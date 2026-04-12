@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/channel_providers.dart';
 import '../providers/live_chat_providers.dart';
@@ -37,6 +38,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
+        actions: [
+          _buildAuthButton(),
+        ],
       ),
       body: Center(
         child: _importing
@@ -45,6 +49,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ? _buildImportPrompt(theme)
                 : _buildSummary(context, theme),
       ),
+    );
+  }
+
+  Widget _buildAuthButton() {
+    final authState = ref.watch(authProvider);
+    if (authState != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (authState.photoUrl != null)
+            CircleAvatar(
+              radius: 14,
+              backgroundImage: NetworkImage(authState.photoUrl!),
+            )
+          else
+            const Icon(Icons.account_circle),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'sign_out') {
+                ref.read(authProvider.notifier).signOut();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'sign_out',
+                child: Text('Sign out${authState.email != null ? ' (${authState.email})' : ''}'),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    return TextButton.icon(
+      onPressed: () => ref.read(authProvider.notifier).signIn(),
+      icon: const Icon(Icons.login),
+      label: const Text('Sign In'),
     );
   }
 

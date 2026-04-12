@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'deletion_providers.dart';
+part of 'export_providers.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,51 +9,51 @@ part of 'deletion_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(DeletionSet)
-final deletionSetProvider = DeletionSetProvider._();
+@ProviderFor(ExportNotifier)
+final exportProvider = ExportNotifierProvider._();
 
-final class DeletionSetProvider
-    extends $NotifierProvider<DeletionSet, Set<String>> {
-  DeletionSetProvider._()
+final class ExportNotifierProvider
+    extends $NotifierProvider<ExportNotifier, bool> {
+  ExportNotifierProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'deletionSetProvider',
+        name: r'exportProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$deletionSetHash();
+  String debugGetCreateSourceHash() => _$exportNotifierHash();
 
   @$internal
   @override
-  DeletionSet create() => DeletionSet();
+  ExportNotifier create() => ExportNotifier();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
+  Override overrideWithValue(bool value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
+      providerOverride: $SyncValueProvider<bool>(value),
     );
   }
 }
 
-String _$deletionSetHash() => r'9af9eca94f6ad203f3742d22ebf6fa11601f40d3';
+String _$exportNotifierHash() => r'6d8c001f4f1015bbbfdf62bf1a85a43db3360e6a';
 
-abstract class _$DeletionSet extends $Notifier<Set<String>> {
-  Set<String> build();
+abstract class _$ExportNotifier extends $Notifier<bool> {
+  bool build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final ref = this.ref as $Ref<bool, bool>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<Set<String>, Set<String>>,
-              Set<String>,
+              AnyNotifier<bool, bool>,
+              bool,
               Object?,
               Object?
             >;

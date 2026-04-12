@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/takeout_data.dart';
+import '../services/deletion_persistence_service.dart';
 import '../services/takeout_import_service.dart';
 
 part 'takeout_providers.g.dart';
@@ -14,7 +15,19 @@ class TakeoutNotifier extends _$TakeoutNotifier {
     final service = TakeoutImportService();
     final data = await service.pickAndImport();
     if (data != null) {
-      state = data;
+      // Filter out previously deleted items
+      final persistence = DeletionPersistenceService();
+      final deletedCommentIds = await persistence.loadDeletedCommentIds();
+      final deletedLiveChatIds = await persistence.loadDeletedLiveChatIds();
+
+      state = data.copyWith(
+        comments: data.comments
+            .where((c) => !deletedCommentIds.contains(c.commentId))
+            .toList(),
+        liveChats: data.liveChats
+            .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+            .toList(),
+      );
     }
   }
 

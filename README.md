@@ -19,8 +19,8 @@ A Flutter app for managing YouTube data from Google Takeout exports. Browse comm
 | Bulk select/delete items                       | 🟡     |
 | Isolate-based parsing for large exports        | 🟡     |
 | Dark mode (system)                             | 🟡     |
-| Login to Google account                        | ❌      |
-| Persist deleted state across sessions          | ❌      |
-| Delete comments via YouTube API                | ❌      |
-| Delete live chats via YouTube API              | ❌      |
-| Export filtered data                           | ❌      |
+| Login to Google account                        | 🟡     |
+| Persist deleted state across sessions          | 🟡     |
+| Delete comments via YouTube API                | 🟡     |
+| Delete live chats via YouTube API              | 🟡     |
+| Export filtered data                           | 🟡     |

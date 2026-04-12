@@ -41,7 +41,7 @@ final class TakeoutNotifierProvider
   }
 }
 
-String _$takeoutNotifierHash() => r'94199baf3422537f2e241f5d7241e9da716ff4e5';
+String _$takeoutNotifierHash() => r'66111ba0c7583f6931ab4c0e60083150ac7352a2';
 
 abstract class _$TakeoutNotifier extends $Notifier<TakeoutData?> {
   TakeoutData? build();

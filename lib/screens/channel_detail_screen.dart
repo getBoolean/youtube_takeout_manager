@@ -2,8 +2,12 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/export_format.dart';
+import '../providers/api_deletion_providers.dart';
+import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deletion_providers.dart';
+import '../providers/export_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../widgets/comment_tile.dart';
@@ -135,7 +139,16 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   }
 
   List<Widget> _buildActions(List comments, List liveChats) {
-    if (!_selectionMode) return [];
+    if (!_selectionMode) {
+      // Export button when not in selection mode
+      return [
+        IconButton(
+          icon: const Icon(Icons.file_download_outlined),
+          tooltip: 'Export',
+          onPressed: () => _showExportDialog(context, comments, liveChats),
+        ),
+      ];
+    }
     return [
       PopupMenuButton<String>(
         onSelected: (value) {
@@ -160,6 +173,42 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         ],
       ),
     ];
+  }
+
+  void _showExportDialog(
+      BuildContext context, List comments, List liveChats) {
+    showDialog(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Export Format'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(exportProvider.notifier).exportData(
+                    comments: comments.cast(),
+                    liveChats: liveChats.cast(),
+                    format: ExportFormat.csv,
+                    filename: 'takeout_export',
+                  );
+            },
+            child: const Text('CSV'),
+          ),
+          SimpleDialogOption(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref.read(exportProvider.notifier).exportData(
+                    comments: comments.cast(),
+                    liveChats: liveChats.cast(),
+                    format: ExportFormat.json,
+                    filename: 'takeout_export',
+                  );
+            },
+            child: const Text('JSON'),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildCommentList(List comments, Set<String> selectedIds) {
@@ -207,44 +256,93 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   }
 
   Widget _buildDeletionBar(BuildContext context, Set<String> selectedIds) {
+    final authenticated = ref.watch(isAuthenticatedProvider);
+
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: FilledButton.icon(
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: const Text('Delete Items'),
-                content: Text(
-                    'Remove ${selectedIds.length} selected item(s) from the list?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      final notifier =
-                          ref.read(deletionSetProvider.notifier);
-                      notifier.removeSelectedComments();
-                      notifier.removeSelectedLiveChats();
-                      Navigator.pop(ctx);
-                      _exitSelectionMode();
-                    },
-                    child: const Text('Delete'),
-                  ),
-                ],
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => _confirmLocalDelete(context, selectedIds),
+                icon: const Icon(Icons.delete_outline),
+                label: Text('Remove ${selectedIds.length} locally'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
               ),
-            );
-          },
-          icon: const Icon(Icons.delete_outline),
-          label: Text('Delete ${selectedIds.length} item(s)'),
-          style: FilledButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.error,
-            foregroundColor: Theme.of(context).colorScheme.onError,
-          ),
+            ),
+            if (authenticated) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _confirmApiDelete(context, selectedIds),
+                  icon: const Icon(Icons.cloud_off),
+                  label: Text('Delete ${selectedIds.length} from YouTube'),
+                ),
+              ),
+            ],
+          ],
         ),
+      ),
+    );
+  }
+
+  void _confirmLocalDelete(BuildContext context, Set<String> selectedIds) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Items'),
+        content: Text(
+            'Remove ${selectedIds.length} selected item(s) from the list?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final notifier = ref.read(deletionSetProvider.notifier);
+              notifier.removeSelectedComments();
+              notifier.removeSelectedLiveChats();
+              Navigator.pop(ctx);
+              _exitSelectionMode();
+            },
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmApiDelete(BuildContext context, Set<String> selectedIds) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete from YouTube'),
+        content: Text(
+            'Permanently delete ${selectedIds.length} selected item(s) from YouTube? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ref
+                  .read(commentApiDeletionProvider.notifier)
+                  .deleteComments(selectedIds);
+              ref
+                  .read(liveChatApiDeletionProvider.notifier)
+                  .deleteLiveChats(selectedIds);
+              _exitSelectionMode();
+            },
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

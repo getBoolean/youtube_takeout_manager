@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../services/deletion_persistence_service.dart';
 import 'takeout_providers.dart';
 
 part 'deletion_providers.g.dart';
@@ -25,13 +26,17 @@ class DeletionSet extends _$DeletionSet {
     state = {};
   }
 
-  void removeSelectedComments() {
-    ref.read(takeoutProvider.notifier).removeComments(state);
+  Future<void> removeSelectedComments() async {
+    final ids = state;
+    ref.read(takeoutProvider.notifier).removeComments(ids);
+    await DeletionPersistenceService().addDeletedCommentIds(ids);
     state = {};
   }
 
-  void removeSelectedLiveChats() {
-    ref.read(takeoutProvider.notifier).removeLiveChats(state);
+  Future<void> removeSelectedLiveChats() async {
+    final ids = state;
+    ref.read(takeoutProvider.notifier).removeLiveChats(ids);
+    await DeletionPersistenceService().addDeletedLiveChatIds(ids);
     state = {};
   }
 }
