@@ -38,7 +38,7 @@ Sign-in requires a Google Cloud OAuth client ID. Without it the app runs normall
 3. **Configure Google Auth Platform:**
    - Navigate to **Google Auth Platform** (in the left sidebar of the Cloud Console).
    - **Branding** — set your app name and support email.
-   - **Audience** — choose **External** and add your Google account as a test user (required while the app is in "Testing" status).
+   - **Audience** — choose **External** and add your Google account as a test user. This is required while the app is in "Testing" status — without it you'll get an "Access blocked" / 403 error when signing in.
    - **Data Access** — add scopes: `openid`, `email`, `profile`, and `https://www.googleapis.com/auth/youtube.force-ssl`.
 4. **Create OAuth credentials:**
    - In **Google Auth Platform**, go to **Clients**.

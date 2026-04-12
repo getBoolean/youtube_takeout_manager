@@ -17,7 +17,6 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
-  String _searchQuery = '';
   bool _fetching = false;
 
   Future<void> _fetchVideoMetadata() async {
@@ -37,15 +36,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final allChannels = ref.watch(channelsProvider);
-    final filtered = _searchQuery.isEmpty
-        ? allChannels
-        : allChannels.where((c) {
-            final title = c.channelTitle?.toLowerCase() ?? '';
-            final id = c.channelId.toLowerCase();
-            final query = _searchQuery.toLowerCase();
-            return title.contains(query) || id.contains(query);
-          }).toList();
+    final filtered = ref.watch(filteredChannelsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -74,7 +65,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             child: SearchBar(
               hintText: 'Search channels...',
               leading: const Icon(Icons.search),
-              onChanged: (value) => setState(() => _searchQuery = value),
+              onChanged: (value) => ref
+                  .read(channelSearchQueryProvider.notifier)
+                  .update(value),
             ),
           ),
         ),

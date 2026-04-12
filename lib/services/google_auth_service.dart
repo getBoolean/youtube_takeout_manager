@@ -1,9 +1,9 @@
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:googleapis_auth/auth_io.dart' as auth_io;
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/oauth_config.dart';
 import '../models/auth_state.dart';
@@ -121,13 +121,7 @@ class GoogleAuthService {
   // ---------------------------------------------------------------------------
 
   void _openBrowser(String url) {
-    if (Platform.isWindows) {
-      Process.run('cmd', ['/c', 'start', '', url]);
-    } else if (Platform.isMacOS) {
-      Process.run('open', [url]);
-    } else {
-      Process.run('xdg-open', [url]);
-    }
+    launchUrl(Uri.parse(url));
   }
 
   Future<Map<String, dynamic>> _fetchUserInfo(http.Client client) async {
@@ -142,7 +136,9 @@ class GoogleAuthService {
 
   static const _storage = FlutterSecureStorage();
 
-  Future<void> _persistCredentials(auth_io.AccessCredentials credentials) async {
+  Future<void> _persistCredentials(
+    auth_io.AccessCredentials credentials,
+  ) async {
     final json = jsonEncode({
       'accessToken': {
         'type': credentials.accessToken.type,
