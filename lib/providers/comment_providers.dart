@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/comment.dart';
 import 'takeout_providers.dart';
+import 'video_providers.dart';
 
 part 'comment_providers.g.dart';
 
@@ -13,9 +14,14 @@ List<Comment> allComments(Ref ref) {
 @riverpod
 Map<String, List<Comment>> commentsByChannel(Ref ref) {
   final comments = ref.watch(allCommentsProvider);
+  final videoMetadata = ref.watch(videoMetadataProvider);
   final grouped = <String, List<Comment>>{};
   for (final comment in comments) {
-    grouped.putIfAbsent(comment.channelId, () => []).add(comment);
+    final video = comment.videoId != null
+        ? videoMetadata[comment.videoId]
+        : null;
+    if (video == null) continue;
+    grouped.putIfAbsent(video.channelId, () => []).add(comment);
   }
   return grouped;
 }

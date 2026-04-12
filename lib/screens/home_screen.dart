@@ -2,11 +2,13 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/oauth_config.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/channel_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
+import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../widgets/import_progress_indicator.dart';
 
@@ -24,7 +26,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _import() async {
     setState(() => _importing = true);
     try {
-      await ref.read(takeoutProvider.notifier).importFiles();
+      final imported = await ref.read(takeoutProvider.notifier).importFiles();
+      if (!mounted) return;
+      if (imported) {
+        final takeout = ref.read(takeoutProvider);
+        if (takeout != null &&
+            takeout.comments.isEmpty &&
+            takeout.liveChats.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'No comments or live chats found in the selected file(s).'),
+              ),
+            );
+          }
+        } else {
+          if (ref.read(authProvider) == null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+                const SnackBar(
+                  content: Text('Sign in to fetch video metadata and view channels.'),
+                ),
+              );
+            }
+            return;
+          }
+          // Load cached video metadata, then fetch new
+          await ref.read(videoMetadataProvider.notifier).loadCache();
+          ref.read(videoMetadataProvider.notifier).fetchMetadata();
+          if (mounted) context.router.push(const ChannelListRoute());
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+          SnackBar(content: Text('Import failed: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _importing = false);
     }
@@ -82,9 +121,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
     return TextButton.icon(
-      onPressed: () => ref.read(authProvider.notifier).signIn(),
+      onPressed: isOAuthConfigured
+          ? () => ref.read(authProvider.notifier).signIn()
+          : null,
       icon: const Icon(Icons.login),
-      label: const Text('Sign In'),
+      label: Text(isOAuthConfigured ? 'Sign In' : 'Sign In (not configured)'),
     );
   }
 
@@ -119,10 +160,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Future<void> _viewChannels() async {
+    if (ref.read(authProvider) == null) {
+      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
+        const SnackBar(
+          content: Text('Sign in to fetch video metadata and view channels.'),
+        ),
+      );
+      return;
+    }
+    await ref.read(videoMetadataProvider.notifier).loadCache();
+    ref.read(videoMetadataProvider.notifier).fetchMetadata();
+    if (mounted) context.router.push(const ChannelListRoute());
+  }
+
   Widget _buildSummary(BuildContext context, ThemeData theme) {
     final commentCount = ref.watch(allCommentsProvider).length;
     final liveChatCount = ref.watch(allLiveChatsProvider).length;
     final channelCount = ref.watch(channelsProvider).length;
+    final isAuthenticated = ref.watch(isAuthenticatedProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -163,9 +219,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 32),
         FilledButton.icon(
-          onPressed: () => context.router.push(const ChannelListRoute()),
+          onPressed: _viewChannels,
           icon: const Icon(Icons.list),
-          label: const Text('View Channels'),
+          label: Text(isAuthenticated ? 'View Channels' : 'Sign in to View Channels'),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(

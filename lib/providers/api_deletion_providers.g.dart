@@ -42,7 +42,7 @@ final class CommentApiDeletionProvider
 }
 
 String _$commentApiDeletionHash() =>
-    r'92083d5672f91e0a093460d2f30b4079901d0228';
+    r'3a88b191aa4c73300550270f245b3a7a72ec4b7f';
 
 abstract class _$CommentApiDeletion extends $Notifier<ApiDeletionResult?> {
   ApiDeletionResult? build();
@@ -95,7 +95,7 @@ final class LiveChatApiDeletionProvider
 }
 
 String _$liveChatApiDeletionHash() =>
-    r'd1509f5274a5c2bbdc4ed054ceabe2c45740c0e1';
+    r'8c8a25b3cfcf4ff4b5bd6c96da8eceea79bb550c';
 
 abstract class _$LiveChatApiDeletion extends $Notifier<ApiDeletionResult?> {
   ApiDeletionResult? build();

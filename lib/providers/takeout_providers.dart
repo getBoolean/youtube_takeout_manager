@@ -11,24 +11,28 @@ class TakeoutNotifier extends _$TakeoutNotifier {
   @override
   TakeoutData? build() => null;
 
-  Future<void> importFiles() async {
+  /// Picks zip files and imports takeout data.
+  /// Returns true if data was imported, false if the user cancelled.
+  /// Throws on parse/extraction errors so the UI can display them.
+  Future<bool> importFiles() async {
     final service = TakeoutImportService();
     final data = await service.pickAndImport();
-    if (data != null) {
-      // Filter out previously deleted items
-      final persistence = DeletionPersistenceService();
-      final deletedCommentIds = await persistence.loadDeletedCommentIds();
-      final deletedLiveChatIds = await persistence.loadDeletedLiveChatIds();
+    if (data == null) return false;
 
-      state = data.copyWith(
-        comments: data.comments
-            .where((c) => !deletedCommentIds.contains(c.commentId))
-            .toList(),
-        liveChats: data.liveChats
-            .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
-            .toList(),
-      );
-    }
+    // Filter out previously deleted items
+    final persistence = DeletionPersistenceService();
+    final deletedCommentIds = await persistence.loadDeletedCommentIds();
+    final deletedLiveChatIds = await persistence.loadDeletedLiveChatIds();
+
+    state = data.copyWith(
+      comments: data.comments
+          .where((c) => !deletedCommentIds.contains(c.commentId))
+          .toList(),
+      liveChats: data.liveChats
+          .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+          .toList(),
+    );
+    return true;
   }
 
   void removeComments(Set<String> commentIds) {

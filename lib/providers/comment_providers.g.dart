@@ -95,7 +95,7 @@ final class CommentsByChannelProvider
   }
 }
 
-String _$commentsByChannelHash() => r'd4fb04e2e8a18d58115fea278dcb94aa7e9496b9';
+String _$commentsByChannelHash() => r'474f0c054c8de0545557b755a0e3ebf0f67da180';
 
 @ProviderFor(channelComments)
 final channelCommentsProvider = ChannelCommentsFamily._();

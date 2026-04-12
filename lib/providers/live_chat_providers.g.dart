@@ -96,7 +96,7 @@ final class LiveChatsByChannelProvider
 }
 
 String _$liveChatsByChannelHash() =>
-    r'9373960b732201e902bc15ee7d168a86d5ec228e';
+    r'd92cbc73128ee099f58c6f01d29517258207ce25';
 
 @ProviderFor(channelLiveChats)
 final channelLiveChatsProvider = ChannelLiveChatsFamily._();

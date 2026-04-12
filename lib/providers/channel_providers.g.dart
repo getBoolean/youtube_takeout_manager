@@ -48,4 +48,4 @@ final class ChannelsProvider
   }
 }
 
-String _$channelsHash() => r'1f8bf4ebffe7749a7990df87a60a689ad748bfd2';
+String _$channelsHash() => r'693d98a2d21e4a49d5bcf870648bb929c50617a1';

@@ -19,8 +19,8 @@ class CommentApiDeletion extends _$CommentApiDeletion {
     final authState = ref.read(authProvider);
     if (authState == null) return;
 
-    final authService = GoogleAuthService();
-    final client = authService.getAuthenticatedClient(authState.accessToken);
+    final client =
+        GoogleAuthService.instance.getAuthenticatedClient(authState.accessToken);
     final service = YoutubeCommentService();
 
     await for (final result
@@ -51,8 +51,8 @@ class LiveChatApiDeletion extends _$LiveChatApiDeletion {
     final authState = ref.read(authProvider);
     if (authState == null) return;
 
-    final authService = GoogleAuthService();
-    final client = authService.getAuthenticatedClient(authState.accessToken);
+    final client =
+        GoogleAuthService.instance.getAuthenticatedClient(authState.accessToken);
     final service = YoutubeLiveChatService();
 
     await for (final result

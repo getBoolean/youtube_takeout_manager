@@ -7,7 +7,7 @@ part 'auth_providers.g.dart';
 
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
-  final _authService = GoogleAuthService();
+  final _authService = GoogleAuthService.instance;
 
   @override
   AuthState? build() => null;
@@ -22,6 +22,14 @@ class AuthNotifier extends _$AuthNotifier {
   Future<void> signOut() async {
     await _authService.signOut();
     state = null;
+  }
+
+  /// Attempt to restore a previous session from persisted credentials.
+  Future<void> tryRestoreSession() async {
+    final authState = await _authService.tryRestoreSession();
+    if (authState != null) {
+      state = authState;
+    }
   }
 }
 
