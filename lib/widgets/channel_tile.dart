@@ -19,10 +19,16 @@ class ChannelTile extends StatelessWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: theme.colorScheme.primaryContainer,
-        child: Text(
-          (channel.channelTitle ?? '?')[0].toUpperCase(),
-          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-        ),
+        backgroundImage: channel.thumbnailUrl != null
+            ? NetworkImage(channel.thumbnailUrl!)
+            : null,
+        child: channel.thumbnailUrl == null
+            ? Text(
+                (channel.channelTitle ?? '?')[0].toUpperCase(),
+                style:
+                    TextStyle(color: theme.colorScheme.onPrimaryContainer),
+              )
+            : null,
       ),
       title: Text(
         channel.channelTitle ?? 'Unknown Channel',

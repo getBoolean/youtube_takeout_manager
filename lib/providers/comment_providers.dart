@@ -11,7 +11,7 @@ List<Comment> allComments(Ref ref) {
   return ref.watch(takeoutProvider)?.comments ?? [];
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Map<String, List<Comment>> commentsByChannel(Ref ref) {
   final comments = ref.watch(allCommentsProvider);
   final videoMetadata = ref.watch(videoMetadataProvider);

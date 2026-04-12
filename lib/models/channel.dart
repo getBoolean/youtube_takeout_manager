@@ -7,6 +7,7 @@ class Channel with ChannelMappable {
   final String channelId;
   final String? channelTitle;
   final String? channelUrl;
+  final String? thumbnailUrl;
   final int commentCount;
   final int liveChatCount;
 
@@ -14,6 +15,7 @@ class Channel with ChannelMappable {
     required this.channelId,
     this.channelTitle,
     this.channelUrl,
+    this.thumbnailUrl,
     required this.commentCount,
     required this.liveChatCount,
   });

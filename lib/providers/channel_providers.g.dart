@@ -103,6 +103,106 @@ final class FilteredChannelsProvider
 
 String _$filteredChannelsHash() => r'f0afa8ba402746c085252d06e07a1f25f9549e5c';
 
+@ProviderFor(channelTitlesFromVideos)
+final channelTitlesFromVideosProvider = ChannelTitlesFromVideosProvider._();
+
+final class ChannelTitlesFromVideosProvider
+    extends
+        $FunctionalProvider<
+          Map<String, String>,
+          Map<String, String>,
+          Map<String, String>
+        >
+    with $Provider<Map<String, String>> {
+  ChannelTitlesFromVideosProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'channelTitlesFromVideosProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelTitlesFromVideosHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<String, String> create(Ref ref) {
+    return channelTitlesFromVideos(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, String>>(value),
+    );
+  }
+}
+
+String _$channelTitlesFromVideosHash() =>
+    r'dabc8a8288340f433115acacab9617f4d0dca765';
+
+@ProviderFor(ChannelThumbnails)
+final channelThumbnailsProvider = ChannelThumbnailsProvider._();
+
+final class ChannelThumbnailsProvider
+    extends $NotifierProvider<ChannelThumbnails, Map<String, String>> {
+  ChannelThumbnailsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'channelThumbnailsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelThumbnailsHash();
+
+  @$internal
+  @override
+  ChannelThumbnails create() => ChannelThumbnails();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, String>>(value),
+    );
+  }
+}
+
+String _$channelThumbnailsHash() => r'8b3db5cfd4171ebe029c0540a81cf871567a08be';
+
+abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
+  Map<String, String> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<Map<String, String>, Map<String, String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Map<String, String>, Map<String, String>>,
+              Map<String, String>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(channels)
 final channelsProvider = ChannelsProvider._();
 
@@ -142,4 +242,4 @@ final class ChannelsProvider
   }
 }
 
-String _$channelsHash() => r'152e654e87c96ba0b53828c182accf9472df0905';
+String _$channelsHash() => r'6938c94c72f7f30f1c05a93eefa731d5445c8355';

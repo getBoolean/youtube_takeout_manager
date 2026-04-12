@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,15 +20,27 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   bool _fetching = false;
+  Timer? _debounce;
 
-  Future<void> _fetchVideoMetadata() async {
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchMetadata() async {
     setState(() => _fetching = true);
     try {
       await ref.read(videoMetadataProvider.notifier).fetchMetadata();
+      final channelIds =
+          ref.read(channelsProvider).map((c) => c.channelId).toSet();
+      await ref
+          .read(channelThumbnailsProvider.notifier)
+          .fetchThumbnails(channelIds);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-          SnackBar(content: Text('Failed to fetch video info: $e')),
+          SnackBar(content: Text('Failed to fetch metadata: $e')),
         );
       }
     } finally {
@@ -53,7 +67,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             )
           else
             IconButton(
-              onPressed: _fetchVideoMetadata,
+              onPressed: _fetchMetadata,
               icon: const Icon(Icons.cloud_download_outlined),
               tooltip: 'Fetch video info',
             ),
@@ -65,9 +79,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             child: SearchBar(
               hintText: 'Search channels...',
               leading: const Icon(Icons.search),
-              onChanged: (value) => ref
-                  .read(channelSearchQueryProvider.notifier)
-                  .update(value),
+              onChanged: (value) {
+                _debounce?.cancel();
+                _debounce = Timer(const Duration(milliseconds: 300), () {
+                  ref.read(channelSearchQueryProvider.notifier).update(value);
+                });
+              },
             ),
           ),
         ),
@@ -78,6 +95,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               message: 'No channels found',
             )
           : ListView.builder(
+              itemExtent: 56,
               itemCount: filtered.length,
               itemBuilder: (context, index) {
                 final channel = filtered[index];

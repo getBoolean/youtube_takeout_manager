@@ -11,7 +11,7 @@ List<LiveChat> allLiveChats(Ref ref) {
   return ref.watch(takeoutProvider)?.liveChats ?? [];
 }
 
-@riverpod
+@Riverpod(keepAlive: true)
 Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
   final liveChats = ref.watch(allLiveChatsProvider);
   final videoMetadata = ref.watch(videoMetadataProvider);

@@ -1,6 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/channel.dart';
+import '../services/channel_cache_service.dart';
+import '../services/google_auth_service.dart';
+import '../services/youtube_channel_service.dart';
+import 'auth_providers.dart';
 import 'comment_providers.dart';
 import 'live_chat_providers.dart';
 import 'takeout_providers.dart';
@@ -29,6 +33,57 @@ List<Channel> filteredChannels(Ref ref) {
 }
 
 @riverpod
+Map<String, String> channelTitlesFromVideos(Ref ref) {
+  final videoMetadata = ref.watch(videoMetadataProvider);
+  final titles = <String, String>{};
+  for (final video in videoMetadata.values) {
+    if (video.channelTitle != null && !titles.containsKey(video.channelId)) {
+      titles[video.channelId] = video.channelTitle!;
+    }
+  }
+  return titles;
+}
+
+@Riverpod(keepAlive: true)
+class ChannelThumbnails extends _$ChannelThumbnails {
+  final _cacheService = ChannelCacheService();
+
+  @override
+  Map<String, String> build() => {};
+
+  /// Loads cached channel thumbnails from local storage.
+  Future<void> loadCache() async {
+    final cached = await _cacheService.loadCachedThumbnails();
+    if (cached.isNotEmpty) {
+      state = {...state, ...cached};
+    }
+  }
+
+  /// Fetches thumbnails for channels not already cached.
+  /// Requires authentication.
+  Future<void> fetchThumbnails(Set<String> channelIds) async {
+    final authState = ref.read(authProvider);
+    if (authState == null) return;
+
+    final uncachedIds = channelIds.difference(state.keys.toSet());
+    if (uncachedIds.isEmpty) return;
+
+    final client = GoogleAuthService.instance
+        .getAuthenticatedClient(authState.accessToken);
+    final service = YoutubeChannelService();
+
+    try {
+      final fetched =
+          await service.fetchChannelThumbnails(client, uncachedIds);
+      state = {...state, ...fetched};
+      await _cacheService.saveThumbnails(state);
+    } finally {
+      client.close();
+    }
+  }
+}
+
+@riverpod
 List<Channel> channels(Ref ref) {
   final takeout = ref.watch(takeoutProvider);
   if (takeout == null) return [];
@@ -43,16 +98,8 @@ List<Channel> channels(Ref ref) {
     ...liveChatsByChannel.keys,
   };
 
-  final videoMetadata = ref.watch(videoMetadataProvider);
-
-  // Pre-build channelId → title map from video metadata for O(1) lookups
-  final channelTitlesFromVideos = <String, String>{};
-  for (final video in videoMetadata.values) {
-    if (video.channelTitle != null &&
-        !channelTitlesFromVideos.containsKey(video.channelId)) {
-      channelTitlesFromVideos[video.channelId] = video.channelTitle!;
-    }
-  }
+  final channelTitlesFromVideos = ref.watch(channelTitlesFromVideosProvider);
+  final thumbnails = ref.watch(channelThumbnailsProvider);
 
   final channels = channelIds.map((id) {
     final sub = subscriptions[id];
@@ -61,6 +108,7 @@ List<Channel> channels(Ref ref) {
       channelId: id,
       channelTitle: channelTitle,
       channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$id',
+      thumbnailUrl: thumbnails[id],
       commentCount: commentsByChannel[id]?.length ?? 0,
       liveChatCount: liveChatsByChannel[id]?.length ?? 0,
     );

@@ -52,8 +52,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             }
             return;
           }
-          // Load cached video metadata, then fetch new
+          // Load cached metadata, then fetch new
           await ref.read(videoMetadataProvider.notifier).loadCache();
+          await ref.read(channelThumbnailsProvider.notifier).loadCache();
           ref.read(videoMetadataProvider.notifier).fetchMetadata();
           if (mounted) context.router.push(const ChannelListRoute());
         }
@@ -170,6 +171,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
     await ref.read(videoMetadataProvider.notifier).loadCache();
+    await ref.read(channelThumbnailsProvider.notifier).loadCache();
     ref.read(videoMetadataProvider.notifier).fetchMetadata();
     if (mounted) context.router.push(const ChannelListRoute());
   }

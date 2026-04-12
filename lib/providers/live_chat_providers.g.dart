@@ -67,7 +67,7 @@ final class LiveChatsByChannelProvider
         argument: null,
         retry: null,
         name: r'liveChatsByChannelProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -96,7 +96,7 @@ final class LiveChatsByChannelProvider
 }
 
 String _$liveChatsByChannelHash() =>
-    r'd92cbc73128ee099f58c6f01d29517258207ce25';
+    r'696b2fd84a1fd47facddf00e6a470d6777077a94';
 
 @ProviderFor(channelLiveChats)
 final channelLiveChatsProvider = ChannelLiveChatsFamily._();

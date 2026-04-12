@@ -67,7 +67,7 @@ final class CommentsByChannelProvider
         argument: null,
         retry: null,
         name: r'commentsByChannelProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -95,7 +95,7 @@ final class CommentsByChannelProvider
   }
 }
 
-String _$commentsByChannelHash() => r'474f0c054c8de0545557b755a0e3ebf0f67da180';
+String _$commentsByChannelHash() => r'383b103bee37c506ceef9eb9f47d054e2598d89a';
 
 @ProviderFor(channelComments)
 final channelCommentsProvider = ChannelCommentsFamily._();

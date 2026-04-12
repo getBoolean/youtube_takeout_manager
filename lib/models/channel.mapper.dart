@@ -39,6 +39,12 @@ class ChannelMapper extends ClassMapperBase<Channel> {
     _$channelUrl,
     opt: true,
   );
+  static String? _$thumbnailUrl(Channel v) => v.thumbnailUrl;
+  static const Field<Channel, String> _f$thumbnailUrl = Field(
+    'thumbnailUrl',
+    _$thumbnailUrl,
+    opt: true,
+  );
   static int _$commentCount(Channel v) => v.commentCount;
   static const Field<Channel, int> _f$commentCount = Field(
     'commentCount',
@@ -55,6 +61,7 @@ class ChannelMapper extends ClassMapperBase<Channel> {
     #channelId: _f$channelId,
     #channelTitle: _f$channelTitle,
     #channelUrl: _f$channelUrl,
+    #thumbnailUrl: _f$thumbnailUrl,
     #commentCount: _f$commentCount,
     #liveChatCount: _f$liveChatCount,
   };
@@ -64,6 +71,7 @@ class ChannelMapper extends ClassMapperBase<Channel> {
       channelId: data.dec(_f$channelId),
       channelTitle: data.dec(_f$channelTitle),
       channelUrl: data.dec(_f$channelUrl),
+      thumbnailUrl: data.dec(_f$thumbnailUrl),
       commentCount: data.dec(_f$commentCount),
       liveChatCount: data.dec(_f$liveChatCount),
     );
@@ -130,6 +138,7 @@ abstract class ChannelCopyWith<$R, $In extends Channel, $Out>
     String? channelId,
     String? channelTitle,
     String? channelUrl,
+    String? thumbnailUrl,
     int? commentCount,
     int? liveChatCount,
   });
@@ -149,6 +158,7 @@ class _ChannelCopyWithImpl<$R, $Out>
     String? channelId,
     Object? channelTitle = $none,
     Object? channelUrl = $none,
+    Object? thumbnailUrl = $none,
     int? commentCount,
     int? liveChatCount,
   }) => $apply(
@@ -156,6 +166,7 @@ class _ChannelCopyWithImpl<$R, $Out>
       if (channelId != null) #channelId: channelId,
       if (channelTitle != $none) #channelTitle: channelTitle,
       if (channelUrl != $none) #channelUrl: channelUrl,
+      if (thumbnailUrl != $none) #thumbnailUrl: thumbnailUrl,
       if (commentCount != null) #commentCount: commentCount,
       if (liveChatCount != null) #liveChatCount: liveChatCount,
     }),
@@ -165,6 +176,7 @@ class _ChannelCopyWithImpl<$R, $Out>
     channelId: data.get(#channelId, or: $value.channelId),
     channelTitle: data.get(#channelTitle, or: $value.channelTitle),
     channelUrl: data.get(#channelUrl, or: $value.channelUrl),
+    thumbnailUrl: data.get(#thumbnailUrl, or: $value.thumbnailUrl),
     commentCount: data.get(#commentCount, or: $value.commentCount),
     liveChatCount: data.get(#liveChatCount, or: $value.liveChatCount),
   );
