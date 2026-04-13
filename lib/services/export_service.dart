@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 import 'package:file_saver/file_saver.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/comment.dart';
 import '../models/export_format.dart';
@@ -108,6 +109,16 @@ class ExportService {
         ? MimeType.csv
         : MimeType.json;
     final bytes = Uint8List.fromList(utf8.encode(content));
+
+    if (kIsWeb) {
+      final result = await FileSaver.instance.saveFile(
+        name: filename,
+        bytes: bytes,
+        fileExtension: ext,
+        mimeType: mimeType,
+      );
+      return result.isNotEmpty;
+    }
 
     final result = await FileSaver.instance.saveAs(
       name: filename,
