@@ -122,27 +122,6 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             onPressed: () =>
                 context.router.push(const DeletionQueueRoute()),
           ),
-          if (progress.isFetching)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  value: progress.total > 0
-                      ? progress.fetched / progress.total
-                      : null,
-                ),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: () =>
-                  ref.read(videoMetadataProvider.notifier).refresh(),
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Refresh metadata',
-            ),
           if (ref.watch(isAuthenticatedProvider))
             PopupMenuButton<String>(
               onSelected: (value) => _handleGlobalDelete(value),
