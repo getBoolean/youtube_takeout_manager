@@ -42,12 +42,60 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
     'subscriptionsByChannelId',
     _$subscriptionsByChannelId,
   );
+  static int _$rawCommentLines(TakeoutData v) => v.rawCommentLines;
+  static const Field<TakeoutData, int> _f$rawCommentLines = Field(
+    'rawCommentLines',
+    _$rawCommentLines,
+    opt: true,
+    def: 0,
+  );
+  static int _$rawLiveChatLines(TakeoutData v) => v.rawLiveChatLines;
+  static const Field<TakeoutData, int> _f$rawLiveChatLines = Field(
+    'rawLiveChatLines',
+    _$rawLiveChatLines,
+    opt: true,
+    def: 0,
+  );
+  static int _$parsedCommentRows(TakeoutData v) => v.parsedCommentRows;
+  static const Field<TakeoutData, int> _f$parsedCommentRows = Field(
+    'parsedCommentRows',
+    _$parsedCommentRows,
+    opt: true,
+    def: 0,
+  );
+  static int _$parsedLiveChatRows(TakeoutData v) => v.parsedLiveChatRows;
+  static const Field<TakeoutData, int> _f$parsedLiveChatRows = Field(
+    'parsedLiveChatRows',
+    _$parsedLiveChatRows,
+    opt: true,
+    def: 0,
+  );
+  static int _$skippedCommentRows(TakeoutData v) => v.skippedCommentRows;
+  static const Field<TakeoutData, int> _f$skippedCommentRows = Field(
+    'skippedCommentRows',
+    _$skippedCommentRows,
+    opt: true,
+    def: 0,
+  );
+  static int _$skippedLiveChatRows(TakeoutData v) => v.skippedLiveChatRows;
+  static const Field<TakeoutData, int> _f$skippedLiveChatRows = Field(
+    'skippedLiveChatRows',
+    _$skippedLiveChatRows,
+    opt: true,
+    def: 0,
+  );
 
   @override
   final MappableFields<TakeoutData> fields = const {
     #comments: _f$comments,
     #liveChats: _f$liveChats,
     #subscriptionsByChannelId: _f$subscriptionsByChannelId,
+    #rawCommentLines: _f$rawCommentLines,
+    #rawLiveChatLines: _f$rawLiveChatLines,
+    #parsedCommentRows: _f$parsedCommentRows,
+    #parsedLiveChatRows: _f$parsedLiveChatRows,
+    #skippedCommentRows: _f$skippedCommentRows,
+    #skippedLiveChatRows: _f$skippedLiveChatRows,
   };
 
   static TakeoutData _instantiate(DecodingData data) {
@@ -55,6 +103,12 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
       comments: data.dec(_f$comments),
       liveChats: data.dec(_f$liveChats),
       subscriptionsByChannelId: data.dec(_f$subscriptionsByChannelId),
+      rawCommentLines: data.dec(_f$rawCommentLines),
+      rawLiveChatLines: data.dec(_f$rawLiveChatLines),
+      parsedCommentRows: data.dec(_f$parsedCommentRows),
+      parsedLiveChatRows: data.dec(_f$parsedLiveChatRows),
+      skippedCommentRows: data.dec(_f$skippedCommentRows),
+      skippedLiveChatRows: data.dec(_f$skippedLiveChatRows),
     );
   }
 
@@ -132,6 +186,12 @@ abstract class TakeoutDataCopyWith<$R, $In extends TakeoutData, $Out>
     List<Comment>? comments,
     List<LiveChat>? liveChats,
     Map<String, Subscription>? subscriptionsByChannelId,
+    int? rawCommentLines,
+    int? rawLiveChatLines,
+    int? parsedCommentRows,
+    int? parsedLiveChatRows,
+    int? skippedCommentRows,
+    int? skippedLiveChatRows,
   });
   TakeoutDataCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -175,12 +235,25 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
     List<Comment>? comments,
     List<LiveChat>? liveChats,
     Map<String, Subscription>? subscriptionsByChannelId,
+    int? rawCommentLines,
+    int? rawLiveChatLines,
+    int? parsedCommentRows,
+    int? parsedLiveChatRows,
+    int? skippedCommentRows,
+    int? skippedLiveChatRows,
   }) => $apply(
     FieldCopyWithData({
       if (comments != null) #comments: comments,
       if (liveChats != null) #liveChats: liveChats,
       if (subscriptionsByChannelId != null)
         #subscriptionsByChannelId: subscriptionsByChannelId,
+      if (rawCommentLines != null) #rawCommentLines: rawCommentLines,
+      if (rawLiveChatLines != null) #rawLiveChatLines: rawLiveChatLines,
+      if (parsedCommentRows != null) #parsedCommentRows: parsedCommentRows,
+      if (parsedLiveChatRows != null) #parsedLiveChatRows: parsedLiveChatRows,
+      if (skippedCommentRows != null) #skippedCommentRows: skippedCommentRows,
+      if (skippedLiveChatRows != null)
+        #skippedLiveChatRows: skippedLiveChatRows,
     }),
   );
   @override
@@ -190,6 +263,24 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
     subscriptionsByChannelId: data.get(
       #subscriptionsByChannelId,
       or: $value.subscriptionsByChannelId,
+    ),
+    rawCommentLines: data.get(#rawCommentLines, or: $value.rawCommentLines),
+    rawLiveChatLines: data.get(#rawLiveChatLines, or: $value.rawLiveChatLines),
+    parsedCommentRows: data.get(
+      #parsedCommentRows,
+      or: $value.parsedCommentRows,
+    ),
+    parsedLiveChatRows: data.get(
+      #parsedLiveChatRows,
+      or: $value.parsedLiveChatRows,
+    ),
+    skippedCommentRows: data.get(
+      #skippedCommentRows,
+      or: $value.skippedCommentRows,
+    ),
+    skippedLiveChatRows: data.get(
+      #skippedLiveChatRows,
+      or: $value.skippedLiveChatRows,
     ),
   );
 

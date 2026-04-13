@@ -219,21 +219,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildSummary(BuildContext context, ThemeData theme) {
+    final takeout = ref.watch(takeoutProvider)!;
     final commentCount = ref.watch(allCommentsProvider).length;
     final liveChatCount = ref.watch(allLiveChatsProvider).length;
     final channelCount = ref.watch(channelsProvider).length;
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final droppedComments = takeout.skippedCommentRows;
+    final droppedLiveChats = takeout.skippedLiveChatRows;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          Icons.check_circle_outline,
+          droppedComments > 0 || droppedLiveChats > 0
+              ? Icons.warning_amber_outlined
+              : Icons.check_circle_outline,
           size: 64,
-          color: theme.colorScheme.primary,
+          color: droppedComments > 0 || droppedLiveChats > 0
+              ? theme.colorScheme.error
+              : theme.colorScheme.primary,
         ),
         const SizedBox(height: 16),
         Text('Import Complete', style: theme.textTheme.headlineSmall),
+        if (droppedComments > 0 || droppedLiveChats > 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Some rows could not be parsed',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Card(
           child: Padding(
@@ -244,12 +260,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   icon: Icons.comment_outlined,
                   label: 'Comments',
                   count: commentCount,
+                  rawCount: takeout.parsedCommentRows,
                 ),
                 const SizedBox(height: 12),
                 _SummaryRow(
                   icon: Icons.chat_bubble_outline,
                   label: 'Live Chats',
                   count: liveChatCount,
+                  rawCount: takeout.parsedLiveChatRows,
                 ),
                 const SizedBox(height: 12),
                 _SummaryRow(
@@ -282,21 +300,34 @@ class _SummaryRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final int count;
+  final int? rawCount;
 
   const _SummaryRow({
     required this.icon,
     required this.label,
     required this.count,
+    this.rawCount,
   });
 
   @override
   Widget build(BuildContext context) {
+    final dropped = rawCount != null ? rawCount! - count : 0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 20),
         const SizedBox(width: 8),
         Text('$count $label'),
+        if (dropped > 0) ...[
+          const SizedBox(width: 8),
+          Text(
+            '($dropped skipped)',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }

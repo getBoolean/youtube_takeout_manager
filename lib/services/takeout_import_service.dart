@@ -18,16 +18,30 @@ TakeoutData _parseZipBytes(List<Uint8List> zipBytesList) {
   final comments = <Comment>[];
   final liveChats = <LiveChat>[];
   final subscriptions = <Subscription>[];
+  var rawCommentLines = 0;
+  var rawLiveChatLines = 0;
+  var parsedCommentRows = 0;
+  var parsedLiveChatRows = 0;
+  var skippedCommentRows = 0;
+  var skippedLiveChatRows = 0;
 
   for (final entry in extractedFiles.entries) {
     final path = entry.key.toLowerCase();
     final bytes = entry.value;
 
     if (path.contains('comments/comments') && path.endsWith('.csv')) {
-      comments.addAll(csvParser.parseCommentsCsv(bytes));
+      final result = csvParser.parseCommentsCsv(bytes);
+      comments.addAll(result.items);
+      rawCommentLines += result.rawLineCount;
+      parsedCommentRows += result.parsedRowCount;
+      skippedCommentRows += result.skippedRowCount;
     } else if (path.contains('live chats/live chats') &&
         path.endsWith('.csv')) {
-      liveChats.addAll(csvParser.parseLiveChatsCsv(bytes));
+      final result = csvParser.parseLiveChatsCsv(bytes);
+      liveChats.addAll(result.items);
+      rawLiveChatLines += result.rawLineCount;
+      parsedLiveChatRows += result.parsedRowCount;
+      skippedLiveChatRows += result.skippedRowCount;
     } else if (path.contains('subscriptions/subscriptions') &&
         path.endsWith('.csv')) {
       subscriptions.addAll(csvParser.parseSubscriptionsCsv(bytes));
@@ -43,6 +57,12 @@ TakeoutData _parseZipBytes(List<Uint8List> zipBytesList) {
     comments: comments,
     liveChats: liveChats,
     subscriptionsByChannelId: subscriptionsByChannelId,
+    rawCommentLines: rawCommentLines,
+    rawLiveChatLines: rawLiveChatLines,
+    parsedCommentRows: parsedCommentRows,
+    parsedLiveChatRows: parsedLiveChatRows,
+    skippedCommentRows: skippedCommentRows,
+    skippedLiveChatRows: skippedLiveChatRows,
   );
 }
 
