@@ -8,8 +8,6 @@ import '../models/deletion_item_type.dart';
 ///
 /// Each delete call costs 50 quota units regardless of item type.
 class YoutubeDeletionService {
-  static const quotaCostPerDelete = 50;
-
   /// Deletes a single item from YouTube.
   ///
   /// Returns `succeeded: true` on success.

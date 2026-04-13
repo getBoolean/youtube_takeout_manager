@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../models/quota_operation.dart';
 import '../models/quota_state.dart';
 
 class QuotaPersistenceService {
@@ -20,8 +21,8 @@ class QuotaPersistenceService {
     final json = await file.readAsString();
     if (json.isEmpty) return _freshState();
 
-    final state =
-        QuotaStateMapper.fromMap(jsonDecode(json) as Map<String, dynamic>);
+    final map = jsonDecode(json) as Map<String, dynamic>;
+    final state = _fromJson(map);
 
     // Reset if we've crossed into a new quota period (midnight Pacific).
     if (_isNewQuotaPeriod(state.periodStart)) {
@@ -33,13 +34,65 @@ class QuotaPersistenceService {
 
   Future<void> saveQuotaState(QuotaState state) async {
     final file = await _getFile();
-    await file.writeAsString(jsonEncode(state.toMap()));
+    await file.writeAsString(jsonEncode(_toJson(state)));
   }
+
+  // ---------------------------------------------------------------------------
+  // Serialization
+  // ---------------------------------------------------------------------------
+
+  Map<String, dynamic> _toJson(QuotaState state) {
+    final usageMap = <String, int>{};
+    for (final entry in state.usageByOperation.entries) {
+      usageMap[entry.key.name] = entry.value;
+    }
+    return {
+      'usageByOperation': usageMap,
+      'periodStart': state.periodStart.toIso8601String(),
+      'dailyLimit': state.dailyLimit,
+    };
+  }
+
+  QuotaState _fromJson(Map<String, dynamic> map) {
+    final periodStart = DateTime.parse(map['periodStart'] as String);
+    final dailyLimit = map['dailyLimit'] as int? ?? 10000;
+
+    // New format: usageByOperation map.
+    if (map.containsKey('usageByOperation')) {
+      final rawUsage = map['usageByOperation'] as Map<String, dynamic>;
+      final usage = <QuotaOperation, int>{};
+      for (final entry in rawUsage.entries) {
+        final op = QuotaOperation.values.where((e) => e.name == entry.key);
+        if (op.isNotEmpty) {
+          usage[op.first] = entry.value as int;
+        }
+      }
+      return QuotaState(
+        usageByOperation: usage,
+        periodStart: periodStart,
+        dailyLimit: dailyLimit,
+      );
+    }
+
+    // Legacy format: single unitsUsed integer → attribute to deleteComment.
+    final legacyUnits = map['unitsUsed'] as int? ?? 0;
+    return QuotaState(
+      usageByOperation: legacyUnits > 0
+          ? {QuotaOperation.deleteComment: legacyUnits}
+          : {},
+      periodStart: periodStart,
+      dailyLimit: dailyLimit,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Quota period helpers
+  // ---------------------------------------------------------------------------
 
   /// Returns a fresh quota state with the current Pacific-day start.
   QuotaState _freshState() {
     return QuotaState(
-      unitsUsed: 0,
+      usageByOperation: {},
       periodStart: _currentPacificMidnight(),
     );
   }

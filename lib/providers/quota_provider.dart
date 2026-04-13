@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/quota_operation.dart';
 import '../models/quota_state.dart';
 import '../services/quota_persistence_service.dart';
-import '../services/youtube_deletion_service.dart';
 
 part 'quota_provider.g.dart';
 
@@ -15,18 +15,18 @@ class QuotaNotifier extends _$QuotaNotifier {
     return _persistence.loadQuotaState();
   }
 
-  /// Whether the current quota allows at least one more deletion.
-  Future<bool> canDelete() async {
+  /// Whether the current quota can afford the given [cost].
+  Future<bool> canAfford(int cost) async {
     final current = await future;
-    return !current.isExhausted;
+    return current.canAfford(cost);
   }
 
-  /// Records a single deletion's quota cost and persists the updated state.
-  Future<void> recordDeletion() async {
+  /// Records quota usage for an [operation], optionally multiplied by [count].
+  Future<void> recordUsage(QuotaOperation operation, {int count = 1}) async {
     final current = await future;
-    final updated = current.copyWith(
-      unitsUsed: current.unitsUsed + YoutubeDeletionService.quotaCostPerDelete,
-    );
+    final newUsage = Map<QuotaOperation, int>.from(current.usageByOperation);
+    newUsage[operation] = (newUsage[operation] ?? 0) + (operation.cost * count);
+    final updated = current.copyWith(usageByOperation: newUsage);
     state = AsyncData(updated);
     await _persistence.saveQuotaState(updated);
   }

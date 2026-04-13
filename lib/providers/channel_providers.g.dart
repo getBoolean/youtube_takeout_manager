@@ -183,7 +183,7 @@ final class ChannelThumbnailsProvider
   }
 }
 
-String _$channelThumbnailsHash() => r'a5a5222537ae67b2fe24ef4a58d4f14e2f17602b';
+String _$channelThumbnailsHash() => r'10775ab8ecbedf022cfb0c7d0f6550bf1c1b8639';
 
 abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
   Map<String, String> build();

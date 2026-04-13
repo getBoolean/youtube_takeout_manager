@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/deletion_item_status.dart';
 import '../models/deletion_item_type.dart';
 import '../models/deletion_queue_item.dart';
+import '../models/quota_operation.dart';
 import '../services/deletion_queue_persistence_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/youtube_deletion_service.dart';
@@ -150,7 +151,9 @@ class DeletionQueue extends _$DeletionQueue {
       await ref.read(quotaProvider.notifier).resetIfNewDay();
 
       while (!_isPaused) {
-        final canDelete = await ref.read(quotaProvider.notifier).canDelete();
+        final canDelete = await ref.read(quotaProvider.notifier).canAfford(
+          QuotaOperation.deleteComment.cost,
+        );
         if (!canDelete) {
           await _markRemainingPending(DeletionItemStatus.quotaExceeded);
           break;
@@ -181,7 +184,10 @@ class DeletionQueue extends _$DeletionQueue {
         final now = DateTime.now().toUtc();
 
         if (result.succeeded) {
-          await ref.read(quotaProvider.notifier).recordDeletion();
+          final op = nextItem.itemType == DeletionItemType.comment
+              ? QuotaOperation.deleteComment
+              : QuotaOperation.deleteLiveChat;
+          await ref.read(quotaProvider.notifier).recordUsage(op);
           await _updateItem(
             nextItem.id,
             nextItem.copyWith(

@@ -1,10 +1,12 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../models/quota_operation.dart';
 import '../models/video.dart';
 import '../services/google_auth_service.dart';
 import '../services/video_cache_service.dart';
 import '../services/youtube_video_service.dart';
 import 'auth_providers.dart';
+import 'quota_provider.dart';
 import 'takeout_providers.dart';
 
 part 'video_providers.g.dart';
@@ -71,6 +73,15 @@ class VideoMetadata extends _$VideoMetadata {
         count++;
         progress.update(count);
         yield Map.unmodifiable(accumulated);
+      }
+
+      // Record quota usage for videos.list API calls.
+      final batchCount = (uncachedIds.length + 49) ~/ 50;
+      if (batchCount > 0) {
+        await ref.read(quotaProvider.notifier).recordUsage(
+              QuotaOperation.videosList,
+              count: batchCount,
+            );
       }
 
       // Persist cache once at the end

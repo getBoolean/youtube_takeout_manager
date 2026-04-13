@@ -1,12 +1,14 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/channel.dart';
+import '../models/quota_operation.dart';
 import '../services/channel_cache_service.dart';
 import '../services/google_auth_service.dart';
 import '../services/youtube_channel_service.dart';
 import 'auth_providers.dart';
 import 'comment_providers.dart';
 import 'live_chat_providers.dart';
+import 'quota_provider.dart';
 import 'takeout_providers.dart';
 import 'video_providers.dart';
 
@@ -97,6 +99,9 @@ class ChannelThumbnails extends _$ChannelThumbnails {
         final batch = _pendingIds.take(10).toSet();
         _pendingIds.removeAll(batch);
         final fetched = await service.fetchChannelThumbnails(client, batch);
+        await ref.read(quotaProvider.notifier).recordUsage(
+              QuotaOperation.channelsList,
+            );
         state = {...state, ...fetched};
       }
       await _cacheService.saveThumbnails(state);
@@ -121,6 +126,13 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     try {
       final fetched =
           await service.fetchChannelThumbnails(client, uncachedIds);
+      final batchCount = (uncachedIds.length + 49) ~/ 50;
+      if (batchCount > 0) {
+        await ref.read(quotaProvider.notifier).recordUsage(
+              QuotaOperation.channelsList,
+              count: batchCount,
+            );
+      }
       state = {...state, ...fetched};
       await _cacheService.saveThumbnails(state);
     } finally {
