@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,9 +30,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _importing = false;
 
   Future<void> _import() async {
+    // Pick files directly from the click handler — browsers require the file
+    // input to be triggered within the user gesture context. Going through
+    // setState or async Riverpod hops first can break this on web.
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+      allowMultiple: true,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    if (!mounted) return;
+
     setState(() => _importing = true);
     try {
-      final imported = await ref.read(takeoutProvider.notifier).importFiles();
+      final imported =
+          await ref.read(takeoutProvider.notifier).importPickedFiles(result);
       if (!mounted) return;
       if (imported) {
         final takeout = ref.read(takeoutProvider).value;

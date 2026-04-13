@@ -1,26 +1,18 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/deletion_queue_item.dart';
 import '../models/deletion_item_status.dart';
 import '../models/deletion_item_type.dart';
 
 class DeletionQueuePersistenceService {
-  static const _filename = 'deletion_queue.json';
-
-  Future<File> _getFile() async {
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/$_filename');
-  }
+  static const _key = 'deletion_queue';
 
   Future<List<DeletionQueueItem>> loadQueue() async {
-    final file = await _getFile();
-    if (!await file.exists()) return [];
-
-    final json = await file.readAsString();
-    if (json.isEmpty) return [];
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_key);
+    if (json == null || json.isEmpty) return [];
 
     final list = jsonDecode(json) as List;
     return list
@@ -29,9 +21,9 @@ class DeletionQueuePersistenceService {
   }
 
   Future<void> saveQueue(List<DeletionQueueItem> items) async {
-    final file = await _getFile();
+    final prefs = await SharedPreferences.getInstance();
     final list = items.map((e) => e.toMap()).toList();
-    await file.writeAsString(jsonEncode(list));
+    await prefs.setString(_key, jsonEncode(list));
   }
 
   /// Returns the set of successfully deleted comment and live chat IDs.

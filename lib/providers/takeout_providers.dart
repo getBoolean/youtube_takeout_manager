@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -18,14 +19,20 @@ class TakeoutNotifier extends _$TakeoutNotifier {
     return compute(parseCsvFiles, savedCsvs);
   }
 
-  /// Picks zip files, extracts CSVs, saves them to disk, and returns the
-  /// parsed data. Returns true if data was imported, false if cancelled.
-  Future<bool> importFiles() async {
-    final service = TakeoutImportService();
-    final result = await service.pickAndImport();
-    if (result == null) return false;
+  /// Processes already-picked files: extracts CSVs, saves them to disk,
+  /// and returns the parsed data. Returns true if data was imported.
+  Future<bool> importPickedFiles(FilePickerResult pickerResult) async {
+    final zipBytesList = <Uint8List>[];
+    for (final file in pickerResult.files) {
+      if (file.bytes != null) {
+        zipBytesList.add(file.bytes!);
+      }
+    }
+    if (zipBytesList.isEmpty) return false;
 
-    // Persist extracted CSVs for future sessions.
+    final service = TakeoutImportService();
+    final result = await service.importFromPickedBytes(zipBytesList);
+
     await TakeoutPersistenceService().saveCsvs(result.csvFiles);
 
     state = AsyncData(result.data);

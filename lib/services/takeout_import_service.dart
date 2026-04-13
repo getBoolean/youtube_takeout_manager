@@ -106,9 +106,12 @@ class TakeoutImportService {
     return (csvFiles: csvFiles, data: data);
   }
 
-  /// Imports from pre-loaded zip bytes (useful for testing or programmatic use).
-  Future<TakeoutData> importFromBytes(List<Uint8List> zipBytesList) async {
+  /// Extracts and parses pre-loaded zip bytes, returning both the raw CSV
+  /// file map (for persistence) and the parsed data.
+  Future<({Map<String, Uint8List> csvFiles, TakeoutData data})>
+      importFromPickedBytes(List<Uint8List> zipBytesList) async {
     final csvFiles = await compute(_extractCsvFiles, zipBytesList);
-    return compute(parseCsvFiles, csvFiles);
+    final data = await compute(parseCsvFiles, csvFiles);
+    return (csvFiles: csvFiles, data: data);
   }
 }

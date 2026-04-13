@@ -1,25 +1,17 @@
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/quota_operation.dart';
 import '../models/quota_state.dart';
 
 class QuotaPersistenceService {
-  static const _filename = 'quota_state.json';
-
-  Future<File> _getFile() async {
-    final dir = await getApplicationSupportDirectory();
-    return File('${dir.path}/$_filename');
-  }
+  static const _key = 'quota_state';
 
   Future<QuotaState> loadQuotaState() async {
-    final file = await _getFile();
-    if (!await file.exists()) return _freshState();
-
-    final json = await file.readAsString();
-    if (json.isEmpty) return _freshState();
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString(_key);
+    if (json == null || json.isEmpty) return _freshState();
 
     final map = jsonDecode(json) as Map<String, dynamic>;
     final state = _fromJson(map);
@@ -33,8 +25,8 @@ class QuotaPersistenceService {
   }
 
   Future<void> saveQuotaState(QuotaState state) async {
-    final file = await _getFile();
-    await file.writeAsString(jsonEncode(_toJson(state)));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode(_toJson(state)));
   }
 
   // ---------------------------------------------------------------------------
