@@ -17,9 +17,7 @@ Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
   final videoMetadata = ref.watch(videoMetadataProvider).value ?? {};
   final grouped = <String, List<LiveChat>>{};
   for (final chat in liveChats) {
-    final video = chat.videoId != null
-        ? videoMetadata[chat.videoId]
-        : null;
+    final video = chat.videoId != null ? videoMetadata[chat.videoId] : null;
     if (video == null) continue;
     grouped.putIfAbsent(video.channelId, () => []).add(chat);
   }

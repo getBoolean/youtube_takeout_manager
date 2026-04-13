@@ -9,7 +9,8 @@ import '../models/auth_state.dart';
 
 import 'google_auth_service_stub.dart'
     if (dart.library.io) 'google_auth_service_native.dart'
-    if (dart.library.js_interop) 'google_auth_service_web.dart' as platform;
+    if (dart.library.js_interop) 'google_auth_service_web.dart'
+    as platform;
 
 const scopes = [
   'https://www.googleapis.com/auth/youtube.force-ssl',

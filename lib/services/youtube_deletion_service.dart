@@ -28,11 +28,14 @@ class YoutubeDeletionService {
       }
       return (succeeded: true, quotaExceeded: false, error: null);
     } on DetailedApiRequestError catch (e) {
-      final isQuota = e.status == 403 &&
+      final isQuota =
+          e.status == 403 &&
           (e.message?.contains('quota') == true ||
-              e.errors.any((err) =>
-                      err.reason == 'quotaExceeded' ||
-                      err.reason == 'dailyLimitExceeded') ==
+              e.errors.any(
+                    (err) =>
+                        err.reason == 'quotaExceeded' ||
+                        err.reason == 'dailyLimitExceeded',
+                  ) ==
                   true);
       return (
         succeeded: false,
@@ -40,11 +43,7 @@ class YoutubeDeletionService {
         error: e.message ?? 'API error ${e.status}',
       );
     } catch (e) {
-      return (
-        succeeded: false,
-        quotaExceeded: false,
-        error: e.toString(),
-      );
+      return (succeeded: false, quotaExceeded: false, error: e.toString());
     }
   }
 }

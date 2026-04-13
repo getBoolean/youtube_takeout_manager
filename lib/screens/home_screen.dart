@@ -44,8 +44,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     setState(() => _importing = true);
     try {
-      final imported =
-          await ref.read(takeoutProvider.notifier).importPickedFiles(result);
+      final imported = await ref
+          .read(takeoutProvider.notifier)
+          .importPickedFiles(result);
       if (!mounted) return;
       if (imported) {
         final takeout = ref.read(takeoutProvider).value;
@@ -53,21 +54,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             takeout.comments.isEmpty &&
             takeout.liveChats.isEmpty) {
           if (mounted) {
-            ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-              const SnackBar(
-                content: Text(
-                    'No comments or live chats found in the selected file(s).'),
-              ),
-            );
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'No comments or live chats found in the selected file(s).',
+                  ),
+                ),
+              );
           }
         } else {
           if (ref.read(authProvider) == null) {
             if (mounted) {
-              ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-                const SnackBar(
-                  content: Text('Sign in to fetch video metadata and view channels.'),
-                ),
-              );
+              ScaffoldMessenger.of(context)
+                ..clearSnackBars()
+                ..showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Sign in to fetch video metadata and view channels.',
+                    ),
+                  ),
+                );
             }
             return;
           }
@@ -77,9 +85,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-          SnackBar(content: Text('Import failed: $e')),
-        );
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text('Import failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _importing = false);
@@ -94,10 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
-        actions: [
-          _buildQueueButton(),
-          _buildAuthButton(),
-        ],
+        actions: [_buildQueueButton(), _buildAuthButton()],
       ),
       body: Center(
         child: _importing
@@ -115,10 +120,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildQueueButton() {
     final queueAsync = ref.watch(deletionQueueProvider);
-    final pendingCount = queueAsync.value
-            ?.where((i) =>
-                i.status == DeletionItemStatus.pending ||
-                i.status == DeletionItemStatus.inProgress)
+    final pendingCount =
+        queueAsync.value
+            ?.where(
+              (i) =>
+                  i.status == DeletionItemStatus.pending ||
+                  i.status == DeletionItemStatus.inProgress,
+            )
             .length ??
         0;
 
@@ -164,7 +172,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'sign_out',
-                child: Text('Sign out${authState.email != null ? ' (${authState.email})' : ''}'),
+                child: Text(
+                  'Sign out${authState.email != null ? ' (${authState.email})' : ''}',
+                ),
               ),
               const PopupMenuItem(
                 value: 'clear_cache',
@@ -192,11 +202,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(
-          Icons.upload_file,
-          size: 80,
-          color: theme.colorScheme.primary,
-        ),
+        Icon(Icons.upload_file, size: 80, color: theme.colorScheme.primary),
         const SizedBox(height: 24),
         Text(
           'Import your Google Takeout data',
@@ -271,9 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Cache cleared.')),
-        );
+        ..showSnackBar(const SnackBar(content: Text('Cache cleared.')));
     }
   }
 
@@ -305,26 +309,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('Quota usage reset.')),
-        );
+        ..showSnackBar(const SnackBar(content: Text('Quota usage reset.')));
     }
   }
 
   Future<void> _viewChannels() async {
     if (ref.read(authProvider) == null) {
-      ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-        const SnackBar(
-          content: Text('Sign in to fetch video metadata and view channels.'),
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Sign in to fetch video metadata and view channels.'),
+          ),
+        );
       return;
     }
     await ref.read(channelThumbnailsProvider.notifier).loadCache();
     if (mounted) context.router.push(const ChannelListRoute());
   }
 
-  Widget _buildSummary(BuildContext context, ThemeData theme, TakeoutData takeout) {
+  Widget _buildSummary(
+    BuildContext context,
+    ThemeData theme,
+    TakeoutData takeout,
+  ) {
     final commentCount = ref.watch(allCommentsProvider).length;
     final liveChatCount = ref.watch(allLiveChatsProvider).length;
     final channelCount = ref.watch(channelsProvider).length;
@@ -390,7 +398,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           FilledButton.icon(
             onPressed: _viewChannels,
             icon: const Icon(Icons.list),
-            label: Text(isAuthenticated ? 'View Channels' : 'Sign in to View Channels'),
+            label: Text(
+              isAuthenticated ? 'View Channels' : 'Sign in to View Channels',
+            ),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(

@@ -78,7 +78,8 @@ class TakeoutImportService {
   /// path → bytes, along with the parsed [TakeoutData].
   ///
   /// Returns null if the user cancels the file picker.
-  Future<({Map<String, Uint8List> csvFiles, TakeoutData data})?> pickAndImport() async {
+  Future<({Map<String, Uint8List> csvFiles, TakeoutData data})?>
+  pickAndImport() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -109,7 +110,7 @@ class TakeoutImportService {
   /// Extracts and parses pre-loaded zip bytes, returning both the raw CSV
   /// file map (for persistence) and the parsed data.
   Future<({Map<String, Uint8List> csvFiles, TakeoutData data})>
-      importFromPickedBytes(List<Uint8List> zipBytesList) async {
+  importFromPickedBytes(List<Uint8List> zipBytesList) async {
     final csvFiles = await compute(_extractCsvFiles, zipBytesList);
     final data = await compute(parseCsvFiles, csvFiles);
     return (csvFiles: csvFiles, data: data);

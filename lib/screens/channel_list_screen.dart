@@ -41,8 +41,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       _cancelChannelsSub = channelsSub.close;
 
       // Flush remaining thumbnail queue when video fetch completes
-      final progressSub =
-          ref.listenManual(videoFetchProgressProvider, (prev, next) {
+      final progressSub = ref.listenManual(videoFetchProgressProvider, (
+        prev,
+        next,
+      ) {
         if (prev != null && prev.isFetching && !next.isFetching) {
           ref.read(channelThumbnailsProvider.notifier).flushQueue();
         }
@@ -60,9 +62,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final label = isComments ? 'comments' : 'live chats';
 
     if (count == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No $label to delete')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No $label to delete')));
       return;
     }
 
@@ -91,8 +93,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             content: Text('$count $label queued for deletion'),
             action: SnackBarAction(
               label: 'View Queue',
-              onPressed: () =>
-                  context.router.push(const DeletionQueueRoute()),
+              onPressed: () => context.router.push(const DeletionQueueRoute()),
             ),
           ),
         );
@@ -178,8 +179,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final query = ref.watch(channelSearchQueryProvider);
     final videoMetadata = ref.watch(videoMetadataProvider);
     final hasData = takeoutAsync.hasValue && takeoutAsync.value != null;
-    final isLoading = !hasData ||
-        (filtered.isEmpty && query.isEmpty &&
+    final isLoading =
+        !hasData ||
+        (filtered.isEmpty &&
+            query.isEmpty &&
             (progress.isFetching || videoMetadata.isLoading));
 
     if (isLoading) {
@@ -192,16 +195,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ? null
             : IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () =>
-                    context.router.replaceAll([const HomeRoute()]),
+                onPressed: () => context.router.replaceAll([const HomeRoute()]),
               ),
         title: const Text('Channels'),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep_outlined),
             tooltip: 'Deletion Queue',
-            onPressed: () =>
-                context.router.push(const DeletionQueueRoute()),
+            onPressed: () => context.router.push(const DeletionQueueRoute()),
           ),
           if (ref.watch(isAuthenticatedProvider))
             PopupMenuButton<String>(
@@ -230,8 +231,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   value: progress.fetched / progress.total,
                 ),
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: SearchBar(
                   hintText: 'Search channels...',
                   leading: const Icon(Icons.search),
@@ -251,9 +254,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       ),
       body: filtered.isEmpty
           ? EmptyState(
-              icon: progress.isFetching ? Icons.hourglass_top : Icons.search_off,
-              message:
-                  progress.isFetching ? 'Loading channels...' : 'No channels found',
+              icon: progress.isFetching
+                  ? Icons.hourglass_top
+                  : Icons.search_off,
+              message: progress.isFetching
+                  ? 'Loading channels...'
+                  : 'No channels found',
             )
           : ListView.builder(
               itemExtent: 56,

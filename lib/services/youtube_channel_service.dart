@@ -20,16 +20,10 @@ class YoutubeChannelService {
     final idList = channelIds.toList();
 
     for (var i = 0; i < idList.length; i += _batchSize) {
-      final batch = idList.sublist(
-        i,
-        (i + _batchSize).clamp(0, idList.length),
-      );
+      final batch = idList.sublist(i, (i + _batchSize).clamp(0, idList.length));
 
       try {
-        final response = await youtube.channels.list(
-          ['snippet'],
-          id: batch,
-        );
+        final response = await youtube.channels.list(['snippet'], id: batch);
 
         for (final item in response.items ?? <yt.Channel>[]) {
           if (item.id == null || item.snippet == null) continue;

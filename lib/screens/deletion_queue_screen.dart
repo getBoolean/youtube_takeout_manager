@@ -83,10 +83,8 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
                 children: [
                   _buildList(items),
                   _buildList(_filter(items, _pendingStatuses)),
-                  _buildList(
-                      _filter(items, {DeletionItemStatus.succeeded})),
-                  _buildList(
-                      _filter(items, _failedStatuses)),
+                  _buildList(_filter(items, {DeletionItemStatus.succeeded})),
+                  _buildList(_filter(items, _failedStatuses)),
                 ],
               ),
             ),
@@ -116,16 +114,21 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
   }
 
   Widget _buildSummaryChips(List<DeletionQueueItem> items) {
-    final pending =
-        items.where((i) => i.status == DeletionItemStatus.pending).length;
-    final inProgress =
-        items.where((i) => i.status == DeletionItemStatus.inProgress).length;
-    final succeeded =
-        items.where((i) => i.status == DeletionItemStatus.succeeded).length;
-    final failed =
-        items.where((i) => i.status == DeletionItemStatus.failed).length;
-    final quotaExceeded =
-        items.where((i) => i.status == DeletionItemStatus.quotaExceeded).length;
+    final pending = items
+        .where((i) => i.status == DeletionItemStatus.pending)
+        .length;
+    final inProgress = items
+        .where((i) => i.status == DeletionItemStatus.inProgress)
+        .length;
+    final succeeded = items
+        .where((i) => i.status == DeletionItemStatus.succeeded)
+        .length;
+    final failed = items
+        .where((i) => i.status == DeletionItemStatus.failed)
+        .length;
+    final quotaExceeded = items
+        .where((i) => i.status == DeletionItemStatus.quotaExceeded)
+        .length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -165,9 +168,8 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
         return DeletionQueueItemTile(
           item: item,
           onRemove: item.status != DeletionItemStatus.inProgress
-              ? () => ref
-                  .read(deletionQueueProvider.notifier)
-                  .removeItem(item.id)
+              ? () =>
+                    ref.read(deletionQueueProvider.notifier).removeItem(item.id)
               : null,
         );
       },
@@ -175,12 +177,13 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
   }
 
   Widget? _buildBottomActions(List<DeletionQueueItem> items) {
-    final hasFailed =
-        items.any((i) => i.status == DeletionItemStatus.failed);
-    final hasQuotaExceeded =
-        items.any((i) => i.status == DeletionItemStatus.quotaExceeded);
-    final hasCompleted =
-        items.any((i) => i.status == DeletionItemStatus.succeeded);
+    final hasFailed = items.any((i) => i.status == DeletionItemStatus.failed);
+    final hasQuotaExceeded = items.any(
+      (i) => i.status == DeletionItemStatus.quotaExceeded,
+    );
+    final hasCompleted = items.any(
+      (i) => i.status == DeletionItemStatus.succeeded,
+    );
 
     if (!hasFailed && !hasQuotaExceeded && !hasCompleted) return null;
 

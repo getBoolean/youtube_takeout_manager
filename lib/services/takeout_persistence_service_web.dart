@@ -17,7 +17,8 @@ class TakeoutPersistenceServiceImpl implements TakeoutPersistenceService {
     final request = web.window.self.indexedDB.open(_dbName, _version);
 
     request.onupgradeneeded = (web.IDBVersionChangeEvent event) {
-      final db = (event.target as web.IDBOpenDBRequest).result as web.IDBDatabase;
+      final db =
+          (event.target as web.IDBOpenDBRequest).result as web.IDBDatabase;
       if (!db.objectStoreNames.contains(_storeName)) {
         db.createObjectStore(_storeName);
       }
@@ -104,9 +105,7 @@ class TakeoutPersistenceServiceImpl implements TakeoutPersistenceService {
           getCompleter.complete(jsBuffer.toDart);
         }.toJS;
         getRequest.onerror = (web.Event _) {
-          getCompleter.completeError(
-            Exception('Failed to get value for $key'),
-          );
+          getCompleter.completeError(Exception('Failed to get value for $key'));
         }.toJS;
         result[key] = await getCompleter.future;
       }

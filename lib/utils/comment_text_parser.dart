@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
-
 /// A parsed segment of a comment/live chat text field.
 sealed class CommentSegment {
   const CommentSegment();
@@ -54,10 +53,14 @@ List<CommentSegment> parseCommentSegments(String raw) {
 /// represented as a placeholder character.
 String parseCommentText(String raw) {
   final segments = parseCommentSegments(raw);
-  return segments.map((s) => switch (s) {
-    TextSegment(:final text) => text,
-    EmojiSegment() => '\u{1F600}',
-  }).join();
+  return segments
+      .map(
+        (s) => switch (s) {
+          TextSegment(:final text) => text,
+          EmojiSegment() => '\u{1F600}',
+        },
+      )
+      .join();
 }
 
 /// Builds an [InlineSpan] list from raw comment JSON for use in [Text.rich].
@@ -65,20 +68,22 @@ List<InlineSpan> buildCommentSpans(String raw, {required double emojiSize}) {
   final segments = parseCommentSegments(raw);
   if (segments.isEmpty) return const [];
 
-  return segments.map<InlineSpan>((s) => switch (s) {
-    TextSegment(:final text) => TextSpan(text: text),
-    EmojiSegment(:final url) => WidgetSpan(
-      alignment: PlaceholderAlignment.middle,
-      child: Image.network(
-        url,
-        width: emojiSize,
-        height: emojiSize,
-        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-        errorBuilder: (_, _, _) => SizedBox(
-          width: emojiSize,
-          height: emojiSize,
-        ),
-      ),
-    ),
-  }).toList();
+  return segments
+      .map<InlineSpan>(
+        (s) => switch (s) {
+          TextSegment(:final text) => TextSpan(text: text),
+          EmojiSegment(:final url) => WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: Image.network(
+              url,
+              width: emojiSize,
+              height: emojiSize,
+              webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+              errorBuilder: (_, _, _) =>
+                  SizedBox(width: emojiSize, height: emojiSize),
+            ),
+          ),
+        },
+      )
+      .toList();
 }

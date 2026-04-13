@@ -11,8 +11,10 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (!isOAuthConfigured) {
-    debugPrint('WARNING: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set. '
-        'Sign-in will be disabled.');
+    debugPrint(
+      'WARNING: GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET not set. '
+      'Sign-in will be disabled.',
+    );
   }
 
   runApp(const ProviderScope(child: _AppWrapper()));

@@ -31,7 +31,7 @@ class LiveChatTile extends StatelessWidget {
       final subtitle = isDeleted
           ? 'Deleted • ${formatDateTime(liveChat.createdAt)}'
           : '${formatDateTime(liveChat.createdAt)}'
-              '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}';
+                '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}';
 
       return SuperChatCard(
         priceMicros: liveChat.price,
@@ -71,7 +71,7 @@ class LiveChatTile extends StatelessWidget {
           isDeleted
               ? 'Deleted • ${formatDateTime(liveChat.createdAt)}'
               : '${formatDateTime(liveChat.createdAt)}'
-                  '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}',
+                    '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}',
         ),
         selected: isSelected,
         onTap: onTap,

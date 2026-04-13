@@ -101,17 +101,18 @@ class ChannelThumbnails extends _$ChannelThumbnails {
       return;
     }
 
-    final client = GoogleAuthService.instance
-        .getAuthenticatedClient(authState.accessToken);
+    final client = GoogleAuthService.instance.getAuthenticatedClient(
+      authState.accessToken,
+    );
     final service = YoutubeChannelService();
     try {
       while (_pendingIds.isNotEmpty) {
         final batch = _pendingIds.take(10).toSet();
         _pendingIds.removeAll(batch);
         final fetched = await service.fetchChannelThumbnails(client, batch);
-        await ref.read(quotaProvider.notifier).recordUsage(
-              QuotaOperation.channelsList,
-            );
+        await ref
+            .read(quotaProvider.notifier)
+            .recordUsage(QuotaOperation.channelsList);
         state = {...state, ...fetched};
       }
       await _cacheService.saveThumbnails(state);
@@ -129,19 +130,18 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     final uncachedIds = channelIds.difference(state.keys.toSet());
     if (uncachedIds.isEmpty) return;
 
-    final client = GoogleAuthService.instance
-        .getAuthenticatedClient(authState.accessToken);
+    final client = GoogleAuthService.instance.getAuthenticatedClient(
+      authState.accessToken,
+    );
     final service = YoutubeChannelService();
 
     try {
-      final fetched =
-          await service.fetchChannelThumbnails(client, uncachedIds);
+      final fetched = await service.fetchChannelThumbnails(client, uncachedIds);
       final batchCount = (uncachedIds.length + 49) ~/ 50;
       if (batchCount > 0) {
-        await ref.read(quotaProvider.notifier).recordUsage(
-              QuotaOperation.channelsList,
-              count: batchCount,
-            );
+        await ref
+            .read(quotaProvider.notifier)
+            .recordUsage(QuotaOperation.channelsList, count: batchCount);
       }
       state = {...state, ...fetched};
       await _cacheService.saveThumbnails(state);

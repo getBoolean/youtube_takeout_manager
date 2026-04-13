@@ -61,8 +61,10 @@ class CsvParserService {
   /// Supports both 8-column (no Post ID) and 9-column (with Post ID) formats.
   CsvParseResult<Comment> parseCommentsCsv(Uint8List bytes) {
     final content = utf8.decode(bytes);
-    final rawLineCount =
-        content.split('\n').where((l) => l.trim().isNotEmpty).length;
+    final rawLineCount = content
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .length;
     final rows = _csv.decode(content);
     if (rows.isEmpty) {
       return const CsvParseResult(
@@ -102,8 +104,9 @@ class CsvParserService {
           videoId: iVideo != null ? _nullableStr(row[iVideo]) : null,
           rawCommentText: rawText,
           displayText: parseCommentText(rawText),
-          topLevelCommentId:
-              iTopLevel != null ? _nullableStr(row[iTopLevel]) : null,
+          topLevelCommentId: iTopLevel != null
+              ? _nullableStr(row[iTopLevel])
+              : null,
         );
       }).toList(),
       rawLineCount: rawLineCount,
@@ -118,8 +121,10 @@ class CsvParserService {
   /// Currency Code and Parent Live Chat ID columns.
   CsvParseResult<LiveChat> parseLiveChatsCsv(Uint8List bytes) {
     final content = utf8.decode(bytes);
-    final rawLineCount =
-        content.split('\n').where((l) => l.trim().isNotEmpty).length;
+    final rawLineCount = content
+        .split('\n')
+        .where((l) => l.trim().isNotEmpty)
+        .length;
     final rows = _csv.decode(content);
     if (rows.isEmpty) {
       return const CsvParseResult(
@@ -133,8 +138,10 @@ class CsvParserService {
     final cols = _buildColumnIndex(rows.first);
     final iId = _col(cols, ['live chat id'])!;
     final iChannel = _col(cols, ['channel id'])!;
-    final iTimestamp =
-        _col(cols, ['live chat create timestamp', 'created at'])!;
+    final iTimestamp = _col(cols, [
+      'live chat create timestamp',
+      'created at',
+    ])!;
     final iPrice = _col(cols, ['price'])!;
     final iCurrency = _col(cols, ['currency code']);
     final iVideo = _col(cols, ['video id']);

@@ -13,10 +13,10 @@ part 'app_router.gr.dart';
 class AppRouter extends RootStackRouter {
   @override
   List<AutoRoute> get routes => [
-        AutoRoute(page: HomeRoute.page, initial: true),
-        AutoRoute(page: ChannelListRoute.page, path: '/channels'),
-        AutoRoute(page: ChannelDetailRoute.page, path: '/channels/:channelId'),
-        AutoRoute(page: DeletionQueueRoute.page, path: '/deletion-queue'),
-        AutoRoute(page: ScriptDeletionRoute.page, path: '/script-deletion'),
-      ];
+    AutoRoute(page: HomeRoute.page, initial: true),
+    AutoRoute(page: ChannelListRoute.page, path: '/channels'),
+    AutoRoute(page: ChannelDetailRoute.page, path: '/channels/:channelId'),
+    AutoRoute(page: DeletionQueueRoute.page, path: '/deletion-queue'),
+    AutoRoute(page: ScriptDeletionRoute.page, path: '/script-deletion'),
+  ];
 }

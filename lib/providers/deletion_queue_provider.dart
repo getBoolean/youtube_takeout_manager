@@ -56,8 +56,10 @@ class DeletionQueue extends _$DeletionQueue {
     Map<String, String?> snippets,
   ) async {
     final current = await future;
-    final existingItemIds =
-        current.where((i) => i.itemType == type).map((i) => i.itemId).toSet();
+    final existingItemIds = current
+        .where((i) => i.itemType == type)
+        .map((i) => i.itemId)
+        .toSet();
     final newIds = ids.difference(existingItemIds);
     if (newIds.isEmpty) return;
 
@@ -69,10 +71,9 @@ class DeletionQueue extends _$DeletionQueue {
         itemId: id,
         itemType: type,
         status: DeletionItemStatus.pending,
-        displayTextSnippet:
-            snippet != null && snippet.length > 80
-                ? '${snippet.substring(0, 80)}...'
-                : snippet,
+        displayTextSnippet: snippet != null && snippet.length > 80
+            ? '${snippet.substring(0, 80)}...'
+            : snippet,
         createdAt: now,
       );
     }).toList();
@@ -143,28 +144,27 @@ class DeletionQueue extends _$DeletionQueue {
       return;
     }
 
-    final client =
-        GoogleAuthService.instance.getAuthenticatedClient(authState.accessToken);
+    final client = GoogleAuthService.instance.getAuthenticatedClient(
+      authState.accessToken,
+    );
 
     try {
       await ref.read(quotaProvider.notifier).resetIfNewDay();
 
       while (!_isPaused) {
-        final canDelete = await ref.read(quotaProvider.notifier).canAfford(
-          QuotaOperation.deleteComment.cost,
-        );
+        final canDelete = await ref
+            .read(quotaProvider.notifier)
+            .canAfford(QuotaOperation.deleteComment.cost);
         if (!canDelete) {
           await _markRemainingPending(DeletionItemStatus.quotaExceeded);
           break;
         }
 
         final items = await future;
-        final nextItem = items
-            .cast<DeletionQueueItem?>()
-            .firstWhere(
-              (i) => i!.status == DeletionItemStatus.pending,
-              orElse: () => null,
-            );
+        final nextItem = items.cast<DeletionQueueItem?>().firstWhere(
+          (i) => i!.status == DeletionItemStatus.pending,
+          orElse: () => null,
+        );
         if (nextItem == null) break;
 
         // Mark as in progress.
@@ -240,9 +240,14 @@ class DeletionQueue extends _$DeletionQueue {
   // Helpers
   // ---------------------------------------------------------------------------
 
-  Future<void> _updateItem(String queueItemId, DeletionQueueItem updated) async {
+  Future<void> _updateItem(
+    String queueItemId,
+    DeletionQueueItem updated,
+  ) async {
     final current = await future;
-    final items = current.map((i) => i.id == queueItemId ? updated : i).toList();
+    final items = current
+        .map((i) => i.id == queueItemId ? updated : i)
+        .toList();
     state = AsyncData(items);
     await _persistence.saveQueue(items);
   }
@@ -250,13 +255,15 @@ class DeletionQueue extends _$DeletionQueue {
   Future<void> _resetItemsByStatus(DeletionItemStatus status) async {
     final current = await future;
     final updated = current
-        .map((i) => i.status == status
-            ? i.copyWith(
-                status: DeletionItemStatus.pending,
-                errorMessage: null,
-                processedAt: null,
-              )
-            : i)
+        .map(
+          (i) => i.status == status
+              ? i.copyWith(
+                  status: DeletionItemStatus.pending,
+                  errorMessage: null,
+                  processedAt: null,
+                )
+              : i,
+        )
         .toList();
     state = AsyncData(updated);
     await _persistence.saveQueue(updated);
@@ -265,9 +272,11 @@ class DeletionQueue extends _$DeletionQueue {
   Future<void> _markRemainingPending(DeletionItemStatus newStatus) async {
     final current = await future;
     final updated = current
-        .map((i) => i.status == DeletionItemStatus.pending
-            ? i.copyWith(status: newStatus)
-            : i)
+        .map(
+          (i) => i.status == DeletionItemStatus.pending
+              ? i.copyWith(status: newStatus)
+              : i,
+        )
         .toList();
     state = AsyncData(updated);
     await _persistence.saveQueue(updated);

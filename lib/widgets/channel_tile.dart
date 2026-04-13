@@ -6,11 +6,7 @@ class ChannelTile extends StatelessWidget {
   final Channel channel;
   final VoidCallback onTap;
 
-  const ChannelTile({
-    super.key,
-    required this.channel,
-    required this.onTap,
-  });
+  const ChannelTile({super.key, required this.channel, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -31,8 +27,7 @@ class ChannelTile extends StatelessWidget {
               )
             : Text(
                 (channel.channelTitle ?? '?')[0].toUpperCase(),
-                style:
-                    TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
               ),
       ),
       title: Text(
@@ -79,11 +74,7 @@ class _Badge extends StatelessWidget {
   final int count;
   final Color color;
 
-  const _Badge({
-    required this.icon,
-    required this.count,
-    required this.color,
-  });
+  const _Badge({required this.icon, required this.count, required this.color});
 
   @override
   Widget build(BuildContext context) {

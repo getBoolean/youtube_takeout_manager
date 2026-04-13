@@ -22,7 +22,10 @@ void main() {
       expect(tier.showBody, isFalse);
       expect(tier.textColor, const Color(0xFFFFFFFF));
 
-      expect(getSuperChatTier(1990000)!.headerColor, const Color(0xFF1565C0)); // \$1.99
+      expect(
+        getSuperChatTier(1990000)!.headerColor,
+        const Color(0xFF1565C0),
+      ); // \$1.99
     });
 
     test('returns light blue tier for \$2–\$4.99', () {
@@ -30,7 +33,10 @@ void main() {
       expect(tier.headerColor, const Color(0xFF00B8D4));
       expect(tier.showBody, isFalse);
 
-      expect(getSuperChatTier(4990000)!.headerColor, const Color(0xFF00B8D4)); // \$4.99
+      expect(
+        getSuperChatTier(4990000)!.headerColor,
+        const Color(0xFF00B8D4),
+      ); // \$4.99
     });
 
     test('returns green tier for \$5–\$9.99', () {
@@ -39,7 +45,10 @@ void main() {
       expect(tier.bodyColor, const Color(0xFF00A88F));
       expect(tier.showBody, isTrue);
 
-      expect(getSuperChatTier(9990000)!.headerColor, const Color(0xFF00BFA5)); // \$9.99
+      expect(
+        getSuperChatTier(9990000)!.headerColor,
+        const Color(0xFF00BFA5),
+      ); // \$9.99
     });
 
     test('returns yellow tier for \$10–\$19.99', () {
@@ -67,12 +76,21 @@ void main() {
       expect(tier.bodyColor, const Color(0xFFB71C1C));
 
       // Very large amounts still red
-      expect(getSuperChatTier(9999990000)!.headerColor, const Color(0xFFD00000)); // \$9999.99
+      expect(
+        getSuperChatTier(9999990000)!.headerColor,
+        const Color(0xFFD00000),
+      ); // \$9999.99
     });
 
     test('boundary: \$1.99 is blue, \$2.00 is light blue', () {
-      expect(getSuperChatTier(1990000)!.headerColor, const Color(0xFF1565C0)); // \$1.99
-      expect(getSuperChatTier(2000000)!.headerColor, const Color(0xFF00B8D4)); // \$2.00
+      expect(
+        getSuperChatTier(1990000)!.headerColor,
+        const Color(0xFF1565C0),
+      ); // \$1.99
+      expect(
+        getSuperChatTier(2000000)!.headerColor,
+        const Color(0xFF00B8D4),
+      ); // \$2.00
     });
   });
 

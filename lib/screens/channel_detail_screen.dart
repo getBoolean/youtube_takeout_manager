@@ -71,7 +71,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   Widget build(BuildContext context) {
     final takeoutAsync = ref.watch(takeoutProvider);
 
-    if (takeoutAsync.isLoading || (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {
+    if (takeoutAsync.isLoading ||
+        (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {
       return _buildLoadingSkeleton();
     }
 
@@ -209,10 +210,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         leading: _buildLeading(),
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: skeletonColor,
-            ),
+            CircleAvatar(radius: 16, backgroundColor: skeletonColor),
             const SizedBox(width: 12),
             Container(
               width: 120,
@@ -480,13 +478,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
 
     switch (result) {
       case ExportResult.success:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Exported $filename.$ext')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Exported $filename.$ext')));
       case ExportResult.error:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Export failed')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Export failed')));
       case ExportResult.cancelled:
         break;
     }

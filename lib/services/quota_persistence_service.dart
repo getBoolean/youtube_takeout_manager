@@ -103,8 +103,11 @@ class QuotaPersistenceService {
     final now = DateTime.now().toUtc();
     final pacificOffset = _isPacificDst(now) ? -7 : -8;
     final pacificNow = now.add(Duration(hours: pacificOffset));
-    final pacificMidnight =
-        DateTime.utc(pacificNow.year, pacificNow.month, pacificNow.day);
+    final pacificMidnight = DateTime.utc(
+      pacificNow.year,
+      pacificNow.month,
+      pacificNow.day,
+    );
     // Convert back to UTC by subtracting the offset.
     return pacificMidnight.subtract(Duration(hours: pacificOffset));
   }
@@ -116,15 +119,17 @@ class QuotaPersistenceService {
 
     // Second Sunday of March at 10:00 UTC (2 AM PST).
     final marchFirst = DateTime.utc(year, 3, 1);
-    final firstSundayOfMarch =
-        marchFirst.add(Duration(days: (7 - marchFirst.weekday) % 7));
+    final firstSundayOfMarch = marchFirst.add(
+      Duration(days: (7 - marchFirst.weekday) % 7),
+    );
     final secondSundayOfMarch = firstSundayOfMarch.add(const Duration(days: 7));
     final dstStart = secondSundayOfMarch.add(const Duration(hours: 10));
 
     // First Sunday of November at 9:00 UTC (2 AM PDT).
     final novFirst = DateTime.utc(year, 11, 1);
-    final firstSundayOfNov =
-        novFirst.add(Duration(days: (7 - novFirst.weekday) % 7));
+    final firstSundayOfNov = novFirst.add(
+      Duration(days: (7 - novFirst.weekday) % 7),
+    );
     final dstEnd = firstSundayOfNov.add(const Duration(hours: 9));
 
     return utc.isAfter(dstStart) && utc.isBefore(dstEnd);

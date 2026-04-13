@@ -31,7 +31,8 @@ class QuotaStatusBar extends ConsumerWidget {
 
         // Build breakdown parts for non-zero operations.
         final parts = <String>[];
-        final deleteUnits = quota.usageFor(QuotaOperation.deleteComment) +
+        final deleteUnits =
+            quota.usageFor(QuotaOperation.deleteComment) +
             quota.usageFor(QuotaOperation.deleteLiveChat);
         final videoUnits = quota.usageFor(QuotaOperation.videosList);
         final channelUnits = quota.usageFor(QuotaOperation.channelsList);
@@ -54,8 +55,8 @@ class QuotaStatusBar extends ConsumerWidget {
                   Text(
                     '$remaining remaining (~$deletesAffordable deletes)',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
@@ -64,11 +65,10 @@ class QuotaStatusBar extends ConsumerWidget {
                 Text(
                   parts.join(' · '),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withValues(alpha: 0.6),
-                      ),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.6),
+                  ),
                 ),
               ],
               const SizedBox(height: 4),
@@ -78,8 +78,9 @@ class QuotaStatusBar extends ConsumerWidget {
                   value: progress,
                   minHeight: 6,
                   color: progressColor,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.surfaceContainerHighest,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
                 ),
               ),
             ],

@@ -56,92 +56,93 @@ class SuperChatCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Header
-                  Container(
-                    color: tier.headerColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    child: Row(
-                      children: [
-                        if (selectionMode) ...[
-                          SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: Checkbox(
-                              value: isSelected,
-                              onChanged: (_) => onTap(),
-                              side: BorderSide(color: tier.textColor),
-                              checkColor: tier.headerColor,
-                              fillColor: WidgetStateProperty.resolveWith(
-                                (states) => states.contains(WidgetState.selected)
-                                    ? tier.textColor
-                                    : Colors.transparent,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
-                        Text(
-                          'Super Chat',
-                          style: TextStyle(
-                            color: tier.textColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          priceLabel,
-                          style: TextStyle(
-                            color: tier.textColor,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Body (only for tiers that show it)
-                  if (tier.showBody)
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
                     Container(
-                      width: double.infinity,
-                      color: tier.bodyColor,
+                      color: tier.headerColor,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text.rich(
-                            TextSpan(children: messageSpans),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+                          if (selectionMode) ...[
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                value: isSelected,
+                                onChanged: (_) => onTap(),
+                                side: BorderSide(color: tier.textColor),
+                                checkColor: tier.headerColor,
+                                fillColor: WidgetStateProperty.resolveWith(
+                                  (states) =>
+                                      states.contains(WidgetState.selected)
+                                      ? tier.textColor
+                                      : Colors.transparent,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            'Super Chat',
                             style: TextStyle(
                               color: tier.textColor,
-                              fontSize: 14,
-                              decoration: isDeleted
-                                  ? TextDecoration.lineThrough
-                                  : null,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
-                          const SizedBox(height: 6),
+                          const Spacer(),
                           Text(
-                            subtitleText,
+                            priceLabel,
                             style: TextStyle(
-                              color: tier.textColor.withValues(alpha: 0.6),
-                              fontSize: 12,
+                              color: tier.textColor,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
                             ),
                           ),
                         ],
                       ),
                     ),
-                ],
-              ),
+                    // Body (only for tiers that show it)
+                    if (tier.showBody)
+                      Container(
+                        width: double.infinity,
+                        color: tier.bodyColor,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text.rich(
+                              TextSpan(children: messageSpans),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: tier.textColor,
+                                fontSize: 14,
+                                decoration: isDeleted
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              subtitleText,
+                              style: TextStyle(
+                                color: tier.textColor.withValues(alpha: 0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

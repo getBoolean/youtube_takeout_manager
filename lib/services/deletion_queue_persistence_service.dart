@@ -27,10 +27,11 @@ class DeletionQueuePersistenceService {
 
   /// Returns the set of successfully deleted comment and live chat IDs.
   Future<({Set<String> commentIds, Set<String> liveChatIds})>
-      loadSucceededIds() async {
+  loadSucceededIds() async {
     final items = await loadQueue();
-    final succeeded =
-        items.where((i) => i.status == DeletionItemStatus.succeeded);
+    final succeeded = items.where(
+      (i) => i.status == DeletionItemStatus.succeeded,
+    );
 
     final commentIds = succeeded
         .where((i) => i.itemType == DeletionItemType.comment)

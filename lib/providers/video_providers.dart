@@ -17,8 +17,7 @@ class VideoFetchProgress extends _$VideoFetchProgress {
   ({bool isFetching, int fetched, int total}) build() =>
       (isFetching: false, fetched: 0, total: 0);
 
-  void start(int total) =>
-      state = (isFetching: true, fetched: 0, total: total);
+  void start(int total) => state = (isFetching: true, fetched: 0, total: total);
 
   void update(int fetched) =>
       state = (isFetching: true, fetched: fetched, total: state.total);
@@ -56,22 +55,26 @@ class VideoMetadata extends _$VideoMetadata {
 
     // Subtract already-cached and not-found IDs
     final notFoundIds = await _cacheService.loadNotFoundIds();
-    final uncachedIds =
-        videoIds.difference(cached.keys.toSet()).difference(notFoundIds);
+    final uncachedIds = videoIds
+        .difference(cached.keys.toSet())
+        .difference(notFoundIds);
     if (uncachedIds.isEmpty) return;
 
     final progress = ref.read(videoFetchProgressProvider.notifier);
     progress.start(uncachedIds.length);
 
-    final client = GoogleAuthService.instance
-        .getAuthenticatedClient(authState.accessToken);
+    final client = GoogleAuthService.instance.getAuthenticatedClient(
+      authState.accessToken,
+    );
     final service = YoutubeVideoService();
     final accumulated = Map<String, Video>.from(cached);
     var count = 0;
 
     try {
-      await for (final video
-          in service.fetchVideoMetadataStream(client, uncachedIds)) {
+      await for (final video in service.fetchVideoMetadataStream(
+        client,
+        uncachedIds,
+      )) {
         accumulated[video.videoId] = video;
         count++;
         progress.update(count);
@@ -81,10 +84,9 @@ class VideoMetadata extends _$VideoMetadata {
       // Record quota usage for videos.list API calls.
       final batchCount = (uncachedIds.length + 49) ~/ 50;
       if (batchCount > 0) {
-        await ref.read(quotaProvider.notifier).recordUsage(
-              QuotaOperation.videosList,
-              count: batchCount,
-            );
+        await ref
+            .read(quotaProvider.notifier)
+            .recordUsage(QuotaOperation.videosList, count: batchCount);
       }
 
       // Persist cache once at the end

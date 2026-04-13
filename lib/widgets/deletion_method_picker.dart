@@ -42,9 +42,10 @@ void showDeletionMethodPicker(
               child: const Text(
                 'Recommended',
                 style: TextStyle(
-                    color: Colors.green,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500),
+                  color: Colors.green,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             onTap: () {
@@ -79,8 +80,7 @@ void _confirmApiDeletion(
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Delete via YouTube API'),
-      content: Text(
-          'Queue $count $label for permanent deletion from YouTube?'),
+      content: Text('Queue $count $label for permanent deletion from YouTube?'),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),

@@ -1,4 +1,1 @@
-enum ExportFormat {
-  csv,
-  json,
-}
+enum ExportFormat { csv, json }

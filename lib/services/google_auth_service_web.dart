@@ -74,8 +74,9 @@ class WebGoogleAuthService extends GoogleAuthService {
     // On web there is no refresh token. Only restore if the access token is
     // still valid (with a 5-minute buffer).
     final buffer = const Duration(minutes: 5);
-    if (credentials.accessToken.expiry
-        .isBefore(DateTime.now().toUtc().add(buffer))) {
+    if (credentials.accessToken.expiry.isBefore(
+      DateTime.now().toUtc().add(buffer),
+    )) {
       await clearPersistedCredentials();
       return null;
     }

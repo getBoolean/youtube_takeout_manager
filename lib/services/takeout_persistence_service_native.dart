@@ -44,8 +44,9 @@ class TakeoutPersistenceServiceImpl implements TakeoutPersistenceService {
     final result = <String, Uint8List>{};
     for (final entity in files) {
       final file = entity as File;
-      final relativePath =
-          p.relative(file.path, from: dir.path).replaceAll('\\', '/');
+      final relativePath = p
+          .relative(file.path, from: dir.path)
+          .replaceAll('\\', '/');
       result[relativePath] = await file.readAsBytes();
     }
     return result;

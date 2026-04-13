@@ -48,13 +48,15 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Delete via My Activity'),
-      ),
+      appBar: AppBar(title: const Text('Delete via My Activity')),
       body: Stepper(
         currentStep: _currentStep,
-        onStepContinue: _currentStep < 3 ? () => setState(() => _currentStep++) : null,
-        onStepCancel: _currentStep > 0 ? () => setState(() => _currentStep--) : null,
+        onStepContinue: _currentStep < 3
+            ? () => setState(() => _currentStep++)
+            : null,
+        onStepCancel: _currentStep > 0
+            ? () => setState(() => _currentStep--)
+            : null,
         controlsBuilder: (context, details) {
           if (_currentStep == 3 && _importResult != null) {
             return Padding(
@@ -154,8 +156,9 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
   }
 
   Future<void> _copyScript(Set<String> commentIds) async {
-    final script =
-        await ScriptGeneratorService().generateDeletionScript(commentIds);
+    final script = await ScriptGeneratorService().generateDeletionScript(
+      commentIds,
+    );
     await Clipboard.setData(ClipboardData(text: script));
     setState(() => _copied = true);
   }
@@ -235,13 +238,14 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
 
     try {
       final map = jsonDecode(text) as Map<String, dynamic>;
-      final succeeded =
-          (map['succeeded'] as List).cast<String>().toSet();
+      final succeeded = (map['succeeded'] as List).cast<String>().toSet();
       final failed = (map['failed'] as List)
-          .map((e) => (
-                id: (e as Map<String, dynamic>)['id'] as String,
-                error: e['error'] as String,
-              ))
+          .map(
+            (e) => (
+              id: (e as Map<String, dynamic>)['id'] as String,
+              error: e['error'] as String,
+            ),
+          )
           .toList();
 
       // Split succeeded IDs into comments vs live chats by checking
@@ -269,16 +273,13 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       }
 
       setState(() {
-        _importResult = _ImportResult(
-          succeeded: succeeded,
-          failed: failed,
-        );
+        _importResult = _ImportResult(succeeded: succeeded, failed: failed);
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid JSON: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Invalid JSON: $e')));
       }
     }
   }

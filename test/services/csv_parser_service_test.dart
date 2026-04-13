@@ -15,10 +15,12 @@ void main() {
 
   group('parseCommentsCsv', () {
     test('parses 9-column format (with Post ID)', () {
-      const header = 'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
           'Parent Comment ID,Post ID,Video ID,Comment Text,'
           'Top-Level Comment ID';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,parent1,post1,vid1,'
           '"{"text":"hello"}",top1\r\n';
 
@@ -35,9 +37,11 @@ void main() {
     });
 
     test('parses 8-column format (no Post ID)', () {
-      const header = 'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
           'Parent Comment ID,Video ID,Comment Text,Top-Level Comment ID';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,,vid1,'
           '"{"text":"hello"}",\r\n';
 
@@ -52,9 +56,11 @@ void main() {
     });
 
     test('parses comment with literal newline in quoted text field', () {
-      const header = 'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
           'Parent Comment ID,Video ID,Comment Text,Top-Level Comment ID';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,,vid1,'
           '"{"text":"line1\nline2"}",\r\n';
 
@@ -64,9 +70,11 @@ void main() {
     });
 
     test('parses comment with commas in quoted text field', () {
-      const header = 'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
           'Parent Comment ID,Video ID,Comment Text,Top-Level Comment ID';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,,vid1,'
           '"{"text":"hello, world, test"}",\r\n';
 
@@ -77,9 +85,11 @@ void main() {
     });
 
     test('parses multiple comments without skipping any', () {
-      const header = 'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
           'Parent Comment ID,Video ID,Comment Text,Top-Level Comment ID';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,,vid1,'
           '"{"text":"hello"}",cid1\r\n'
           'cid2,ch1,2024-01-02T00:00:00.000Z,0.0,,vid2,'
@@ -99,9 +109,11 @@ void main() {
 
   group('parseLiveChatsCsv', () {
     test('parses 6-column format (no Currency, no Parent)', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,0.0,vid1,'
           '"{"text":"hello"}"\r\n';
 
@@ -115,9 +127,11 @@ void main() {
     });
 
     test('parses 7-column format with Currency code', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Currency code,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,10.0,USD,vid1,'
           '"{"text":"superchat!"}"\r\n';
 
@@ -129,9 +143,11 @@ void main() {
     });
 
     test('parses 7-column format with Parent Live Chat ID', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Parent Live Chat ID,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,0.0,,vid1,'
           '"{"text":"reply"}"\r\n';
 
@@ -142,9 +158,11 @@ void main() {
     });
 
     test('parses 8-column format with Currency and Parent', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Currency code,Parent Live Chat ID,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,5.0,EUR,,vid1,'
           '"{"text":"euro superchat"}"\r\n';
 
@@ -156,9 +174,11 @@ void main() {
     });
 
     test('parses live chat with literal newline in quoted text field', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,0.0,vid1,'
           '"{"text":"line1\nline2"}"\r\n';
 
@@ -168,9 +188,11 @@ void main() {
     });
 
     test('parses multiple live chats without skipping any', () {
-      const header = 'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
           'Price,Video ID,Live Chat Text';
-      final csv = '$header\r\n'
+      final csv =
+          '$header\r\n'
           'lc1,ch1,2024-01-01T00:00:00.000Z,0.0,vid1,'
           '"{"text":"hello"}"\r\n'
           'lc2,ch1,2024-01-02T00:00:00.000Z,0.0,vid2,'

@@ -25,10 +25,16 @@ class ExportNotifier extends _$ExportNotifier {
     try {
       final service = ExportService();
       final content = switch (format) {
-        ExportFormat.csv =>
-          service.exportToCsv(comments, liveChats, channelNames: channelNames),
-        ExportFormat.json =>
-          service.exportToJson(comments, liveChats, channelNames: channelNames),
+        ExportFormat.csv => service.exportToCsv(
+          comments,
+          liveChats,
+          channelNames: channelNames,
+        ),
+        ExportFormat.json => service.exportToJson(
+          comments,
+          liveChats,
+          channelNames: channelNames,
+        ),
       };
       final saved = await service.saveToFile(content, filename, format);
       return saved ? ExportResult.success : ExportResult.cancelled;

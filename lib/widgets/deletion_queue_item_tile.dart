@@ -9,11 +9,7 @@ class DeletionQueueItemTile extends StatelessWidget {
   final DeletionQueueItem item;
   final VoidCallback? onRemove;
 
-  const DeletionQueueItemTile({
-    super.key,
-    required this.item,
-    this.onRemove,
-  });
+  const DeletionQueueItemTile({super.key, required this.item, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +79,11 @@ class _StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

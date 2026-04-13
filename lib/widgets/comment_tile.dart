@@ -31,7 +31,7 @@ class CommentTile extends StatelessWidget {
       final subtitle = isDeleted
           ? 'Deleted • ${formatDateTime(comment.createdAt)}'
           : '${formatDateTime(comment.createdAt)}'
-              '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}';
+                '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}';
 
       return SuperChatCard(
         priceMicros: comment.price,
@@ -58,8 +58,8 @@ class CommentTile extends StatelessWidget {
                 isDeleted
                     ? Icons.delete_outline
                     : isReply
-                        ? Icons.reply
-                        : Icons.comment_outlined,
+                    ? Icons.reply
+                    : Icons.comment_outlined,
                 color: isDeleted
                     ? theme.colorScheme.error
                     : theme.colorScheme.primary,
@@ -76,7 +76,7 @@ class CommentTile extends StatelessWidget {
           isDeleted
               ? 'Deleted • ${formatDateTime(comment.createdAt)}'
               : '${formatDateTime(comment.createdAt)}'
-                  '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}',
+                    '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}',
         ),
         selected: isSelected,
         onTap: onTap,

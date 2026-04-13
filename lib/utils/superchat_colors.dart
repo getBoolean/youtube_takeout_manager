@@ -19,13 +19,67 @@ const _dark = Color(0xFF212121);
 const _micros = 1000000;
 
 const _tiers = [
-  (min: 100.0, tier: SuperChatTier(headerColor: Color(0xFFD00000), bodyColor: Color(0xFFB71C1C), textColor: _white, showBody: true)),
-  (min: 50.0, tier: SuperChatTier(headerColor: Color(0xFFC2185B), bodyColor: Color(0xFFAD1457), textColor: _white, showBody: true)),
-  (min: 20.0, tier: SuperChatTier(headerColor: Color(0xFFE65100), bodyColor: Color(0xFFBF360C), textColor: _white, showBody: true)),
-  (min: 10.0, tier: SuperChatTier(headerColor: Color(0xFFFFB300), bodyColor: Color(0xFFF9A825), textColor: _dark, showBody: true)),
-  (min: 5.0, tier: SuperChatTier(headerColor: Color(0xFF00BFA5), bodyColor: Color(0xFF00A88F), textColor: _white, showBody: true)),
-  (min: 2.0, tier: SuperChatTier(headerColor: Color(0xFF00B8D4), textColor: _white, showBody: false)),
-  (min: 1.0, tier: SuperChatTier(headerColor: Color(0xFF1565C0), textColor: _white, showBody: false)),
+  (
+    min: 100.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFFD00000),
+      bodyColor: Color(0xFFB71C1C),
+      textColor: _white,
+      showBody: true,
+    ),
+  ),
+  (
+    min: 50.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFFC2185B),
+      bodyColor: Color(0xFFAD1457),
+      textColor: _white,
+      showBody: true,
+    ),
+  ),
+  (
+    min: 20.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFFE65100),
+      bodyColor: Color(0xFFBF360C),
+      textColor: _white,
+      showBody: true,
+    ),
+  ),
+  (
+    min: 10.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFFFFB300),
+      bodyColor: Color(0xFFF9A825),
+      textColor: _dark,
+      showBody: true,
+    ),
+  ),
+  (
+    min: 5.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFF00BFA5),
+      bodyColor: Color(0xFF00A88F),
+      textColor: _white,
+      showBody: true,
+    ),
+  ),
+  (
+    min: 2.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFF00B8D4),
+      textColor: _white,
+      showBody: false,
+    ),
+  ),
+  (
+    min: 1.0,
+    tier: SuperChatTier(
+      headerColor: Color(0xFF1565C0),
+      textColor: _white,
+      showBody: false,
+    ),
+  ),
 ];
 
 /// Returns the Super Chat tier for the given [priceMicros], or null if the

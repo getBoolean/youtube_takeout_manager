@@ -17,15 +17,15 @@ class DeletionPersistenceService {
   }
 
   Future<void> addDeletedCommentIds(Set<String> ids) async {
-    final existing =
-        (await _kv.getStringList(_deletedCommentIdsKey) ?? []).toSet();
+    final existing = (await _kv.getStringList(_deletedCommentIdsKey) ?? [])
+        .toSet();
     existing.addAll(ids);
     await _kv.setStringList(_deletedCommentIdsKey, existing.toList());
   }
 
   Future<void> addDeletedLiveChatIds(Set<String> ids) async {
-    final existing =
-        (await _kv.getStringList(_deletedLiveChatIdsKey) ?? []).toSet();
+    final existing = (await _kv.getStringList(_deletedLiveChatIdsKey) ?? [])
+        .toSet();
     existing.addAll(ids);
     await _kv.setStringList(_deletedLiveChatIdsKey, existing.toList());
   }
