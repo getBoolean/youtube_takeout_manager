@@ -8,12 +8,16 @@ import '../models/takeout_data.dart';
 import 'csv_parser_service.dart';
 import 'zip_extraction_service.dart';
 
-/// Top-level function for [compute] — parses zip bytes into [TakeoutData].
-TakeoutData _parseZipBytes(List<Uint8List> zipBytesList) {
-  final zipService = ZipExtractionService();
-  final csvParser = CsvParserService();
+/// Top-level function for [compute] — extracts zips and returns the
+/// extracted CSV file map (path → bytes).
+Map<String, Uint8List> _extractCsvFiles(List<Uint8List> zipBytesList) {
+  return ZipExtractionService().extractRelevantFiles(zipBytesList);
+}
 
-  final extractedFiles = zipService.extractRelevantFiles(zipBytesList);
+/// Top-level function for [compute] — parses a map of CSV file paths to
+/// bytes into [TakeoutData].
+TakeoutData parseCsvFiles(Map<String, Uint8List> extractedFiles) {
+  final csvParser = CsvParserService();
 
   final comments = <Comment>[];
   final liveChats = <LiveChat>[];
@@ -70,10 +74,11 @@ TakeoutData _parseZipBytes(List<Uint8List> zipBytesList) {
 /// file picker → read bytes → extract zips → parse CSVs → return TakeoutData.
 class TakeoutImportService {
   /// Opens a file picker for the user to select one or more takeout zip files,
-  /// then parses them and returns the aggregated [TakeoutData].
+  /// then extracts the relevant CSV files and returns them as a map of
+  /// path → bytes, along with the parsed [TakeoutData].
   ///
   /// Returns null if the user cancels the file picker.
-  Future<TakeoutData?> pickAndImport() async {
+  Future<({Map<String, Uint8List> csvFiles, TakeoutData data})?> pickAndImport() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -92,12 +97,18 @@ class TakeoutImportService {
 
     if (zipBytesList.isEmpty) return null;
 
-    // Run heavy parsing in an isolate on native, main thread on web
-    return compute(_parseZipBytes, zipBytesList);
+    // Extract CSVs in isolate (heavy zip decoding).
+    final csvFiles = await compute(_extractCsvFiles, zipBytesList);
+
+    // Parse the extracted CSVs in isolate.
+    final data = await compute(parseCsvFiles, csvFiles);
+
+    return (csvFiles: csvFiles, data: data);
   }
 
   /// Imports from pre-loaded zip bytes (useful for testing or programmatic use).
   Future<TakeoutData> importFromBytes(List<Uint8List> zipBytesList) async {
-    return compute(_parseZipBytes, zipBytesList);
+    final csvFiles = await compute(_extractCsvFiles, zipBytesList);
+    return compute(parseCsvFiles, csvFiles);
   }
 }

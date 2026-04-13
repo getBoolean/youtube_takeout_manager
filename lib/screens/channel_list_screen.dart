@@ -4,7 +4,11 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
+import '../providers/comment_providers.dart';
+import '../providers/deletion_queue_provider.dart';
+import '../providers/live_chat_providers.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../widgets/channel_tile.dart';
@@ -45,6 +49,71 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     });
   }
 
+  void _handleGlobalDelete(String value) {
+    final allComments = ref.read(allCommentsProvider);
+    final allLiveChats = ref.read(allLiveChatsProvider);
+
+    final isComments = value == 'delete_all_comments';
+    final count = isComments ? allComments.length : allLiveChats.length;
+    final label = isComments ? 'comments' : 'live chats';
+
+    if (count == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No $label to delete')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete All ${isComments ? 'Comments' : 'Live Chats'}'),
+        content: Text(
+            'Queue all $count $label for permanent deletion from YouTube?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              final notifier = ref.read(deletionQueueProvider.notifier);
+              if (isComments) {
+                final snippets = <String, String?>{
+                  for (final c in allComments) c.commentId: c.displayText,
+                };
+                notifier.enqueueComments(
+                  allComments.map((c) => c.commentId).toSet(),
+                  snippets: snippets,
+                );
+              } else {
+                final snippets = <String, String?>{
+                  for (final c in allLiveChats) c.liveChatId: c.displayText,
+                };
+                notifier.enqueueLiveChats(
+                  allLiveChats.map((c) => c.liveChatId).toSet(),
+                  snippets: snippets,
+                );
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$count $label queued for deletion'),
+                  action: SnackBarAction(
+                    label: 'View Queue',
+                    onPressed: () =>
+                        context.router.push(const DeletionQueueRoute()),
+                  ),
+                ),
+              );
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -62,6 +131,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       appBar: AppBar(
         title: const Text('Channels'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Deletion Queue',
+            onPressed: () =>
+                context.router.push(const DeletionQueueRoute()),
+          ),
           if (progress.isFetching)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -82,6 +157,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   ref.read(videoMetadataProvider.notifier).refresh(),
               icon: const Icon(Icons.refresh),
               tooltip: 'Refresh metadata',
+            ),
+          if (ref.watch(isAuthenticatedProvider))
+            PopupMenuButton<String>(
+              onSelected: (value) => _handleGlobalDelete(value),
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: 'delete_all_comments',
+                  child: Text('Delete All Comments from YouTube'),
+                ),
+                PopupMenuItem(
+                  value: 'delete_all_chats',
+                  child: Text('Delete All Live Chats from YouTube'),
+                ),
+              ],
             ),
         ],
         bottom: PreferredSize(

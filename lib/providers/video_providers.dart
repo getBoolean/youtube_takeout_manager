@@ -37,7 +37,7 @@ class VideoMetadata extends _$VideoMetadata {
 
     // Check prerequisites for API fetching
     final authState = ref.read(authProvider);
-    final takeout = ref.read(takeoutProvider);
+    final takeout = ref.read(takeoutProvider).value;
     if (authState == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats

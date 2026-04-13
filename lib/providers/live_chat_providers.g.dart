@@ -48,7 +48,7 @@ final class AllLiveChatsProvider
   }
 }
 
-String _$allLiveChatsHash() => r'5a13ae43fdb31693be30c34c88237c25d3362497';
+String _$allLiveChatsHash() => r'20d0553bbbff085eb00e89a0f145bbe2668825ad';
 
 @ProviderFor(liveChatsByChannel)
 final liveChatsByChannelProvider = LiveChatsByChannelProvider._();

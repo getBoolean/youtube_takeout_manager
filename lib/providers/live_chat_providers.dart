@@ -8,7 +8,7 @@ part 'live_chat_providers.g.dart';
 
 @riverpod
 List<LiveChat> allLiveChats(Ref ref) {
-  return ref.watch(takeoutProvider)?.liveChats ?? [];
+  return ref.watch(takeoutProvider).value?.liveChats ?? [];
 }
 
 @Riverpod(keepAlive: true)

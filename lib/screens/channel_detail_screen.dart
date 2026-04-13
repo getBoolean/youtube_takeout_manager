@@ -2,14 +2,18 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/comment.dart';
 import '../models/export_format.dart';
-import '../providers/api_deletion_providers.dart';
+import '../models/live_chat.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deletion_providers.dart';
+import '../providers/deletion_queue_provider.dart';
 import '../providers/export_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
+import '../router/app_router.dart';
+import '../services/deletion_persistence_service.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
@@ -50,7 +54,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     final comments = ref.watch(channelCommentsProvider(widget.channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(widget.channelId));
     final selectedIds = ref.watch(deletionSetProvider);
-    final takeout = ref.watch(takeoutProvider);
+    final takeout = ref.watch(takeoutProvider).value;
     final sub = takeout?.subscriptionsByChannelId[widget.channelId];
     final channelName = sub?.channelTitle ?? 'Unknown Channel';
 
@@ -68,8 +72,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   Widget _buildTabbedView(
     BuildContext context,
     String channelName,
-    List comments,
-    List liveChats,
+    List<Comment> comments,
+    List<LiveChat> liveChats,
     Set<String> selectedIds,
   ) {
     return DefaultTabController(
@@ -99,7 +103,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         ),
         bottomNavigationBar:
             _selectionMode && selectedIds.isNotEmpty
-                ? _buildDeletionBar(context, selectedIds)
+                ? _buildDeletionBar(context, selectedIds, comments, liveChats)
                 : null,
       ),
     );
@@ -108,8 +112,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   Widget _buildSingleView(
     BuildContext context,
     String channelName,
-    List comments,
-    List liveChats,
+    List<Comment> comments,
+    List<LiveChat> liveChats,
     Set<String> selectedIds,
   ) {
     return Scaffold(
@@ -133,14 +137,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                 ),
       bottomNavigationBar:
           _selectionMode && selectedIds.isNotEmpty
-              ? _buildDeletionBar(context, selectedIds)
+              ? _buildDeletionBar(context, selectedIds, comments, liveChats)
               : null,
     );
   }
 
-  List<Widget> _buildActions(List comments, List liveChats) {
+  List<Widget> _buildActions(List<Comment> comments, List<LiveChat> liveChats) {
     if (!_selectionMode) {
-      // Export button when not in selection mode
       return [
         IconButton(
           icon: const Icon(Icons.file_download_outlined),
@@ -154,9 +157,9 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         onSelected: (value) {
           final notifier = ref.read(deletionSetProvider.notifier);
           if (value == 'select_all_comments') {
-            notifier.addAll(comments.map((c) => c.commentId as String));
+            notifier.addAll(comments.map((c) => c.commentId));
           } else if (value == 'select_all_chats') {
-            notifier.addAll(liveChats.map((c) => c.liveChatId as String));
+            notifier.addAll(liveChats.map((c) => c.liveChatId));
           }
         },
         itemBuilder: (context) => [
@@ -176,7 +179,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   }
 
   void _showExportDialog(
-      BuildContext context, List comments, List liveChats) {
+      BuildContext context, List<Comment> comments, List<LiveChat> liveChats) {
     showDialog(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -186,8 +189,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               ref.read(exportProvider.notifier).exportData(
-                    comments: comments.cast(),
-                    liveChats: liveChats.cast(),
+                    comments: comments,
+                    liveChats: liveChats,
                     format: ExportFormat.csv,
                     filename: 'takeout_export',
                   );
@@ -198,8 +201,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               ref.read(exportProvider.notifier).exportData(
-                    comments: comments.cast(),
-                    liveChats: liveChats.cast(),
+                    comments: comments,
+                    liveChats: liveChats,
                     format: ExportFormat.json,
                     filename: 'takeout_export',
                   );
@@ -211,7 +214,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     );
   }
 
-  Widget _buildCommentList(List comments, Set<String> selectedIds) {
+  Widget _buildCommentList(List<Comment> comments, Set<String> selectedIds) {
     if (comments.isEmpty) {
       return const EmptyState(
           icon: Icons.comment_outlined, message: 'No comments');
@@ -226,14 +229,19 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           selectionMode: _selectionMode,
           onTap: _selectionMode
               ? () => _toggleSelection(comment.commentId)
-              : () {},
+              : () => _showSingleItemActions(
+                    context,
+                    itemId: comment.commentId,
+                    displayText: comment.displayText,
+                    isComment: true,
+                  ),
           onLongPress: () => _enterSelectionMode(comment.commentId),
         );
       },
     );
   }
 
-  Widget _buildLiveChatList(List liveChats, Set<String> selectedIds) {
+  Widget _buildLiveChatList(List<LiveChat> liveChats, Set<String> selectedIds) {
     if (liveChats.isEmpty) {
       return const EmptyState(
           icon: Icons.chat_bubble_outline, message: 'No live chats');
@@ -248,15 +256,99 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           selectionMode: _selectionMode,
           onTap: _selectionMode
               ? () => _toggleSelection(chat.liveChatId)
-              : () {},
+              : () => _showSingleItemActions(
+                    context,
+                    itemId: chat.liveChatId,
+                    displayText: chat.displayText,
+                    isComment: false,
+                  ),
           onLongPress: () => _enterSelectionMode(chat.liveChatId),
         );
       },
     );
   }
 
-  Widget _buildDeletionBar(BuildContext context, Set<String> selectedIds) {
+  // ---------------------------------------------------------------------------
+  // Single-item actions (tap outside selection mode)
+  // ---------------------------------------------------------------------------
+
+  void _showSingleItemActions(
+    BuildContext context, {
+    required String itemId,
+    required String displayText,
+    required bool isComment,
+  }) {
+    final authenticated = ref.read(isAuthenticatedProvider);
+
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (authenticated)
+              ListTile(
+                leading: const Icon(Icons.cloud_off),
+                title: const Text('Delete from YouTube'),
+                subtitle: const Text('Permanently removes from your account'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _enqueueSingle(itemId, displayText, isComment);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Remove locally'),
+              subtitle: const Text('Hides from this app only'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _removeLocally({itemId}, isComment);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _enqueueSingle(String itemId, String displayText, bool isComment) {
+    final notifier = ref.read(deletionQueueProvider.notifier);
+    final snippets = {itemId: displayText};
+
+    if (isComment) {
+      notifier.enqueueComments({itemId}, snippets: snippets);
+    } else {
+      notifier.enqueueLiveChats({itemId}, snippets: snippets);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('1 item queued for deletion'),
+        action: SnackBarAction(
+          label: 'View Queue',
+          onPressed: () => context.router.push(const DeletionQueueRoute()),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bulk deletion bar
+  // ---------------------------------------------------------------------------
+
+  Widget _buildDeletionBar(
+    BuildContext context,
+    Set<String> selectedIds,
+    List<Comment> comments,
+    List<LiveChat> liveChats,
+  ) {
     final authenticated = ref.watch(isAuthenticatedProvider);
+
+    // Split selected IDs by type.
+    final commentIdSet = comments.map((c) => c.commentId).toSet();
+    final liveChatIdSet = liveChats.map((c) => c.liveChatId).toSet();
+    final selectedCommentIds = selectedIds.intersection(commentIdSet);
+    final selectedLiveChatIds = selectedIds.intersection(liveChatIdSet);
 
     return SafeArea(
       child: Padding(
@@ -265,7 +357,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => _confirmLocalDelete(context, selectedIds),
+                onPressed: () => _confirmLocalDelete(
+                    context, selectedCommentIds, selectedLiveChatIds),
                 icon: const Icon(Icons.delete_outline),
                 label: Text('Remove ${selectedIds.length} locally'),
                 style: FilledButton.styleFrom(
@@ -278,7 +371,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: FilledButton.icon(
-                  onPressed: () => _confirmApiDelete(context, selectedIds),
+                  onPressed: () => _confirmApiDelete(
+                    context,
+                    comments,
+                    liveChats,
+                    selectedCommentIds,
+                    selectedLiveChatIds,
+                  ),
                   icon: const Icon(Icons.cloud_off),
                   label: Text('Delete ${selectedIds.length} from YouTube'),
                 ),
@@ -290,13 +389,17 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     );
   }
 
-  void _confirmLocalDelete(BuildContext context, Set<String> selectedIds) {
+  void _confirmLocalDelete(
+    BuildContext context,
+    Set<String> commentIds,
+    Set<String> liveChatIds,
+  ) {
+    final total = commentIds.length + liveChatIds.length;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove Items'),
-        content: Text(
-            'Remove ${selectedIds.length} selected item(s) from the list?'),
+        content: Text('Remove $total selected item(s) from the list?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -304,10 +407,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final notifier = ref.read(deletionSetProvider.notifier);
-              notifier.removeSelectedComments();
-              notifier.removeSelectedLiveChats();
               Navigator.pop(ctx);
+              if (commentIds.isNotEmpty) {
+                _removeLocally(commentIds, true);
+              }
+              if (liveChatIds.isNotEmpty) {
+                _removeLocally(liveChatIds, false);
+              }
               _exitSelectionMode();
             },
             child: const Text('Remove'),
@@ -317,13 +423,20 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     );
   }
 
-  void _confirmApiDelete(BuildContext context, Set<String> selectedIds) {
+  void _confirmApiDelete(
+    BuildContext context,
+    List<Comment> comments,
+    List<LiveChat> liveChats,
+    Set<String> commentIds,
+    Set<String> liveChatIds,
+  ) {
+    final total = commentIds.length + liveChatIds.length;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete from YouTube'),
         content: Text(
-            'Permanently delete ${selectedIds.length} selected item(s) from YouTube? This cannot be undone.'),
+            'Queue $total selected item(s) for permanent deletion from YouTube?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -332,12 +445,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              ref
-                  .read(commentApiDeletionProvider.notifier)
-                  .deleteComments(selectedIds);
-              ref
-                  .read(liveChatApiDeletionProvider.notifier)
-                  .deleteLiveChats(selectedIds);
+              _enqueueSelected(comments, liveChats, commentIds, liveChatIds);
               _exitSelectionMode();
             },
             child: const Text('Delete'),
@@ -345,5 +453,60 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _enqueueSelected(
+    List<Comment> comments,
+    List<LiveChat> liveChats,
+    Set<String> commentIds,
+    Set<String> liveChatIds,
+  ) {
+    final notifier = ref.read(deletionQueueProvider.notifier);
+
+    if (commentIds.isNotEmpty) {
+      final snippets = <String, String?>{};
+      for (final c in comments) {
+        if (commentIds.contains(c.commentId)) {
+          snippets[c.commentId] = c.displayText;
+        }
+      }
+      notifier.enqueueComments(commentIds, snippets: snippets);
+    }
+
+    if (liveChatIds.isNotEmpty) {
+      final snippets = <String, String?>{};
+      for (final c in liveChats) {
+        if (liveChatIds.contains(c.liveChatId)) {
+          snippets[c.liveChatId] = c.displayText;
+        }
+      }
+      notifier.enqueueLiveChats(liveChatIds, snippets: snippets);
+    }
+
+    final total = commentIds.length + liveChatIds.length;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$total item(s) queued for deletion'),
+        action: SnackBarAction(
+          label: 'View Queue',
+          onPressed: () => context.router.push(const DeletionQueueRoute()),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  Future<void> _removeLocally(Set<String> ids, bool isComment) async {
+    final persistence = DeletionPersistenceService();
+    if (isComment) {
+      ref.read(takeoutProvider.notifier).removeComments(ids);
+      await persistence.addDeletedCommentIds(ids);
+    } else {
+      ref.read(takeoutProvider.notifier).removeLiveChats(ids);
+      await persistence.addDeletedLiveChatIds(ids);
+    }
   }
 }

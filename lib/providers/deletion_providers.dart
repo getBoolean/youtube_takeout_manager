@@ -1,10 +1,11 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../services/deletion_persistence_service.dart';
-import 'takeout_providers.dart';
+import '../models/comment.dart';
+import '../models/live_chat.dart';
 
 part 'deletion_providers.g.dart';
 
+/// Manages the set of IDs currently selected for deletion in the UI.
 @riverpod
 class DeletionSet extends _$DeletionSet {
   @override
@@ -25,18 +26,22 @@ class DeletionSet extends _$DeletionSet {
   void clear() {
     state = {};
   }
+}
 
-  Future<void> removeSelectedComments() async {
-    final ids = state;
-    ref.read(takeoutProvider.notifier).removeComments(ids);
-    await DeletionPersistenceService().addDeletedCommentIds(ids);
-    state = {};
-  }
+/// Splits the current selection into just the comment IDs present in
+/// the given channel's comments.
+@riverpod
+Set<String> selectedCommentIds(Ref ref, List<Comment> channelComments) {
+  final selected = ref.watch(deletionSetProvider);
+  final commentIdSet = channelComments.map((c) => c.commentId).toSet();
+  return selected.intersection(commentIdSet);
+}
 
-  Future<void> removeSelectedLiveChats() async {
-    final ids = state;
-    ref.read(takeoutProvider.notifier).removeLiveChats(ids);
-    await DeletionPersistenceService().addDeletedLiveChatIds(ids);
-    state = {};
-  }
+/// Splits the current selection into just the live chat IDs present in
+/// the given channel's live chats.
+@riverpod
+Set<String> selectedLiveChatIds(Ref ref, List<LiveChat> channelLiveChats) {
+  final selected = ref.watch(deletionSetProvider);
+  final chatIdSet = channelLiveChats.map((c) => c.liveChatId).toSet();
+  return selected.intersection(chatIdSet);
 }

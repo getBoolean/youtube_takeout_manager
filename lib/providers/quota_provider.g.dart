@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'takeout_providers.dart';
+part of 'quota_provider.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,43 +9,43 @@ part of 'takeout_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(TakeoutNotifier)
-final takeoutProvider = TakeoutNotifierProvider._();
+@ProviderFor(QuotaNotifier)
+final quotaProvider = QuotaNotifierProvider._();
 
-final class TakeoutNotifierProvider
-    extends $AsyncNotifierProvider<TakeoutNotifier, TakeoutData?> {
-  TakeoutNotifierProvider._()
+final class QuotaNotifierProvider
+    extends $AsyncNotifierProvider<QuotaNotifier, QuotaState> {
+  QuotaNotifierProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'takeoutProvider',
+        name: r'quotaProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$takeoutNotifierHash();
+  String debugGetCreateSourceHash() => _$quotaNotifierHash();
 
   @$internal
   @override
-  TakeoutNotifier create() => TakeoutNotifier();
+  QuotaNotifier create() => QuotaNotifier();
 }
 
-String _$takeoutNotifierHash() => r'b051ffe4849f5054934d67c675fa66205e5aa817';
+String _$quotaNotifierHash() => r'8f9e1c12b691b333da7dda8153d59d21263fa7bd';
 
-abstract class _$TakeoutNotifier extends $AsyncNotifier<TakeoutData?> {
-  FutureOr<TakeoutData?> build();
+abstract class _$QuotaNotifier extends $AsyncNotifier<QuotaState> {
+  FutureOr<QuotaState> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<TakeoutData?>, TakeoutData?>;
+    final ref = this.ref as $Ref<AsyncValue<QuotaState>, QuotaState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<TakeoutData?>, TakeoutData?>,
-              AsyncValue<TakeoutData?>,
+              AnyNotifier<AsyncValue<QuotaState>, QuotaState>,
+              AsyncValue<QuotaState>,
               Object?,
               Object?
             >;

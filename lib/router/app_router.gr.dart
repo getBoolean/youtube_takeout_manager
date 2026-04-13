@@ -80,6 +80,22 @@ class ChannelListRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [DeletionQueueScreen]
+class DeletionQueueRoute extends PageRouteInfo<void> {
+  const DeletionQueueRoute({List<PageRouteInfo>? children})
+    : super(DeletionQueueRoute.name, initialChildren: children);
+
+  static const String name = 'DeletionQueueRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const DeletionQueueScreen();
+    },
+  );
+}
+
+/// generated route for
 /// [HomeScreen]
 class HomeRoute extends PageRouteInfo<void> {
   const HomeRoute({List<PageRouteInfo>? children})

@@ -48,7 +48,7 @@ final class AllCommentsProvider
   }
 }
 
-String _$allCommentsHash() => r'c479dbbf0f27040c1c0acb6d00987262aa7a59c4';
+String _$allCommentsHash() => r'b31010c52a56d62b49f287a2c037a714d784c6c9';
 
 @ProviderFor(commentsByChannel)
 final commentsByChannelProvider = CommentsByChannelProvider._();

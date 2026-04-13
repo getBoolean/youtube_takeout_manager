@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'config/oauth_config.dart';
+import 'models/deletion_item_status.dart';
 import 'providers/auth_providers.dart';
+import 'providers/deletion_queue_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +30,18 @@ class _AppWrapperState extends ConsumerState<_AppWrapper> {
   void initState() {
     super.initState();
     if (isOAuthConfigured) {
-      ref.read(authProvider.notifier).tryRestoreSession();
+      _initSession();
+    }
+  }
+
+  Future<void> _initSession() async {
+    await ref.read(authProvider.notifier).tryRestoreSession();
+    // Auto-resume deletion queue if authenticated with pending items.
+    if (ref.read(authProvider) != null) {
+      final queue = await ref.read(deletionQueueProvider.future);
+      if (queue.any((i) => i.status == DeletionItemStatus.pending)) {
+        ref.read(deletionQueueProvider.notifier).startProcessing();
+      }
     }
   }
 

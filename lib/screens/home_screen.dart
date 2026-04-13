@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/oauth_config.dart';
+import '../models/deletion_item_status.dart';
+import '../models/takeout_data.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/channel_providers.dart';
+import '../providers/deletion_queue_provider.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../providers/video_providers.dart';
@@ -30,7 +33,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final imported = await ref.read(takeoutProvider.notifier).importFiles();
       if (!mounted) return;
       if (imported) {
-        final takeout = ref.read(takeoutProvider);
+        final takeout = ref.read(takeoutProvider).value;
         if (takeout != null &&
             takeout.comments.isEmpty &&
             takeout.liveChats.isEmpty) {
@@ -70,22 +73,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final takeout = ref.watch(takeoutProvider);
+    final takeoutAsync = ref.watch(takeoutProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
         actions: [
+          _buildQueueButton(),
           _buildAuthButton(),
         ],
       ),
       body: Center(
         child: _importing
             ? const ImportProgressIndicator()
-            : takeout == null
-                ? _buildImportPrompt(theme)
-                : _buildSummary(context, theme),
+            : takeoutAsync.when(
+                loading: () => const ImportProgressIndicator(),
+                error: (e, _) => _buildError(theme, e),
+                data: (takeout) => takeout == null
+                    ? _buildImportPrompt(theme)
+                    : _buildSummary(context, theme, takeout),
+              ),
+      ),
+    );
+  }
+
+  Widget _buildQueueButton() {
+    final queueAsync = ref.watch(deletionQueueProvider);
+    final pendingCount = queueAsync.value
+            ?.where((i) =>
+                i.status == DeletionItemStatus.pending ||
+                i.status == DeletionItemStatus.inProgress)
+            .length ??
+        0;
+
+    return Badge(
+      isLabelVisible: pendingCount > 0,
+      label: Text('$pendingCount'),
+      child: IconButton(
+        icon: const Icon(Icons.delete_sweep_outlined),
+        tooltip: 'Deletion Queue',
+        onPressed: () => context.router.push(const DeletionQueueRoute()),
       ),
     );
   }
@@ -165,6 +193,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _buildError(ThemeData theme, Object error) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+        const SizedBox(height: 16),
+        Text('Failed to load saved data', style: theme.textTheme.headlineSmall),
+        const SizedBox(height: 8),
+        Text('$error', style: theme.textTheme.bodySmall),
+        const SizedBox(height: 32),
+        FilledButton.icon(
+          onPressed: _import,
+          icon: const Icon(Icons.folder_open),
+          label: const Text('Import New Data'),
+        ),
+      ],
+    );
+  }
+
   Future<void> _clearCache() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -192,7 +239,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
 
-    // Reset provider state so the UI reflects cleared cache
     ref.invalidate(videoMetadataProvider);
     ref.invalidate(channelThumbnailsProvider);
 
@@ -218,8 +264,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) context.router.push(const ChannelListRoute());
   }
 
-  Widget _buildSummary(BuildContext context, ThemeData theme) {
-    final takeout = ref.watch(takeoutProvider)!;
+  Widget _buildSummary(BuildContext context, ThemeData theme, TakeoutData takeout) {
     final commentCount = ref.watch(allCommentsProvider).length;
     final liveChatCount = ref.watch(allLiveChatsProvider).length;
     final channelCount = ref.watch(channelsProvider).length;
@@ -227,71 +272,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final droppedComments = takeout.skippedCommentRows;
     final droppedLiveChats = takeout.skippedLiveChatRows;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          droppedComments > 0 || droppedLiveChats > 0
-              ? Icons.warning_amber_outlined
-              : Icons.check_circle_outline,
-          size: 64,
-          color: droppedComments > 0 || droppedLiveChats > 0
-              ? theme.colorScheme.error
-              : theme.colorScheme.primary,
-        ),
-        const SizedBox(height: 16),
-        Text('Import Complete', style: theme.textTheme.headlineSmall),
-        if (droppedComments > 0 || droppedLiveChats > 0) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Some rows could not be parsed',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.error,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            droppedComments > 0 || droppedLiveChats > 0
+                ? Icons.warning_amber_outlined
+                : Icons.check_circle_outline,
+            size: 64,
+            color: droppedComments > 0 || droppedLiveChats > 0
+                ? theme.colorScheme.error
+                : theme.colorScheme.primary,
+          ),
+          const SizedBox(height: 16),
+          Text('Import Complete', style: theme.textTheme.headlineSmall),
+          if (droppedComments > 0 || droppedLiveChats > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Some rows could not be parsed',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
             ),
+          ],
+          const SizedBox(height: 24),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  _SummaryRow(
+                    icon: Icons.comment_outlined,
+                    label: 'Comments',
+                    count: commentCount,
+                    rawCount: takeout.parsedCommentRows,
+                  ),
+                  const SizedBox(height: 12),
+                  _SummaryRow(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'Live Chats',
+                    count: liveChatCount,
+                    rawCount: takeout.parsedLiveChatRows,
+                  ),
+                  const SizedBox(height: 12),
+                  _SummaryRow(
+                    icon: Icons.people_outline,
+                    label: 'Channels',
+                    count: channelCount,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          FilledButton.icon(
+            onPressed: _viewChannels,
+            icon: const Icon(Icons.list),
+            label: Text(isAuthenticated ? 'View Channels' : 'Sign in to View Channels'),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _import,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Re-import'),
           ),
         ],
-        const SizedBox(height: 24),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                _SummaryRow(
-                  icon: Icons.comment_outlined,
-                  label: 'Comments',
-                  count: commentCount,
-                  rawCount: takeout.parsedCommentRows,
-                ),
-                const SizedBox(height: 12),
-                _SummaryRow(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Live Chats',
-                  count: liveChatCount,
-                  rawCount: takeout.parsedLiveChatRows,
-                ),
-                const SizedBox(height: 12),
-                _SummaryRow(
-                  icon: Icons.people_outline,
-                  label: 'Channels',
-                  count: channelCount,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-        FilledButton.icon(
-          onPressed: _viewChannels,
-          icon: const Icon(Icons.list),
-          label: Text(isAuthenticated ? 'View Channels' : 'Sign in to View Channels'),
-        ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _import,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Re-import'),
-        ),
-      ],
+      ),
     );
   }
 }

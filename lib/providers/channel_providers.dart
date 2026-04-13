@@ -131,7 +131,7 @@ class ChannelThumbnails extends _$ChannelThumbnails {
 
 @riverpod
 List<Channel> channels(Ref ref) {
-  final takeout = ref.watch(takeoutProvider);
+  final takeout = ref.watch(takeoutProvider).value;
   if (takeout == null) return [];
 
   final commentsByChannel = ref.watch(commentsByChannelProvider);

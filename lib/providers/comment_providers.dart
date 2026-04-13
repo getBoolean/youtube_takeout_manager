@@ -8,7 +8,7 @@ part 'comment_providers.g.dart';
 
 @riverpod
 List<Comment> allComments(Ref ref) {
-  return ref.watch(takeoutProvider)?.comments ?? [];
+  return ref.watch(takeoutProvider).value?.comments ?? [];
 }
 
 @Riverpod(keepAlive: true)

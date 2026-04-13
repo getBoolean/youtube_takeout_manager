@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../screens/home_screen.dart';
 import '../screens/channel_list_screen.dart';
 import '../screens/channel_detail_screen.dart';
+import '../screens/deletion_queue_screen.dart';
 
 part 'app_router.gr.dart';
 
@@ -14,5 +15,6 @@ class AppRouter extends RootStackRouter {
         AutoRoute(page: HomeRoute.page, initial: true),
         AutoRoute(page: ChannelListRoute.page, path: '/channels'),
         AutoRoute(page: ChannelDetailRoute.page, path: '/channels/:channelId'),
+        AutoRoute(page: DeletionQueueRoute.page, path: '/deletion-queue'),
       ];
 }
