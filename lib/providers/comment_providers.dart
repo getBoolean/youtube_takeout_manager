@@ -14,7 +14,7 @@ List<Comment> allComments(Ref ref) {
 @Riverpod(keepAlive: true)
 Map<String, List<Comment>> commentsByChannel(Ref ref) {
   final comments = ref.watch(allCommentsProvider);
-  final videoMetadata = ref.watch(videoMetadataProvider);
+  final videoMetadata = ref.watch(videoMetadataProvider).value ?? {};
   final grouped = <String, List<Comment>>{};
   for (final comment in comments) {
     final video = comment.videoId != null

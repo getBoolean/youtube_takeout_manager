@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 
@@ -58,5 +60,51 @@ class YoutubeVideoService {
     }
 
     return results;
+  }
+
+  /// Streams individual [Video] objects as they are fetched from the API.
+  ///
+  /// Batches requests in groups of [_batchSize] for efficiency, but yields
+  /// each video individually as it is parsed from the response.
+  Stream<Video> fetchVideoMetadataStream(
+    http.Client authClient,
+    Set<String> videoIds,
+  ) async* {
+    final youtube = yt.YouTubeApi(authClient);
+    final idList = videoIds.toList();
+
+    for (var i = 0; i < idList.length; i += _batchSize) {
+      final batch = idList.sublist(
+        i,
+        min(i + _batchSize, idList.length),
+      );
+
+      try {
+        final response = await youtube.videos.list(
+          ['snippet'],
+          id: batch,
+        );
+
+        for (final item in response.items ?? <yt.Video>[]) {
+          if (item.id == null || item.snippet == null) continue;
+          final snippet = item.snippet!;
+          yield Video(
+            videoId: item.id!,
+            channelId: snippet.channelId ?? '',
+            channelTitle: snippet.channelTitle,
+            title: snippet.title,
+            description: snippet.description,
+            thumbnailUrl: snippet.thumbnails?.default_?.url,
+            publishedAt: snippet.publishedAt,
+          );
+        }
+      } catch (_) {
+        // Continue with remaining batches on error
+      }
+
+      if (i + _batchSize < idList.length) {
+        await Future.delayed(_delayBetweenRequests);
+      }
+    }
   }
 }

@@ -19,80 +19,106 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
-  bool _fetching = false;
   Timer? _debounce;
+  void Function()? _cancelChannelsSub;
+  void Function()? _cancelProgressSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Listen for new channels and queue their thumbnails
+      final channelsSub = ref.listenManual(channelsProvider, (prev, next) {
+        final ids = next.map((c) => c.channelId).toSet();
+        ref.read(channelThumbnailsProvider.notifier).queueChannelIds(ids);
+      });
+      _cancelChannelsSub = channelsSub.close;
+
+      // Flush remaining thumbnail queue when video fetch completes
+      final progressSub =
+          ref.listenManual(videoFetchProgressProvider, (prev, next) {
+        if (prev != null && prev.isFetching && !next.isFetching) {
+          ref.read(channelThumbnailsProvider.notifier).flushQueue();
+        }
+      });
+      _cancelProgressSub = progressSub.close;
+    });
+  }
 
   @override
   void dispose() {
     _debounce?.cancel();
+    _cancelChannelsSub?.call();
+    _cancelProgressSub?.call();
     super.dispose();
-  }
-
-  Future<void> _fetchMetadata() async {
-    setState(() => _fetching = true);
-    try {
-      await ref.read(videoMetadataProvider.notifier).fetchMetadata();
-      final channelIds =
-          ref.read(channelsProvider).map((c) => c.channelId).toSet();
-      await ref
-          .read(channelThumbnailsProvider.notifier)
-          .fetchThumbnails(channelIds);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
-          SnackBar(content: Text('Failed to fetch metadata: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _fetching = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final filtered = ref.watch(filteredChannelsProvider);
+    final progress = ref.watch(videoFetchProgressProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channels'),
         actions: [
-          if (_fetching)
-            const Padding(
-              padding: EdgeInsets.all(12),
+          if (progress.isFetching)
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: SizedBox(
                 width: 24,
                 height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  value: progress.total > 0
+                      ? progress.fetched / progress.total
+                      : null,
+                ),
               ),
             )
           else
             IconButton(
-              onPressed: _fetchMetadata,
-              icon: const Icon(Icons.cloud_download_outlined),
-              tooltip: 'Fetch video info',
+              onPressed: () =>
+                  ref.read(videoMetadataProvider.notifier).refresh(),
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh metadata',
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SearchBar(
-              hintText: 'Search channels...',
-              leading: const Icon(Icons.search),
-              onChanged: (value) {
-                _debounce?.cancel();
-                _debounce = Timer(const Duration(milliseconds: 300), () {
-                  ref.read(channelSearchQueryProvider.notifier).update(value);
-                });
-              },
-            ),
+          preferredSize: const Size.fromHeight(
+            56 + 4, // search bar + progress indicator
+          ),
+          child: Column(
+            children: [
+              if (progress.isFetching && progress.total > 0)
+                LinearProgressIndicator(
+                  value: progress.fetched / progress.total,
+                ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SearchBar(
+                  hintText: 'Search channels...',
+                  leading: const Icon(Icons.search),
+                  onChanged: (value) {
+                    _debounce?.cancel();
+                    _debounce = Timer(const Duration(milliseconds: 300), () {
+                      ref
+                          .read(channelSearchQueryProvider.notifier)
+                          .update(value);
+                    });
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
       body: filtered.isEmpty
-          ? const EmptyState(
-              icon: Icons.search_off,
-              message: 'No channels found',
+          ? EmptyState(
+              icon: progress.isFetching ? Icons.hourglass_top : Icons.search_off,
+              message:
+                  progress.isFetching ? 'Loading channels...' : 'No channels found',
             )
           : ListView.builder(
               itemExtent: 56,

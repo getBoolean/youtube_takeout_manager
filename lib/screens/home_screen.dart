@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/oauth_config.dart';
 import '../providers/auth_providers.dart';
@@ -52,10 +53,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             }
             return;
           }
-          // Load cached metadata, then fetch new
-          await ref.read(videoMetadataProvider.notifier).loadCache();
           await ref.read(channelThumbnailsProvider.notifier).loadCache();
-          ref.read(videoMetadataProvider.notifier).fetchMetadata();
           if (mounted) context.router.push(const ChannelListRoute());
         }
       }
@@ -109,12 +107,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onSelected: (value) {
               if (value == 'sign_out') {
                 ref.read(authProvider.notifier).signOut();
+              } else if (value == 'clear_cache') {
+                _clearCache();
               }
             },
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'sign_out',
                 child: Text('Sign out${authState.email != null ? ' (${authState.email})' : ''}'),
+              ),
+              const PopupMenuItem(
+                value: 'clear_cache',
+                child: Text('Clear cache'),
               ),
             ],
           ),
@@ -161,6 +165,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Future<void> _clearCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cache'),
+        content: const Text(
+          'This will clear all cached video metadata, channel thumbnails, '
+          'and not-found IDs. Data will be re-fetched from the YouTube API '
+          'on next use.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+
+    // Reset provider state so the UI reflects cleared cache
+    ref.invalidate(videoMetadataProvider);
+    ref.invalidate(channelThumbnailsProvider);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Cache cleared.')),
+        );
+    }
+  }
+
   Future<void> _viewChannels() async {
     if (ref.read(authProvider) == null) {
       ScaffoldMessenger.of(context)..clearSnackBars()..showSnackBar(
@@ -170,9 +214,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       return;
     }
-    await ref.read(videoMetadataProvider.notifier).loadCache();
     await ref.read(channelThumbnailsProvider.notifier).loadCache();
-    ref.read(videoMetadataProvider.notifier).fetchMetadata();
     if (mounted) context.router.push(const ChannelListRoute());
   }
 

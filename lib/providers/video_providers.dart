@@ -10,28 +10,35 @@ import 'takeout_providers.dart';
 part 'video_providers.g.dart';
 
 @Riverpod(keepAlive: true)
+class VideoFetchProgress extends _$VideoFetchProgress {
+  @override
+  ({bool isFetching, int fetched, int total}) build() =>
+      (isFetching: false, fetched: 0, total: 0);
+
+  void start(int total) =>
+      state = (isFetching: true, fetched: 0, total: total);
+
+  void update(int fetched) =>
+      state = (isFetching: true, fetched: fetched, total: state.total);
+
+  void complete() =>
+      state = (isFetching: false, fetched: state.total, total: state.total);
+}
+
+@Riverpod(keepAlive: true)
 class VideoMetadata extends _$VideoMetadata {
   final _cacheService = VideoCacheService();
 
   @override
-  Map<String, Video> build() => {};
-
-  /// Loads cached video metadata from local storage.
-  Future<void> loadCache() async {
+  Stream<Map<String, Video>> build() async* {
+    // Load cache first, yield immediately
     final cached = await _cacheService.loadCachedVideos();
-    if (cached.isNotEmpty) {
-      state = {...state, ...cached};
-    }
-  }
+    yield cached;
 
-  /// Fetches metadata for videos not already cached.
-  /// Requires authentication.
-  Future<void> fetchMetadata() async {
+    // Check prerequisites for API fetching
     final authState = ref.read(authProvider);
-    if (authState == null) return;
-
     final takeout = ref.read(takeoutProvider);
-    if (takeout == null) return;
+    if (authState == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats
     final videoIds = <String>{};
@@ -44,31 +51,43 @@ class VideoMetadata extends _$VideoMetadata {
 
     // Subtract already-cached and not-found IDs
     final notFoundIds = await _cacheService.loadNotFoundIds();
-    final uncachedIds = videoIds
-        .difference(state.keys.toSet())
-        .difference(notFoundIds);
-
+    final uncachedIds =
+        videoIds.difference(cached.keys.toSet()).difference(notFoundIds);
     if (uncachedIds.isEmpty) return;
 
-    final client =
-        GoogleAuthService.instance.getAuthenticatedClient(authState.accessToken);
+    final progress = ref.read(videoFetchProgressProvider.notifier);
+    progress.start(uncachedIds.length);
+
+    final client = GoogleAuthService.instance
+        .getAuthenticatedClient(authState.accessToken);
     final service = YoutubeVideoService();
+    final accumulated = Map<String, Video>.from(cached);
+    var count = 0;
 
     try {
-      final fetched = await service.fetchVideoMetadata(client, uncachedIds);
+      await for (final video
+          in service.fetchVideoMetadataStream(client, uncachedIds)) {
+        accumulated[video.videoId] = video;
+        count++;
+        progress.update(count);
+        yield Map.unmodifiable(accumulated);
+      }
 
-      // Merge new results into state
-      state = {...state, ...fetched};
-      await _cacheService.saveVideos(state);
+      // Persist cache once at the end
+      await _cacheService.saveVideos(accumulated);
 
       // Persist IDs that were not found
-      final newNotFound = uncachedIds.difference(fetched.keys.toSet());
+      final newNotFound = uncachedIds.difference(accumulated.keys.toSet());
       if (newNotFound.isNotEmpty) {
         final allNotFound = notFoundIds.union(newNotFound);
         await _cacheService.saveNotFoundIds(allNotFound);
       }
     } finally {
       client.close();
+      progress.complete();
     }
   }
+
+  /// Re-trigger the stream (reload cache + fetch new).
+  void refresh() => ref.invalidateSelf();
 }

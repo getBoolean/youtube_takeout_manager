@@ -12,8 +12,8 @@ A Flutter app for managing YouTube data from Google Takeout exports. Browse comm
 | Import split/multi-part zips                   | 🔵     |
 | Parse comments CSV                             | 🔵     |
 | Parse live chats CSV                           | 🔵     |
-| Resolve channel names from subscriptions       | 🟡     |
-| Channel list with search                       | 🟡     |
+| Resolve channel names from subscriptions       | 🔵     |
+| Channel list with search                       | 🔵     |
 | Channel detail with tabbed comments/live chats | 🔵     |
 | Select individual items for deletion           | 🟡     |
 | Bulk select/delete items                       | 🟡     |

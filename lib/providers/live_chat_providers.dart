@@ -14,7 +14,7 @@ List<LiveChat> allLiveChats(Ref ref) {
 @Riverpod(keepAlive: true)
 Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
   final liveChats = ref.watch(allLiveChatsProvider);
-  final videoMetadata = ref.watch(videoMetadataProvider);
+  final videoMetadata = ref.watch(videoMetadataProvider).value ?? {};
   final grouped = <String, List<LiveChat>>{};
   for (final chat in liveChats) {
     final video = chat.videoId != null

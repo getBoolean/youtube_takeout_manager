@@ -34,7 +34,7 @@ List<Channel> filteredChannels(Ref ref) {
 
 @riverpod
 Map<String, String> channelTitlesFromVideos(Ref ref) {
-  final videoMetadata = ref.watch(videoMetadataProvider);
+  final videoMetadata = ref.watch(videoMetadataProvider).value ?? {};
   final titles = <String, String>{};
   for (final video in videoMetadata.values) {
     if (video.channelTitle != null && !titles.containsKey(video.channelId)) {
@@ -47,6 +47,8 @@ Map<String, String> channelTitlesFromVideos(Ref ref) {
 @Riverpod(keepAlive: true)
 class ChannelThumbnails extends _$ChannelThumbnails {
   final _cacheService = ChannelCacheService();
+  final _pendingIds = <String>{};
+  bool _fetchInProgress = false;
 
   @override
   Map<String, String> build() => {};
@@ -59,8 +61,52 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     }
   }
 
-  /// Fetches thumbnails for channels not already cached.
-  /// Requires authentication.
+  /// Queue channel IDs for thumbnail fetching.
+  /// Buffers them and fetches in batches of 10.
+  void queueChannelIds(Set<String> channelIds) {
+    final uncached = channelIds.difference(state.keys.toSet());
+    if (uncached.isEmpty) return;
+    _pendingIds.addAll(uncached);
+    if (_pendingIds.length >= 10 && !_fetchInProgress) {
+      _fetchPending();
+    }
+  }
+
+  /// Flush any remaining queued IDs (called when video stream completes).
+  Future<void> flushQueue() async {
+    if (_pendingIds.isNotEmpty && !_fetchInProgress) {
+      await _fetchPending();
+    }
+  }
+
+  Future<void> _fetchPending() async {
+    if (_fetchInProgress || _pendingIds.isEmpty) return;
+    _fetchInProgress = true;
+
+    final authState = ref.read(authProvider);
+    if (authState == null) {
+      _fetchInProgress = false;
+      return;
+    }
+
+    final client = GoogleAuthService.instance
+        .getAuthenticatedClient(authState.accessToken);
+    final service = YoutubeChannelService();
+    try {
+      while (_pendingIds.isNotEmpty) {
+        final batch = _pendingIds.take(10).toSet();
+        _pendingIds.removeAll(batch);
+        final fetched = await service.fetchChannelThumbnails(client, batch);
+        state = {...state, ...fetched};
+      }
+      await _cacheService.saveThumbnails(state);
+    } finally {
+      client.close();
+      _fetchInProgress = false;
+    }
+  }
+
+  /// Fetches thumbnails for channels not already cached (manual refresh).
   Future<void> fetchThumbnails(Set<String> channelIds) async {
     final authState = ref.read(authProvider);
     if (authState == null) return;

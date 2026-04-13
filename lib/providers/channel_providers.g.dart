@@ -149,7 +149,7 @@ final class ChannelTitlesFromVideosProvider
 }
 
 String _$channelTitlesFromVideosHash() =>
-    r'dabc8a8288340f433115acacab9617f4d0dca765';
+    r'ed393773d249f269882c15519e293baf03011288';
 
 @ProviderFor(ChannelThumbnails)
 final channelThumbnailsProvider = ChannelThumbnailsProvider._();
@@ -183,7 +183,7 @@ final class ChannelThumbnailsProvider
   }
 }
 
-String _$channelThumbnailsHash() => r'8b3db5cfd4171ebe029c0540a81cf871567a08be';
+String _$channelThumbnailsHash() => r'a5a5222537ae67b2fe24ef4a58d4f14e2f17602b';
 
 abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
   Map<String, String> build();
