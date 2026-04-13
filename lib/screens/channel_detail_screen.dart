@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/comment.dart';
 import '../models/export_format.dart';
@@ -235,6 +236,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                     itemId: comment.commentId,
                     displayText: comment.displayText,
                     isComment: true,
+                    videoId: comment.videoId,
+                    commentId: comment.commentId,
                   ),
           onLongPress: () => _enterSelectionMode(comment.commentId),
         );
@@ -262,6 +265,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                     itemId: chat.liveChatId,
                     displayText: chat.displayText,
                     isComment: false,
+                    videoId: chat.videoId,
                   ),
           onLongPress: () => _enterSelectionMode(chat.liveChatId),
         );
@@ -278,6 +282,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     required String itemId,
     required String displayText,
     required bool isComment,
+    String? videoId,
+    String? commentId,
   }) {
     final authenticated = ref.read(isAuthenticatedProvider);
 
@@ -287,6 +293,23 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (videoId != null)
+              ListTile(
+                leading: const Icon(Icons.open_in_new),
+                title: const Text('Open on YouTube'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final uri = commentId != null
+                      ? Uri.https('www.youtube.com', '/watch', {
+                          'v': videoId,
+                          'lc': commentId,
+                        })
+                      : Uri.https('www.youtube.com', '/watch', {
+                          'v': videoId,
+                        });
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
+                },
+              ),
             if (authenticated)
               ListTile(
                 leading: const Icon(Icons.cloud_off),
