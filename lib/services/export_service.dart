@@ -133,7 +133,7 @@ class ExportService {
   /// Sanitizes a string for use as a filename.
   static String sanitizeFilename(String name) {
     return name
-        .replaceAll(RegExp(r'[^\w\s-]'), '_')
+        .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_')
         .replaceAll(RegExp(r'\s+'), '_')
         .trim();
   }
