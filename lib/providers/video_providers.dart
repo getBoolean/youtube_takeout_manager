@@ -38,8 +38,8 @@ class VideoMetadata extends _$VideoMetadata {
     yield cached;
 
     // Check prerequisites for API fetching
-    final authState = ref.read(authProvider);
-    final takeout = ref.read(takeoutProvider).value;
+    final authState = ref.watch(authProvider);
+    final takeout = ref.watch(takeoutProvider).value;
     if (authState == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats
@@ -98,7 +98,4 @@ class VideoMetadata extends _$VideoMetadata {
       progress.complete();
     }
   }
-
-  /// Re-trigger the stream (reload cache + fetch new).
-  void refresh() => ref.invalidateSelf();
 }
