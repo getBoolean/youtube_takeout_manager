@@ -165,34 +165,43 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           tooltip: 'Export',
           onPressed: () => _showExportDialog(context, comments, liveChats),
         ),
+        if (ref.watch(isAuthenticatedProvider))
+          PopupMenuButton<String>(
+            onSelected: (value) => _handleChannelDelete(
+              value,
+              comments,
+              liveChats,
+              deletedCommentIds,
+              deletedLiveChatIds,
+            ),
+            itemBuilder: (_) => [
+              if (comments.isNotEmpty)
+                const PopupMenuItem(
+                  value: 'delete_all_comments',
+                  child: Text('Delete All Comments from YouTube'),
+                ),
+              if (liveChats.isNotEmpty)
+                const PopupMenuItem(
+                  value: 'delete_all_chats',
+                  child: Text('Delete All Live Chats from YouTube'),
+                ),
+            ],
+          ),
       ];
     }
     return [
-      PopupMenuButton<String>(
-        onSelected: (value) {
+      IconButton(
+        icon: const Icon(Icons.select_all),
+        tooltip: 'Select All',
+        onPressed: () {
           final notifier = ref.read(deletionSetProvider.notifier);
-          if (value == 'select_all_comments') {
-            notifier.addAll(comments
-                .where((c) => !deletedCommentIds.contains(c.commentId))
-                .map((c) => c.commentId));
-          } else if (value == 'select_all_chats') {
-            notifier.addAll(liveChats
-                .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
-                .map((c) => c.liveChatId));
-          }
+          notifier.addAll(comments
+              .where((c) => !deletedCommentIds.contains(c.commentId))
+              .map((c) => c.commentId));
+          notifier.addAll(liveChats
+              .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+              .map((c) => c.liveChatId));
         },
-        itemBuilder: (context) => [
-          if (comments.isNotEmpty)
-            const PopupMenuItem(
-              value: 'select_all_comments',
-              child: Text('Select All Comments'),
-            ),
-          if (liveChats.isNotEmpty)
-            const PopupMenuItem(
-              value: 'select_all_chats',
-              child: Text('Select All Live Chats'),
-            ),
-        ],
       ),
     ];
   }
@@ -373,6 +382,60 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _handleChannelDelete(
+    String value,
+    List<Comment> comments,
+    List<LiveChat> liveChats,
+    Set<String> deletedCommentIds,
+    Set<String> deletedLiveChatIds,
+  ) {
+    final isComments = value == 'delete_all_comments';
+    final items = isComments
+        ? comments.where((c) => !deletedCommentIds.contains(c.commentId)).toList()
+        : liveChats.where((c) => !deletedLiveChatIds.contains(c.liveChatId)).toList();
+    final label = isComments ? 'comments' : 'live chats';
+
+    if (items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No $label to delete')),
+      );
+      return;
+    }
+
+    final ids = isComments
+        ? items.cast<Comment>().map((c) => c.commentId).toSet()
+        : items.cast<LiveChat>().map((c) => c.liveChatId).toSet();
+    showDeletionMethodPicker(
+      context,
+      ref: ref,
+      ids: ids,
+      onApiChosen: () {
+        final notifier = ref.read(deletionQueueProvider.notifier);
+        if (isComments) {
+          final snippets = <String, String?>{
+            for (final c in items.cast<Comment>()) c.commentId: c.displayText,
+          };
+          notifier.enqueueComments(ids, snippets: snippets);
+        } else {
+          final snippets = <String, String?>{
+            for (final c in items.cast<LiveChat>()) c.liveChatId: c.displayText,
+          };
+          notifier.enqueueLiveChats(ids, snippets: snippets);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${ids.length} $label queued for deletion'),
+            action: SnackBarAction(
+              label: 'View Queue',
+              onPressed: () =>
+                  context.router.push(const DeletionQueueRoute()),
+            ),
+          ),
+        );
+      },
     );
   }
 
