@@ -180,6 +180,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               itemBuilder: (context, index) {
                 final channel = filtered[index];
                 return ChannelTile(
+                  key: ValueKey(channel.channelId),
                   channel: channel,
                   onTap: () => context.router.push(
                     ChannelDetailRoute(channelId: channel.channelId),
