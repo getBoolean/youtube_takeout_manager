@@ -387,7 +387,29 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
               subtitle: const Text('For comments you already deleted outside the app'),
               onTap: () {
                 Navigator.pop(ctx);
-                _removeLocally({itemId}, isComment);
+                showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Remove locally?'),
+                    content: const Text(
+                      'This only removes the item from your list. '
+                      'It does not delete it from YouTube.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _removeLocally({itemId}, isComment);
+                        },
+                        child: const Text('Remove'),
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
           ],
