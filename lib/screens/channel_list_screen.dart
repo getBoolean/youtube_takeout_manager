@@ -65,58 +65,37 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Delete All ${isComments ? 'Comments' : 'Live Chats'}'),
-        content: Text(
-            'Queue all $count $label for permanent deletion from YouTube?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+    final ids = isComments
+        ? allComments.map((c) => c.commentId).toSet()
+        : allLiveChats.map((c) => c.liveChatId).toSet();
+    showDeletionMethodPicker(
+      context,
+      ref: ref,
+      ids: ids,
+      onApiChosen: () {
+        final notifier = ref.read(deletionQueueProvider.notifier);
+        if (isComments) {
+          final snippets = <String, String?>{
+            for (final c in allComments) c.commentId: c.displayText,
+          };
+          notifier.enqueueComments(ids, snippets: snippets);
+        } else {
+          final snippets = <String, String?>{
+            for (final c in allLiveChats) c.liveChatId: c.displayText,
+          };
+          notifier.enqueueLiveChats(ids, snippets: snippets);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$count $label queued for deletion'),
+            action: SnackBarAction(
+              label: 'View Queue',
+              onPressed: () =>
+                  context.router.push(const DeletionQueueRoute()),
+            ),
           ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              final ids = isComments
-                  ? allComments.map((c) => c.commentId).toSet()
-                  : allLiveChats.map((c) => c.liveChatId).toSet();
-              showDeletionMethodPicker(
-                context,
-                ref: ref,
-                ids: ids,
-                onApiChosen: () {
-                  final notifier = ref.read(deletionQueueProvider.notifier);
-                  if (isComments) {
-                    final snippets = <String, String?>{
-                      for (final c in allComments) c.commentId: c.displayText,
-                    };
-                    notifier.enqueueComments(ids, snippets: snippets);
-                  } else {
-                    final snippets = <String, String?>{
-                      for (final c in allLiveChats)
-                        c.liveChatId: c.displayText,
-                    };
-                    notifier.enqueueLiveChats(ids, snippets: snippets);
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('$count $label queued for deletion'),
-                      action: SnackBarAction(
-                        label: 'View Queue',
-                        onPressed: () =>
-                            context.router.push(const DeletionQueueRoute()),
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

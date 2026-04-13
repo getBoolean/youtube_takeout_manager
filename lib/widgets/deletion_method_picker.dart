@@ -59,12 +59,41 @@ void showDeletionMethodPicker(
             subtitle: const Text('~200 deletes/day quota limit'),
             onTap: () {
               Navigator.pop(ctx);
-              onApiChosen?.call();
+              _confirmApiDeletion(context, ids.length, onApiChosen);
             },
           ),
           const SizedBox(height: 8),
         ],
       ),
+    ),
+  );
+}
+
+void _confirmApiDeletion(
+  BuildContext context,
+  int count,
+  VoidCallback? onConfirmed,
+) {
+  final label = count == 1 ? 'item' : 'items';
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Delete via YouTube API'),
+      content: Text(
+          'Queue $count $label for permanent deletion from YouTube?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            onConfirmed?.call();
+          },
+          child: const Text('Delete'),
+        ),
+      ],
     ),
   );
 }
