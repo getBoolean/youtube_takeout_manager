@@ -14,6 +14,7 @@ import '../providers/deletion_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/export_providers.dart';
 import '../providers/live_chat_providers.dart';
+import '../services/export_service.dart';
 import '../router/app_router.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/deletion_method_picker.dart';
@@ -235,7 +236,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         IconButton(
           icon: const Icon(Icons.file_download_outlined),
           tooltip: 'Export',
-          onPressed: () => _showExportDialog(context, comments, liveChats),
+          onPressed: () => _showExportSheet(context, comments, liveChats),
         ),
         if (ref.watch(isAuthenticatedProvider))
           PopupMenuButton<String>(
@@ -290,47 +291,103 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     ];
   }
 
-  void _showExportDialog(
+  void _showExportSheet(
     BuildContext context,
     List<Comment> comments,
     List<LiveChat> liveChats,
   ) {
-    showDialog(
+    final channels = ref.read(channelsProvider);
+    final channel = channels
+        .where((c) => c.channelId == widget.channelId)
+        .firstOrNull;
+    final channelName = channel?.channelTitle ?? 'Unknown Channel';
+    final filename = ExportService.sanitizeFilename('${channelName}_export');
+    final channelNames = {widget.channelId: channelName};
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Export Format'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref
-                  .read(exportProvider.notifier)
-                  .exportData(
-                    comments: comments,
-                    liveChats: liveChats,
-                    format: ExportFormat.csv,
-                    filename: 'takeout_export',
-                  );
-            },
-            child: const Text('CSV'),
-          ),
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ref
-                  .read(exportProvider.notifier)
-                  .exportData(
-                    comments: comments,
-                    liveChats: liveChats,
-                    format: ExportFormat.json,
-                    filename: 'takeout_export',
-                  );
-            },
-            child: const Text('JSON'),
-          ),
-        ],
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Export Data',
+                  style: Theme.of(ctx).textTheme.titleLarge,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Export as CSV'),
+              subtitle: const Text('Comma-separated values (.csv)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _doExport(
+                  format: ExportFormat.csv,
+                  filename: filename,
+                  comments: comments,
+                  liveChats: liveChats,
+                  channelNames: channelNames,
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.data_object),
+              title: const Text('Export as JSON'),
+              subtitle: const Text('Structured data (.json)'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _doExport(
+                  format: ExportFormat.json,
+                  filename: filename,
+                  comments: comments,
+                  liveChats: liveChats,
+                  channelNames: channelNames,
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _doExport({
+    required ExportFormat format,
+    required String filename,
+    required List<Comment> comments,
+    required List<LiveChat> liveChats,
+    required Map<String, String> channelNames,
+  }) async {
+    final ext = format == ExportFormat.csv ? 'csv' : 'json';
+    final result = await ref
+        .read(exportProvider.notifier)
+        .exportData(
+          comments: comments,
+          liveChats: liveChats,
+          format: format,
+          filename: filename,
+          channelNames: channelNames,
+        );
+
+    if (!mounted) return;
+
+    switch (result) {
+      case ExportResult.success:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported $filename.$ext')),
+        );
+      case ExportResult.error:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed')),
+        );
+      case ExportResult.cancelled:
+        break;
+    }
   }
 
   Widget _buildCommentList(

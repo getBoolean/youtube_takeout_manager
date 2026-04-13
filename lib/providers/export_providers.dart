@@ -7,12 +7,14 @@ import '../services/export_service.dart';
 
 part 'export_providers.g.dart';
 
+enum ExportResult { success, cancelled, error }
+
 @riverpod
 class ExportNotifier extends _$ExportNotifier {
   @override
   bool build() => false; // isExporting
 
-  Future<void> exportData({
+  Future<ExportResult> exportData({
     required List<Comment> comments,
     required List<LiveChat> liveChats,
     required ExportFormat format,
@@ -28,7 +30,10 @@ class ExportNotifier extends _$ExportNotifier {
         ExportFormat.json =>
           service.exportToJson(comments, liveChats, channelNames: channelNames),
       };
-      await service.saveToFile(content, filename, format);
+      final saved = await service.saveToFile(content, filename, format);
+      return saved ? ExportResult.success : ExportResult.cancelled;
+    } catch (_) {
+      return ExportResult.error;
     } finally {
       state = false;
     }

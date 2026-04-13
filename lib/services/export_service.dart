@@ -1,10 +1,8 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:file_saver/file_saver.dart';
 
 import '../models/comment.dart';
 import '../models/export_format.dart';
@@ -22,7 +20,17 @@ class ExportService {
   }) {
     final rows = <List<dynamic>>[
       // Header
-      ['Type', 'ID', 'Channel ID', 'Channel Name', 'Video ID', 'Date', 'Text'],
+      [
+        'Type',
+        'ID',
+        'Channel ID',
+        'Channel Name',
+        'Video ID',
+        'Date',
+        'Text',
+        'Price',
+        'Currency',
+      ],
       // Comments
       ...comments.map((c) => [
             'comment',
@@ -32,6 +40,8 @@ class ExportService {
             c.videoId ?? '',
             c.createdAt.toIso8601String(),
             c.displayText,
+            c.price,
+            '',
           ]),
       // Live chats
       ...liveChats.map((c) => [
@@ -42,6 +52,8 @@ class ExportService {
             c.videoId ?? '',
             c.createdAt.toIso8601String(),
             c.displayText,
+            c.price,
+            c.currencyCode ?? '',
           ]),
     ];
 
@@ -64,6 +76,7 @@ class ExportService {
                 'date': c.createdAt.toIso8601String(),
                 'text': c.displayText,
                 'parentCommentId': c.parentCommentId,
+                'price': c.price,
               })
           .toList(),
       'liveChats': liveChats
@@ -74,6 +87,8 @@ class ExportService {
                 'videoId': c.videoId,
                 'date': c.createdAt.toIso8601String(),
                 'text': c.displayText,
+                'price': c.price,
+                'currency': c.currencyCode,
               })
           .toList(),
     };
@@ -81,32 +96,34 @@ class ExportService {
     return const JsonEncoder.withIndent('  ').convert(data);
   }
 
-  /// Saves content to a file. Uses file picker save dialog on desktop,
-  /// share sheet on mobile.
-  Future<void> saveToFile(
+  /// Saves content to a file using the platform-appropriate mechanism.
+  /// Returns `true` if the file was saved, `false` if the user cancelled.
+  Future<bool> saveToFile(
     String content,
     String filename,
     ExportFormat format,
   ) async {
-    final extension = format == ExportFormat.csv ? 'csv' : 'json';
-    final fullFilename = '$filename.$extension';
+    final ext = format == ExportFormat.csv ? 'csv' : 'json';
+    final mimeType = format == ExportFormat.csv
+        ? MimeType.csv
+        : MimeType.json;
+    final bytes = Uint8List.fromList(utf8.encode(content));
 
-    if (Platform.isAndroid || Platform.isIOS) {
-      // Mobile: use share sheet
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$fullFilename');
-      await file.writeAsString(content);
-      await Share.shareXFiles([XFile(file.path)]);
-    } else {
-      // Desktop: use save dialog
-      final result = await FilePicker.saveFile(
-        fileName: fullFilename,
-        type: FileType.custom,
-        allowedExtensions: [extension],
-      );
-      if (result != null) {
-        await File(result).writeAsString(content);
-      }
-    }
+    final result = await FileSaver.instance.saveAs(
+      name: filename,
+      bytes: bytes,
+      fileExtension: ext,
+      mimeType: mimeType,
+    );
+
+    return result != null;
+  }
+
+  /// Sanitizes a string for use as a filename.
+  static String sanitizeFilename(String name) {
+    return name
+        .replaceAll(RegExp(r'[^\w\s-]'), '_')
+        .replaceAll(RegExp(r'\s+'), '_')
+        .trim();
   }
 }

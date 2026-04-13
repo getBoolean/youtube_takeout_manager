@@ -29,7 +29,7 @@ A Flutter app for managing YouTube data from Google Takeout exports. Browse comm
 | Delete comments via YouTube API                | ✅     |
 | Delete live chats via YouTube API              | ✅     |
 | Auto-resume deletion queue on startup          | ✅     |
-| Export filtered data                           | 🟡     |
+| Export filtered data                           | ✅     |
 
 ## Build from Source
 
