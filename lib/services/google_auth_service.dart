@@ -1,130 +1,58 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show protected;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:googleapis_auth/auth_io.dart' as auth_io;
+import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 
-import '../config/oauth_config.dart';
 import '../models/auth_state.dart';
 
-const _scopes = [
+import 'google_auth_service_stub.dart'
+    if (dart.library.io) 'google_auth_service_native.dart'
+    if (dart.library.js_interop) 'google_auth_service_web.dart' as platform;
+
+const scopes = [
   'https://www.googleapis.com/auth/youtube.force-ssl',
   'openid',
   'email',
   'profile',
 ];
 
-const _credentialsKey = 'google_auth_credentials';
+const credentialsKey = 'google_auth_credentials';
 
 /// Service for Google OAuth2 authentication.
 ///
-/// Uses `googleapis_auth` with a browser-based consent flow that works on
-/// desktop platforms (Windows/macOS/Linux). A local HTTP server captures the
-/// OAuth redirect after the user consents in their browser.
-class GoogleAuthService {
-  GoogleAuthService._();
-  static final instance = GoogleAuthService._();
+/// Platform-specific implementations handle the actual sign-in flow:
+/// - Native (Windows/macOS/Linux): local HTTP server redirect via `auth_io`
+/// - Web: Google Identity Services popup via `auth_browser`
+abstract class GoogleAuthService {
+  GoogleAuthService();
 
-  auth_io.AutoRefreshingAuthClient? _authClient;
+  static final GoogleAuthService instance = platform.createGoogleAuthService();
 
-  /// Triggers the interactive sign-in flow via the user's default browser.
-  /// Returns an [AuthState] on success, or null if cancelled/failed.
-  Future<AuthState?> signIn() async {
-    try {
-      final clientId = auth_io.ClientId(googleClientId, googleClientSecret);
+  http.Client? get authClient;
 
-      final client = await auth_io.clientViaUserConsent(
-        clientId,
-        _scopes,
-        _openBrowser,
-      );
+  Future<AuthState?> signIn();
+  Future<void> signOut();
+  http.Client getAuthenticatedClient(String accessToken);
+  Future<AuthState?> tryRestoreSession();
 
-      _authClient = client;
-      client.credentialUpdates.listen(_persistCredentials);
-      await _persistCredentials(client.credentials);
+  // ---------------------------------------------------------------------------
+  // Shared helpers (for subclass use only)
+  // ---------------------------------------------------------------------------
 
-      final userInfo = await _fetchUserInfo(client);
-
-      return AuthState(
-        accessToken: client.credentials.accessToken.data,
-        displayName: userInfo['name'] as String?,
-        email: userInfo['email'] as String?,
-        photoUrl: userInfo['picture'] as String?,
-      );
-    } on Exception {
-      return null;
-    }
-  }
-
-  /// Signs the user out and clears persisted credentials.
-  Future<void> signOut() async {
-    _authClient?.close();
-    _authClient = null;
-    await _clearPersistedCredentials();
-  }
-
-  /// Returns an authenticated HTTP client for use with `googleapis` APIs.
-  ///
-  /// When an [AutoRefreshingAuthClient] is available (after sign-in or session
-  /// restore), returns a non-closing wrapper around it so callers that call
-  /// `client.close()` don't kill the shared client. Otherwise falls back to
-  /// constructing a client from the raw [accessToken].
-  http.Client getAuthenticatedClient(String accessToken) {
-    if (_authClient != null) return _NonClosingClient(_authClient!);
-
-    final credentials = auth_io.AccessCredentials(
-      auth_io.AccessToken(
-        'Bearer',
-        accessToken,
-        DateTime.now().toUtc().add(const Duration(hours: 1)),
-      ),
-      null,
-      _scopes,
+  @protected
+  AuthState buildAuthState(String accessToken, Map<String, dynamic> userInfo) {
+    return AuthState(
+      accessToken: accessToken,
+      displayName: userInfo['name'] as String?,
+      email: userInfo['email'] as String?,
+      photoUrl: userInfo['picture'] as String?,
     );
-    return auth_io.authenticatedClient(http.Client(), credentials);
   }
 
-  /// Attempts to restore a previous session from persisted credentials.
-  /// Returns an [AuthState] on success, or null if no valid session exists.
-  Future<AuthState?> tryRestoreSession() async {
-    final credentials = await _loadPersistedCredentials();
-    if (credentials == null || credentials.refreshToken == null) return null;
-
-    try {
-      final clientId = auth_io.ClientId(googleClientId, googleClientSecret);
-      final client = auth_io.autoRefreshingClient(
-        clientId,
-        credentials,
-        http.Client(),
-      );
-
-      _authClient = client;
-      client.credentialUpdates.listen(_persistCredentials);
-
-      final userInfo = await _fetchUserInfo(client);
-
-      return AuthState(
-        accessToken: client.credentials.accessToken.data,
-        displayName: userInfo['name'] as String?,
-        email: userInfo['email'] as String?,
-        photoUrl: userInfo['picture'] as String?,
-      );
-    } on Exception {
-      await _clearPersistedCredentials();
-      return null;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  void _openBrowser(String url) {
-    launchUrl(Uri.parse(url));
-  }
-
-  Future<Map<String, dynamic>> _fetchUserInfo(http.Client client) async {
+  @protected
+  Future<Map<String, dynamic>> fetchUserInfo(http.Client client) async {
     final response = await client.get(
       Uri.parse('https://www.googleapis.com/oauth2/v3/userinfo'),
     );
@@ -134,11 +62,11 @@ class GoogleAuthService {
     return {};
   }
 
-  static const _storage = FlutterSecureStorage();
+  @protected
+  static const storage = FlutterSecureStorage();
 
-  Future<void> _persistCredentials(
-    auth_io.AccessCredentials credentials,
-  ) async {
+  @protected
+  Future<void> persistCredentials(AccessCredentials credentials) async {
     final json = jsonEncode({
       'accessToken': {
         'type': credentials.accessToken.type,
@@ -148,18 +76,19 @@ class GoogleAuthService {
       'refreshToken': credentials.refreshToken,
       'scopes': credentials.scopes,
     });
-    await _storage.write(key: _credentialsKey, value: json);
+    await storage.write(key: credentialsKey, value: json);
   }
 
-  Future<auth_io.AccessCredentials?> _loadPersistedCredentials() async {
-    final raw = await _storage.read(key: _credentialsKey);
+  @protected
+  Future<AccessCredentials?> loadPersistedCredentials() async {
+    final raw = await storage.read(key: credentialsKey);
     if (raw == null) return null;
 
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
       final tokenMap = map['accessToken'] as Map<String, dynamic>;
-      return auth_io.AccessCredentials(
-        auth_io.AccessToken(
+      return AccessCredentials(
+        AccessToken(
           tokenMap['type'] as String,
           tokenMap['data'] as String,
           DateTime.parse(tokenMap['expiry'] as String),
@@ -172,16 +101,17 @@ class GoogleAuthService {
     }
   }
 
-  Future<void> _clearPersistedCredentials() async {
-    await _storage.delete(key: _credentialsKey);
+  @protected
+  Future<void> clearPersistedCredentials() async {
+    await storage.delete(key: credentialsKey);
   }
 }
 
 /// Wrapper that delegates all requests but ignores [close], preventing callers
-/// from accidentally closing the shared [AutoRefreshingAuthClient].
-class _NonClosingClient extends http.BaseClient {
+/// from accidentally closing the shared auth client.
+class NonClosingClient extends http.BaseClient {
   final http.Client _inner;
-  _NonClosingClient(this._inner);
+  NonClosingClient(this._inner);
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) =>
