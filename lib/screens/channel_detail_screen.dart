@@ -15,6 +15,7 @@ import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
 import '../services/deletion_persistence_service.dart';
 import '../widgets/comment_tile.dart';
+import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
 
@@ -293,13 +294,19 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                 subtitle: const Text('Permanently removes from your account'),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _enqueueSingle(itemId, displayText, isComment);
+                  showDeletionMethodPicker(
+                    context,
+                    ref: ref,
+                    ids: {itemId},
+                    onApiChosen: () =>
+                        _enqueueSingle(itemId, displayText, isComment),
+                  );
                 },
               ),
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Remove locally'),
-              subtitle: const Text('Hides from this app only'),
+              subtitle: const Text('For comments you already deleted outside the app'),
               onTap: () {
                 Navigator.pop(ctx);
                 _removeLocally({itemId}, isComment);
@@ -356,14 +363,17 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         child: Row(
           children: [
             Expanded(
-              child: FilledButton.icon(
-                onPressed: () => _confirmLocalDelete(
-                    context, selectedCommentIds, selectedLiveChatIds),
-                icon: const Icon(Icons.delete_outline),
-                label: Text('Remove ${selectedIds.length} locally'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError,
+              child: Tooltip(
+                message: 'For items you already deleted outside the app',
+                child: FilledButton.icon(
+                  onPressed: () => _confirmLocalDelete(
+                      context, selectedCommentIds, selectedLiveChatIds),
+                  icon: const Icon(Icons.delete_outline),
+                  label: Text('Remove ${selectedIds.length} locally'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
                 ),
               ),
             ),
@@ -399,7 +409,10 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Remove Items'),
-        content: Text('Remove $total selected item(s) from the list?'),
+        content: Text(
+            'Remove $total item(s) from the list?\n\n'
+            'Use this for items you already deleted manually outside the app. '
+            'This does not delete them from YouTube.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -430,28 +443,15 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     Set<String> commentIds,
     Set<String> liveChatIds,
   ) {
-    final total = commentIds.length + liveChatIds.length;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete from YouTube'),
-        content: Text(
-            'Queue $total selected item(s) for permanent deletion from YouTube?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _enqueueSelected(comments, liveChats, commentIds, liveChatIds);
-              _exitSelectionMode();
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final allIds = {...commentIds, ...liveChatIds};
+    showDeletionMethodPicker(
+      context,
+      ref: ref,
+      ids: allIds,
+      onApiChosen: () {
+        _enqueueSelected(comments, liveChats, commentIds, liveChatIds);
+        _exitSelectionMode();
+      },
     );
   }
 

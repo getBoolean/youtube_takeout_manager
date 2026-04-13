@@ -110,3 +110,19 @@ class HomeRoute extends PageRouteInfo<void> {
     },
   );
 }
+
+/// generated route for
+/// [ScriptDeletionScreen]
+class ScriptDeletionRoute extends PageRouteInfo<void> {
+  const ScriptDeletionRoute({List<PageRouteInfo>? children})
+    : super(ScriptDeletionRoute.name, initialChildren: children);
+
+  static const String name = 'ScriptDeletionRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const ScriptDeletionScreen();
+    },
+  );
+}
