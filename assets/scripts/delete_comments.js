@@ -106,11 +106,34 @@
   }
 
   console.log(`\nDone! ${results.succeeded.length} succeeded, ${results.failed.length} failed`);
-  try {
-    copy(JSON.stringify(results));
-    console.log('Results copied to clipboard. Paste them back into the app.');
-  } catch (e) {
-    console.log('Could not copy to clipboard. Copy the JSON below manually:');
-    console.log(JSON.stringify(results));
-  }
+  const resultsJson = JSON.stringify(results);
+
+  // Create a clickable "Copy Results" button in the console
+  const btnStyle = 'font-size:14px;padding:6px 16px;background:#1a73e8;color:#fff;border:none;border-radius:4px;cursor:pointer;';
+  const btn = document.createElement('button');
+  btn.textContent = 'Copy Results to Clipboard';
+  btn.setAttribute('style', btnStyle);
+  btn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(resultsJson);
+      btn.textContent = 'Copied!';
+      btn.style.background = '#188038';
+    } catch (e) {
+      // Fallback: select from a temporary textarea
+      const ta = document.createElement('textarea');
+      ta.value = resultsJson;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      btn.textContent = 'Copied!';
+      btn.style.background = '#188038';
+    }
+  };
+  document.body.appendChild(btn);
+  btn.style.position = 'fixed';
+  btn.style.bottom = '20px';
+  btn.style.right = '20px';
+  btn.style.zIndex = '999999';
+  console.log('%c👆 Click the blue button in the bottom-right corner to copy results, then paste them back into the app.', 'font-size:13px;font-weight:bold;');
 })();
