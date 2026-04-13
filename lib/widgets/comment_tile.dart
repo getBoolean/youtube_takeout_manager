@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/comment.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
+import 'superchat_card.dart';
 
 class CommentTile extends StatelessWidget {
   final Comment comment;
@@ -24,6 +25,27 @@ class CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spans = buildCommentSpans(comment.rawCommentText, emojiSize: 20);
+
+    if (comment.price > 0) {
+      final subtitle = isDeleted
+          ? 'Deleted • ${formatDateTime(comment.createdAt)}'
+          : '${formatDateTime(comment.createdAt)}'
+              '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}';
+
+      return SuperChatCard(
+        priceMicros: comment.price,
+        currencyCode: 'USD',
+        messageSpans: spans,
+        subtitleText: subtitle,
+        isSelected: isSelected,
+        isDeleted: isDeleted,
+        selectionMode: selectionMode,
+        onTap: onTap,
+        onLongPress: onLongPress,
+      );
+    }
+
     final isReply = comment.parentCommentId != null;
     final theme = Theme.of(context);
 
@@ -43,12 +65,7 @@ class CommentTile extends StatelessWidget {
                     : theme.colorScheme.primary,
               ),
         title: Text.rich(
-          TextSpan(
-            children: buildCommentSpans(
-              comment.rawCommentText,
-              emojiSize: 20,
-            ),
-          ),
+          TextSpan(children: spans),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: isDeleted

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/live_chat.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
+import 'superchat_card.dart';
 
 class LiveChatTile extends StatelessWidget {
   final LiveChat liveChat;
@@ -24,6 +25,27 @@ class LiveChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final spans = buildCommentSpans(liveChat.rawText, emojiSize: 20);
+
+    if (liveChat.price > 0) {
+      final subtitle = isDeleted
+          ? 'Deleted • ${formatDateTime(liveChat.createdAt)}'
+          : '${formatDateTime(liveChat.createdAt)}'
+              '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}';
+
+      return SuperChatCard(
+        priceMicros: liveChat.price,
+        currencyCode: liveChat.currencyCode ?? 'USD',
+        messageSpans: spans,
+        subtitleText: subtitle,
+        isSelected: isSelected,
+        isDeleted: isDeleted,
+        selectionMode: selectionMode,
+        onTap: onTap,
+        onLongPress: onLongPress,
+      );
+    }
+
     final theme = Theme.of(context);
 
     return Opacity(
@@ -38,12 +60,7 @@ class LiveChatTile extends StatelessWidget {
                     : theme.colorScheme.secondary,
               ),
         title: Text.rich(
-          TextSpan(
-            children: buildCommentSpans(
-              liveChat.rawText,
-              emojiSize: 20,
-            ),
-          ),
+          TextSpan(children: spans),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: isDeleted
