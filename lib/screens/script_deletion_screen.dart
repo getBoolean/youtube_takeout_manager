@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../providers/deleted_ids_providers.dart';
 import '../providers/script_deletion_provider.dart';
 import '../providers/takeout_providers.dart';
-import '../services/deletion_persistence_service.dart';
 import '../services/script_generator_service.dart';
 
 @RoutePage()
@@ -256,14 +256,15 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
         final deletedComments = succeeded.intersection(commentIdSet);
         final deletedLiveChats = succeeded.intersection(liveChatIdSet);
 
-        final persistence = DeletionPersistenceService();
         if (deletedComments.isNotEmpty) {
-          await persistence.addDeletedCommentIds(deletedComments);
-          ref.read(takeoutProvider.notifier).removeComments(deletedComments);
+          await ref
+              .read(deletedCommentIdsProvider.notifier)
+              .markDeleted(deletedComments);
         }
         if (deletedLiveChats.isNotEmpty) {
-          await persistence.addDeletedLiveChatIds(deletedLiveChats);
-          ref.read(takeoutProvider.notifier).removeLiveChats(deletedLiveChats);
+          await ref
+              .read(deletedLiveChatIdsProvider.notifier)
+              .markDeleted(deletedLiveChats);
         }
       }
 

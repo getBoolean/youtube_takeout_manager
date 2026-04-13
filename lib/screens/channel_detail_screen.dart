@@ -8,13 +8,13 @@ import '../models/export_format.dart';
 import '../models/live_chat.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
+import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/export_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
-import '../services/deletion_persistence_service.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
@@ -56,6 +56,10 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     final comments = ref.watch(channelCommentsProvider(widget.channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(widget.channelId));
     final selectedIds = ref.watch(deletionSetProvider);
+    final deletedCommentIds =
+        ref.watch(deletedCommentIdsProvider).value ?? {};
+    final deletedLiveChatIds =
+        ref.watch(deletedLiveChatIdsProvider).value ?? {};
     final takeout = ref.watch(takeoutProvider).value;
     final sub = takeout?.subscriptionsByChannelId[widget.channelId];
     final channelName = sub?.channelTitle ?? 'Unknown Channel';
@@ -65,10 +69,10 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     final useTabs = hasComments && hasLiveChats;
 
     return useTabs
-        ? _buildTabbedView(
-            context, channelName, comments, liveChats, selectedIds)
-        : _buildSingleView(
-            context, channelName, comments, liveChats, selectedIds);
+        ? _buildTabbedView(context, channelName, comments, liveChats,
+            selectedIds, deletedCommentIds, deletedLiveChatIds)
+        : _buildSingleView(context, channelName, comments, liveChats,
+            selectedIds, deletedCommentIds, deletedLiveChatIds);
   }
 
   Widget _buildTabbedView(
@@ -77,6 +81,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     List<Comment> comments,
     List<LiveChat> liveChats,
     Set<String> selectedIds,
+    Set<String> deletedCommentIds,
+    Set<String> deletedLiveChatIds,
   ) {
     return DefaultTabController(
       length: 2,
@@ -89,7 +95,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                   onPressed: _exitSelectionMode,
                 )
               : null,
-          actions: _buildActions(comments, liveChats),
+          actions: _buildActions(comments, liveChats, deletedCommentIds, deletedLiveChatIds),
           bottom: TabBar(
             tabs: [
               Tab(text: 'Comments (${comments.length})'),
@@ -99,8 +105,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         ),
         body: TabBarView(
           children: [
-            _buildCommentList(comments, selectedIds),
-            _buildLiveChatList(liveChats, selectedIds),
+            _buildCommentList(comments, selectedIds, deletedCommentIds),
+            _buildLiveChatList(liveChats, selectedIds, deletedLiveChatIds),
           ],
         ),
         bottomNavigationBar:
@@ -117,6 +123,8 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     List<Comment> comments,
     List<LiveChat> liveChats,
     Set<String> selectedIds,
+    Set<String> deletedCommentIds,
+    Set<String> deletedLiveChatIds,
   ) {
     return Scaffold(
       appBar: AppBar(
@@ -127,12 +135,12 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
                 onPressed: _exitSelectionMode,
               )
             : null,
-        actions: _buildActions(comments, liveChats),
+        actions: _buildActions(comments, liveChats, deletedCommentIds, deletedLiveChatIds),
       ),
       body: comments.isNotEmpty
-          ? _buildCommentList(comments, selectedIds)
+          ? _buildCommentList(comments, selectedIds, deletedCommentIds)
           : liveChats.isNotEmpty
-              ? _buildLiveChatList(liveChats, selectedIds)
+              ? _buildLiveChatList(liveChats, selectedIds, deletedLiveChatIds)
               : const EmptyState(
                   icon: Icons.inbox_outlined,
                   message: 'No interactions found',
@@ -144,7 +152,12 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     );
   }
 
-  List<Widget> _buildActions(List<Comment> comments, List<LiveChat> liveChats) {
+  List<Widget> _buildActions(
+    List<Comment> comments,
+    List<LiveChat> liveChats,
+    Set<String> deletedCommentIds,
+    Set<String> deletedLiveChatIds,
+  ) {
     if (!_selectionMode) {
       return [
         IconButton(
@@ -159,9 +172,13 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         onSelected: (value) {
           final notifier = ref.read(deletionSetProvider.notifier);
           if (value == 'select_all_comments') {
-            notifier.addAll(comments.map((c) => c.commentId));
+            notifier.addAll(comments
+                .where((c) => !deletedCommentIds.contains(c.commentId))
+                .map((c) => c.commentId));
           } else if (value == 'select_all_chats') {
-            notifier.addAll(liveChats.map((c) => c.liveChatId));
+            notifier.addAll(liveChats
+                .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+                .map((c) => c.liveChatId));
           }
         },
         itemBuilder: (context) => [
@@ -216,7 +233,11 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
     );
   }
 
-  Widget _buildCommentList(List<Comment> comments, Set<String> selectedIds) {
+  Widget _buildCommentList(
+    List<Comment> comments,
+    Set<String> selectedIds,
+    Set<String> deletedIds,
+  ) {
     if (comments.isEmpty) {
       return const EmptyState(
           icon: Icons.comment_outlined, message: 'No comments');
@@ -225,27 +246,36 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
       itemCount: comments.length,
       itemBuilder: (context, index) {
         final comment = comments[index];
+        final isDeleted = deletedIds.contains(comment.commentId);
         return CommentTile(
           comment: comment,
           isSelected: selectedIds.contains(comment.commentId),
+          isDeleted: isDeleted,
           selectionMode: _selectionMode,
-          onTap: _selectionMode
-              ? () => _toggleSelection(comment.commentId)
-              : () => _showSingleItemActions(
-                    context,
-                    itemId: comment.commentId,
-                    displayText: comment.displayText,
-                    isComment: true,
-                    videoId: comment.videoId,
-                    commentId: comment.commentId,
-                  ),
-          onLongPress: () => _enterSelectionMode(comment.commentId),
+          onTap: isDeleted
+              ? () {}
+              : _selectionMode
+                  ? () => _toggleSelection(comment.commentId)
+                  : () => _showSingleItemActions(
+                        context,
+                        itemId: comment.commentId,
+                        displayText: comment.displayText,
+                        isComment: true,
+                        videoId: comment.videoId,
+                        commentId: comment.commentId,
+                      ),
+          onLongPress:
+              isDeleted ? () {} : () => _enterSelectionMode(comment.commentId),
         );
       },
     );
   }
 
-  Widget _buildLiveChatList(List<LiveChat> liveChats, Set<String> selectedIds) {
+  Widget _buildLiveChatList(
+    List<LiveChat> liveChats,
+    Set<String> selectedIds,
+    Set<String> deletedIds,
+  ) {
     if (liveChats.isEmpty) {
       return const EmptyState(
           icon: Icons.chat_bubble_outline, message: 'No live chats');
@@ -254,20 +284,25 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
       itemCount: liveChats.length,
       itemBuilder: (context, index) {
         final chat = liveChats[index];
+        final isDeleted = deletedIds.contains(chat.liveChatId);
         return LiveChatTile(
           liveChat: chat,
           isSelected: selectedIds.contains(chat.liveChatId),
+          isDeleted: isDeleted,
           selectionMode: _selectionMode,
-          onTap: _selectionMode
-              ? () => _toggleSelection(chat.liveChatId)
-              : () => _showSingleItemActions(
-                    context,
-                    itemId: chat.liveChatId,
-                    displayText: chat.displayText,
-                    isComment: false,
-                    videoId: chat.videoId,
-                  ),
-          onLongPress: () => _enterSelectionMode(chat.liveChatId),
+          onTap: isDeleted
+              ? () {}
+              : _selectionMode
+                  ? () => _toggleSelection(chat.liveChatId)
+                  : () => _showSingleItemActions(
+                        context,
+                        itemId: chat.liveChatId,
+                        displayText: chat.displayText,
+                        isComment: false,
+                        videoId: chat.videoId,
+                      ),
+          onLongPress:
+              isDeleted ? () {} : () => _enterSelectionMode(chat.liveChatId),
         );
       },
     );
@@ -523,13 +558,10 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   // ---------------------------------------------------------------------------
 
   Future<void> _removeLocally(Set<String> ids, bool isComment) async {
-    final persistence = DeletionPersistenceService();
     if (isComment) {
-      ref.read(takeoutProvider.notifier).removeComments(ids);
-      await persistence.addDeletedCommentIds(ids);
+      await ref.read(deletedCommentIdsProvider.notifier).markDeleted(ids);
     } else {
-      ref.read(takeoutProvider.notifier).removeLiveChats(ids);
-      await persistence.addDeletedLiveChatIds(ids);
+      await ref.read(deletedLiveChatIdsProvider.notifier).markDeleted(ids);
     }
   }
 }

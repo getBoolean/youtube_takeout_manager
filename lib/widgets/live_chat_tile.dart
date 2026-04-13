@@ -7,6 +7,7 @@ import '../utils/date_formatter.dart';
 class LiveChatTile extends StatelessWidget {
   final LiveChat liveChat;
   final bool isSelected;
+  final bool isDeleted;
   final bool selectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -15,6 +16,7 @@ class LiveChatTile extends StatelessWidget {
     super.key,
     required this.liveChat,
     required this.isSelected,
+    this.isDeleted = false,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
@@ -22,30 +24,42 @@ class LiveChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: selectionMode
-          ? Checkbox(value: isSelected, onChanged: (_) => onTap())
-          : Icon(
-              Icons.chat_bubble_outline,
-              color: Theme.of(context).colorScheme.secondary,
+    final theme = Theme.of(context);
+
+    return Opacity(
+      opacity: isDeleted ? 0.5 : 1.0,
+      child: ListTile(
+        leading: selectionMode
+            ? Checkbox(value: isSelected, onChanged: (_) => onTap())
+            : Icon(
+                isDeleted ? Icons.delete_outline : Icons.chat_bubble_outline,
+                color: isDeleted
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.secondary,
+              ),
+        title: Text.rich(
+          TextSpan(
+            children: buildCommentSpans(
+              liveChat.rawText,
+              emojiSize: 20,
             ),
-      title: Text.rich(
-        TextSpan(
-          children: buildCommentSpans(
-            liveChat.rawText,
-            emojiSize: 20,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: isDeleted
+              ? const TextStyle(decoration: TextDecoration.lineThrough)
+              : null,
         ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+        subtitle: Text(
+          isDeleted
+              ? 'Deleted • ${formatDateTime(liveChat.createdAt)}'
+              : '${formatDateTime(liveChat.createdAt)}'
+                  '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}',
+        ),
+        selected: isSelected,
+        onTap: onTap,
+        onLongPress: onLongPress,
       ),
-      subtitle: Text(
-        '${formatDateTime(liveChat.createdAt)}'
-        '${liveChat.videoId != null ? ' • Stream: ${liveChat.videoId}' : ''}',
-      ),
-      selected: isSelected,
-      onTap: onTap,
-      onLongPress: onLongPress,
     );
   }
 }

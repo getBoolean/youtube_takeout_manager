@@ -12,7 +12,6 @@ import '../services/youtube_deletion_service.dart';
 import 'auth_providers.dart';
 import 'deleted_ids_providers.dart';
 import 'quota_provider.dart';
-import 'takeout_providers.dart';
 
 part 'deletion_queue_provider.g.dart';
 
@@ -196,18 +195,16 @@ class DeletionQueue extends _$DeletionQueue {
             ),
           );
 
-          // Persist as deleted and remove from UI.
+          // Persist as deleted and notify UI to re-render with deleted styling.
           final idSet = {nextItem.itemId};
           if (nextItem.itemType == DeletionItemType.comment) {
             await ref
                 .read(deletedCommentIdsProvider.notifier)
                 .markDeleted(idSet);
-            ref.read(takeoutProvider.notifier).removeComments(idSet);
           } else {
             await ref
                 .read(deletedLiveChatIdsProvider.notifier)
                 .markDeleted(idSet);
-            ref.read(takeoutProvider.notifier).removeLiveChats(idSet);
           }
         } else if (result.quotaExceeded) {
           await _updateItem(

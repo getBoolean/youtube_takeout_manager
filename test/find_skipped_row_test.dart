@@ -1,10 +1,15 @@
+// ignore_for_file: avoid_print
+
 import 'dart:io';
+
 import 'package:csv/csv.dart';
-import 'package:test/test.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('find skipped rows', () {
-    final dir = Directory('takeout_extracted/Takeout/YouTube and YouTube Music/comments');
+    final dir = Directory(
+      'takeout_extracted/Takeout/YouTube and YouTube Music/comments',
+    );
     final csv = Csv(autoDetect: false);
     var totalSkipped = 0;
 

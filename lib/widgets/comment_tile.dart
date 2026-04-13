@@ -7,6 +7,7 @@ import '../utils/date_formatter.dart';
 class CommentTile extends StatelessWidget {
   final Comment comment;
   final bool isSelected;
+  final bool isDeleted;
   final bool selectionMode;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -15,6 +16,7 @@ class CommentTile extends StatelessWidget {
     super.key,
     required this.comment,
     required this.isSelected,
+    this.isDeleted = false,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
@@ -23,31 +25,46 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isReply = comment.parentCommentId != null;
+    final theme = Theme.of(context);
 
-    return ListTile(
-      leading: selectionMode
-          ? Checkbox(value: isSelected, onChanged: (_) => onTap())
-          : Icon(
-              isReply ? Icons.reply : Icons.comment_outlined,
-              color: Theme.of(context).colorScheme.primary,
+    return Opacity(
+      opacity: isDeleted ? 0.5 : 1.0,
+      child: ListTile(
+        leading: selectionMode
+            ? Checkbox(value: isSelected, onChanged: (_) => onTap())
+            : Icon(
+                isDeleted
+                    ? Icons.delete_outline
+                    : isReply
+                        ? Icons.reply
+                        : Icons.comment_outlined,
+                color: isDeleted
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+              ),
+        title: Text.rich(
+          TextSpan(
+            children: buildCommentSpans(
+              comment.rawCommentText,
+              emojiSize: 20,
             ),
-      title: Text.rich(
-        TextSpan(
-          children: buildCommentSpans(
-            comment.rawCommentText,
-            emojiSize: 20,
           ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: isDeleted
+              ? const TextStyle(decoration: TextDecoration.lineThrough)
+              : null,
         ),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
+        subtitle: Text(
+          isDeleted
+              ? 'Deleted • ${formatDateTime(comment.createdAt)}'
+              : '${formatDateTime(comment.createdAt)}'
+                  '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}',
+        ),
+        selected: isSelected,
+        onTap: onTap,
+        onLongPress: onLongPress,
       ),
-      subtitle: Text(
-        '${formatDateTime(comment.createdAt)}'
-        '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}',
-      ),
-      selected: isSelected,
-      onTap: onTap,
-      onLongPress: onLongPress,
     );
   }
 }
