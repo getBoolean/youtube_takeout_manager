@@ -184,6 +184,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             56 + 4, // search bar + progress indicator
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (progress.isFetching && progress.total > 0)
                 LinearProgressIndicator(
