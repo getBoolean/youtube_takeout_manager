@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/live_chat.dart';
+import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
 
 class LiveChatTile extends StatelessWidget {
@@ -28,8 +29,13 @@ class LiveChatTile extends StatelessWidget {
               Icons.chat_bubble_outline,
               color: Theme.of(context).colorScheme.secondary,
             ),
-      title: Text(
-        liveChat.displayText,
+      title: Text.rich(
+        TextSpan(
+          children: buildCommentSpans(
+            liveChat.rawText,
+            emojiSize: 20,
+          ),
+        ),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),

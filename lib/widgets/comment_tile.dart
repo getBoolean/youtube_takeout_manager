@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/comment.dart';
+import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
 
 class CommentTile extends StatelessWidget {
@@ -30,8 +31,13 @@ class CommentTile extends StatelessWidget {
               isReply ? Icons.reply : Icons.comment_outlined,
               color: Theme.of(context).colorScheme.primary,
             ),
-      title: Text(
-        comment.displayText,
+      title: Text.rich(
+        TextSpan(
+          children: buildCommentSpans(
+            comment.rawCommentText,
+            emojiSize: 20,
+          ),
+        ),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),

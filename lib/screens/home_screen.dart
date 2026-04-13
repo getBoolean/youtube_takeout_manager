@@ -307,14 +307,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     icon: Icons.comment_outlined,
                     label: 'Comments',
                     count: commentCount,
-                    rawCount: takeout.parsedCommentRows,
+                    skippedCount: droppedComments,
                   ),
                   const SizedBox(height: 12),
                   _SummaryRow(
                     icon: Icons.chat_bubble_outline,
                     label: 'Live Chats',
                     count: liveChatCount,
-                    rawCount: takeout.parsedLiveChatRows,
+                    skippedCount: droppedLiveChats,
                   ),
                   const SizedBox(height: 12),
                   _SummaryRow(
@@ -348,28 +348,27 @@ class _SummaryRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final int count;
-  final int? rawCount;
+  final int skippedCount;
 
   const _SummaryRow({
     required this.icon,
     required this.label,
     required this.count,
-    this.rawCount,
+    this.skippedCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final dropped = rawCount != null ? rawCount! - count : 0;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 20),
         const SizedBox(width: 8),
         Text('$count $label'),
-        if (dropped > 0) ...[
+        if (skippedCount > 0) ...[
           const SizedBox(width: 8),
           Text(
-            '($dropped skipped)',
+            '($skippedCount skipped)',
             style: TextStyle(
               color: Theme.of(context).colorScheme.error,
               fontSize: 12,
