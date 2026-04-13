@@ -12,6 +12,7 @@ import '../providers/channel_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
+import '../providers/quota_provider.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../widgets/import_progress_indicator.dart';
@@ -137,6 +138,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ref.read(authProvider.notifier).signOut();
               } else if (value == 'clear_cache') {
                 _clearCache();
+              } else if (value == 'reset_quota') {
+                _resetQuota();
               }
             },
             itemBuilder: (context) => [
@@ -147,6 +150,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const PopupMenuItem(
                 value: 'clear_cache',
                 child: Text('Clear cache'),
+              ),
+              const PopupMenuItem(
+                value: 'reset_quota',
+                child: Text('Reset quota usage'),
               ),
             ],
           ),
@@ -249,6 +256,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ..clearSnackBars()
         ..showSnackBar(
           const SnackBar(content: Text('Cache cleared.')),
+        );
+    }
+  }
+
+  Future<void> _resetQuota() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reset Quota Usage'),
+        content: const Text(
+          'This will reset the tracked API quota usage to zero. '
+          'Use this if the count is out of sync with your actual usage.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reset'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await ref.read(quotaProvider.notifier).resetUsage();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Quota usage reset.')),
         );
     }
   }

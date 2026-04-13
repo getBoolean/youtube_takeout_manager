@@ -31,6 +31,14 @@ class QuotaNotifier extends _$QuotaNotifier {
     await _persistence.saveQuotaState(updated);
   }
 
+  /// Resets all quota usage to zero.
+  Future<void> resetUsage() async {
+    final current = await future;
+    final updated = current.copyWith(usageByOperation: {});
+    state = AsyncData(updated);
+    await _persistence.saveQuotaState(updated);
+  }
+
   /// Resets the quota if a new day has started (checked via persistence).
   Future<void> resetIfNewDay() async {
     final fresh = await _persistence.loadQuotaState();
