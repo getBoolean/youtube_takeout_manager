@@ -48,14 +48,17 @@ Sign-in requires a Google Cloud OAuth client ID. Without it the app runs normall
    - **Data Access** — add scopes: `openid`, `email`, `profile`, and `https://www.googleapis.com/auth/youtube.force-ssl`.
 4. **Create OAuth credentials:**
    - In **Google Auth Platform**, go to **Clients**.
-   - Create a new client with application type **Desktop app**.
-   - Copy the **Client ID** and **Client Secret**.
+   - **Desktop:** Create a client with application type **Desktop app**. Copy the **Client ID** and **Client Secret**.
+   - **Web:** Create a second client with application type **Web application**.
+     - Under **Authorized JavaScript origins**, add the URL where the app will run (e.g. `http://localhost:9000`).
+     - Copy the **Client ID** (no secret is needed for the web client).
 5. **Add credentials to the project:**
    Create a `.env` file in the project root (this file is gitignored):
 
    ```properties
-   GOOGLE_CLIENT_ID=your-client-id
-   GOOGLE_CLIENT_SECRET=your-client-secret
+   GOOGLE_CLIENT_ID=your-desktop-client-id
+   GOOGLE_CLIENT_SECRET=your-desktop-client-secret
+   GOOGLE_WEB_CLIENT_ID=your-web-client-id
    ```
 
    The VS Code launch configurations already pass this file via `--dart-define-from-file`. To run from the command line:
