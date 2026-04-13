@@ -189,18 +189,29 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           ),
       ];
     }
+    final selectableIds = {
+      ...comments
+          .where((c) => !deletedCommentIds.contains(c.commentId))
+          .map((c) => c.commentId),
+      ...liveChats
+          .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+          .map((c) => c.liveChatId),
+    };
+    final selectedIds = ref.watch(deletionSetProvider);
+    final allSelected =
+        selectableIds.isNotEmpty && selectableIds.difference(selectedIds).isEmpty;
+
     return [
       IconButton(
-        icon: const Icon(Icons.select_all),
-        tooltip: 'Select All',
+        icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+        tooltip: allSelected ? 'Deselect All' : 'Select All',
         onPressed: () {
           final notifier = ref.read(deletionSetProvider.notifier);
-          notifier.addAll(comments
-              .where((c) => !deletedCommentIds.contains(c.commentId))
-              .map((c) => c.commentId));
-          notifier.addAll(liveChats
-              .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
-              .map((c) => c.liveChatId));
+          if (allSelected) {
+            notifier.clear();
+          } else {
+            notifier.addAll(selectableIds);
+          }
         },
       ),
     ];
