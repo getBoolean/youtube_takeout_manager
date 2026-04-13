@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'kv_storage_service.dart';
 
 const _deletedCommentIdsKey = 'deleted_comment_ids';
 const _deletedLiveChatIdsKey = 'deleted_live_chat_ids';
@@ -6,28 +6,27 @@ const _deletedLiveChatIdsKey = 'deleted_live_chat_ids';
 /// Persists deleted comment and live chat IDs to local storage
 /// so they survive app restarts.
 class DeletionPersistenceService {
+  final _kv = KvStorageService();
+
   Future<Set<String>> loadDeletedCommentIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList(_deletedCommentIdsKey) ?? []).toSet();
+    return (await _kv.getStringList(_deletedCommentIdsKey) ?? []).toSet();
   }
 
   Future<Set<String>> loadDeletedLiveChatIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList(_deletedLiveChatIdsKey) ?? []).toSet();
+    return (await _kv.getStringList(_deletedLiveChatIdsKey) ?? []).toSet();
   }
 
   Future<void> addDeletedCommentIds(Set<String> ids) async {
-    final prefs = await SharedPreferences.getInstance();
-    final existing = (prefs.getStringList(_deletedCommentIdsKey) ?? []).toSet();
+    final existing =
+        (await _kv.getStringList(_deletedCommentIdsKey) ?? []).toSet();
     existing.addAll(ids);
-    await prefs.setStringList(_deletedCommentIdsKey, existing.toList());
+    await _kv.setStringList(_deletedCommentIdsKey, existing.toList());
   }
 
   Future<void> addDeletedLiveChatIds(Set<String> ids) async {
-    final prefs = await SharedPreferences.getInstance();
     final existing =
-        (prefs.getStringList(_deletedLiveChatIdsKey) ?? []).toSet();
+        (await _kv.getStringList(_deletedLiveChatIdsKey) ?? []).toSet();
     existing.addAll(ids);
-    await prefs.setStringList(_deletedLiveChatIdsKey, existing.toList());
+    await _kv.setStringList(_deletedLiveChatIdsKey, existing.toList());
   }
 }

@@ -1,17 +1,17 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/deletion_queue_item.dart';
 import '../models/deletion_item_status.dart';
 import '../models/deletion_item_type.dart';
+import 'kv_storage_service.dart';
 
 class DeletionQueuePersistenceService {
   static const _key = 'deletion_queue';
 
+  final _kv = KvStorageService();
+
   Future<List<DeletionQueueItem>> loadQueue() async {
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_key);
+    final json = await _kv.getString(_key);
     if (json == null || json.isEmpty) return [];
 
     final list = jsonDecode(json) as List;
@@ -21,9 +21,8 @@ class DeletionQueuePersistenceService {
   }
 
   Future<void> saveQueue(List<DeletionQueueItem> items) async {
-    final prefs = await SharedPreferences.getInstance();
     final list = items.map((e) => e.toMap()).toList();
-    await prefs.setString(_key, jsonEncode(list));
+    await _kv.setString(_key, jsonEncode(list));
   }
 
   /// Returns the set of successfully deleted comment and live chat IDs.

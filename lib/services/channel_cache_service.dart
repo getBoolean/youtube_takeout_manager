@@ -1,15 +1,16 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
+import 'kv_storage_service.dart';
 
 const _cachedThumbnailsKey = 'cached_channel_thumbnails';
 
 /// Persists channel thumbnail URLs to local storage
 /// so they survive app restarts and avoid redundant API calls.
 class ChannelCacheService {
+  final _kv = KvStorageService();
+
   Future<Map<String, String>> loadCachedThumbnails() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_cachedThumbnailsKey);
+    final jsonStr = await _kv.getString(_cachedThumbnailsKey);
     if (jsonStr == null) return {};
 
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -17,7 +18,10 @@ class ChannelCacheService {
   }
 
   Future<void> saveThumbnails(Map<String, String> thumbnails) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cachedThumbnailsKey, jsonEncode(thumbnails));
+    await _kv.setString(_cachedThumbnailsKey, jsonEncode(thumbnails));
+  }
+
+  Future<void> clearThumbnails() async {
+    await _kv.remove(_cachedThumbnailsKey);
   }
 }

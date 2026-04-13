@@ -2,10 +2,10 @@ import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../config/oauth_config.dart';
 import '../models/deletion_item_status.dart';
+import '../services/channel_cache_service.dart';
+import '../services/video_cache_service.dart';
 import '../models/takeout_data.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
@@ -262,10 +262,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('cached_video_metadata');
-    await prefs.remove('video_not_found_ids');
-    await prefs.remove('cached_channel_thumbnails');
+    await VideoCacheService().clearCache();
+    await ChannelCacheService().clearThumbnails();
 
     ref.invalidate(videoMetadataProvider);
     ref.invalidate(channelThumbnailsProvider);

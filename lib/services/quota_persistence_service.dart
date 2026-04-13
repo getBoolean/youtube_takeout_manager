@@ -1,16 +1,16 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/quota_operation.dart';
 import '../models/quota_state.dart';
+import 'kv_storage_service.dart';
 
 class QuotaPersistenceService {
   static const _key = 'quota_state';
 
+  final _kv = KvStorageService();
+
   Future<QuotaState> loadQuotaState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_key);
+    final json = await _kv.getString(_key);
     if (json == null || json.isEmpty) return _freshState();
 
     final map = jsonDecode(json) as Map<String, dynamic>;
@@ -25,8 +25,7 @@ class QuotaPersistenceService {
   }
 
   Future<void> saveQuotaState(QuotaState state) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(_toJson(state)));
+    await _kv.setString(_key, jsonEncode(_toJson(state)));
   }
 
   // ---------------------------------------------------------------------------
