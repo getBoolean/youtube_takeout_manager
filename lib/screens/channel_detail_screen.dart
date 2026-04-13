@@ -353,12 +353,12 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
               if (comments.isNotEmpty)
                 const PopupMenuItem(
                   value: 'delete_all_comments',
-                  child: Text('Delete All Comments from YouTube'),
+                  child: Text('Delete All Comments from Channel'),
                 ),
               if (liveChats.isNotEmpty)
                 const PopupMenuItem(
                   value: 'delete_all_chats',
-                  child: Text('Delete All Live Chats from YouTube'),
+                  child: Text('Delete All Live Chats from Channel'),
                 ),
             ],
           ),
