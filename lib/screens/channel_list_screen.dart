@@ -138,15 +138,18 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(
-            56 + 4, // search bar + progress indicator
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          preferredSize: const Size.fromHeight(56),
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
               if (progress.isFetching && progress.total > 0)
-                LinearProgressIndicator(
-                  value: progress.fetched / progress.total,
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: LinearProgressIndicator(
+                    value: progress.fetched / progress.total,
+                  ),
                 ),
               Padding(
                 padding:
