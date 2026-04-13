@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 import 'package:file_saver/file_saver.dart';
@@ -33,29 +32,33 @@ class ExportService {
         'Currency',
       ],
       // Comments
-      ...comments.map((c) => [
-            'comment',
-            c.commentId,
-            c.channelId,
-            channelNames?[c.channelId] ?? '',
-            c.videoId ?? '',
-            c.createdAt.toIso8601String(),
-            c.displayText,
-            c.price,
-            '',
-          ]),
+      ...comments.map(
+        (c) => [
+          'comment',
+          c.commentId,
+          c.channelId,
+          channelNames?[c.channelId] ?? '',
+          c.videoId ?? '',
+          c.createdAt.toIso8601String(),
+          c.displayText,
+          c.price,
+          '',
+        ],
+      ),
       // Live chats
-      ...liveChats.map((c) => [
-            'live_chat',
-            c.liveChatId,
-            c.channelId,
-            channelNames?[c.channelId] ?? '',
-            c.videoId ?? '',
-            c.createdAt.toIso8601String(),
-            c.displayText,
-            c.price,
-            c.currencyCode ?? '',
-          ]),
+      ...liveChats.map(
+        (c) => [
+          'live_chat',
+          c.liveChatId,
+          c.channelId,
+          channelNames?[c.channelId] ?? '',
+          c.videoId ?? '',
+          c.createdAt.toIso8601String(),
+          c.displayText,
+          c.price,
+          c.currencyCode ?? '',
+        ],
+      ),
     ];
 
     return _csv.encode(rows);
@@ -69,28 +72,32 @@ class ExportService {
   }) {
     final data = {
       'comments': comments
-          .map((c) => {
-                'id': c.commentId,
-                'channelId': c.channelId,
-                'channelName': channelNames?[c.channelId],
-                'videoId': c.videoId,
-                'date': c.createdAt.toIso8601String(),
-                'text': c.displayText,
-                'parentCommentId': c.parentCommentId,
-                'price': c.price,
-              })
+          .map(
+            (c) => {
+              'id': c.commentId,
+              'channelId': c.channelId,
+              'channelName': channelNames?[c.channelId],
+              'videoId': c.videoId,
+              'date': c.createdAt.toIso8601String(),
+              'text': c.displayText,
+              'parentCommentId': c.parentCommentId,
+              'price': c.price,
+            },
+          )
           .toList(),
       'liveChats': liveChats
-          .map((c) => {
-                'id': c.liveChatId,
-                'channelId': c.channelId,
-                'channelName': channelNames?[c.channelId],
-                'videoId': c.videoId,
-                'date': c.createdAt.toIso8601String(),
-                'text': c.displayText,
-                'price': c.price,
-                'currency': c.currencyCode,
-              })
+          .map(
+            (c) => {
+              'id': c.liveChatId,
+              'channelId': c.channelId,
+              'channelName': channelNames?[c.channelId],
+              'videoId': c.videoId,
+              'date': c.createdAt.toIso8601String(),
+              'text': c.displayText,
+              'price': c.price,
+              'currency': c.currencyCode,
+            },
+          )
           .toList(),
     };
 
@@ -105,9 +112,7 @@ class ExportService {
     ExportFormat format,
   ) async {
     final ext = format == ExportFormat.csv ? 'csv' : 'json';
-    final mimeType = format == ExportFormat.csv
-        ? MimeType.csv
-        : MimeType.json;
+    final mimeType = format == ExportFormat.csv ? MimeType.csv : MimeType.json;
     final bytes = Uint8List.fromList(utf8.encode(content));
 
     if (kIsWeb) {
