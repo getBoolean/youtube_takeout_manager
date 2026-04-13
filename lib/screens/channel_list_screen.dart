@@ -175,9 +175,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
     final filtered = ref.watch(filteredChannelsProvider);
     final progress = ref.watch(videoFetchProgressProvider);
-    final isLoading = takeoutAsync.isLoading ||
-        (!takeoutAsync.hasValue && !takeoutAsync.hasError) ||
-        (filtered.isEmpty && progress.isFetching);
+    final query = ref.watch(channelSearchQueryProvider);
+    final videoMetadata = ref.watch(videoMetadataProvider);
+    final hasData = takeoutAsync.hasValue && takeoutAsync.value != null;
+    final isLoading = !hasData ||
+        (filtered.isEmpty && query.isEmpty &&
+            (progress.isFetching || videoMetadata.isLoading));
 
     if (isLoading) {
       return _buildLoadingSkeleton();
