@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
 
+
 /// A parsed segment of a comment/live chat text field.
 sealed class CommentSegment {
   const CommentSegment();
@@ -72,6 +73,7 @@ List<InlineSpan> buildCommentSpans(String raw, {required double emojiSize}) {
         url,
         width: emojiSize,
         height: emojiSize,
+        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
         errorBuilder: (_, _, _) => SizedBox(
           width: emojiSize,
           height: emojiSize,

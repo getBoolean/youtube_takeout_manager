@@ -195,18 +195,23 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         CircleAvatar(
           radius: 16,
           backgroundColor: theme.colorScheme.primaryContainer,
-          backgroundImage: thumbnailUrl != null
-              ? NetworkImage(thumbnailUrl)
-              : null,
-          child: thumbnailUrl == null
-              ? Text(
+          child: thumbnailUrl != null
+              ? ClipOval(
+                  child: Image.network(
+                    thumbnailUrl,
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
+                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                  ),
+                )
+              : Text(
                   channelName[0].toUpperCase(),
                   style: TextStyle(
                     color: theme.colorScheme.onPrimaryContainer,
                     fontSize: 14,
                   ),
-                )
-              : null,
+                ),
         ),
         const SizedBox(width: 12),
         Expanded(child: Text(channelName, overflow: TextOverflow.ellipsis)),

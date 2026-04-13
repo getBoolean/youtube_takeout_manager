@@ -140,9 +140,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (authState.photoUrl != null)
-            CircleAvatar(
-              radius: 14,
-              backgroundImage: NetworkImage(authState.photoUrl!),
+            ClipOval(
+              child: Image.network(
+                authState.photoUrl!,
+                width: 28,
+                height: 28,
+                fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+              ),
             )
           else
             const Icon(Icons.account_circle),
