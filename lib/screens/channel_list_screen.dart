@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
+import '../providers/takeout_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/live_chat_providers.dart';
@@ -107,10 +108,80 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     super.dispose();
   }
 
+  Widget _buildLoadingSkeleton() {
+    final theme = Theme.of(context);
+    final skeletonColor = theme.colorScheme.surfaceContainerHighest;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Channels'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56 + 4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: const SearchBar(
+              hintText: 'Search channels...',
+              leading: Icon(Icons.search),
+              enabled: false,
+            ),
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 10,
+        itemExtent: 56,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              CircleAvatar(radius: 16, backgroundColor: skeletonColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 14,
+                      width: 140,
+                      decoration: BoxDecoration(
+                        color: skeletonColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      height: 12,
+                      width: 80,
+                      decoration: BoxDecoration(
+                        color: skeletonColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final takeoutAsync = ref.watch(takeoutProvider);
+
     final filtered = ref.watch(filteredChannelsProvider);
     final progress = ref.watch(videoFetchProgressProvider);
+    final isLoading = takeoutAsync.isLoading ||
+        (!takeoutAsync.hasValue && !takeoutAsync.hasError) ||
+        (filtered.isEmpty && progress.isFetching);
+
+    if (isLoading) {
+      return _buildLoadingSkeleton();
+    }
 
     return Scaffold(
       appBar: AppBar(

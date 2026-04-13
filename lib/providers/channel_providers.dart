@@ -53,7 +53,17 @@ class ChannelThumbnails extends _$ChannelThumbnails {
   bool _fetchInProgress = false;
 
   @override
-  Map<String, String> build() => {};
+  Map<String, String> build() {
+    _loadCacheOnInit();
+    return {};
+  }
+
+  Future<void> _loadCacheOnInit() async {
+    final cached = await _cacheService.loadCachedThumbnails();
+    if (cached.isNotEmpty) {
+      state = {...state, ...cached};
+    }
+  }
 
   /// Loads cached channel thumbnails from local storage.
   Future<void> loadCache() async {

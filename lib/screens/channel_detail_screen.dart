@@ -8,6 +8,7 @@ import '../models/export_format.dart';
 import '../models/live_chat.dart';
 import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
+import '../providers/takeout_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_providers.dart';
@@ -38,6 +39,20 @@ class ChannelDetailScreen extends ConsumerStatefulWidget {
 class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   bool _selectionMode = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!context.router.canPop()) {
+        context.router.replaceAll([
+          const HomeRoute(),
+          const ChannelListRoute(),
+          ChannelDetailRoute(channelId: widget.channelId),
+        ]);
+      }
+    });
+  }
+
   void _toggleSelection(String id) {
     ref.read(deletionSetProvider.notifier).toggle(id);
   }
@@ -54,6 +69,12 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final takeoutAsync = ref.watch(takeoutProvider);
+
+    if (takeoutAsync.isLoading || (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {
+      return _buildLoadingSkeleton();
+    }
+
     final comments = ref.watch(channelCommentsProvider(widget.channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(widget.channelId));
     final selectedIds = ref.watch(deletionSetProvider);
@@ -112,12 +133,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         appBar: AppBar(
           titleSpacing: 0,
           title: _buildTitle(channelName, thumbnailUrl),
-          leading: _selectionMode
-              ? IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: _exitSelectionMode,
-                )
-              : null,
+          leading: _buildLeading(),
           actions: _buildActions(
             channelUrl,
             comments,
@@ -160,12 +176,7 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         title: _buildTitle(channelName, thumbnailUrl),
-        leading: _selectionMode
-            ? IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: _exitSelectionMode,
-              )
-            : null,
+        leading: _buildLeading(),
         actions: _buildActions(
           channelUrl,
           comments,
@@ -186,6 +197,92 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
           ? _buildDeletionBar(context, selectedIds, comments, liveChats)
           : null,
     );
+  }
+
+  Widget _buildLoadingSkeleton() {
+    final theme = Theme.of(context);
+    final skeletonColor = theme.colorScheme.surfaceContainerHighest;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        leading: _buildLeading(),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: skeletonColor,
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 120,
+              height: 16,
+              decoration: BoxDecoration(
+                color: skeletonColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 8,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(radius: 16, backgroundColor: skeletonColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 12,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: skeletonColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 12,
+                      width: 200,
+                      decoration: BoxDecoration(
+                        color: skeletonColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildLeading() {
+    if (_selectionMode) {
+      return IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _exitSelectionMode,
+      );
+    }
+    if (!context.router.canPop()) {
+      return IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.router.replaceAll([
+          const HomeRoute(),
+          const ChannelListRoute(),
+        ]),
+      );
+    }
+    return null;
   }
 
   Widget _buildTitle(String channelName, String? thumbnailUrl) {
