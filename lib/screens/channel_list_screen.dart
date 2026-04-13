@@ -188,6 +188,13 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: context.router.canPop()
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () =>
+                    context.router.replaceAll([const HomeRoute()]),
+              ),
         title: const Text('Channels'),
         actions: [
           IconButton(
