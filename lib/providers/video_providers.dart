@@ -37,9 +37,12 @@ class VideoMetadata extends _$VideoMetadata {
     final cached = await _cacheService.loadCachedVideos();
     yield cached;
 
-    // Check prerequisites for API fetching
-    final authState = ref.watch(authProvider);
-    final takeout = ref.watch(takeoutProvider).value;
+    // Re-run when auth or takeout changes, but read current values.
+    ref.listen(authProvider, (_, _) => ref.invalidateSelf());
+    ref.listen(takeoutProvider, (_, _) => ref.invalidateSelf());
+
+    final authState = ref.read(authProvider);
+    final takeout = ref.read(takeoutProvider).value;
     if (authState == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats
