@@ -237,7 +237,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (confirmed != true || !mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+    await prefs.remove('cached_video_metadata');
+    await prefs.remove('video_not_found_ids');
+    await prefs.remove('cached_channel_thumbnails');
 
     ref.invalidate(videoMetadataProvider);
     ref.invalidate(channelThumbnailsProvider);
