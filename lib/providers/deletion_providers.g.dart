@@ -44,7 +44,7 @@ final class DeletionSetProvider
   }
 }
 
-String _$deletionSetHash() => r'02d7a89840b01ac396b24c8751a13e5d48eef203';
+String _$deletionSetHash() => r'9e27415d231c52b092bc38c8479fc3baa4aeb811';
 
 /// Manages the set of IDs currently selected for deletion in the UI.
 

@@ -1,26 +1,30 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/comment.dart';
 import '../models/export_format.dart';
 import '../models/live_chat.dart';
+import '../models/video_group.dart';
 import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
-import '../providers/takeout_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/export_providers.dart';
+import '../providers/grouped_providers.dart';
 import '../providers/live_chat_providers.dart';
+import '../providers/takeout_providers.dart';
 import '../services/export_service.dart';
 import '../router/app_router.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
+import '../widgets/video_group_header.dart';
 
 @RoutePage()
 class ChannelDetailScreen extends ConsumerStatefulWidget {
@@ -38,6 +42,15 @@ class ChannelDetailScreen extends ConsumerStatefulWidget {
 
 class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
   bool _selectionMode = false;
+  final _commentScrollController = ScrollController();
+  final _liveChatScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _commentScrollController.dispose();
+    _liveChatScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -501,33 +514,65 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         message: 'No comments',
       );
     }
-    return ListView.builder(
-      itemCount: comments.length,
-      itemBuilder: (context, index) {
-        final comment = comments[index];
-        final isDeleted = deletedIds.contains(comment.commentId);
-        return CommentTile(
-          comment: comment,
-          isSelected: selectedIds.contains(comment.commentId),
-          isDeleted: isDeleted,
-          selectionMode: _selectionMode,
-          onTap: isDeleted
-              ? () {}
-              : _selectionMode
-              ? () => _toggleSelection(comment.commentId)
-              : () => _showSingleItemActions(
-                  context,
-                  itemId: comment.commentId,
-                  displayText: comment.displayText,
-                  isComment: true,
-                  videoId: comment.videoId,
-                  commentId: comment.commentId,
-                ),
-          onLongPress: isDeleted
-              ? () {}
-              : () => _enterSelectionMode(comment.commentId),
-        );
-      },
+    final groups = ref.watch(
+      groupedChannelCommentsProvider(widget.channelId),
+    );
+    return CustomScrollView(
+      controller: _commentScrollController,
+      slivers: [
+        for (final group in groups)
+          _buildCommentGroup(group, selectedIds, deletedIds),
+      ],
+    );
+  }
+
+  Widget _buildCommentGroup(
+    VideoGroup<Comment> group,
+    Set<String> selectedIds,
+    Set<String> deletedIds,
+  ) {
+    final groupItemIds = group.items.map((c) => c.commentId).toSet();
+    final controller = StickyCollapsablePanelController(key: group.groupKey);
+
+    return SliverStickyCollapsablePanel(
+      scrollController: _commentScrollController,
+      panelController: controller,
+      headerBuilder: (context, status) => VideoGroupHeader(
+        group: group,
+        status: status,
+        selectionMode: _selectionMode,
+        selectedIds: selectedIds,
+        groupItemIds: groupItemIds,
+        onToggleGroupSelection: _toggleGroupSelection,
+      ),
+      sliverPanel: SliverList.builder(
+        itemCount: group.items.length,
+        itemBuilder: (context, index) {
+          final comment = group.items[index];
+          final isDeleted = deletedIds.contains(comment.commentId);
+          return CommentTile(
+            comment: comment,
+            isSelected: selectedIds.contains(comment.commentId),
+            isDeleted: isDeleted,
+            selectionMode: _selectionMode,
+            onTap: isDeleted
+                ? () {}
+                : _selectionMode
+                ? () => _toggleSelection(comment.commentId)
+                : () => _showSingleItemActions(
+                    context,
+                    itemId: comment.commentId,
+                    displayText: comment.displayText,
+                    isComment: true,
+                    videoId: comment.videoId,
+                    commentId: comment.commentId,
+                  ),
+            onLongPress: isDeleted
+                ? () {}
+                : () => _enterSelectionMode(comment.commentId),
+          );
+        },
+      ),
     );
   }
 
@@ -542,33 +587,76 @@ class _ChannelDetailScreenState extends ConsumerState<ChannelDetailScreen> {
         message: 'No live chats',
       );
     }
-    return ListView.builder(
-      itemCount: liveChats.length,
-      itemBuilder: (context, index) {
-        final chat = liveChats[index];
-        final isDeleted = deletedIds.contains(chat.liveChatId);
-        return LiveChatTile(
-          liveChat: chat,
-          isSelected: selectedIds.contains(chat.liveChatId),
-          isDeleted: isDeleted,
-          selectionMode: _selectionMode,
-          onTap: isDeleted
-              ? () {}
-              : _selectionMode
-              ? () => _toggleSelection(chat.liveChatId)
-              : () => _showSingleItemActions(
-                  context,
-                  itemId: chat.liveChatId,
-                  displayText: chat.displayText,
-                  isComment: false,
-                  videoId: chat.videoId,
-                ),
-          onLongPress: isDeleted
-              ? () {}
-              : () => _enterSelectionMode(chat.liveChatId),
-        );
-      },
+    final groups = ref.watch(
+      groupedChannelLiveChatsProvider(widget.channelId),
     );
+    return CustomScrollView(
+      controller: _liveChatScrollController,
+      slivers: [
+        for (final group in groups)
+          _buildLiveChatGroup(group, selectedIds, deletedIds),
+      ],
+    );
+  }
+
+  Widget _buildLiveChatGroup(
+    VideoGroup<LiveChat> group,
+    Set<String> selectedIds,
+    Set<String> deletedIds,
+  ) {
+    final groupItemIds = group.items.map((c) => c.liveChatId).toSet();
+    final controller = StickyCollapsablePanelController(key: group.groupKey);
+
+    return SliverStickyCollapsablePanel(
+      scrollController: _liveChatScrollController,
+      panelController: controller,
+      headerBuilder: (context, status) => VideoGroupHeader(
+        group: group,
+        status: status,
+        selectionMode: _selectionMode,
+        selectedIds: selectedIds,
+        groupItemIds: groupItemIds,
+        onToggleGroupSelection: _toggleGroupSelection,
+      ),
+      sliverPanel: SliverList.builder(
+        itemCount: group.items.length,
+        itemBuilder: (context, index) {
+          final chat = group.items[index];
+          final isDeleted = deletedIds.contains(chat.liveChatId);
+          return LiveChatTile(
+            liveChat: chat,
+            isSelected: selectedIds.contains(chat.liveChatId),
+            isDeleted: isDeleted,
+            selectionMode: _selectionMode,
+            onTap: isDeleted
+                ? () {}
+                : _selectionMode
+                ? () => _toggleSelection(chat.liveChatId)
+                : () => _showSingleItemActions(
+                    context,
+                    itemId: chat.liveChatId,
+                    displayText: chat.displayText,
+                    isComment: false,
+                    videoId: chat.videoId,
+                  ),
+            onLongPress: isDeleted
+                ? () {}
+                : () => _enterSelectionMode(chat.liveChatId),
+          );
+        },
+      ),
+    );
+  }
+
+  void _toggleGroupSelection(Set<String> groupItemIds) {
+    final notifier = ref.read(deletionSetProvider.notifier);
+    final selectedIds = ref.read(deletionSetProvider);
+    final allSelected = groupItemIds.difference(selectedIds).isEmpty;
+    if (allSelected) {
+      notifier.removeAll(groupItemIds);
+    } else {
+      notifier.addAll(groupItemIds);
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -30,8 +30,7 @@ class CommentTile extends StatelessWidget {
     if (comment.price > 0) {
       final subtitle = isDeleted
           ? 'Deleted • ${formatDateTime(comment.createdAt)}'
-          : '${formatDateTime(comment.createdAt)}'
-                '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}';
+          : formatDateTime(comment.createdAt);
 
       return SuperChatCard(
         priceMicros: comment.price,
@@ -75,8 +74,7 @@ class CommentTile extends StatelessWidget {
         subtitle: Text(
           isDeleted
               ? 'Deleted • ${formatDateTime(comment.createdAt)}'
-              : '${formatDateTime(comment.createdAt)}'
-                    '${comment.videoId != null ? ' • Video: ${comment.videoId}' : ''}',
+              : formatDateTime(comment.createdAt),
         ),
         selected: isSelected,
         onTap: onTap,

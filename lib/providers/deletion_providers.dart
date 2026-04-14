@@ -23,6 +23,10 @@ class DeletionSet extends _$DeletionSet {
     state = {...state, ...ids};
   }
 
+  void removeAll(Iterable<String> ids) {
+    state = {...state}..removeAll(ids);
+  }
+
   void clear() {
     state = {};
   }

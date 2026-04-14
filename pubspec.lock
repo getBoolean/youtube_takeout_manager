@@ -909,6 +909,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  sliver_sticky_collapsable_panel:
+    dependency: "direct main"
+    description:
+      name: sliver_sticky_collapsable_panel
+      sha256: "202b1154227cd4fa04e24240b474a83370f5415aa42667622755810b54bf96ec"
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.1"
   source_gen:
     dependency: transitive
     description:
