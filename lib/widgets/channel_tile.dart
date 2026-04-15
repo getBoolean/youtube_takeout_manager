@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../models/channel.dart';
+import 'highlighted_text.dart';
 
 class ChannelTile extends StatelessWidget {
   final Channel channel;
+  final String? highlightQuery;
   final VoidCallback onTap;
 
-  const ChannelTile({super.key, required this.channel, required this.onTap});
+  const ChannelTile({
+    super.key,
+    required this.channel,
+    required this.onTap,
+    this.highlightQuery,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,14 +37,16 @@ class ChannelTile extends StatelessWidget {
                 style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
               ),
       ),
-      title: Text(
+      title: HighlightedText(
         channel.channelTitle ?? 'Unknown Channel',
+        query: highlightQuery,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: channel.channelTitle == null
-          ? Text(
+          ? HighlightedText(
               channel.channelId,
+              query: highlightQuery,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall,

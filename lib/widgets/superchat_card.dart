@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/superchat_colors.dart';
+import 'highlighted_text.dart';
 
 class SuperChatCard extends StatelessWidget {
   final double priceMicros;
@@ -10,6 +11,7 @@ class SuperChatCard extends StatelessWidget {
   final bool isSelected;
   final bool isDeleted;
   final bool selectionMode;
+  final String? highlightQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -24,6 +26,7 @@ class SuperChatCard extends StatelessWidget {
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
+    this.highlightQuery,
   });
 
   @override
@@ -118,8 +121,9 @@ class SuperChatCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text.rich(
-                              TextSpan(children: messageSpans),
+                            HighlightedText.rich(
+                              messageSpans,
+                              query: highlightQuery,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
@@ -128,6 +132,12 @@ class SuperChatCard extends StatelessWidget {
                                 decoration: isDeleted
                                     ? TextDecoration.lineThrough
                                     : null,
+                              ),
+                              matchStyle: TextStyle(
+                                color: tier.textColor,
+                                fontWeight: FontWeight.w800,
+                                decoration: TextDecoration.underline,
+                                decorationColor: tier.textColor,
                               ),
                             ),
                             const SizedBox(height: 6),

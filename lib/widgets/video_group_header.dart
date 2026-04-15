@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/video.dart';
 import '../models/video_group.dart';
 import '../providers/video_providers.dart';
+import 'highlighted_text.dart';
 
 class VideoGroupHeader extends ConsumerWidget {
   final VideoGroup group;
@@ -13,6 +14,7 @@ class VideoGroupHeader extends ConsumerWidget {
   final bool selectionMode;
   final bool allSelected;
   final bool someSelected;
+  final String? highlightQuery;
   final VoidCallback onToggleGroupSelection;
 
   const VideoGroupHeader({
@@ -23,6 +25,7 @@ class VideoGroupHeader extends ConsumerWidget {
     required this.allSelected,
     required this.someSelected,
     required this.onToggleGroupSelection,
+    this.highlightQuery,
   });
 
   @override
@@ -61,8 +64,9 @@ class VideoGroupHeader extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    HighlightedText(
                       title,
+                      query: highlightQuery,
                       style: theme.textTheme.titleSmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

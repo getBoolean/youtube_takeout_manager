@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/live_chat.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
+import 'highlighted_text.dart';
 import 'superchat_card.dart';
 
 class LiveChatTile extends StatelessWidget {
@@ -10,6 +11,7 @@ class LiveChatTile extends StatelessWidget {
   final bool isSelected;
   final bool isDeleted;
   final bool selectionMode;
+  final String? highlightQuery;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -21,6 +23,7 @@ class LiveChatTile extends StatelessWidget {
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
+    this.highlightQuery,
   });
 
   @override
@@ -36,6 +39,7 @@ class LiveChatTile extends StatelessWidget {
         priceMicros: liveChat.price,
         currencyCode: liveChat.currencyCode ?? 'USD',
         messageSpans: spans,
+        highlightQuery: highlightQuery,
         subtitleText: subtitle,
         isSelected: isSelected,
         isDeleted: isDeleted,
@@ -58,8 +62,9 @@ class LiveChatTile extends StatelessWidget {
                     ? theme.colorScheme.error
                     : theme.colorScheme.secondary,
               ),
-        title: Text.rich(
-          TextSpan(children: spans),
+        title: HighlightedText.rich(
+          spans,
+          query: highlightQuery,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: isDeleted

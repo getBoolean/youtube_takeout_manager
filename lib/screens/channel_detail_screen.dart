@@ -427,6 +427,7 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
                         group: groups[i],
                         selectionMode: widget.selectionMode,
                         scrollController: widget.scrollController,
+                        highlightQuery: query,
                       ),
                   ],
                 ),
@@ -440,12 +441,14 @@ class _CommentGroupSliver extends HookConsumerWidget {
   final VideoGroup<Comment> group;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
+  final String highlightQuery;
 
   const _CommentGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
+    required this.highlightQuery,
   });
 
   @override
@@ -483,6 +486,7 @@ class _CommentGroupSliver extends HookConsumerWidget {
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
+        highlightQuery: highlightQuery,
         onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
@@ -494,6 +498,7 @@ class _CommentGroupSliver extends HookConsumerWidget {
             comment: comment,
             isDeleted: isDeleted,
             selectionMode: selectionMode,
+            highlightQuery: highlightQuery,
           );
         },
       ),
@@ -505,11 +510,13 @@ class _CommentTileConsumer extends ConsumerWidget {
   final Comment comment;
   final bool isDeleted;
   final ValueNotifier<bool> selectionMode;
+  final String highlightQuery;
 
   const _CommentTileConsumer({
     required this.comment,
     required this.isDeleted,
     required this.selectionMode,
+    required this.highlightQuery,
   });
 
   @override
@@ -522,6 +529,7 @@ class _CommentTileConsumer extends ConsumerWidget {
       isSelected: isSelected,
       isDeleted: isDeleted,
       selectionMode: selectionMode.value,
+      highlightQuery: highlightQuery,
       onTap: isDeleted
           ? () {}
           : selectionMode.value
@@ -641,6 +649,7 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
                         group: groups[i],
                         selectionMode: widget.selectionMode,
                         scrollController: widget.scrollController,
+                        highlightQuery: query,
                       ),
                   ],
                 ),
@@ -654,12 +663,14 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
   final VideoGroup<LiveChat> group;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
+  final String highlightQuery;
 
   const _LiveChatGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
+    required this.highlightQuery,
   });
 
   @override
@@ -695,6 +706,7 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
+        highlightQuery: highlightQuery,
         onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
@@ -706,6 +718,7 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
             chat: chat,
             isDeleted: isDeleted,
             selectionMode: selectionMode,
+            highlightQuery: highlightQuery,
           );
         },
       ),
@@ -717,11 +730,13 @@ class _LiveChatTileConsumer extends ConsumerWidget {
   final LiveChat chat;
   final bool isDeleted;
   final ValueNotifier<bool> selectionMode;
+  final String highlightQuery;
 
   const _LiveChatTileConsumer({
     required this.chat,
     required this.isDeleted,
     required this.selectionMode,
+    required this.highlightQuery,
   });
 
   @override
@@ -734,6 +749,7 @@ class _LiveChatTileConsumer extends ConsumerWidget {
       isSelected: isSelected,
       isDeleted: isDeleted,
       selectionMode: selectionMode.value,
+      highlightQuery: highlightQuery,
       onTap: isDeleted
           ? () {}
           : selectionMode.value

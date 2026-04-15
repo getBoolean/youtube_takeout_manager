@@ -252,17 +252,23 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   ? 'Loading channels...'
                   : 'No channels found',
             )
-          : ListView.builder(
-              itemExtent: 56,
-              itemCount: filtered.length,
-              itemBuilder: (context, index) {
-                final channel = filtered[index];
-                return ChannelTile(
-                  key: ValueKey(channel.channelId),
-                  channel: channel,
-                  onTap: () => context.router.push(
-                    ChannelDetailRoute(channelId: channel.channelId),
-                  ),
+          : Consumer(
+              builder: (context, ref, _) {
+                final query = ref.watch(channelSearchQueryProvider);
+                return ListView.builder(
+                  itemExtent: 56,
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final channel = filtered[index];
+                    return ChannelTile(
+                      key: ValueKey(channel.channelId),
+                      channel: channel,
+                      highlightQuery: query,
+                      onTap: () => context.router.push(
+                        ChannelDetailRoute(channelId: channel.channelId),
+                      ),
+                    );
+                  },
                 );
               },
             ),
