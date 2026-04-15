@@ -62,20 +62,20 @@ class ChannelDetailScreen extends HookConsumerWidget {
       return const _LoadingSkeleton();
     }
 
-    final comments = ref.watch(channelCommentsProvider(channelId));
-    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-    final selectedIds = ref.watch(deletionSetProvider);
-    final deletedCommentIds = ref.watch(deletedCommentIdsProvider).value ?? {};
-    final deletedLiveChatIds =
-        ref.watch(deletedLiveChatIdsProvider).value ?? {};
-    final channel = ref
-        .watch(channelsProvider)
-        .where((c) => c.channelId == channelId)
-        .firstOrNull;
+    final commentCount = ref.watch(
+      channelCommentsProvider(channelId).select((l) => l.length),
+    );
+    final liveChatCount = ref.watch(
+      channelLiveChatsProvider(channelId).select((l) => l.length),
+    );
+    final hasSelection = ref.watch(
+      deletionSetProvider.select((s) => s.isNotEmpty),
+    );
+    final channel = ref.watch(channelByIdProvider(channelId));
     final channelName = channel?.channelTitle ?? 'Unknown Channel';
 
-    final hasComments = comments.isNotEmpty;
-    final hasLiveChats = liveChats.isNotEmpty;
+    final hasComments = commentCount > 0;
+    final hasLiveChats = liveChatCount > 0;
     final useTabs = hasComments && hasLiveChats;
 
     final body = useTabs
@@ -85,13 +85,11 @@ class ChannelDetailScreen extends HookConsumerWidget {
                 channelId: channelId,
                 selectionMode: selectionMode,
                 scrollController: commentScrollController,
-                deletedIds: deletedCommentIds,
               ),
               _LiveChatListView(
                 channelId: channelId,
                 selectionMode: selectionMode,
                 scrollController: liveChatScrollController,
-                deletedIds: deletedLiveChatIds,
               ),
             ],
           )
@@ -100,14 +98,12 @@ class ChannelDetailScreen extends HookConsumerWidget {
             channelId: channelId,
             selectionMode: selectionMode,
             scrollController: commentScrollController,
-            deletedIds: deletedCommentIds,
           )
         : hasLiveChats
         ? _LiveChatListView(
             channelId: channelId,
             selectionMode: selectionMode,
             scrollController: liveChatScrollController,
-            deletedIds: deletedLiveChatIds,
           )
         : const EmptyState(
             icon: Icons.inbox_outlined,
@@ -121,34 +117,44 @@ class ChannelDetailScreen extends HookConsumerWidget {
           channelName: channelName,
           thumbnailUrl: channel?.thumbnailUrl,
         ),
-        leading: _ChannelLeading(selectionMode: selectionMode),
+        leading: selectionMode.value
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  selectionMode.value = false;
+                  ref.read(deletionSetProvider.notifier).clear();
+                },
+              )
+            : !context.router.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.router.replaceAll([
+                  const HomeRoute(),
+                  const ChannelListRoute(),
+                ]),
+              )
+            : null,
         actions: [
           _ChannelAppBarActions(
             channelId: channelId,
             channelUrl: channel?.channelUrl,
-            comments: comments,
-            liveChats: liveChats,
             selectionMode: selectionMode,
-            deletedCommentIds: deletedCommentIds,
-            deletedLiveChatIds: deletedLiveChatIds,
           ),
         ],
         bottom: useTabs
             ? TabBar(
                 tabs: [
-                  Tab(text: 'Comments (${comments.length})'),
-                  Tab(text: 'Live Chats (${liveChats.length})'),
+                  Tab(text: 'Comments ($commentCount)'),
+                  Tab(text: 'Live Chats ($liveChatCount)'),
                 ],
               )
             : null,
       ),
       body: body,
-      bottomNavigationBar: selectionMode.value && selectedIds.isNotEmpty
+      bottomNavigationBar: selectionMode.value && hasSelection
           ? _DeletionBar(
+              channelId: channelId,
               selectionMode: selectionMode,
-              comments: comments,
-              liveChats: liveChats,
-              selectedIds: selectedIds,
             )
           : null,
     );
@@ -202,71 +208,32 @@ class _ChannelTitle extends StatelessWidget {
   }
 }
 
-class _ChannelLeading extends ConsumerWidget {
-  final ValueNotifier<bool> selectionMode;
-
-  const _ChannelLeading({required this.selectionMode});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (selectionMode.value) {
-      return IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: () {
-          selectionMode.value = false;
-          ref.read(deletionSetProvider.notifier).clear();
-        },
-      );
-    }
-    if (!context.router.canPop()) {
-      return IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => context.router.replaceAll([
-          const HomeRoute(),
-          const ChannelListRoute(),
-        ]),
-      );
-    }
-    return const SizedBox.shrink();
-  }
-}
-
 class _ChannelAppBarActions extends ConsumerWidget {
   final String channelId;
   final String? channelUrl;
-  final List<Comment> comments;
-  final List<LiveChat> liveChats;
   final ValueNotifier<bool> selectionMode;
-  final Set<String> deletedCommentIds;
-  final Set<String> deletedLiveChatIds;
 
   const _ChannelAppBarActions({
     required this.channelId,
     required this.channelUrl,
-    required this.comments,
-    required this.liveChats,
     required this.selectionMode,
-    required this.deletedCommentIds,
-    required this.deletedLiveChatIds,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (selectionMode.value) {
-      return _SelectAllAction(
-        comments: comments,
-        liveChats: liveChats,
-        deletedCommentIds: deletedCommentIds,
-        deletedLiveChatIds: deletedLiveChatIds,
-      );
+      return _SelectAllAction(channelId: channelId);
     }
 
-    final channels = ref.watch(channelsProvider);
-    final channel = channels
-        .where((c) => c.channelId == channelId)
-        .firstOrNull;
+    final channel = ref.watch(channelByIdProvider(channelId));
     final channelName = channel?.channelTitle ?? 'Unknown Channel';
     final authenticated = ref.watch(isAuthenticatedProvider);
+    final hasComments = ref.watch(
+      channelCommentsProvider(channelId).select((l) => l.isNotEmpty),
+    );
+    final hasLiveChats = ref.watch(
+      channelLiveChatsProvider(channelId).select((l) => l.isNotEmpty),
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -288,8 +255,8 @@ class _ChannelAppBarActions extends ConsumerWidget {
             ref,
             channelId: channelId,
             channelName: channelName,
-            comments: comments,
-            liveChats: liveChats,
+            comments: ref.read(channelCommentsProvider(channelId)),
+            liveChats: ref.read(channelLiveChatsProvider(channelId)),
           ),
         ),
         if (authenticated)
@@ -298,18 +265,20 @@ class _ChannelAppBarActions extends ConsumerWidget {
               context,
               ref,
               value: value,
-              comments: comments,
-              liveChats: liveChats,
-              deletedCommentIds: deletedCommentIds,
-              deletedLiveChatIds: deletedLiveChatIds,
+              comments: ref.read(channelCommentsProvider(channelId)),
+              liveChats: ref.read(channelLiveChatsProvider(channelId)),
+              deletedCommentIds:
+                  ref.read(deletedCommentIdsProvider).value ?? {},
+              deletedLiveChatIds:
+                  ref.read(deletedLiveChatIdsProvider).value ?? {},
             ),
             itemBuilder: (_) => [
-              if (comments.isNotEmpty)
+              if (hasComments)
                 const PopupMenuItem(
                   value: 'delete_all_comments',
                   child: Text('Delete All Comments from Channel'),
                 ),
-              if (liveChats.isNotEmpty)
+              if (hasLiveChats)
                 const PopupMenuItem(
                   value: 'delete_all_chats',
                   child: Text('Delete All Live Chats from Channel'),
@@ -322,20 +291,17 @@ class _ChannelAppBarActions extends ConsumerWidget {
 }
 
 class _SelectAllAction extends ConsumerWidget {
-  final List<Comment> comments;
-  final List<LiveChat> liveChats;
-  final Set<String> deletedCommentIds;
-  final Set<String> deletedLiveChatIds;
+  final String channelId;
 
-  const _SelectAllAction({
-    required this.comments,
-    required this.liveChats,
-    required this.deletedCommentIds,
-    required this.deletedLiveChatIds,
-  });
+  const _SelectAllAction({required this.channelId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final comments = ref.watch(channelCommentsProvider(channelId));
+    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
+    final deletedCommentIds = ref.watch(deletedCommentIdsProvider).value ?? {};
+    final deletedLiveChatIds =
+        ref.watch(deletedLiveChatIdsProvider).value ?? {};
     final selectableIds = {
       ...comments
           .where((c) => !deletedCommentIds.contains(c.commentId))
@@ -368,22 +334,30 @@ class _SelectAllAction extends ConsumerWidget {
 // Body: list views and group slivers
 // =============================================================================
 
-class _CommentListView extends ConsumerWidget {
+class _CommentListView extends ConsumerStatefulWidget {
   final String channelId;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
-  final Set<String> deletedIds;
 
   const _CommentListView({
     required this.channelId,
     required this.selectionMode,
     required this.scrollController,
-    required this.deletedIds,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final groups = ref.watch(groupedChannelCommentsProvider(channelId));
+  ConsumerState<_CommentListView> createState() => _CommentListViewState();
+}
+
+class _CommentListViewState extends ConsumerState<_CommentListView>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final groups = ref.watch(groupedChannelCommentsProvider(widget.channelId));
     if (groups.isEmpty) {
       return const EmptyState(
         icon: Icons.comment_outlined,
@@ -391,15 +365,14 @@ class _CommentListView extends ConsumerWidget {
       );
     }
     return CustomScrollView(
-      controller: scrollController,
+      controller: widget.scrollController,
       slivers: [
         for (final group in groups)
           _CommentGroupSliver(
             key: ValueKey('comment-group-${group.groupKey}'),
             group: group,
-            selectionMode: selectionMode,
-            scrollController: scrollController,
-            deletedIds: deletedIds,
+            selectionMode: widget.selectionMode,
+            scrollController: widget.scrollController,
           ),
       ],
     );
@@ -410,14 +383,12 @@ class _CommentGroupSliver extends HookConsumerWidget {
   final VideoGroup<Comment> group;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
-  final Set<String> deletedIds;
 
   const _CommentGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
-    required this.deletedIds,
   });
 
   @override
@@ -427,9 +398,24 @@ class _CommentGroupSliver extends HookConsumerWidget {
     final controller = useMemoized(
       () => StickyCollapsablePanelController(key: group.groupKey),
     );
+    final groupItemIds = useMemoized(
+      () => group.items.map((c) => c.commentId).toSet(),
+      [group],
+    );
 
-    final selectedIds = ref.watch(deletionSetProvider);
-    final groupItemIds = group.items.map((c) => c.commentId).toSet();
+    final groupSel = ref.watch(
+      deletionSetProvider.select((s) {
+        var hits = 0;
+        for (final id in groupItemIds) {
+          if (s.contains(id)) hits++;
+        }
+        return (
+          all: groupItemIds.isNotEmpty && hits == groupItemIds.length,
+          any: hits > 0,
+        );
+      }),
+    );
+    final deletedIds = ref.watch(deletedCommentIdsProvider).value ?? const {};
 
     return SliverStickyCollapsablePanel(
       scrollController: scrollController,
@@ -438,40 +424,20 @@ class _CommentGroupSliver extends HookConsumerWidget {
         group: group,
         status: status,
         selectionMode: selectionMode.value,
-        selectedIds: selectedIds,
-        groupItemIds: groupItemIds,
-        onToggleGroupSelection: (ids) => _toggleGroupSelection(ref, ids),
+        allSelected: groupSel.all,
+        someSelected: groupSel.any && !groupSel.all,
+        onToggleGroupSelection: () =>
+            _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,
         itemBuilder: (context, index) {
           final comment = group.items[index];
           final isDeleted = deletedIds.contains(comment.commentId);
-          return CommentTile(
+          return _CommentTileConsumer(
             comment: comment,
-            isSelected: selectedIds.contains(comment.commentId),
             isDeleted: isDeleted,
-            selectionMode: selectionMode.value,
-            onTap: isDeleted
-                ? () {}
-                : selectionMode.value
-                ? () =>
-                      ref.read(deletionSetProvider.notifier).toggle(comment.commentId)
-                : () => _showSingleItemActions(
-                    context,
-                    ref,
-                    itemId: comment.commentId,
-                    displayText: comment.displayText,
-                    isComment: true,
-                    videoId: comment.videoId,
-                    commentId: comment.commentId,
-                  ),
-            onLongPress: isDeleted
-                ? () {}
-                : () {
-                    selectionMode.value = true;
-                    ref.read(deletionSetProvider.notifier).toggle(comment.commentId);
-                  },
+            selectionMode: selectionMode,
           );
         },
       ),
@@ -479,22 +445,75 @@ class _CommentGroupSliver extends HookConsumerWidget {
   }
 }
 
-class _LiveChatListView extends ConsumerWidget {
+class _CommentTileConsumer extends ConsumerWidget {
+  final Comment comment;
+  final bool isDeleted;
+  final ValueNotifier<bool> selectionMode;
+
+  const _CommentTileConsumer({
+    required this.comment,
+    required this.isDeleted,
+    required this.selectionMode,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSelected = ref.watch(
+      deletionSetProvider.select((s) => s.contains(comment.commentId)),
+    );
+    return CommentTile(
+      comment: comment,
+      isSelected: isSelected,
+      isDeleted: isDeleted,
+      selectionMode: selectionMode.value,
+      onTap: isDeleted
+          ? () {}
+          : selectionMode.value
+          ? () =>
+                ref.read(deletionSetProvider.notifier).toggle(comment.commentId)
+          : () => _showSingleItemActions(
+              context,
+              ref,
+              itemId: comment.commentId,
+              displayText: comment.displayText,
+              isComment: true,
+              videoId: comment.videoId,
+              commentId: comment.commentId,
+            ),
+      onLongPress: isDeleted
+          ? () {}
+          : () {
+              selectionMode.value = true;
+              ref.read(deletionSetProvider.notifier).toggle(comment.commentId);
+            },
+    );
+  }
+}
+
+class _LiveChatListView extends ConsumerStatefulWidget {
   final String channelId;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
-  final Set<String> deletedIds;
 
   const _LiveChatListView({
     required this.channelId,
     required this.selectionMode,
     required this.scrollController,
-    required this.deletedIds,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final groups = ref.watch(groupedChannelLiveChatsProvider(channelId));
+  ConsumerState<_LiveChatListView> createState() => _LiveChatListViewState();
+}
+
+class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final groups = ref.watch(groupedChannelLiveChatsProvider(widget.channelId));
     if (groups.isEmpty) {
       return const EmptyState(
         icon: Icons.chat_bubble_outline,
@@ -502,15 +521,14 @@ class _LiveChatListView extends ConsumerWidget {
       );
     }
     return CustomScrollView(
-      controller: scrollController,
+      controller: widget.scrollController,
       slivers: [
         for (final group in groups)
           _LiveChatGroupSliver(
             key: ValueKey('livechat-group-${group.groupKey}'),
             group: group,
-            selectionMode: selectionMode,
-            scrollController: scrollController,
-            deletedIds: deletedIds,
+            selectionMode: widget.selectionMode,
+            scrollController: widget.scrollController,
           ),
       ],
     );
@@ -521,14 +539,12 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
   final VideoGroup<LiveChat> group;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
-  final Set<String> deletedIds;
 
   const _LiveChatGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
-    required this.deletedIds,
   });
 
   @override
@@ -536,9 +552,24 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
     final controller = useMemoized(
       () => StickyCollapsablePanelController(key: group.groupKey),
     );
+    final groupItemIds = useMemoized(
+      () => group.items.map((c) => c.liveChatId).toSet(),
+      [group],
+    );
 
-    final selectedIds = ref.watch(deletionSetProvider);
-    final groupItemIds = group.items.map((c) => c.liveChatId).toSet();
+    final groupSel = ref.watch(
+      deletionSetProvider.select((s) {
+        var hits = 0;
+        for (final id in groupItemIds) {
+          if (s.contains(id)) hits++;
+        }
+        return (
+          all: groupItemIds.isNotEmpty && hits == groupItemIds.length,
+          any: hits > 0,
+        );
+      }),
+    );
+    final deletedIds = ref.watch(deletedLiveChatIdsProvider).value ?? const {};
 
     return SliverStickyCollapsablePanel(
       scrollController: scrollController,
@@ -547,42 +578,67 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         group: group,
         status: status,
         selectionMode: selectionMode.value,
-        selectedIds: selectedIds,
-        groupItemIds: groupItemIds,
-        onToggleGroupSelection: (ids) => _toggleGroupSelection(ref, ids),
+        allSelected: groupSel.all,
+        someSelected: groupSel.any && !groupSel.all,
+        onToggleGroupSelection: () =>
+            _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,
         itemBuilder: (context, index) {
           final chat = group.items[index];
           final isDeleted = deletedIds.contains(chat.liveChatId);
-          return LiveChatTile(
-            liveChat: chat,
-            isSelected: selectedIds.contains(chat.liveChatId),
+          return _LiveChatTileConsumer(
+            chat: chat,
             isDeleted: isDeleted,
-            selectionMode: selectionMode.value,
-            onTap: isDeleted
-                ? () {}
-                : selectionMode.value
-                ? () =>
-                      ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId)
-                : () => _showSingleItemActions(
-                    context,
-                    ref,
-                    itemId: chat.liveChatId,
-                    displayText: chat.displayText,
-                    isComment: false,
-                    videoId: chat.videoId,
-                  ),
-            onLongPress: isDeleted
-                ? () {}
-                : () {
-                    selectionMode.value = true;
-                    ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId);
-                  },
+            selectionMode: selectionMode,
           );
         },
       ),
+    );
+  }
+}
+
+class _LiveChatTileConsumer extends ConsumerWidget {
+  final LiveChat chat;
+  final bool isDeleted;
+  final ValueNotifier<bool> selectionMode;
+
+  const _LiveChatTileConsumer({
+    required this.chat,
+    required this.isDeleted,
+    required this.selectionMode,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isSelected = ref.watch(
+      deletionSetProvider.select((s) => s.contains(chat.liveChatId)),
+    );
+    return LiveChatTile(
+      liveChat: chat,
+      isSelected: isSelected,
+      isDeleted: isDeleted,
+      selectionMode: selectionMode.value,
+      onTap: isDeleted
+          ? () {}
+          : selectionMode.value
+          ? () =>
+                ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId)
+          : () => _showSingleItemActions(
+              context,
+              ref,
+              itemId: chat.liveChatId,
+              displayText: chat.displayText,
+              isComment: false,
+              videoId: chat.videoId,
+            ),
+      onLongPress: isDeleted
+          ? () {}
+          : () {
+              selectionMode.value = true;
+              ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId);
+            },
     );
   }
 }
@@ -592,21 +648,20 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
 // =============================================================================
 
 class _DeletionBar extends ConsumerWidget {
+  final String channelId;
   final ValueNotifier<bool> selectionMode;
-  final List<Comment> comments;
-  final List<LiveChat> liveChats;
-  final Set<String> selectedIds;
 
   const _DeletionBar({
+    required this.channelId,
     required this.selectionMode,
-    required this.comments,
-    required this.liveChats,
-    required this.selectedIds,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authenticated = ref.watch(isAuthenticatedProvider);
+    final comments = ref.watch(channelCommentsProvider(channelId));
+    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
+    final selectedIds = ref.watch(deletionSetProvider);
 
     final commentIdSet = comments.map((c) => c.commentId).toSet();
     final liveChatIdSet = liveChats.map((c) => c.liveChatId).toSet();

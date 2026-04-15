@@ -243,3 +243,80 @@ final class ChannelsProvider
 }
 
 String _$channelsHash() => r'31beddcd8fae022e129a60f10a41807478d17cb6';
+
+@ProviderFor(channelById)
+final channelByIdProvider = ChannelByIdFamily._();
+
+final class ChannelByIdProvider
+    extends $FunctionalProvider<Channel?, Channel?, Channel?>
+    with $Provider<Channel?> {
+  ChannelByIdProvider._({
+    required ChannelByIdFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelByIdProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelByIdHash();
+
+  @override
+  String toString() {
+    return r'channelByIdProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<Channel?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Channel? create(Ref ref) {
+    final argument = this.argument as String;
+    return channelById(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Channel? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Channel?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelByIdProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelByIdHash() => r'14d5a19fc6f6cba71a5df228ceda3f14467e6341';
+
+final class ChannelByIdFamily extends $Family
+    with $FunctionalFamilyOverride<Channel?, String> {
+  ChannelByIdFamily._()
+    : super(
+        retry: null,
+        name: r'channelByIdProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  ChannelByIdProvider call(String channelId) =>
+      ChannelByIdProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelByIdProvider';
+}

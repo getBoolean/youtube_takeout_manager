@@ -186,3 +186,28 @@ List<Channel> channels(Ref ref) {
   channels.sort((a, b) => b.totalInteractions.compareTo(a.totalInteractions));
   return channels;
 }
+
+@riverpod
+Channel? channelById(Ref ref, String channelId) {
+  final takeout = ref.watch(takeoutProvider).value;
+  if (takeout == null) return null;
+
+  final commentsByChannel = ref.watch(commentsByChannelProvider);
+  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
+  if (!commentsByChannel.containsKey(channelId) &&
+      !liveChatsByChannel.containsKey(channelId)) {
+    return null;
+  }
+
+  final sub = takeout.subscriptionsByChannelId[channelId];
+  final titleFromVideos = ref.watch(channelTitlesFromVideosProvider)[channelId];
+  final thumbnail = ref.watch(channelThumbnailsProvider)[channelId];
+  return Channel(
+    channelId: channelId,
+    channelTitle: sub?.channelTitle ?? titleFromVideos,
+    channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$channelId',
+    thumbnailUrl: thumbnail,
+    commentCount: commentsByChannel[channelId]?.length ?? 0,
+    liveChatCount: liveChatsByChannel[channelId]?.length ?? 0,
+  );
+}

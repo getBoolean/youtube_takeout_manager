@@ -11,17 +11,17 @@ class VideoGroupHeader extends ConsumerWidget {
   final VideoGroup group;
   final SliverStickyCollapsablePanelStatus status;
   final bool selectionMode;
-  final Set<String> selectedIds;
-  final Set<String> groupItemIds;
-  final ValueChanged<Set<String>> onToggleGroupSelection;
+  final bool allSelected;
+  final bool someSelected;
+  final VoidCallback onToggleGroupSelection;
 
   const VideoGroupHeader({
     super.key,
     required this.group,
     required this.status,
     required this.selectionMode,
-    required this.selectedIds,
-    required this.groupItemIds,
+    required this.allSelected,
+    required this.someSelected,
     required this.onToggleGroupSelection,
   });
 
@@ -37,11 +37,6 @@ class VideoGroupHeader extends ConsumerWidget {
         '${group.items.length} ${group.items.length == 1 ? 'item' : 'items'}';
     final thumbnailUrl = video?.thumbnailUrl;
 
-    final selectedCount = groupItemIds.intersection(selectedIds).length;
-    final allSelected =
-        groupItemIds.isNotEmpty && selectedCount == groupItemIds.length;
-    final someSelected = selectedCount > 0 && !allSelected;
-
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: InkWell(
@@ -56,8 +51,7 @@ class VideoGroupHeader extends ConsumerWidget {
                   child: Checkbox(
                     value: allSelected ? true : (someSelected ? null : false),
                     tristate: true,
-                    onChanged: (_) =>
-                        onToggleGroupSelection(groupItemIds),
+                    onChanged: (_) => onToggleGroupSelection(),
                   ),
                 ),
               _buildThumbnail(thumbnailUrl, theme),
