@@ -488,6 +488,13 @@ class _CommentGroupSliver extends HookConsumerWidget {
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
         onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
+        onLongPress: () {
+          selectionMode.value = true;
+          _toggleGroupSelection(ref, groupItemIds);
+        },
+        onToggleExpanded: () => controller.isExpanded
+            ? controller.collapsePanel()
+            : controller.expandPanel(),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,
@@ -708,6 +715,13 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
         onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
+        onLongPress: () {
+          selectionMode.value = true;
+          _toggleGroupSelection(ref, groupItemIds);
+        },
+        onToggleExpanded: () => controller.isExpanded
+            ? controller.collapsePanel()
+            : controller.expandPanel(),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,

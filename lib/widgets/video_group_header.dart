@@ -17,6 +17,8 @@ class VideoGroupHeader extends ConsumerWidget {
   final bool someSelected;
   final String? highlightQuery;
   final VoidCallback onToggleGroupSelection;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onToggleExpanded;
 
   const VideoGroupHeader({
     super.key,
@@ -27,6 +29,8 @@ class VideoGroupHeader extends ConsumerWidget {
     required this.someSelected,
     required this.onToggleGroupSelection,
     this.highlightQuery,
+    this.onLongPress,
+    this.onToggleExpanded,
   });
 
   @override
@@ -51,7 +55,8 @@ class VideoGroupHeader extends ConsumerWidget {
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: InkWell(
-        onTap: null, // handled by SliverStickyCollapsablePanel
+        onTap: selectionMode ? onToggleGroupSelection : onToggleExpanded,
+        onLongPress: onLongPress,
         child: Cue.onToggle(
           toggled: isCompact,
           motion: const Spring.smooth(),
@@ -134,9 +139,13 @@ class VideoGroupHeader extends ConsumerWidget {
               launchUrl(uri, mode: LaunchMode.externalApplication);
             },
           ),
-        Icon(
-          status.isExpanded ? Icons.expand_less : Icons.expand_more,
-          color: theme.colorScheme.onSurfaceVariant,
+        IconButton(
+          icon: Icon(
+            status.isExpanded ? Icons.expand_less : Icons.expand_more,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          tooltip: status.isExpanded ? 'Collapse' : 'Expand',
+          onPressed: onToggleExpanded,
         ),
       ],
     );
