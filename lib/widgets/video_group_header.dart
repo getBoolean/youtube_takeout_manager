@@ -83,8 +83,8 @@ class VideoGroupHeader extends ConsumerWidget {
                 Actor(
                   acts: const [
                     Act.sizedBox(
-                      width: AnimatableValue.tween(160, 48),
-                      height: AnimatableValue.tween(90, 27),
+                      width: AnimatableValue.tween(160, 78),
+                      height: AnimatableValue.tween(90, 44),
                       alignment: Alignment.centerLeft,
                     ),
                   ],
