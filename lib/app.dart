@@ -4,9 +4,9 @@ import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
 class App extends StatelessWidget {
-  App({super.key});
+  const App({super.key});
 
-  final _appRouter = AppRouter();
+  static final _appRouter = AppRouter();
 
   @override
   Widget build(BuildContext context) {
