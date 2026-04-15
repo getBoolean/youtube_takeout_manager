@@ -109,7 +109,7 @@ final class ChannelCommentsProvider
   }) : super(
          retry: null,
          name: r'channelCommentsProvider',
-         isAutoDispose: false,
+         isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -154,7 +154,7 @@ final class ChannelCommentsProvider
   }
 }
 
-String _$channelCommentsHash() => r'f15e1fc2dc71f7287d873e3410cfebe15ab65f31';
+String _$channelCommentsHash() => r'2d5cd13f2b7e95bc27e7f96cbcd462578a48c8f4';
 
 final class ChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<Comment>, String> {
@@ -164,7 +164,7 @@ final class ChannelCommentsFamily extends $Family
         name: r'channelCommentsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: false,
+        isAutoDispose: true,
       );
 
   ChannelCommentsProvider call(String channelId) =>
@@ -172,4 +172,57 @@ final class ChannelCommentsFamily extends $Family
 
   @override
   String toString() => r'channelCommentsProvider';
+}
+
+@ProviderFor(CommentSearchQuery)
+final commentSearchQueryProvider = CommentSearchQueryProvider._();
+
+final class CommentSearchQueryProvider
+    extends $NotifierProvider<CommentSearchQuery, String> {
+  CommentSearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'commentSearchQueryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$commentSearchQueryHash();
+
+  @$internal
+  @override
+  CommentSearchQuery create() => CommentSearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$commentSearchQueryHash() =>
+    r'4292f227a4c4dcc3af7efada5e3b3a3b5300548c';
+
+abstract class _$CommentSearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
 }

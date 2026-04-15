@@ -30,3 +30,11 @@ List<LiveChat> channelLiveChats(Ref ref, String channelId) {
   final chats = byChannel[channelId] ?? [];
   return chats..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
+
+@riverpod
+class LiveChatSearchQuery extends _$LiveChatSearchQuery {
+  @override
+  String build() => '';
+
+  void update(String query) => state = query;
+}

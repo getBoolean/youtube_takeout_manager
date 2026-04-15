@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +11,7 @@ import '../providers/live_chat_providers.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../widgets/channel_tile.dart';
+import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 
@@ -25,7 +24,6 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
-  Timer? _debounce;
   void Function()? _cancelChannelsSub;
   void Function()? _cancelProgressSub;
 
@@ -103,7 +101,6 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   @override
   void dispose() {
-    _debounce?.cancel();
     _cancelChannelsSub?.call();
     _cancelProgressSub?.call();
     super.dispose();
@@ -235,17 +232,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   horizontal: 16,
                   vertical: 8,
                 ),
-                child: SearchBar(
+                child: DebouncedSearchBar(
                   hintText: 'Search channels...',
-                  leading: const Icon(Icons.search),
-                  onChanged: (value) {
-                    _debounce?.cancel();
-                    _debounce = Timer(const Duration(milliseconds: 300), () {
-                      ref
-                          .read(channelSearchQueryProvider.notifier)
-                          .update(value);
-                    });
-                  },
+                  onQueryChanged: (value) => ref
+                      .read(channelSearchQueryProvider.notifier)
+                      .update(value),
                 ),
               ),
             ],

@@ -110,7 +110,7 @@ final class ChannelLiveChatsProvider
   }) : super(
          retry: null,
          name: r'channelLiveChatsProvider',
-         isAutoDispose: false,
+         isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -155,7 +155,7 @@ final class ChannelLiveChatsProvider
   }
 }
 
-String _$channelLiveChatsHash() => r'b0871bdbb236d9b8575c3ec37edd5b18f65910d9';
+String _$channelLiveChatsHash() => r'056b1edef236ffb40b36c1d20bffbe35a3276446';
 
 final class ChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<LiveChat>, String> {
@@ -165,7 +165,7 @@ final class ChannelLiveChatsFamily extends $Family
         name: r'channelLiveChatsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: false,
+        isAutoDispose: true,
       );
 
   ChannelLiveChatsProvider call(String channelId) =>
@@ -173,4 +173,57 @@ final class ChannelLiveChatsFamily extends $Family
 
   @override
   String toString() => r'channelLiveChatsProvider';
+}
+
+@ProviderFor(LiveChatSearchQuery)
+final liveChatSearchQueryProvider = LiveChatSearchQueryProvider._();
+
+final class LiveChatSearchQueryProvider
+    extends $NotifierProvider<LiveChatSearchQuery, String> {
+  LiveChatSearchQueryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'liveChatSearchQueryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$liveChatSearchQueryHash();
+
+  @$internal
+  @override
+  LiveChatSearchQuery create() => LiveChatSearchQuery();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String>(value),
+    );
+  }
+}
+
+String _$liveChatSearchQueryHash() =>
+    r'4ea04e1c32ad95d847f00376df6fe8f57df98456';
+
+abstract class _$LiveChatSearchQuery extends $Notifier<String> {
+  String build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<String, String>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<String, String>,
+              String,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
 }

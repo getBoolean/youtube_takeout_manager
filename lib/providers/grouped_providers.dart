@@ -2,9 +2,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/comment.dart';
 import '../models/live_chat.dart';
+import '../models/video.dart';
 import '../models/video_group.dart';
+import '../utils/comment_text_parser.dart';
 import 'comment_providers.dart';
 import 'live_chat_providers.dart';
+import 'video_providers.dart';
 
 part 'grouped_providers.g.dart';
 
@@ -78,4 +81,86 @@ List<VideoGroup<LiveChat>> groupedChannelLiveChats(
   });
 
   return result;
+}
+
+/// Resolves the display title of a group — mirrors `VideoGroupHeader._resolveTitle`
+/// so search can match against what the user actually sees in group headers.
+String _resolveGroupTitle(VideoGroup group, Map<String, Video> videoMap) {
+  switch (group.groupType) {
+    case GroupType.video:
+      return videoMap[group.groupKey]?.title ?? 'Video: ${group.groupKey}';
+    case GroupType.post:
+      final postId = group.groupKey.replaceFirst('post:', '');
+      return 'Community Post: $postId';
+    case GroupType.orphaned:
+      return 'Other';
+  }
+}
+
+List<VideoGroup<T>> _filterGroups<T>({
+  required List<VideoGroup<T>> groups,
+  required String query,
+  required Map<String, Video> videoMap,
+  required String Function(T) extractText,
+  required VideoGroup<T> Function(VideoGroup<T> group, List<T> items) rebuild,
+}) {
+  if (query.isEmpty) return groups;
+  final lower = query.toLowerCase();
+  final result = <VideoGroup<T>>[];
+  for (final group in groups) {
+    final title = _resolveGroupTitle(group, videoMap).toLowerCase();
+    if (title.contains(lower)) {
+      result.add(group);
+      continue;
+    }
+    final matching = group.items
+        .where((item) => extractText(item).toLowerCase().contains(lower))
+        .toList();
+    if (matching.isNotEmpty) {
+      result.add(rebuild(group, matching));
+    }
+  }
+  return result;
+}
+
+@riverpod
+List<VideoGroup<Comment>> filteredGroupedChannelComments(
+  Ref ref,
+  String channelId,
+) {
+  final groups = ref.watch(groupedChannelCommentsProvider(channelId));
+  final query = ref.watch(commentSearchQueryProvider);
+  final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
+  return _filterGroups<Comment>(
+    groups: groups,
+    query: query,
+    videoMap: videoMap,
+    extractText: (c) => parseCommentText(c.rawCommentText),
+    rebuild: (g, items) => VideoGroup<Comment>(
+      groupKey: g.groupKey,
+      groupType: g.groupType,
+      items: items,
+    ),
+  );
+}
+
+@riverpod
+List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
+  Ref ref,
+  String channelId,
+) {
+  final groups = ref.watch(groupedChannelLiveChatsProvider(channelId));
+  final query = ref.watch(liveChatSearchQueryProvider);
+  final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
+  return _filterGroups<LiveChat>(
+    groups: groups,
+    query: query,
+    videoMap: videoMap,
+    extractText: (c) => parseCommentText(c.rawText),
+    rebuild: (g, items) => VideoGroup<LiveChat>(
+      groupKey: g.groupKey,
+      groupType: g.groupType,
+      items: items,
+    ),
+  );
 }

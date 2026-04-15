@@ -26,7 +26,7 @@ final class GroupedChannelCommentsProvider
   }) : super(
          retry: null,
          name: r'groupedChannelCommentsProvider',
-         isAutoDispose: false,
+         isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -74,7 +74,7 @@ final class GroupedChannelCommentsProvider
 }
 
 String _$groupedChannelCommentsHash() =>
-    r'aeac947bb71dd8ef204f328ed3e8bcb5230abb6f';
+    r'e33c2d5520a8d8ede0aed0fd2a0100c5a62acca7';
 
 final class GroupedChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
@@ -84,7 +84,7 @@ final class GroupedChannelCommentsFamily extends $Family
         name: r'groupedChannelCommentsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: false,
+        isAutoDispose: true,
       );
 
   GroupedChannelCommentsProvider call(String channelId) =>
@@ -111,7 +111,7 @@ final class GroupedChannelLiveChatsProvider
   }) : super(
          retry: null,
          name: r'groupedChannelLiveChatsProvider',
-         isAutoDispose: false,
+         isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -159,7 +159,7 @@ final class GroupedChannelLiveChatsProvider
 }
 
 String _$groupedChannelLiveChatsHash() =>
-    r'3903c952fbf5be4a8b8e4669aef7594f07a6ebb6';
+    r'4031931181184de1637884f0ccb27f41925bf1ae';
 
 final class GroupedChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
@@ -169,7 +169,7 @@ final class GroupedChannelLiveChatsFamily extends $Family
         name: r'groupedChannelLiveChatsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: false,
+        isAutoDispose: true,
       );
 
   GroupedChannelLiveChatsProvider call(String channelId) =>
@@ -177,4 +177,179 @@ final class GroupedChannelLiveChatsFamily extends $Family
 
   @override
   String toString() => r'groupedChannelLiveChatsProvider';
+}
+
+@ProviderFor(filteredGroupedChannelComments)
+final filteredGroupedChannelCommentsProvider =
+    FilteredGroupedChannelCommentsFamily._();
+
+final class FilteredGroupedChannelCommentsProvider
+    extends
+        $FunctionalProvider<
+          List<VideoGroup<Comment>>,
+          List<VideoGroup<Comment>>,
+          List<VideoGroup<Comment>>
+        >
+    with $Provider<List<VideoGroup<Comment>>> {
+  FilteredGroupedChannelCommentsProvider._({
+    required FilteredGroupedChannelCommentsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'filteredGroupedChannelCommentsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$filteredGroupedChannelCommentsHash();
+
+  @override
+  String toString() {
+    return r'filteredGroupedChannelCommentsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<VideoGroup<Comment>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<VideoGroup<Comment>> create(Ref ref) {
+    final argument = this.argument as String;
+    return filteredGroupedChannelComments(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<VideoGroup<Comment>> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<VideoGroup<Comment>>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FilteredGroupedChannelCommentsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$filteredGroupedChannelCommentsHash() =>
+    r'2d85f9277100fdfc36e3dadb97dfaf20dc4f7f2f';
+
+final class FilteredGroupedChannelCommentsFamily extends $Family
+    with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
+  FilteredGroupedChannelCommentsFamily._()
+    : super(
+        retry: null,
+        name: r'filteredGroupedChannelCommentsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  FilteredGroupedChannelCommentsProvider call(String channelId) =>
+      FilteredGroupedChannelCommentsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'filteredGroupedChannelCommentsProvider';
+}
+
+@ProviderFor(filteredGroupedChannelLiveChats)
+final filteredGroupedChannelLiveChatsProvider =
+    FilteredGroupedChannelLiveChatsFamily._();
+
+final class FilteredGroupedChannelLiveChatsProvider
+    extends
+        $FunctionalProvider<
+          List<VideoGroup<LiveChat>>,
+          List<VideoGroup<LiveChat>>,
+          List<VideoGroup<LiveChat>>
+        >
+    with $Provider<List<VideoGroup<LiveChat>>> {
+  FilteredGroupedChannelLiveChatsProvider._({
+    required FilteredGroupedChannelLiveChatsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'filteredGroupedChannelLiveChatsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$filteredGroupedChannelLiveChatsHash();
+
+  @override
+  String toString() {
+    return r'filteredGroupedChannelLiveChatsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<VideoGroup<LiveChat>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<VideoGroup<LiveChat>> create(Ref ref) {
+    final argument = this.argument as String;
+    return filteredGroupedChannelLiveChats(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<VideoGroup<LiveChat>> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<VideoGroup<LiveChat>>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FilteredGroupedChannelLiveChatsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$filteredGroupedChannelLiveChatsHash() =>
+    r'e71752a425aab67003c785dd171e7cf26037a08b';
+
+final class FilteredGroupedChannelLiveChatsFamily extends $Family
+    with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
+  FilteredGroupedChannelLiveChatsFamily._()
+    : super(
+        retry: null,
+        name: r'filteredGroupedChannelLiveChatsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  FilteredGroupedChannelLiveChatsProvider call(String channelId) =>
+      FilteredGroupedChannelLiveChatsProvider._(
+        argument: channelId,
+        from: this,
+      );
+
+  @override
+  String toString() => r'filteredGroupedChannelLiveChatsProvider';
 }

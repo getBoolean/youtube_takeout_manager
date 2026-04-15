@@ -22,6 +22,7 @@ import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
 import '../services/export_service.dart';
 import '../widgets/comment_tile.dart';
+import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
@@ -152,10 +153,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
       ),
       body: body,
       bottomNavigationBar: selectionMode.value && hasSelection
-          ? _DeletionBar(
-              channelId: channelId,
-              selectionMode: selectionMode,
-            )
+          ? _DeletionBar(channelId: channelId, selectionMode: selectionMode)
           : null,
     );
 
@@ -376,8 +374,9 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
     if (!widget.scrollController.hasClients) return;
     final pos = widget.scrollController.position;
     if (pos.pixels >= pos.maxScrollExtent - _growThreshold) {
-      final total =
-          ref.read(groupedChannelCommentsProvider(widget.channelId)).length;
+      final total = ref
+          .read(filteredGroupedChannelCommentsProvider(widget.channelId))
+          .length;
       if (_visibleCount < total) {
         setState(() {
           _visibleCount = (_visibleCount + _growBy).clamp(0, total);
@@ -389,24 +388,49 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final groups = ref.watch(groupedChannelCommentsProvider(widget.channelId));
-    if (groups.isEmpty) {
-      return const EmptyState(
-        icon: Icons.comment_outlined,
-        message: 'No comments',
-      );
-    }
+    ref.listen(commentSearchQueryProvider, (_, _) {
+      setState(() => _visibleCount = _initialVisible);
+      if (widget.scrollController.hasClients) {
+        widget.scrollController.jumpTo(0);
+      }
+    });
+    final query = ref.watch(commentSearchQueryProvider);
+    final groups = ref.watch(
+      filteredGroupedChannelCommentsProvider(widget.channelId),
+    );
     final visible = _visibleCount.clamp(0, groups.length);
-    return CustomScrollView(
-      controller: widget.scrollController,
-      slivers: [
-        for (var i = 0; i < visible; i++)
-          _CommentGroupSliver(
-            key: ValueKey('comment-group-${groups[i].groupKey}'),
-            group: groups[i],
-            selectionMode: widget.selectionMode,
-            scrollController: widget.scrollController,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: DebouncedSearchBar(
+            hintText: 'Search comments...',
+            onQueryChanged: (v) =>
+                ref.read(commentSearchQueryProvider.notifier).update(v),
           ),
+        ),
+        Expanded(
+          child: groups.isEmpty
+              ? EmptyState(
+                  icon: query.isEmpty
+                      ? Icons.comment_outlined
+                      : Icons.search_off,
+                  message: query.isEmpty ? 'No comments' : 'No results',
+                )
+              : CustomScrollView(
+                  controller: widget.scrollController,
+                  slivers: [
+                    for (var i = 0; i < visible; i++)
+                      _CommentGroupSliver(
+                        key: ValueKey('comment-group-${groups[i].groupKey}'),
+                        group: groups[i],
+                        selectionMode: widget.selectionMode,
+                        scrollController: widget.scrollController,
+                      ),
+                  ],
+                ),
+        ),
       ],
     );
   }
@@ -459,8 +483,7 @@ class _CommentGroupSliver extends HookConsumerWidget {
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
-        onToggleGroupSelection: () =>
-            _toggleGroupSelection(ref, groupItemIds),
+        onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,
@@ -565,8 +588,9 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
     if (!widget.scrollController.hasClients) return;
     final pos = widget.scrollController.position;
     if (pos.pixels >= pos.maxScrollExtent - _growThreshold) {
-      final total =
-          ref.read(groupedChannelLiveChatsProvider(widget.channelId)).length;
+      final total = ref
+          .read(filteredGroupedChannelLiveChatsProvider(widget.channelId))
+          .length;
       if (_visibleCount < total) {
         setState(() {
           _visibleCount = (_visibleCount + _growBy).clamp(0, total);
@@ -578,24 +602,49 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final groups = ref.watch(groupedChannelLiveChatsProvider(widget.channelId));
-    if (groups.isEmpty) {
-      return const EmptyState(
-        icon: Icons.chat_bubble_outline,
-        message: 'No live chats',
-      );
-    }
+    ref.listen(liveChatSearchQueryProvider, (_, _) {
+      setState(() => _visibleCount = _initialVisible);
+      if (widget.scrollController.hasClients) {
+        widget.scrollController.jumpTo(0);
+      }
+    });
+    final query = ref.watch(liveChatSearchQueryProvider);
+    final groups = ref.watch(
+      filteredGroupedChannelLiveChatsProvider(widget.channelId),
+    );
     final visible = _visibleCount.clamp(0, groups.length);
-    return CustomScrollView(
-      controller: widget.scrollController,
-      slivers: [
-        for (var i = 0; i < visible; i++)
-          _LiveChatGroupSliver(
-            key: ValueKey('livechat-group-${groups[i].groupKey}'),
-            group: groups[i],
-            selectionMode: widget.selectionMode,
-            scrollController: widget.scrollController,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: DebouncedSearchBar(
+            hintText: 'Search live chats...',
+            onQueryChanged: (v) =>
+                ref.read(liveChatSearchQueryProvider.notifier).update(v),
           ),
+        ),
+        Expanded(
+          child: groups.isEmpty
+              ? EmptyState(
+                  icon: query.isEmpty
+                      ? Icons.chat_bubble_outline
+                      : Icons.search_off,
+                  message: query.isEmpty ? 'No live chats' : 'No results',
+                )
+              : CustomScrollView(
+                  controller: widget.scrollController,
+                  slivers: [
+                    for (var i = 0; i < visible; i++)
+                      _LiveChatGroupSliver(
+                        key: ValueKey('livechat-group-${groups[i].groupKey}'),
+                        group: groups[i],
+                        selectionMode: widget.selectionMode,
+                        scrollController: widget.scrollController,
+                      ),
+                  ],
+                ),
+        ),
       ],
     );
   }
@@ -646,8 +695,7 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
-        onToggleGroupSelection: () =>
-            _toggleGroupSelection(ref, groupItemIds),
+        onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
       ),
       sliverPanel: SliverList.builder(
         itemCount: group.items.length,
@@ -689,8 +737,7 @@ class _LiveChatTileConsumer extends ConsumerWidget {
       onTap: isDeleted
           ? () {}
           : selectionMode.value
-          ? () =>
-                ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId)
+          ? () => ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId)
           : () => _showSingleItemActions(
               context,
               ref,
@@ -717,10 +764,7 @@ class _DeletionBar extends ConsumerWidget {
   final String channelId;
   final ValueNotifier<bool> selectionMode;
 
-  const _DeletionBar({
-    required this.channelId,
-    required this.selectionMode,
-  });
+  const _DeletionBar({required this.channelId, required this.selectionMode});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
