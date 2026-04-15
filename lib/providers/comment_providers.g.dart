@@ -109,7 +109,7 @@ final class ChannelCommentsProvider
   }) : super(
          retry: null,
          name: r'channelCommentsProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -154,7 +154,7 @@ final class ChannelCommentsProvider
   }
 }
 
-String _$channelCommentsHash() => r'2d5cd13f2b7e95bc27e7f96cbcd462578a48c8f4';
+String _$channelCommentsHash() => r'f15e1fc2dc71f7287d873e3410cfebe15ab65f31';
 
 final class ChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<Comment>, String> {
@@ -164,7 +164,7 @@ final class ChannelCommentsFamily extends $Family
         name: r'channelCommentsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   ChannelCommentsProvider call(String channelId) =>

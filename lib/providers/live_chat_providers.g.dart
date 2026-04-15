@@ -110,7 +110,7 @@ final class ChannelLiveChatsProvider
   }) : super(
          retry: null,
          name: r'channelLiveChatsProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -155,7 +155,7 @@ final class ChannelLiveChatsProvider
   }
 }
 
-String _$channelLiveChatsHash() => r'056b1edef236ffb40b36c1d20bffbe35a3276446';
+String _$channelLiveChatsHash() => r'b0871bdbb236d9b8575c3ec37edd5b18f65910d9';
 
 final class ChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<LiveChat>, String> {
@@ -165,7 +165,7 @@ final class ChannelLiveChatsFamily extends $Family
         name: r'channelLiveChatsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   ChannelLiveChatsProvider call(String channelId) =>

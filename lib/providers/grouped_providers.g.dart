@@ -26,7 +26,7 @@ final class GroupedChannelCommentsProvider
   }) : super(
          retry: null,
          name: r'groupedChannelCommentsProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -74,7 +74,7 @@ final class GroupedChannelCommentsProvider
 }
 
 String _$groupedChannelCommentsHash() =>
-    r'e33c2d5520a8d8ede0aed0fd2a0100c5a62acca7';
+    r'aeac947bb71dd8ef204f328ed3e8bcb5230abb6f';
 
 final class GroupedChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
@@ -84,7 +84,7 @@ final class GroupedChannelCommentsFamily extends $Family
         name: r'groupedChannelCommentsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   GroupedChannelCommentsProvider call(String channelId) =>
@@ -111,7 +111,7 @@ final class GroupedChannelLiveChatsProvider
   }) : super(
          retry: null,
          name: r'groupedChannelLiveChatsProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -159,7 +159,7 @@ final class GroupedChannelLiveChatsProvider
 }
 
 String _$groupedChannelLiveChatsHash() =>
-    r'4031931181184de1637884f0ccb27f41925bf1ae';
+    r'3903c952fbf5be4a8b8e4669aef7594f07a6ebb6';
 
 final class GroupedChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
@@ -169,7 +169,7 @@ final class GroupedChannelLiveChatsFamily extends $Family
         name: r'groupedChannelLiveChatsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   GroupedChannelLiveChatsProvider call(String channelId) =>

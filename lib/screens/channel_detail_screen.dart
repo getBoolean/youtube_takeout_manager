@@ -351,8 +351,40 @@ class _CommentListView extends ConsumerStatefulWidget {
 
 class _CommentListViewState extends ConsumerState<_CommentListView>
     with AutomaticKeepAliveClientMixin {
+  static const int _initialVisible = 15;
+  static const int _growBy = 10;
+  static const double _growThreshold = 400;
+
+  int _visibleCount = _initialVisible;
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_maybeGrow);
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_maybeGrow);
+    super.dispose();
+  }
+
+  void _maybeGrow() {
+    if (!widget.scrollController.hasClients) return;
+    final pos = widget.scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - _growThreshold) {
+      final total =
+          ref.read(groupedChannelCommentsProvider(widget.channelId)).length;
+      if (_visibleCount < total) {
+        setState(() {
+          _visibleCount = (_visibleCount + _growBy).clamp(0, total);
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -364,13 +396,14 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
         message: 'No comments',
       );
     }
+    final visible = _visibleCount.clamp(0, groups.length);
     return CustomScrollView(
       controller: widget.scrollController,
       slivers: [
-        for (final group in groups)
+        for (var i = 0; i < visible; i++)
           _CommentGroupSliver(
-            key: ValueKey('comment-group-${group.groupKey}'),
-            group: group,
+            key: ValueKey('comment-group-${groups[i].groupKey}'),
+            group: groups[i],
             selectionMode: widget.selectionMode,
             scrollController: widget.scrollController,
           ),
@@ -507,8 +540,40 @@ class _LiveChatListView extends ConsumerStatefulWidget {
 
 class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
     with AutomaticKeepAliveClientMixin {
+  static const int _initialVisible = 15;
+  static const int _growBy = 10;
+  static const double _growThreshold = 400;
+
+  int _visibleCount = _initialVisible;
+
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_maybeGrow);
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_maybeGrow);
+    super.dispose();
+  }
+
+  void _maybeGrow() {
+    if (!widget.scrollController.hasClients) return;
+    final pos = widget.scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - _growThreshold) {
+      final total =
+          ref.read(groupedChannelLiveChatsProvider(widget.channelId)).length;
+      if (_visibleCount < total) {
+        setState(() {
+          _visibleCount = (_visibleCount + _growBy).clamp(0, total);
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -520,13 +585,14 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
         message: 'No live chats',
       );
     }
+    final visible = _visibleCount.clamp(0, groups.length);
     return CustomScrollView(
       controller: widget.scrollController,
       slivers: [
-        for (final group in groups)
+        for (var i = 0; i < visible; i++)
           _LiveChatGroupSliver(
-            key: ValueKey('livechat-group-${group.groupKey}'),
-            group: group,
+            key: ValueKey('livechat-group-${groups[i].groupKey}'),
+            group: groups[i],
             selectionMode: widget.selectionMode,
             scrollController: widget.scrollController,
           ),
