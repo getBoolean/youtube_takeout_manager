@@ -1,3 +1,4 @@
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
@@ -39,112 +40,79 @@ class VideoGroupHeader extends ConsumerWidget {
     final subtitle =
         '${group.items.length} ${group.items.length == 1 ? 'item' : 'items'}';
     final thumbnailUrl = video?.thumbnailUrl;
+    // scrollPercentage hits 1.0 once the header is fully scrolled past the top.
+    // Include it so groups above the viewport stay compact instead of trying to
+    // animate back to large (which would grow their sliver extent and shake the
+    // whole list).
+    final isCompact = status.isPinned ||
+        !status.isExpanded ||
+        status.scrollPercentage >= 1.0;
 
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: InkWell(
         onTap: null, // handled by SliverStickyCollapsablePanel
-        child: (status.isPinned || !status.isExpanded)
-            ? _buildCompact(theme, title, subtitle, thumbnailUrl)
-            : _buildLarge(theme, title, subtitle, thumbnailUrl),
-      ),
-    );
-  }
-
-  Widget _buildLarge(
-    ThemeData theme,
-    String title,
-    String subtitle,
-    String? thumbnailUrl,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (selectionMode)
-            Padding(
-              padding: const EdgeInsets.only(right: 8, top: 4),
-              child: Checkbox(
-                value: allSelected ? true : (someSelected ? null : false),
-                tristate: true,
-                onChanged: (_) => onToggleGroupSelection(),
+        child: Cue.onToggle(
+          toggled: isCompact,
+          motion: const Spring.smooth(),
+          reverseMotion: const Spring.smooth(),
+          child: Actor(
+            acts: const [
+              Act.padding(
+                from: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                to: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-            ),
-          _buildThumbnail(thumbnailUrl, theme, width: 160, height: 90),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
+            ],
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                HighlightedText(
-                  title,
-                  query: highlightQuery,
-                  style: theme.textTheme.titleMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                if (selectionMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8, top: 4),
+                    child: Checkbox(
+                      value: allSelected ? true : (someSelected ? null : false),
+                      tristate: true,
+                      onChanged: (_) => onToggleGroupSelection(),
+                    ),
+                  ),
+                Actor(
+                  acts: const [
+                    Act.sizedBox(
+                      width: AnimatableValue.tween(160, 48),
+                      height: AnimatableValue.tween(90, 27),
+                      alignment: Alignment.centerLeft,
+                    ),
+                  ],
+                  child: _buildThumbnail(thumbnailUrl, theme),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      HighlightedText(
+                        title,
+                        query: highlightQuery,
+                        style: theme.textTheme.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                _buildTrailingActions(theme),
               ],
             ),
           ),
-          _buildTrailingActions(theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCompact(
-    ThemeData theme,
-    String title,
-    String subtitle,
-    String? thumbnailUrl,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          if (selectionMode)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Checkbox(
-                value: allSelected ? true : (someSelected ? null : false),
-                tristate: true,
-                onChanged: (_) => onToggleGroupSelection(),
-              ),
-            ),
-          _buildThumbnail(thumbnailUrl, theme, width: 48, height: 27),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                HighlightedText(
-                  title,
-                  query: highlightQuery,
-                  style: theme.textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _buildTrailingActions(theme),
-        ],
+        ),
       ),
     );
   }
@@ -186,53 +154,36 @@ class VideoGroupHeader extends ConsumerWidget {
     }
   }
 
-  Widget _buildThumbnail(
-    String? thumbnailUrl,
-    ThemeData theme, {
-    required double width,
-    required double height,
-  }) {
-    final radius = width >= 120 ? 8.0 : 4.0;
-
+  Widget _buildThumbnail(String? thumbnailUrl, ThemeData theme) {
     if (thumbnailUrl != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: BorderRadius.circular(8),
         child: Image.network(
           thumbnailUrl,
-          width: width,
-          height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) =>
-              _placeholderIcon(theme, width: width, height: height),
+          errorBuilder: (_, _, _) => _placeholderIcon(theme),
         ),
       );
     }
 
-    return _placeholderIcon(theme, width: width, height: height);
+    return _placeholderIcon(theme);
   }
 
-  Widget _placeholderIcon(
-    ThemeData theme, {
-    required double width,
-    required double height,
-  }) {
+  Widget _placeholderIcon(ThemeData theme) {
     final icon = switch (group.groupType) {
       GroupType.video => Icons.videocam_outlined,
       GroupType.post => Icons.article_outlined,
       GroupType.orphaned => Icons.help_outline,
     };
 
-    final radius = width >= 120 ? 8.0 : 4.0;
-    final iconSize = height * 0.5;
-
-    return Container(
-      width: width,
-      height: height,
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(radius),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(icon, size: iconSize, color: theme.colorScheme.onSurfaceVariant),
+      child: Center(
+        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
+      ),
     );
   }
 }
