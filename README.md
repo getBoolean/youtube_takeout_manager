@@ -2,36 +2,6 @@
 
 A Flutter app for managing YouTube data from Google Takeout exports. Browse comments and live chats by channel, and delete them individually or in bulk.
 
-## Feature Status
-
-❌ Not started · 🟡 Scaffolded · 🔵 In progress · ✅ Done
-
-| Feature                                        | Status |
-|------------------------------------------------|--------|
-| Import single takeout zip                      | ✅     |
-| Import split/multi-part zips                   | ✅     |
-| Parse comments CSV                             | ✅     |
-| Parse live chats CSV                           | ✅     |
-| Resolve channel names from subscriptions       | ✅     |
-| Channel list with search                       | ✅     |
-| Channel detail with tabbed comments/live chats | ✅     |
-| Search comments and live chats in a channel    | ✅     |
-| Select individual items for deletion           | ✅     |
-| Bulk select/delete items                       | ✅     |
-| Global delete all comments/live chats          | ✅     |
-| Persistent deletion queue                      | ✅     |
-| Deletion queue screen with progress            | ✅     |
-| API quota tracking (daily limit)               | ✅     |
-| Persist takeout data across sessions           | ✅     |
-| Isolate-based parsing for large exports        | ✅     |
-| Dark mode (system)                             | ✅     |
-| Login to Google account                        | ✅     |
-| Persist deleted state across sessions          | ✅     |
-| Delete comments via YouTube API                | ✅     |
-| Delete live chats via YouTube API              | ✅     |
-| Auto-resume deletion queue on startup          | ✅     |
-| Export filtered data                           | ✅     |
-
 ## Build from Source
 
 ### Google OAuth Credentials

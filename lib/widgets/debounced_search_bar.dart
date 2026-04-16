@@ -9,6 +9,7 @@ class DebouncedSearchBar extends StatefulWidget {
   final ValueChanged<String> onQueryChanged;
   final Duration debounce;
   final bool enabled;
+  final List<Widget>? trailing;
 
   const DebouncedSearchBar({
     super.key,
@@ -16,6 +17,7 @@ class DebouncedSearchBar extends StatefulWidget {
     required this.onQueryChanged,
     this.debounce = const Duration(milliseconds: 300),
     this.enabled = true,
+    this.trailing,
   });
 
   @override
@@ -59,15 +61,15 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
       hintText: widget.hintText,
       enabled: widget.enabled,
       leading: const Icon(Icons.search),
-      trailing: _hasText
-          ? [
-              IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Clear',
-                onPressed: _handleClear,
-              ),
-            ]
-          : null,
+      trailing: [
+        if (_hasText)
+          IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: 'Clear',
+            onPressed: _handleClear,
+          ),
+        ...?widget.trailing,
+      ],
       onChanged: _handleChanged,
     );
   }

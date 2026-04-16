@@ -130,6 +130,18 @@ class KvStorageServiceImpl implements KvStorageService {
   }
 
   @override
+  Future<bool?> getBoolean(String key) async {
+    final raw = await getString(key);
+    if (raw == null) return null;
+    return raw == 'true';
+  }
+
+  @override
+  Future<void> setBoolean(String key, bool value) async {
+    await setString(key, value ? 'true' : 'false');
+  }
+
+  @override
   Future<void> remove(String key) async {
     final db = await _openDb();
     try {

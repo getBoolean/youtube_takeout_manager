@@ -4,9 +4,11 @@ import '../models/comment.dart';
 import '../models/live_chat.dart';
 import '../models/video.dart';
 import '../models/video_group.dart';
+import '../models/search_options_state.dart';
 import '../utils/comment_text_parser.dart';
 import 'comment_providers.dart';
 import 'live_chat_providers.dart';
+import 'search_options_providers.dart';
 import 'video_providers.dart';
 
 part 'grouped_providers.g.dart';
@@ -101,6 +103,7 @@ List<VideoGroup<T>> _filterGroups<T>({
   required List<VideoGroup<T>> groups,
   required String query,
   required Map<String, Video> videoMap,
+  required SearchOptionsState options,
   required String Function(T) extractText,
   required VideoGroup<T> Function(VideoGroup<T> group, List<T> items) rebuild,
 }) {
@@ -108,16 +111,18 @@ List<VideoGroup<T>> _filterGroups<T>({
   final lower = query.toLowerCase();
   final result = <VideoGroup<T>>[];
   for (final group in groups) {
-    final title = _resolveGroupTitle(group, videoMap).toLowerCase();
-    if (title.contains(lower)) {
-      result.add(group);
-      continue;
+    if (options.matchGroupTitles) {
+      final title = _resolveGroupTitle(group, videoMap).toLowerCase();
+      if (title.contains(lower)) {
+        result.add(group);
+        continue;
+      }
     }
     final matching = group.items
         .where((item) => extractText(item).toLowerCase().contains(lower))
         .toList();
     if (matching.isNotEmpty) {
-      result.add(rebuild(group, matching));
+      result.add(options.expandMatchedVideos ? group : rebuild(group, matching));
     }
   }
   return result;
@@ -131,10 +136,13 @@ List<VideoGroup<Comment>> filteredGroupedChannelComments(
   final groups = ref.watch(groupedChannelCommentsProvider(channelId));
   final query = ref.watch(commentSearchQueryProvider);
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
+  final options =
+      ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
   return _filterGroups<Comment>(
     groups: groups,
     query: query,
     videoMap: videoMap,
+    options: options,
     extractText: (c) => parseCommentText(c.rawCommentText),
     rebuild: (g, items) => VideoGroup<Comment>(
       groupKey: g.groupKey,
@@ -152,10 +160,13 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
   final groups = ref.watch(groupedChannelLiveChatsProvider(channelId));
   final query = ref.watch(liveChatSearchQueryProvider);
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
+  final options =
+      ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
   return _filterGroups<LiveChat>(
     groups: groups,
     query: query,
     videoMap: videoMap,
+    options: options,
     extractText: (c) => parseCommentText(c.rawText),
     rebuild: (g, items) => VideoGroup<LiveChat>(
       groupKey: g.groupKey,

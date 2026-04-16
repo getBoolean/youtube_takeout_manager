@@ -14,5 +14,7 @@ abstract class KvStorageService {
   Future<void> setString(String key, String value);
   Future<List<String>?> getStringList(String key);
   Future<void> setStringList(String key, List<String> value);
+  Future<bool?> getBoolean(String key);
+  Future<void> setBoolean(String key, bool value);
   Future<void> remove(String key);
 }

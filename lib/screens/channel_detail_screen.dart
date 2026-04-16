@@ -26,6 +26,7 @@ import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
+import '../widgets/search_options_menu_button.dart';
 import '../widgets/video_group_header.dart';
 
 @RoutePage()
@@ -408,6 +409,7 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
             hintText: 'Search comments...',
             onQueryChanged: (v) =>
                 ref.read(commentSearchQueryProvider.notifier).update(v),
+            trailing: const [SearchOptionsMenuButton()],
           ),
         ),
         Expanded(
@@ -637,6 +639,7 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
             hintText: 'Search live chats...',
             onQueryChanged: (v) =>
                 ref.read(liveChatSearchQueryProvider.notifier).update(v),
+            trailing: const [SearchOptionsMenuButton()],
           ),
         ),
         Expanded(
