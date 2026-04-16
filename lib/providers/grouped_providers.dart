@@ -7,6 +7,7 @@ import '../models/video_group.dart';
 import '../models/search_options_state.dart';
 import '../utils/comment_text_parser.dart';
 import 'comment_providers.dart';
+import 'deleted_ids_providers.dart';
 import 'live_chat_providers.dart';
 import 'search_options_providers.dart';
 import 'video_providers.dart';
@@ -174,4 +175,35 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
       items: items,
     ),
   );
+}
+
+/// Flat list of comments currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+@riverpod
+List<Comment> filteredSearchComments(Ref ref, String channelId) {
+  final query = ref.watch(commentSearchQueryProvider);
+  if (query.isEmpty) return const [];
+  final groups = ref.watch(filteredGroupedChannelCommentsProvider(channelId));
+  final deleted = ref.watch(deletedCommentIdsProvider).value ?? const <String>{};
+  return [
+    for (final g in groups)
+      for (final c in g.items)
+        if (!deleted.contains(c.commentId)) c,
+  ];
+}
+
+/// Flat list of live chats currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+@riverpod
+List<LiveChat> filteredSearchLiveChats(Ref ref, String channelId) {
+  final query = ref.watch(liveChatSearchQueryProvider);
+  if (query.isEmpty) return const [];
+  final groups = ref.watch(filteredGroupedChannelLiveChatsProvider(channelId));
+  final deleted =
+      ref.watch(deletedLiveChatIdsProvider).value ?? const <String>{};
+  return [
+    for (final g in groups)
+      for (final c in g.items)
+        if (!deleted.contains(c.liveChatId)) c,
+  ];
 }

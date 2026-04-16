@@ -353,3 +353,189 @@ final class FilteredGroupedChannelLiveChatsFamily extends $Family
   @override
   String toString() => r'filteredGroupedChannelLiveChatsProvider';
 }
+
+/// Flat list of comments currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+@ProviderFor(filteredSearchComments)
+final filteredSearchCommentsProvider = FilteredSearchCommentsFamily._();
+
+/// Flat list of comments currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+final class FilteredSearchCommentsProvider
+    extends $FunctionalProvider<List<Comment>, List<Comment>, List<Comment>>
+    with $Provider<List<Comment>> {
+  /// Flat list of comments currently visible in search results, excluding any
+  /// already marked as deleted. Empty when the search query is empty.
+  FilteredSearchCommentsProvider._({
+    required FilteredSearchCommentsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'filteredSearchCommentsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$filteredSearchCommentsHash();
+
+  @override
+  String toString() {
+    return r'filteredSearchCommentsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<Comment>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<Comment> create(Ref ref) {
+    final argument = this.argument as String;
+    return filteredSearchComments(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<Comment> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<Comment>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FilteredSearchCommentsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$filteredSearchCommentsHash() =>
+    r'21b63fe5a2ba0f685c9cc353cd6e09402734e9a7';
+
+/// Flat list of comments currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+final class FilteredSearchCommentsFamily extends $Family
+    with $FunctionalFamilyOverride<List<Comment>, String> {
+  FilteredSearchCommentsFamily._()
+    : super(
+        retry: null,
+        name: r'filteredSearchCommentsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Flat list of comments currently visible in search results, excluding any
+  /// already marked as deleted. Empty when the search query is empty.
+
+  FilteredSearchCommentsProvider call(String channelId) =>
+      FilteredSearchCommentsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'filteredSearchCommentsProvider';
+}
+
+/// Flat list of live chats currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+@ProviderFor(filteredSearchLiveChats)
+final filteredSearchLiveChatsProvider = FilteredSearchLiveChatsFamily._();
+
+/// Flat list of live chats currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+final class FilteredSearchLiveChatsProvider
+    extends $FunctionalProvider<List<LiveChat>, List<LiveChat>, List<LiveChat>>
+    with $Provider<List<LiveChat>> {
+  /// Flat list of live chats currently visible in search results, excluding any
+  /// already marked as deleted. Empty when the search query is empty.
+  FilteredSearchLiveChatsProvider._({
+    required FilteredSearchLiveChatsFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'filteredSearchLiveChatsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$filteredSearchLiveChatsHash();
+
+  @override
+  String toString() {
+    return r'filteredSearchLiveChatsProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<LiveChat>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<LiveChat> create(Ref ref) {
+    final argument = this.argument as String;
+    return filteredSearchLiveChats(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<LiveChat> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<LiveChat>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FilteredSearchLiveChatsProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$filteredSearchLiveChatsHash() =>
+    r'56dbd2c568c2b8a318825e02c55f4287b26e941a';
+
+/// Flat list of live chats currently visible in search results, excluding any
+/// already marked as deleted. Empty when the search query is empty.
+
+final class FilteredSearchLiveChatsFamily extends $Family
+    with $FunctionalFamilyOverride<List<LiveChat>, String> {
+  FilteredSearchLiveChatsFamily._()
+    : super(
+        retry: null,
+        name: r'filteredSearchLiveChatsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Flat list of live chats currently visible in search results, excluding any
+  /// already marked as deleted. Empty when the search query is empty.
+
+  FilteredSearchLiveChatsProvider call(String channelId) =>
+      FilteredSearchLiveChatsProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'filteredSearchLiveChatsProvider';
+}

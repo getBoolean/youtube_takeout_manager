@@ -233,6 +233,12 @@ class _ChannelAppBarActions extends ConsumerWidget {
     final hasLiveChats = ref.watch(
       channelLiveChatsProvider(channelId).select((l) => l.isNotEmpty),
     );
+    final matchingCommentCount = ref.watch(
+      filteredSearchCommentsProvider(channelId).select((l) => l.length),
+    );
+    final matchingLiveChatCount = ref.watch(
+      filteredSearchLiveChatsProvider(channelId).select((l) => l.length),
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -260,17 +266,37 @@ class _ChannelAppBarActions extends ConsumerWidget {
         ),
         if (authenticated)
           PopupMenuButton<String>(
-            onSelected: (value) => _handleChannelDelete(
-              context,
-              ref,
-              value: value,
-              comments: ref.read(channelCommentsProvider(channelId)),
-              liveChats: ref.read(channelLiveChatsProvider(channelId)),
-              deletedCommentIds:
-                  ref.read(deletedCommentIdsProvider).value ?? {},
-              deletedLiveChatIds:
-                  ref.read(deletedLiveChatIdsProvider).value ?? {},
-            ),
+            onSelected: (value) {
+              switch (value) {
+                case 'delete_all_comments':
+                case 'delete_all_chats':
+                  _handleChannelDelete(
+                    context,
+                    ref,
+                    value: value,
+                    comments: ref.read(channelCommentsProvider(channelId)),
+                    liveChats: ref.read(channelLiveChatsProvider(channelId)),
+                    deletedCommentIds:
+                        ref.read(deletedCommentIdsProvider).value ?? {},
+                    deletedLiveChatIds:
+                        ref.read(deletedLiveChatIdsProvider).value ?? {},
+                  );
+                case 'delete_matching_comments':
+                  _handleDeleteSearchResults(
+                    context,
+                    ref,
+                    isComments: true,
+                    channelId: channelId,
+                  );
+                case 'delete_matching_chats':
+                  _handleDeleteSearchResults(
+                    context,
+                    ref,
+                    isComments: false,
+                    channelId: channelId,
+                  );
+              }
+            },
             itemBuilder: (_) => [
               if (hasComments)
                 const PopupMenuItem(
@@ -281,6 +307,20 @@ class _ChannelAppBarActions extends ConsumerWidget {
                 const PopupMenuItem(
                   value: 'delete_all_chats',
                   child: Text('Delete All Live Chats from Channel'),
+                ),
+              if (matchingCommentCount > 0)
+                PopupMenuItem(
+                  value: 'delete_matching_comments',
+                  child: Text(
+                    'Delete $matchingCommentCount matching comments',
+                  ),
+                ),
+              if (matchingLiveChatCount > 0)
+                PopupMenuItem(
+                  value: 'delete_matching_chats',
+                  child: Text(
+                    'Delete $matchingLiveChatCount matching live chats',
+                  ),
                 ),
             ],
           ),
@@ -1153,6 +1193,53 @@ void _showSingleItemActions(
   );
 }
 
+/// Single composed flow for "bulk delete via picker + snackbar".
+///
+/// Owns the picker → enqueue → snackbar chain for every API-based bulk delete
+/// (channel-wide, selection mode, search results). Callers just build the
+/// snippet maps — ID sets are derived from the map keys.
+void _bulkDeleteViaPicker(
+  BuildContext context,
+  WidgetRef ref, {
+  required Map<String, String?> commentSnippets,
+  required Map<String, String?> liveChatSnippets,
+  VoidCallback? onQueued,
+}) {
+  final commentIds = commentSnippets.keys.toSet();
+  final liveChatIds = liveChatSnippets.keys.toSet();
+  final allIds = {...commentIds, ...liveChatIds};
+  if (allIds.isEmpty) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('No items to delete')));
+    return;
+  }
+  showDeletionMethodPicker(
+    context,
+    ref: ref,
+    ids: allIds,
+    onApiChosen: () {
+      final queue = ref.read(deletionQueueProvider.notifier);
+      if (commentIds.isNotEmpty) {
+        queue.enqueueComments(commentIds, snippets: commentSnippets);
+      }
+      if (liveChatIds.isNotEmpty) {
+        queue.enqueueLiveChats(liveChatIds, snippets: liveChatSnippets);
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${allIds.length} item(s) queued for deletion'),
+          action: SnackBarAction(
+            label: 'View Queue',
+            onPressed: () => context.router.push(const DeletionQueueRoute()),
+          ),
+        ),
+      );
+      onQueued?.call();
+    },
+  );
+}
+
 void _handleChannelDelete(
   BuildContext context,
   WidgetRef ref, {
@@ -1162,52 +1249,58 @@ void _handleChannelDelete(
   required Set<String> deletedCommentIds,
   required Set<String> deletedLiveChatIds,
 }) {
-  final isComments = value == 'delete_all_comments';
-  final items = isComments
-      ? comments.where((c) => !deletedCommentIds.contains(c.commentId)).toList()
-      : liveChats
-            .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
-            .toList();
-  final label = isComments ? 'comments' : 'live chats';
-
-  if (items.isEmpty) {
-    ScaffoldMessenger.of(
+  if (value == 'delete_all_comments') {
+    _bulkDeleteViaPicker(
       context,
-    ).showSnackBar(SnackBar(content: Text('No $label to delete')));
-    return;
+      ref,
+      commentSnippets: {
+        for (final c in comments)
+          if (!deletedCommentIds.contains(c.commentId))
+            c.commentId: c.displayText,
+      },
+      liveChatSnippets: const {},
+    );
+  } else {
+    _bulkDeleteViaPicker(
+      context,
+      ref,
+      commentSnippets: const {},
+      liveChatSnippets: {
+        for (final c in liveChats)
+          if (!deletedLiveChatIds.contains(c.liveChatId))
+            c.liveChatId: c.displayText,
+      },
+    );
   }
+}
 
-  final ids = isComments
-      ? items.cast<Comment>().map((c) => c.commentId).toSet()
-      : items.cast<LiveChat>().map((c) => c.liveChatId).toSet();
-  showDeletionMethodPicker(
-    context,
-    ref: ref,
-    ids: ids,
-    onApiChosen: () {
-      final notifier = ref.read(deletionQueueProvider.notifier);
-      if (isComments) {
-        final snippets = <String, String?>{
-          for (final c in items.cast<Comment>()) c.commentId: c.displayText,
-        };
-        notifier.enqueueComments(ids, snippets: snippets);
-      } else {
-        final snippets = <String, String?>{
-          for (final c in items.cast<LiveChat>()) c.liveChatId: c.displayText,
-        };
-        notifier.enqueueLiveChats(ids, snippets: snippets);
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${ids.length} $label queued for deletion'),
-          action: SnackBarAction(
-            label: 'View Queue',
-            onPressed: () => context.router.push(const DeletionQueueRoute()),
-          ),
-        ),
-      );
-    },
-  );
+void _handleDeleteSearchResults(
+  BuildContext context,
+  WidgetRef ref, {
+  required bool isComments,
+  required String channelId,
+}) {
+  if (isComments) {
+    final matches = ref.read(filteredSearchCommentsProvider(channelId));
+    _bulkDeleteViaPicker(
+      context,
+      ref,
+      commentSnippets: {
+        for (final c in matches) c.commentId: c.displayText,
+      },
+      liveChatSnippets: const {},
+    );
+  } else {
+    final matches = ref.read(filteredSearchLiveChatsProvider(channelId));
+    _bulkDeleteViaPicker(
+      context,
+      ref,
+      commentSnippets: const {},
+      liveChatSnippets: {
+        for (final c in matches) c.liveChatId: c.displayText,
+      },
+    );
+  }
 }
 
 void _enqueueSingle(
@@ -1287,65 +1380,21 @@ void _confirmApiDelete(
   required Set<String> commentIds,
   required Set<String> liveChatIds,
 }) {
-  final allIds = {...commentIds, ...liveChatIds};
-  showDeletionMethodPicker(
+  _bulkDeleteViaPicker(
     context,
-    ref: ref,
-    ids: allIds,
-    onApiChosen: () {
-      _enqueueSelected(
-        context,
-        ref,
-        comments: comments,
-        liveChats: liveChats,
-        commentIds: commentIds,
-        liveChatIds: liveChatIds,
-      );
+    ref,
+    commentSnippets: {
+      for (final c in comments)
+        if (commentIds.contains(c.commentId)) c.commentId: c.displayText,
+    },
+    liveChatSnippets: {
+      for (final c in liveChats)
+        if (liveChatIds.contains(c.liveChatId)) c.liveChatId: c.displayText,
+    },
+    onQueued: () {
       selectionMode.value = false;
       ref.read(deletionSetProvider.notifier).clear();
     },
-  );
-}
-
-void _enqueueSelected(
-  BuildContext context,
-  WidgetRef ref, {
-  required List<Comment> comments,
-  required List<LiveChat> liveChats,
-  required Set<String> commentIds,
-  required Set<String> liveChatIds,
-}) {
-  final notifier = ref.read(deletionQueueProvider.notifier);
-
-  if (commentIds.isNotEmpty) {
-    final snippets = <String, String?>{};
-    for (final c in comments) {
-      if (commentIds.contains(c.commentId)) {
-        snippets[c.commentId] = c.displayText;
-      }
-    }
-    notifier.enqueueComments(commentIds, snippets: snippets);
-  }
-
-  if (liveChatIds.isNotEmpty) {
-    final snippets = <String, String?>{};
-    for (final c in liveChats) {
-      if (liveChatIds.contains(c.liveChatId)) {
-        snippets[c.liveChatId] = c.displayText;
-      }
-    }
-    notifier.enqueueLiveChats(liveChatIds, snippets: snippets);
-  }
-
-  final total = commentIds.length + liveChatIds.length;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text('$total item(s) queued for deletion'),
-      action: SnackBarAction(
-        label: 'View Queue',
-        onPressed: () => context.router.push(const DeletionQueueRoute()),
-      ),
-    ),
   );
 }
 
