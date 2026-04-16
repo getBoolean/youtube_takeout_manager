@@ -26,6 +26,7 @@ import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
+import '../widgets/queue_snackbar.dart';
 import '../widgets/search_options_menu_button.dart';
 import '../widgets/video_group_header.dart';
 
@@ -1226,14 +1227,10 @@ void _bulkDeleteViaPicker(
       if (liveChatIds.isNotEmpty) {
         queue.enqueueLiveChats(liveChatIds, snippets: liveChatSnippets);
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${allIds.length} item(s) queued for deletion'),
-          action: SnackBarAction(
-            label: 'View Queue',
-            onPressed: () => context.router.push(const DeletionQueueRoute()),
-          ),
-        ),
+      showQueuedForDeletionSnackBar(
+        context,
+        ref,
+        message: '${allIds.length} item(s) queued for deletion',
       );
       onQueued?.call();
     },
@@ -1319,14 +1316,10 @@ void _enqueueSingle(
     notifier.enqueueLiveChats({itemId}, snippets: snippets);
   }
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: const Text('1 item queued for deletion'),
-      action: SnackBarAction(
-        label: 'View Queue',
-        onPressed: () => context.router.push(const DeletionQueueRoute()),
-      ),
-    ),
+  showQueuedForDeletionSnackBar(
+    context,
+    ref,
+    message: '1 item queued for deletion',
   );
 }
 

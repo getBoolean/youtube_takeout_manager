@@ -14,6 +14,7 @@ import '../widgets/channel_tile.dart';
 import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/queue_snackbar.dart';
 
 @RoutePage()
 class ChannelListScreen extends ConsumerStatefulWidget {
@@ -86,14 +87,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           };
           notifier.enqueueLiveChats(ids, snippets: snippets);
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$count $label queued for deletion'),
-            action: SnackBarAction(
-              label: 'View Queue',
-              onPressed: () => context.router.push(const DeletionQueueRoute()),
-            ),
-          ),
+        showQueuedForDeletionSnackBar(
+          context,
+          ref,
+          message: '$count $label queued for deletion',
         );
       },
     );
