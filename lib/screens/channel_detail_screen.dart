@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/comment.dart';
 import '../models/export_format.dart';
 import '../models/live_chat.dart';
+import '../models/queue_item_kind.dart';
 import '../models/video_group.dart';
 import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
@@ -277,10 +278,16 @@ class _ChannelAppBarActions extends ConsumerWidget {
                     value: value,
                     comments: ref.read(channelCommentsProvider(channelId)),
                     liveChats: ref.read(channelLiveChatsProvider(channelId)),
-                    deletedCommentIds:
-                        ref.read(deletedCommentIdsProvider).value ?? {},
-                    deletedLiveChatIds:
-                        ref.read(deletedLiveChatIdsProvider).value ?? {},
+                    skipCommentIds: {
+                      ...?ref.read(deletedCommentIdsProvider).value,
+                      ...ref.read(queuedCommentIdsProvider),
+                      ...ref.read(failedCommentIdsProvider),
+                    },
+                    skipLiveChatIds: {
+                      ...?ref.read(deletedLiveChatIdsProvider).value,
+                      ...ref.read(queuedLiveChatIdsProvider),
+                      ...ref.read(failedLiveChatIdsProvider),
+                    },
                   );
                 case 'delete_matching_comments':
                   _handleDeleteSearchResults(
@@ -339,15 +346,22 @@ class _SelectAllAction extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final comments = ref.watch(channelCommentsProvider(channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-    final deletedCommentIds = ref.watch(deletedCommentIdsProvider).value ?? {};
-    final deletedLiveChatIds =
-        ref.watch(deletedLiveChatIdsProvider).value ?? {};
+    final skipCommentIds = {
+      ...?ref.watch(deletedCommentIdsProvider).value,
+      ...ref.watch(queuedCommentIdsProvider),
+      ...ref.watch(failedCommentIdsProvider),
+    };
+    final skipLiveChatIds = {
+      ...?ref.watch(deletedLiveChatIdsProvider).value,
+      ...ref.watch(queuedLiveChatIdsProvider),
+      ...ref.watch(failedLiveChatIdsProvider),
+    };
     final selectableIds = {
       ...comments
-          .where((c) => !deletedCommentIds.contains(c.commentId))
+          .where((c) => !skipCommentIds.contains(c.commentId))
           .map((c) => c.commentId),
       ...liveChats
-          .where((c) => !deletedLiveChatIds.contains(c.liveChatId))
+          .where((c) => !skipLiveChatIds.contains(c.liveChatId))
           .map((c) => c.liveChatId),
     };
     final selectedIds = ref.watch(deletionSetProvider);
@@ -519,6 +533,9 @@ class _CommentGroupSliver extends HookConsumerWidget {
       }),
     );
     final deletedIds = ref.watch(deletedCommentIdsProvider).value ?? const {};
+    final queuedIds = ref.watch(queuedCommentIdsProvider);
+    final failedIds = ref.watch(failedCommentIdsProvider);
+    final ineligibleIds = {...deletedIds, ...queuedIds, ...failedIds};
 
     return SliverStickyCollapsablePanel(
       scrollController: scrollController,
@@ -530,10 +547,11 @@ class _CommentGroupSliver extends HookConsumerWidget {
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
-        onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
+        onToggleGroupSelection: () =>
+            _toggleGroupSelection(ref, groupItemIds, ineligibleIds),
         onLongPress: () {
           selectionMode.value = true;
-          _toggleGroupSelection(ref, groupItemIds);
+          _toggleGroupSelection(ref, groupItemIds, ineligibleIds);
         },
         onToggleExpanded: () => controller.isExpanded
             ? controller.collapsePanel()
@@ -543,10 +561,12 @@ class _CommentGroupSliver extends HookConsumerWidget {
         itemCount: group.items.length,
         itemBuilder: (context, index) {
           final comment = group.items[index];
-          final isDeleted = deletedIds.contains(comment.commentId);
+          final id = comment.commentId;
           return _CommentTileConsumer(
             comment: comment,
-            isDeleted: isDeleted,
+            isDeleted: deletedIds.contains(id),
+            isQueued: queuedIds.contains(id),
+            isFailed: failedIds.contains(id),
             selectionMode: selectionMode,
             highlightQuery: highlightQuery,
           );
@@ -559,12 +579,16 @@ class _CommentGroupSliver extends HookConsumerWidget {
 class _CommentTileConsumer extends ConsumerWidget {
   final Comment comment;
   final bool isDeleted;
+  final bool isQueued;
+  final bool isFailed;
   final ValueNotifier<bool> selectionMode;
   final String highlightQuery;
 
   const _CommentTileConsumer({
     required this.comment,
     required this.isDeleted,
+    required this.isQueued,
+    required this.isFailed,
     required this.selectionMode,
     required this.highlightQuery,
   });
@@ -574,27 +598,35 @@ class _CommentTileConsumer extends ConsumerWidget {
     final isSelected = ref.watch(
       deletionSetProvider.select((s) => s.contains(comment.commentId)),
     );
+    final ineligible = isDeleted || isQueued || isFailed;
     return CommentTile(
       comment: comment,
       isSelected: isSelected,
       isDeleted: isDeleted,
+      isQueued: isQueued,
+      isFailed: isFailed,
       selectionMode: selectionMode.value,
       highlightQuery: highlightQuery,
       onTap: isDeleted
           ? () {}
           : selectionMode.value
-          ? () =>
-                ref.read(deletionSetProvider.notifier).toggle(comment.commentId)
+          ? (ineligible
+                ? () {}
+                : () => ref
+                      .read(deletionSetProvider.notifier)
+                      .toggle(comment.commentId))
           : () => _showSingleItemActions(
               context,
               ref,
               itemId: comment.commentId,
               displayText: comment.displayText,
-              isComment: true,
+              kind: QueueItemKind.comment,
               videoId: comment.videoId,
               commentId: comment.commentId,
+              isQueued: isQueued,
+              isFailed: isFailed,
             ),
-      onLongPress: isDeleted
+      onLongPress: ineligible
           ? () {}
           : () {
               selectionMode.value = true;
@@ -747,6 +779,9 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
       }),
     );
     final deletedIds = ref.watch(deletedLiveChatIdsProvider).value ?? const {};
+    final queuedIds = ref.watch(queuedLiveChatIdsProvider);
+    final failedIds = ref.watch(failedLiveChatIdsProvider);
+    final ineligibleIds = {...deletedIds, ...queuedIds, ...failedIds};
 
     return SliverStickyCollapsablePanel(
       scrollController: scrollController,
@@ -758,10 +793,11 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
-        onToggleGroupSelection: () => _toggleGroupSelection(ref, groupItemIds),
+        onToggleGroupSelection: () =>
+            _toggleGroupSelection(ref, groupItemIds, ineligibleIds),
         onLongPress: () {
           selectionMode.value = true;
-          _toggleGroupSelection(ref, groupItemIds);
+          _toggleGroupSelection(ref, groupItemIds, ineligibleIds);
         },
         onToggleExpanded: () => controller.isExpanded
             ? controller.collapsePanel()
@@ -771,10 +807,12 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         itemCount: group.items.length,
         itemBuilder: (context, index) {
           final chat = group.items[index];
-          final isDeleted = deletedIds.contains(chat.liveChatId);
+          final id = chat.liveChatId;
           return _LiveChatTileConsumer(
             chat: chat,
-            isDeleted: isDeleted,
+            isDeleted: deletedIds.contains(id),
+            isQueued: queuedIds.contains(id),
+            isFailed: failedIds.contains(id),
             selectionMode: selectionMode,
             highlightQuery: highlightQuery,
           );
@@ -787,12 +825,16 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
 class _LiveChatTileConsumer extends ConsumerWidget {
   final LiveChat chat;
   final bool isDeleted;
+  final bool isQueued;
+  final bool isFailed;
   final ValueNotifier<bool> selectionMode;
   final String highlightQuery;
 
   const _LiveChatTileConsumer({
     required this.chat,
     required this.isDeleted,
+    required this.isQueued,
+    required this.isFailed,
     required this.selectionMode,
     required this.highlightQuery,
   });
@@ -802,25 +844,34 @@ class _LiveChatTileConsumer extends ConsumerWidget {
     final isSelected = ref.watch(
       deletionSetProvider.select((s) => s.contains(chat.liveChatId)),
     );
+    final ineligible = isDeleted || isQueued || isFailed;
     return LiveChatTile(
       liveChat: chat,
       isSelected: isSelected,
       isDeleted: isDeleted,
+      isQueued: isQueued,
+      isFailed: isFailed,
       selectionMode: selectionMode.value,
       highlightQuery: highlightQuery,
       onTap: isDeleted
           ? () {}
           : selectionMode.value
-          ? () => ref.read(deletionSetProvider.notifier).toggle(chat.liveChatId)
+          ? (ineligible
+                ? () {}
+                : () => ref
+                      .read(deletionSetProvider.notifier)
+                      .toggle(chat.liveChatId))
           : () => _showSingleItemActions(
               context,
               ref,
               itemId: chat.liveChatId,
               displayText: chat.displayText,
-              isComment: false,
+              kind: QueueItemKind.liveChat,
               videoId: chat.videoId,
+              isQueued: isQueued,
+              isFailed: isFailed,
             ),
-      onLongPress: isDeleted
+      onLongPress: ineligible
           ? () {}
           : () {
               selectionMode.value = true;
@@ -988,14 +1039,20 @@ class _LoadingSkeleton extends StatelessWidget {
 // file-scope functions because they operate on Navigator/ref, not widget state.
 // =============================================================================
 
-void _toggleGroupSelection(WidgetRef ref, Set<String> groupItemIds) {
+void _toggleGroupSelection(
+  WidgetRef ref,
+  Set<String> groupItemIds,
+  Set<String> ineligibleIds,
+) {
+  final eligible = groupItemIds.difference(ineligibleIds);
+  if (eligible.isEmpty) return;
   final notifier = ref.read(deletionSetProvider.notifier);
   final selectedIds = ref.read(deletionSetProvider);
-  final allSelected = groupItemIds.difference(selectedIds).isEmpty;
+  final allSelected = eligible.difference(selectedIds).isEmpty;
   if (allSelected) {
-    notifier.removeAll(groupItemIds);
+    notifier.removeAll(eligible);
   } else {
-    notifier.addAll(groupItemIds);
+    notifier.addAll(eligible);
   }
 }
 
@@ -1107,11 +1164,14 @@ void _showSingleItemActions(
   WidgetRef ref, {
   required String itemId,
   required String displayText,
-  required bool isComment,
+  required QueueItemKind kind,
   String? videoId,
   String? commentId,
+  bool isQueued = false,
+  bool isFailed = false,
 }) {
   final authenticated = ref.read(isAuthenticatedProvider);
+  final isComment = kind == QueueItemKind.comment;
 
   showModalBottomSheet(
     context: context,
@@ -1134,7 +1194,31 @@ void _showSingleItemActions(
                 launchUrl(uri, mode: LaunchMode.externalApplication);
               },
             ),
-          if (authenticated)
+          if (isFailed)
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: const Text('Retry'),
+              subtitle: const Text('Re-queue for deletion'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ref
+                    .read(deletionQueueProvider.notifier)
+                    .retryByItemId(itemId, kind);
+              },
+            ),
+          if (isQueued || isFailed)
+            ListTile(
+              leading: const Icon(Icons.remove_circle_outline),
+              title: const Text('Remove from queue'),
+              subtitle: const Text('Cancel the pending deletion'),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await ref
+                    .read(deletionQueueProvider.notifier)
+                    .removeByItemId(itemId, kind);
+              },
+            )
+          else if (authenticated)
             ListTile(
               leading: const Icon(Icons.cloud_off),
               title: const Text('Delete from YouTube'),
@@ -1155,39 +1239,40 @@ void _showSingleItemActions(
                 );
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Remove locally'),
-            subtitle: const Text(
-              'For comments you already deleted outside the app',
-            ),
-            onTap: () {
-              Navigator.pop(ctx);
-              showDialog<void>(
-                context: context,
-                builder: (dialogCtx) => AlertDialog(
-                  title: const Text('Remove locally?'),
-                  content: const Text(
-                    'This only removes the item from your list. '
-                    'It does not delete it from YouTube.',
+          if (!isQueued && !isFailed)
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Remove locally'),
+              subtitle: const Text(
+                'For comments you already deleted outside the app',
+              ),
+              onTap: () {
+                Navigator.pop(ctx);
+                showDialog<void>(
+                  context: context,
+                  builder: (dialogCtx) => AlertDialog(
+                    title: const Text('Remove locally?'),
+                    content: const Text(
+                      'This only removes the item from your list. '
+                      'It does not delete it from YouTube.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(dialogCtx),
+                        child: const Text('Cancel'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(dialogCtx);
+                          _removeLocally(ref, {itemId}, isComment);
+                        },
+                        child: const Text('Remove'),
+                      ),
+                    ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(dialogCtx),
-                      child: const Text('Cancel'),
-                    ),
-                    FilledButton(
-                      onPressed: () {
-                        Navigator.pop(dialogCtx);
-                        _removeLocally(ref, {itemId}, isComment);
-                      },
-                      child: const Text('Remove'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
         ],
       ),
     ),
@@ -1243,8 +1328,8 @@ void _handleChannelDelete(
   required String value,
   required List<Comment> comments,
   required List<LiveChat> liveChats,
-  required Set<String> deletedCommentIds,
-  required Set<String> deletedLiveChatIds,
+  required Set<String> skipCommentIds,
+  required Set<String> skipLiveChatIds,
 }) {
   if (value == 'delete_all_comments') {
     _bulkDeleteViaPicker(
@@ -1252,7 +1337,7 @@ void _handleChannelDelete(
       ref,
       commentSnippets: {
         for (final c in comments)
-          if (!deletedCommentIds.contains(c.commentId))
+          if (!skipCommentIds.contains(c.commentId))
             c.commentId: c.displayText,
       },
       liveChatSnippets: const {},
@@ -1264,7 +1349,7 @@ void _handleChannelDelete(
       commentSnippets: const {},
       liveChatSnippets: {
         for (final c in liveChats)
-          if (!deletedLiveChatIds.contains(c.liveChatId))
+          if (!skipLiveChatIds.contains(c.liveChatId))
             c.liveChatId: c.displayText,
       },
     );
@@ -1279,22 +1364,34 @@ void _handleDeleteSearchResults(
 }) {
   if (isComments) {
     final matches = ref.read(filteredSearchCommentsProvider(channelId));
+    final skip = {
+      ...?ref.read(deletedCommentIdsProvider).value,
+      ...ref.read(queuedCommentIdsProvider),
+      ...ref.read(failedCommentIdsProvider),
+    };
     _bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: {
-        for (final c in matches) c.commentId: c.displayText,
+        for (final c in matches)
+          if (!skip.contains(c.commentId)) c.commentId: c.displayText,
       },
       liveChatSnippets: const {},
     );
   } else {
     final matches = ref.read(filteredSearchLiveChatsProvider(channelId));
+    final skip = {
+      ...?ref.read(deletedLiveChatIdsProvider).value,
+      ...ref.read(queuedLiveChatIdsProvider),
+      ...ref.read(failedLiveChatIdsProvider),
+    };
     _bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: const {},
       liveChatSnippets: {
-        for (final c in matches) c.liveChatId: c.displayText,
+        for (final c in matches)
+          if (!skip.contains(c.liveChatId)) c.liveChatId: c.displayText,
       },
     );
   }

@@ -10,6 +10,8 @@ class CommentTile extends StatelessWidget {
   final Comment comment;
   final bool isSelected;
   final bool isDeleted;
+  final bool isQueued;
+  final bool isFailed;
   final bool selectionMode;
   final String? highlightQuery;
   final VoidCallback onTap;
@@ -20,6 +22,8 @@ class CommentTile extends StatelessWidget {
     required this.comment,
     required this.isSelected,
     this.isDeleted = false,
+    this.isQueued = false,
+    this.isFailed = false,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
@@ -29,12 +33,14 @@ class CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final spans = buildCommentSpans(comment.rawCommentText, emojiSize: 20);
+    final subtitle = _subtitleFor(
+      isDeleted: isDeleted,
+      isFailed: isFailed,
+      isQueued: isQueued,
+      createdAt: comment.createdAt,
+    );
 
     if (comment.price > 0) {
-      final subtitle = isDeleted
-          ? 'Deleted • ${formatDateTime(comment.createdAt)}'
-          : formatDateTime(comment.createdAt);
-
       return SuperChatCard(
         priceMicros: comment.price,
         currencyCode: 'USD',
@@ -43,6 +49,8 @@ class CommentTile extends StatelessWidget {
         subtitleText: subtitle,
         isSelected: isSelected,
         isDeleted: isDeleted,
+        isQueued: isQueued,
+        isFailed: isFailed,
         selectionMode: selectionMode,
         onTap: onTap,
         onLongPress: onLongPress,
@@ -58,14 +66,18 @@ class CommentTile extends StatelessWidget {
         leading: selectionMode
             ? Checkbox(value: isSelected, onChanged: (_) => onTap())
             : Icon(
-                isDeleted
-                    ? Icons.delete_outline
-                    : isReply
-                    ? Icons.reply
-                    : Icons.comment_outlined,
-                color: isDeleted
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.primary,
+                _leadingIcon(
+                  isDeleted: isDeleted,
+                  isFailed: isFailed,
+                  isQueued: isQueued,
+                  fallback: isReply ? Icons.reply : Icons.comment_outlined,
+                ),
+                color: _leadingColor(
+                  theme,
+                  isDeleted: isDeleted,
+                  isFailed: isFailed,
+                  isQueued: isQueued,
+                ),
               ),
         title: HighlightedText.rich(
           spans,
@@ -76,15 +88,48 @@ class CommentTile extends StatelessWidget {
               ? const TextStyle(decoration: TextDecoration.lineThrough)
               : null,
         ),
-        subtitle: Text(
-          isDeleted
-              ? 'Deleted • ${formatDateTime(comment.createdAt)}'
-              : formatDateTime(comment.createdAt),
-        ),
+        subtitle: Text(subtitle),
         selected: isSelected,
         onTap: onTap,
         onLongPress: onLongPress,
       ),
     );
   }
+}
+
+String _subtitleFor({
+  required bool isDeleted,
+  required bool isFailed,
+  required bool isQueued,
+  required DateTime createdAt,
+}) {
+  final date = formatDateTime(createdAt);
+  if (isDeleted) return 'Deleted • $date';
+  if (isFailed) return 'Failed • $date';
+  if (isQueued) return 'Queued • $date';
+  return date;
+}
+
+IconData _leadingIcon({
+  required bool isDeleted,
+  required bool isFailed,
+  required bool isQueued,
+  required IconData fallback,
+}) {
+  if (isDeleted) return Icons.delete_outline;
+  if (isFailed) return Icons.error_outline;
+  if (isQueued) return Icons.schedule;
+  return fallback;
+}
+
+Color _leadingColor(
+  ThemeData theme, {
+  required bool isDeleted,
+  required bool isFailed,
+  required bool isQueued,
+}) {
+  final scheme = theme.colorScheme;
+  if (isDeleted || isFailed) return scheme.error;
+  if (isQueued) return scheme.tertiary;
+  return scheme.primary;
 }

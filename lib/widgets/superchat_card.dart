@@ -10,6 +10,8 @@ class SuperChatCard extends StatelessWidget {
   final String subtitleText;
   final bool isSelected;
   final bool isDeleted;
+  final bool isQueued;
+  final bool isFailed;
   final bool selectionMode;
   final String? highlightQuery;
   final VoidCallback onTap;
@@ -23,6 +25,8 @@ class SuperChatCard extends StatelessWidget {
     required this.subtitleText,
     required this.isSelected,
     this.isDeleted = false,
+    this.isQueued = false,
+    this.isFailed = false,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
@@ -35,6 +39,8 @@ class SuperChatCard extends StatelessWidget {
     if (tier == null) return const SizedBox.shrink();
 
     final priceLabel = formatSuperChatPrice(priceMicros, currencyCode);
+    final badgeIcon = _badgeIcon();
+    final scheme = Theme.of(context).colorScheme;
 
     return Opacity(
       opacity: isDeleted ? 0.5 : 1.0,
@@ -51,7 +57,7 @@ class SuperChatCard extends StatelessWidget {
                   ? BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: scheme.primary,
                         width: 2,
                       ),
                     )
@@ -87,6 +93,9 @@ class SuperChatCard extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                          ] else if (badgeIcon != null) ...[
+                            Icon(badgeIcon, size: 18, color: tier.textColor),
                             const SizedBox(width: 8),
                           ],
                           Text(
@@ -159,5 +168,12 @@ class SuperChatCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  IconData? _badgeIcon() {
+    if (isDeleted) return Icons.delete_outline;
+    if (isFailed) return Icons.error_outline;
+    if (isQueued) return Icons.schedule;
+    return null;
   }
 }

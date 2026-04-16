@@ -130,6 +130,33 @@ class DeletionQueue extends _$DeletionQueue {
     await _persistence.saveQueue(updated);
   }
 
+  Future<void> removeByItemId(String itemId, QueueItemKind kind) async {
+    final current = await future;
+    final updated = current
+        .where((i) => !(i.itemId == itemId && i.itemType == kind))
+        .toList();
+    if (updated.length == current.length) return;
+    state = AsyncData(updated);
+    await _persistence.saveQueue(updated);
+  }
+
+  Future<void> retryByItemId(String itemId, QueueItemKind kind) async {
+    final current = await future;
+    final updated = current
+        .map(
+          (i) => (i.itemId == itemId && i.itemType == kind)
+              ? i.copyWith(
+                  status: DeletionItemStatus.pending,
+                  errorMessage: null,
+                  processedAt: null,
+                )
+              : i,
+        )
+        .toList();
+    state = AsyncData(updated);
+    await _persistence.saveQueue(updated);
+  }
+
   // ---------------------------------------------------------------------------
   // Processing loop
   // ---------------------------------------------------------------------------
