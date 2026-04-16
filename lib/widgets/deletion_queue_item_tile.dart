@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/deletion_item_status.dart';
-import '../models/deletion_item_type.dart';
+import '../models/queue_item_kind.dart';
 import '../models/deletion_queue_item.dart';
 import '../utils/date_formatter.dart';
 
@@ -17,7 +17,7 @@ class DeletionQueueItemTile extends StatelessWidget {
 
     return ListTile(
       leading: Icon(
-        item.itemType == DeletionItemType.comment
+        item.itemType == QueueItemKind.comment
             ? Icons.comment_outlined
             : Icons.chat_bubble_outline,
         color: colorScheme.primary,

@@ -15,7 +15,7 @@ class DeletionQueueItemMapper extends ClassMapperBase<DeletionQueueItem> {
   static DeletionQueueItemMapper ensureInitialized() {
     if (_instance == null) {
       MapperContainer.globals.use(_instance = DeletionQueueItemMapper._());
-      DeletionItemTypeMapper.ensureInitialized();
+      QueueItemKindMapper.ensureInitialized();
       DeletionItemStatusMapper.ensureInitialized();
     }
     return _instance!;
@@ -31,8 +31,8 @@ class DeletionQueueItemMapper extends ClassMapperBase<DeletionQueueItem> {
     'itemId',
     _$itemId,
   );
-  static DeletionItemType _$itemType(DeletionQueueItem v) => v.itemType;
-  static const Field<DeletionQueueItem, DeletionItemType> _f$itemType = Field(
+  static QueueItemKind _$itemType(DeletionQueueItem v) => v.itemType;
+  static const Field<DeletionQueueItem, QueueItemKind> _f$itemType = Field(
     'itemType',
     _$itemType,
   );
@@ -165,7 +165,7 @@ abstract class DeletionQueueItemCopyWith<
   $R call({
     String? id,
     String? itemId,
-    DeletionItemType? itemType,
+    QueueItemKind? itemType,
     DeletionItemStatus? status,
     String? displayTextSnippet,
     String? errorMessage,
@@ -189,7 +189,7 @@ class _DeletionQueueItemCopyWithImpl<$R, $Out>
   $R call({
     String? id,
     String? itemId,
-    DeletionItemType? itemType,
+    QueueItemKind? itemType,
     DeletionItemStatus? status,
     Object? displayTextSnippet = $none,
     Object? errorMessage = $none,

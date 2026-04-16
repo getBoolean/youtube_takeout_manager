@@ -1,12 +1,14 @@
 import 'package:googleapis/youtube/v3.dart';
 import 'package:http/http.dart' as http;
 
-import '../models/deletion_item_type.dart';
-
 /// Unified service for deleting YouTube comments and live chat messages
 /// via the YouTube Data API v3.
 ///
-/// Each delete call costs 50 quota units regardless of item type.
+/// Live chat messages from Takeout are deletable via `comments.delete` because
+/// Google treats them under the same activity type. `liveChatMessages.delete`
+/// is not used — it only works on messages in currently-active broadcasts.
+///
+/// Each delete call costs 50 quota units.
 class YoutubeDeletionService {
   /// Deletes a single item from YouTube.
   ///
@@ -16,16 +18,10 @@ class YoutubeDeletionService {
   Future<({bool succeeded, bool quotaExceeded, String? error})> deleteItem(
     http.Client client,
     String itemId,
-    DeletionItemType type,
   ) async {
     final youtube = YouTubeApi(client);
     try {
-      switch (type) {
-        case DeletionItemType.comment:
-          await youtube.comments.delete(itemId);
-        case DeletionItemType.liveChat:
-          await youtube.liveChatMessages.delete(itemId);
-      }
+      await youtube.comments.delete(itemId);
       return (succeeded: true, quotaExceeded: false, error: null);
     } on DetailedApiRequestError catch (e) {
       final isQuota =

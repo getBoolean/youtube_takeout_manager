@@ -1,7 +1,7 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
 import 'deletion_item_status.dart';
-import 'deletion_item_type.dart';
+import 'queue_item_kind.dart';
 
 part 'deletion_queue_item.mapper.dart';
 
@@ -9,7 +9,7 @@ part 'deletion_queue_item.mapper.dart';
 class DeletionQueueItem with DeletionQueueItemMappable {
   final String id;
   final String itemId;
-  final DeletionItemType itemType;
+  final QueueItemKind itemType;
   final DeletionItemStatus status;
   final String? displayTextSnippet;
   final String? errorMessage;

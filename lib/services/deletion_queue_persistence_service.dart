@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../models/deletion_queue_item.dart';
 import '../models/deletion_item_status.dart';
-import '../models/deletion_item_type.dart';
+import '../models/queue_item_kind.dart';
 import 'kv_storage_service.dart';
 
 class DeletionQueuePersistenceService {
@@ -34,11 +34,11 @@ class DeletionQueuePersistenceService {
     );
 
     final commentIds = succeeded
-        .where((i) => i.itemType == DeletionItemType.comment)
+        .where((i) => i.itemType == QueueItemKind.comment)
         .map((i) => i.itemId)
         .toSet();
     final liveChatIds = succeeded
-        .where((i) => i.itemType == DeletionItemType.liveChat)
+        .where((i) => i.itemType == QueueItemKind.liveChat)
         .map((i) => i.itemId)
         .toSet();
 

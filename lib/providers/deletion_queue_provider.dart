@@ -3,7 +3,7 @@ import 'dart:math';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../models/deletion_item_status.dart';
-import '../models/deletion_item_type.dart';
+import '../models/queue_item_kind.dart';
 import '../models/deletion_queue_item.dart';
 import '../models/quota_operation.dart';
 import '../services/deletion_queue_persistence_service.dart';
@@ -40,19 +40,19 @@ class DeletionQueue extends _$DeletionQueue {
     Set<String> ids, {
     Map<String, String?> snippets = const {},
   }) async {
-    await _enqueue(ids, DeletionItemType.comment, snippets);
+    await _enqueue(ids, QueueItemKind.comment, snippets);
   }
 
   Future<void> enqueueLiveChats(
     Set<String> ids, {
     Map<String, String?> snippets = const {},
   }) async {
-    await _enqueue(ids, DeletionItemType.liveChat, snippets);
+    await _enqueue(ids, QueueItemKind.liveChat, snippets);
   }
 
   Future<void> _enqueue(
     Set<String> ids,
-    DeletionItemType type,
+    QueueItemKind type,
     Map<String, String?> snippets,
   ) async {
     final current = await future;
@@ -177,13 +177,12 @@ class DeletionQueue extends _$DeletionQueue {
         final result = await _deletionService.deleteItem(
           client,
           nextItem.itemId,
-          nextItem.itemType,
         );
 
         final now = DateTime.now().toUtc();
 
         if (result.succeeded) {
-          final op = nextItem.itemType == DeletionItemType.comment
+          final op = nextItem.itemType == QueueItemKind.comment
               ? QuotaOperation.deleteComment
               : QuotaOperation.deleteLiveChat;
           await ref.read(quotaProvider.notifier).recordUsage(op);
@@ -197,7 +196,7 @@ class DeletionQueue extends _$DeletionQueue {
 
           // Persist as deleted and notify UI to re-render with deleted styling.
           final idSet = {nextItem.itemId};
-          if (nextItem.itemType == DeletionItemType.comment) {
+          if (nextItem.itemType == QueueItemKind.comment) {
             await ref
                 .read(deletedCommentIdsProvider.notifier)
                 .markDeleted(idSet);
