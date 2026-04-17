@@ -16,11 +16,19 @@ class ChannelDetailRoute extends PageRouteInfo<ChannelDetailRouteArgs> {
   ChannelDetailRoute({
     Key? key,
     required String channelId,
+    String? targetKind,
+    String? targetId,
     List<PageRouteInfo>? children,
   }) : super(
          ChannelDetailRoute.name,
-         args: ChannelDetailRouteArgs(key: key, channelId: channelId),
+         args: ChannelDetailRouteArgs(
+           key: key,
+           channelId: channelId,
+           targetKind: targetKind,
+           targetId: targetId,
+         ),
          rawPathParams: {'channelId': channelId},
+         rawQueryParams: {'targetKind': targetKind, 'targetId': targetId},
          initialChildren: children,
        );
 
@@ -30,37 +38,61 @@ class ChannelDetailRoute extends PageRouteInfo<ChannelDetailRouteArgs> {
     name,
     builder: (data) {
       final pathParams = data.inheritedPathParams;
+      final queryParams = data.queryParams;
       final args = data.argsAs<ChannelDetailRouteArgs>(
         orElse: () => ChannelDetailRouteArgs(
           channelId: pathParams.getString('channelId'),
+          targetKind: queryParams.optString('targetKind'),
+          targetId: queryParams.optString('targetId'),
         ),
       );
-      return ChannelDetailScreen(key: args.key, channelId: args.channelId);
+      return ChannelDetailScreen(
+        key: args.key,
+        channelId: args.channelId,
+        targetKind: args.targetKind,
+        targetId: args.targetId,
+      );
     },
   );
 }
 
 class ChannelDetailRouteArgs {
-  const ChannelDetailRouteArgs({this.key, required this.channelId});
+  const ChannelDetailRouteArgs({
+    this.key,
+    required this.channelId,
+    this.targetKind,
+    this.targetId,
+  });
 
   final Key? key;
 
   final String channelId;
 
+  final String? targetKind;
+
+  final String? targetId;
+
   @override
   String toString() {
-    return 'ChannelDetailRouteArgs{key: $key, channelId: $channelId}';
+    return 'ChannelDetailRouteArgs{key: $key, channelId: $channelId, targetKind: $targetKind, targetId: $targetId}';
   }
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
     if (other is! ChannelDetailRouteArgs) return false;
-    return key == other.key && channelId == other.channelId;
+    return key == other.key &&
+        channelId == other.channelId &&
+        targetKind == other.targetKind &&
+        targetId == other.targetId;
   }
 
   @override
-  int get hashCode => key.hashCode ^ channelId.hashCode;
+  int get hashCode =>
+      key.hashCode ^
+      channelId.hashCode ^
+      targetKind.hashCode ^
+      targetId.hashCode;
 }
 
 /// generated route for

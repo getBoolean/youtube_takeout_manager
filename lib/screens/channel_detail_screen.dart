@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
@@ -18,6 +19,7 @@ import '../providers/deletion_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../providers/export_providers.dart';
 import '../providers/grouped_providers.dart';
+import '../providers/header_animation_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
@@ -28,16 +30,21 @@ import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
 import '../widgets/queue_snackbar.dart';
+import '../widgets/scroll_target_highlight.dart';
 import '../widgets/search_options_menu_button.dart';
 import '../widgets/video_group_header.dart';
 
 @RoutePage()
 class ChannelDetailScreen extends HookConsumerWidget {
   final String channelId;
+  final String? targetKind;
+  final String? targetId;
 
   const ChannelDetailScreen({
     super.key,
     @PathParam('channelId') required this.channelId,
+    @QueryParam('targetKind') this.targetKind,
+    @QueryParam('targetId') this.targetId,
   });
 
   @override
@@ -45,6 +52,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
     final selectionMode = useState(false);
     final commentScrollController = useScrollController();
     final liveChatScrollController = useScrollController();
+    final tabController = useTabController(initialLength: 2);
 
     // Deep-link guard: ensure back navigation lands somewhere sensible.
     useEffect(() {
@@ -59,6 +67,25 @@ class ChannelDetailScreen extends HookConsumerWidget {
       });
       return null;
     }, const []);
+
+    // Resolve scroll target from query params. Split per kind so each list
+    // view only sees its own id; the other sees null.
+    final isCommentTarget = targetKind == 'comment' && targetId != null;
+    final isLiveChatTarget = targetKind == 'liveChat' && targetId != null;
+    final commentTargetId = isCommentTarget ? targetId : null;
+    final liveChatTargetId = isLiveChatTarget ? targetId : null;
+
+    // One-shot: when arriving with a scroll target, switch to the matching
+    // tab. Clearing the per-list search query is handled inside each list
+    // view's initState, before its `ref.listen` is registered — so it
+    // doesn't fire the search-reset that would undo the scroll target.
+    useEffect(() {
+      if (!isCommentTarget && !isLiveChatTarget) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        tabController.animateTo(isCommentTarget ? 0 : 1);
+      });
+      return null;
+    }, [channelId, targetKind, targetId]);
 
     final takeoutAsync = ref.watch(takeoutProvider);
     if (takeoutAsync.isLoading ||
@@ -84,16 +111,19 @@ class ChannelDetailScreen extends HookConsumerWidget {
 
     final body = useTabs
         ? TabBarView(
+            controller: tabController,
             children: [
               _CommentListView(
                 channelId: channelId,
                 selectionMode: selectionMode,
                 scrollController: commentScrollController,
+                initialScrollTarget: commentTargetId,
               ),
               _LiveChatListView(
                 channelId: channelId,
                 selectionMode: selectionMode,
                 scrollController: liveChatScrollController,
+                initialScrollTarget: liveChatTargetId,
               ),
             ],
           )
@@ -102,19 +132,21 @@ class ChannelDetailScreen extends HookConsumerWidget {
             channelId: channelId,
             selectionMode: selectionMode,
             scrollController: commentScrollController,
+            initialScrollTarget: commentTargetId,
           )
         : hasLiveChats
         ? _LiveChatListView(
             channelId: channelId,
             selectionMode: selectionMode,
             scrollController: liveChatScrollController,
+            initialScrollTarget: liveChatTargetId,
           )
         : const EmptyState(
             icon: Icons.inbox_outlined,
             message: 'No interactions found',
           );
 
-    final scaffold = Scaffold(
+    return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
         title: _ChannelTitle(
@@ -147,6 +179,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
         ],
         bottom: useTabs
             ? TabBar(
+                controller: tabController,
                 tabs: [
                   Tab(text: 'Comments ($commentCount)'),
                   Tab(text: 'Live Chats ($liveChatCount)'),
@@ -159,10 +192,6 @@ class ChannelDetailScreen extends HookConsumerWidget {
           ? _DeletionBar(channelId: channelId, selectionMode: selectionMode)
           : null,
     );
-
-    return useTabs
-        ? DefaultTabController(length: 2, child: scaffold)
-        : scaffold;
   }
 }
 
@@ -319,9 +348,7 @@ class _ChannelAppBarActions extends ConsumerWidget {
               if (matchingCommentCount > 0)
                 PopupMenuItem(
                   value: 'delete_matching_comments',
-                  child: Text(
-                    'Delete $matchingCommentCount matching comments',
-                  ),
+                  child: Text('Delete $matchingCommentCount matching comments'),
                 ),
               if (matchingLiveChatCount > 0)
                 PopupMenuItem(
@@ -392,11 +419,13 @@ class _CommentListView extends ConsumerStatefulWidget {
   final String channelId;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
+  final String? initialScrollTarget;
 
   const _CommentListView({
     required this.channelId,
     required this.selectionMode,
     required this.scrollController,
+    this.initialScrollTarget,
   });
 
   @override
@@ -410,6 +439,8 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
   static const double _growThreshold = 400;
 
   int _visibleCount = _initialVisible;
+  String? _expandGroupKey;
+  String? _highlightId;
 
   @override
   bool get wantKeepAlive => true;
@@ -418,6 +449,24 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
   void initState() {
     super.initState();
     widget.scrollController.addListener(_maybeGrow);
+    _applyInitialScrollTarget();
+  }
+
+  void _applyInitialScrollTarget() {
+    final target = widget.initialScrollTarget;
+    if (target == null) return;
+    final groups = ref.read(
+      filteredGroupedChannelCommentsProvider(widget.channelId),
+    );
+    for (var i = 0; i < groups.length; i++) {
+      final hit = groups[i].items.any((c) => c.commentId == target);
+      if (hit) {
+        if (i >= _visibleCount) _visibleCount = i + 1;
+        _expandGroupKey = groups[i].groupKey;
+        _highlightId = target;
+        return;
+      }
+    }
   }
 
   @override
@@ -485,6 +534,29 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
                         selectionMode: widget.selectionMode,
                         scrollController: widget.scrollController,
                         highlightQuery: query,
+                        // While a scroll target is active, force the target
+                        // group expanded and all siblings collapsed so
+                        // layout can't shift underneath the scroll. Once
+                        // the highlight is consumed we pass null to leave
+                        // whatever state the user has set alone.
+                        expandInitially: _expandGroupKey == null
+                            ? null
+                            : groups[i].groupKey == _expandGroupKey,
+                        highlightCommentId:
+                            groups[i].groupKey == _expandGroupKey
+                            ? _highlightId
+                            : null,
+                        onHighlightConsumed:
+                            groups[i].groupKey == _expandGroupKey
+                            ? () {
+                                if (mounted) {
+                                  setState(() {
+                                    _highlightId = null;
+                                    _expandGroupKey = null;
+                                  });
+                                }
+                              }
+                            : null,
                       ),
                   ],
                 ),
@@ -500,12 +572,24 @@ class _CommentGroupSliver extends HookConsumerWidget {
   final ScrollController scrollController;
   final String highlightQuery;
 
+  /// Tri-state: `true` forces the panel expanded on first frame, `false`
+  /// forces it collapsed, `null` leaves the user's current state alone.
+  /// During a scroll-to-target flow the target group gets `true` and all
+  /// other groups get `false`, which removes layout-extent shifts from
+  /// sibling panels and makes the scroll deterministic.
+  final bool? expandInitially;
+  final String? highlightCommentId;
+  final VoidCallback? onHighlightConsumed;
+
   const _CommentGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
     required this.highlightQuery,
+    this.expandInitially,
+    this.highlightCommentId,
+    this.onHighlightConsumed,
   });
 
   @override
@@ -519,6 +603,49 @@ class _CommentGroupSliver extends HookConsumerWidget {
       () => group.items.map((c) => c.commentId).toSet(),
       [group],
     );
+    final highlightKey = useMemoized(
+      () => highlightCommentId == null ? null : GlobalKey(),
+      [highlightCommentId],
+    );
+    final headerKey = useMemoized(
+      () => highlightCommentId == null ? null : GlobalKey(),
+      [highlightCommentId],
+    );
+
+    useEffect(() {
+      final force = expandInitially;
+      if (force == null) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (force && !controller.isExpanded) {
+          controller.expandPanel();
+        } else if (!force && controller.isExpanded) {
+          controller.collapsePanel();
+        }
+      });
+      return null;
+    }, [expandInitially]);
+
+    useEffect(() {
+      final key = highlightKey;
+      if (key == null) return null;
+      // Double post-frame so the sibling collapse/expand calls from the
+      // `expandInitially` effect above have taken effect and the layout
+      // is stable when we compute the scroll offset.
+      final suppressHeaderAnimation = ref.read(
+        suppressHeaderAnimationProvider.notifier,
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollTileBelowHeader(
+            key.currentContext,
+            headerKey,
+            scrollController,
+            suppressHeaderAnimation,
+          );
+        });
+      });
+      return null;
+    }, [highlightKey]);
 
     final groupSel = ref.watch(
       deletionSetProvider.select((s) {
@@ -541,12 +668,17 @@ class _CommentGroupSliver extends HookConsumerWidget {
       scrollController: scrollController,
       panelController: controller,
       headerBuilder: (context, status) => VideoGroupHeader(
+        key: headerKey,
         group: group,
         status: status,
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
+        // While this group is the scroll-to-target, render the header in
+        // its compact layout from the first frame so the panel's scroll
+        // extent doesn't shrink when the header pins mid-animation.
+        forceCompact: expandInitially == true,
         onToggleGroupSelection: () =>
             _toggleGroupSelection(ref, groupItemIds, ineligibleIds),
         onLongPress: () {
@@ -562,7 +694,7 @@ class _CommentGroupSliver extends HookConsumerWidget {
         itemBuilder: (context, index) {
           final comment = group.items[index];
           final id = comment.commentId;
-          return _CommentTileConsumer(
+          final tile = _CommentTileConsumer(
             comment: comment,
             isDeleted: deletedIds.contains(id),
             isQueued: queuedIds.contains(id),
@@ -570,6 +702,15 @@ class _CommentGroupSliver extends HookConsumerWidget {
             selectionMode: selectionMode,
             highlightQuery: highlightQuery,
           );
+          if (id == highlightCommentId && highlightKey != null) {
+            return ScrollTargetHighlight(
+              key: highlightKey,
+              active: true,
+              onComplete: onHighlightConsumed,
+              child: tile,
+            );
+          }
+          return tile;
         },
       ),
     );
@@ -640,11 +781,13 @@ class _LiveChatListView extends ConsumerStatefulWidget {
   final String channelId;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
+  final String? initialScrollTarget;
 
   const _LiveChatListView({
     required this.channelId,
     required this.selectionMode,
     required this.scrollController,
+    this.initialScrollTarget,
   });
 
   @override
@@ -658,6 +801,8 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
   static const double _growThreshold = 400;
 
   int _visibleCount = _initialVisible;
+  String? _expandGroupKey;
+  String? _highlightId;
 
   @override
   bool get wantKeepAlive => true;
@@ -666,6 +811,24 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
   void initState() {
     super.initState();
     widget.scrollController.addListener(_maybeGrow);
+    _applyInitialScrollTarget();
+  }
+
+  void _applyInitialScrollTarget() {
+    final target = widget.initialScrollTarget;
+    if (target == null) return;
+    final groups = ref.read(
+      filteredGroupedChannelLiveChatsProvider(widget.channelId),
+    );
+    for (var i = 0; i < groups.length; i++) {
+      final hit = groups[i].items.any((c) => c.liveChatId == target);
+      if (hit) {
+        if (i >= _visibleCount) _visibleCount = i + 1;
+        _expandGroupKey = groups[i].groupKey;
+        _highlightId = target;
+        return;
+      }
+    }
   }
 
   @override
@@ -733,6 +896,24 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
                         selectionMode: widget.selectionMode,
                         scrollController: widget.scrollController,
                         highlightQuery: query,
+                        expandInitially: _expandGroupKey == null
+                            ? null
+                            : groups[i].groupKey == _expandGroupKey,
+                        highlightLiveChatId:
+                            groups[i].groupKey == _expandGroupKey
+                            ? _highlightId
+                            : null,
+                        onHighlightConsumed:
+                            groups[i].groupKey == _expandGroupKey
+                            ? () {
+                                if (mounted) {
+                                  setState(() {
+                                    _highlightId = null;
+                                    _expandGroupKey = null;
+                                  });
+                                }
+                              }
+                            : null,
                       ),
                   ],
                 ),
@@ -748,12 +929,21 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
   final ScrollController scrollController;
   final String highlightQuery;
 
+  /// See [_CommentGroupSliver.expandInitially]. Tri-state: `true` forces
+  /// expand, `false` forces collapse, `null` leaves user state alone.
+  final bool? expandInitially;
+  final String? highlightLiveChatId;
+  final VoidCallback? onHighlightConsumed;
+
   const _LiveChatGroupSliver({
     super.key,
     required this.group,
     required this.selectionMode,
     required this.scrollController,
     required this.highlightQuery,
+    this.expandInitially,
+    this.highlightLiveChatId,
+    this.onHighlightConsumed,
   });
 
   @override
@@ -765,6 +955,46 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
       () => group.items.map((c) => c.liveChatId).toSet(),
       [group],
     );
+    final highlightKey = useMemoized(
+      () => highlightLiveChatId == null ? null : GlobalKey(),
+      [highlightLiveChatId],
+    );
+    final headerKey = useMemoized(
+      () => highlightLiveChatId == null ? null : GlobalKey(),
+      [highlightLiveChatId],
+    );
+
+    useEffect(() {
+      final force = expandInitially;
+      if (force == null) return null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (force && !controller.isExpanded) {
+          controller.expandPanel();
+        } else if (!force && controller.isExpanded) {
+          controller.collapsePanel();
+        }
+      });
+      return null;
+    }, [expandInitially]);
+
+    useEffect(() {
+      final key = highlightKey;
+      if (key == null) return null;
+      final suppressHeaderAnimation = ref.read(
+        suppressHeaderAnimationProvider.notifier,
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollTileBelowHeader(
+            key.currentContext,
+            headerKey,
+            scrollController,
+            suppressHeaderAnimation,
+          );
+        });
+      });
+      return null;
+    }, [highlightKey]);
 
     final groupSel = ref.watch(
       deletionSetProvider.select((s) {
@@ -787,12 +1017,14 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
       scrollController: scrollController,
       panelController: controller,
       headerBuilder: (context, status) => VideoGroupHeader(
+        key: headerKey,
         group: group,
         status: status,
         selectionMode: selectionMode.value,
         allSelected: groupSel.all,
         someSelected: groupSel.any && !groupSel.all,
         highlightQuery: highlightQuery,
+        forceCompact: expandInitially == true,
         onToggleGroupSelection: () =>
             _toggleGroupSelection(ref, groupItemIds, ineligibleIds),
         onLongPress: () {
@@ -808,7 +1040,7 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
         itemBuilder: (context, index) {
           final chat = group.items[index];
           final id = chat.liveChatId;
-          return _LiveChatTileConsumer(
+          final tile = _LiveChatTileConsumer(
             chat: chat,
             isDeleted: deletedIds.contains(id),
             isQueued: queuedIds.contains(id),
@@ -816,6 +1048,15 @@ class _LiveChatGroupSliver extends HookConsumerWidget {
             selectionMode: selectionMode,
             highlightQuery: highlightQuery,
           );
+          if (id == highlightLiveChatId && highlightKey != null) {
+            return ScrollTargetHighlight(
+              key: highlightKey,
+              active: true,
+              onComplete: onHighlightConsumed,
+              child: tile,
+            );
+          }
+          return tile;
         },
       ),
     );
@@ -1337,8 +1578,7 @@ void _handleChannelDelete(
       ref,
       commentSnippets: {
         for (final c in comments)
-          if (!skipCommentIds.contains(c.commentId))
-            c.commentId: c.displayText,
+          if (!skipCommentIds.contains(c.commentId)) c.commentId: c.displayText,
       },
       liveChatSnippets: const {},
     );
@@ -1497,5 +1737,54 @@ Future<void> _removeLocally(
     await ref.read(deletedCommentIdsProvider.notifier).markDeleted(ids);
   } else {
     await ref.read(deletedLiveChatIdsProvider.notifier).markDeleted(ids);
+  }
+}
+
+/// Scrolls [scrollController] so the widget at [tileContext] lands just below
+/// the sticky [VideoGroupHeader] instead of being hidden behind it.
+///
+/// The target group is built with [VideoGroupHeader.forceCompact] and its
+/// siblings are pre-collapsed, so every header is already at its compact
+/// height from the first frame — the panel's scroll extent can't shrink
+/// during the animation. That makes a single `animateTo` land on exactly
+/// the right offset without any follow-up correction. The offset is the
+/// target header's measured height plus a 12px gap, so tiles stay visible
+/// below the pinned header even when the title wraps to two lines.
+Future<void> _scrollTileBelowHeader(
+  BuildContext? tileContext,
+  GlobalKey? headerKey,
+  ScrollController scrollController,
+  SuppressHeaderAnimation suppressHeaderAnimation,
+) async {
+  if (tileContext == null || !tileContext.mounted) return;
+  if (!scrollController.hasClients) return;
+  final tileBox = tileContext.findRenderObject();
+  if (tileBox is! RenderBox || !tileBox.hasSize) return;
+
+  const gap = 12.0;
+  final headerBox = headerKey?.currentContext?.findRenderObject();
+  final headerHeight = (headerBox is RenderBox && headerBox.hasSize)
+      ? headerBox.size.height
+      : 72.0;
+  final targetPixelOffset = headerHeight + gap;
+
+  suppressHeaderAnimation.set(active: true);
+  try {
+    final revealOffset = RenderAbstractViewport.of(
+      tileBox,
+    ).getOffsetToReveal(tileBox, 0.0).offset;
+    final position = scrollController.position;
+    final target = (revealOffset - targetPixelOffset).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if ((target - scrollController.offset).abs() < 0.5) return;
+    await scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeInOut,
+    );
+  } finally {
+    suppressHeaderAnimation.set(active: false);
   }
 }

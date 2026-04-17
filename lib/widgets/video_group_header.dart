@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/video.dart';
 import '../models/video_group.dart';
+import '../providers/header_animation_providers.dart';
 import '../providers/video_providers.dart';
 import 'highlighted_text.dart';
 
@@ -20,6 +21,14 @@ class VideoGroupHeader extends ConsumerWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onToggleExpanded;
 
+  /// When true the header renders in its compact layout regardless of
+  /// scroll/pin state, and the Cue transition is disabled. Used during
+  /// scroll-to-target so the target group's header has a stable, known
+  /// height from the first frame — the scroll animation can land on a
+  /// single precomputed offset without chasing a layout that shrinks when
+  /// the header pins mid-scroll.
+  final bool forceCompact;
+
   const VideoGroupHeader({
     super.key,
     required this.group,
@@ -31,6 +40,7 @@ class VideoGroupHeader extends ConsumerWidget {
     this.highlightQuery,
     this.onLongPress,
     this.onToggleExpanded,
+    this.forceCompact = false,
   });
 
   @override
@@ -48,9 +58,14 @@ class VideoGroupHeader extends ConsumerWidget {
     // Include it so groups above the viewport stay compact instead of trying to
     // animate back to large (which would grow their sliver extent and shake the
     // whole list).
-    final isCompact = status.isPinned ||
+    final isCompact = forceCompact ||
+        status.isPinned ||
         !status.isExpanded ||
         status.scrollPercentage >= 1.0;
+    final suppressAnimation =
+        forceCompact || ref.watch(suppressHeaderAnimationProvider);
+    const CueMotion springMotion = Spring.smooth();
+    final CueMotion motion = suppressAnimation ? CueMotion.none : springMotion;
 
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
@@ -59,8 +74,8 @@ class VideoGroupHeader extends ConsumerWidget {
         onLongPress: onLongPress,
         child: Cue.onToggle(
           toggled: isCompact,
-          motion: const Spring.smooth(),
-          reverseMotion: const Spring.smooth(),
+          motion: motion,
+          reverseMotion: motion,
           child: Actor(
             acts: const [
               Act.padding(

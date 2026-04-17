@@ -478,9 +478,21 @@ class _CrossChannelResultTile extends ConsumerWidget {
             : isFailed
             ? Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error)
             : const Icon(Icons.chevron_right),
-        onTap: () => context.router.push(
-          ChannelDetailRoute(channelId: item.channelId),
-        ),
+        onTap: () {
+          // Clear any stale per-channel search queries so the target item
+          // isn't filtered out on the detail screen.
+          ref.read(commentSearchQueryProvider.notifier).update('');
+          ref.read(liveChatSearchQueryProvider.notifier).update('');
+          context.router.push(
+            ChannelDetailRoute(
+              channelId: item.channelId,
+              targetKind: item.kind == QueueItemKind.comment
+                  ? 'comment'
+                  : 'liveChat',
+              targetId: item.id,
+            ),
+          );
+        },
       ),
     );
   }
