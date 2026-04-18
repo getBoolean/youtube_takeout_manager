@@ -28,9 +28,9 @@ List<Channel> filteredChannels(Ref ref) {
   final query = ref.watch(channelSearchQueryProvider).toLowerCase();
   if (query.isEmpty) return channels;
   return channels.where((c) {
-    final title = c.channelTitle?.toLowerCase() ?? '';
-    final id = c.channelId.toLowerCase();
-    return title.contains(query) || id.contains(query);
+    final title = c.channelTitle?.toLowerCase();
+    if (title != null) return title.contains(query);
+    return c.channelId.toLowerCase().contains(query);
   }).toList();
 }
 
