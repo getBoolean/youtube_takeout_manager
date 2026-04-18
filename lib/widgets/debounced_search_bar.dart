@@ -1,6 +1,9 @@
 import 'dart:async';
 
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
+
+import 'cue_motion.dart';
 
 /// A [SearchBar] wrapper that debounces [onQueryChanged] and exposes a clear
 /// button when the field is non-empty.
@@ -56,18 +59,28 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final motion = premiumSpring(context);
     return SearchBar(
       controller: _controller,
       hintText: widget.hintText,
       enabled: widget.enabled,
       leading: const Icon(Icons.search),
       trailing: [
-        if (_hasText)
-          IconButton(
+        Cue.onToggle(
+          toggled: _hasText,
+          motion: motion,
+          reverseMotion: motion,
+          acts: const [
+            ClipAct.width(),
+            OpacityAct.fadeIn(),
+            ScaleAct(from: 0.7),
+          ],
+          child: IconButton(
             icon: const Icon(Icons.close),
             tooltip: 'Clear',
             onPressed: _handleClear,
           ),
+        ),
         ...?widget.trailing,
       ],
       onChanged: _handleChanged,

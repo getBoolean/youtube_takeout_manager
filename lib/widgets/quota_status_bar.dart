@@ -4,6 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/quota_operation.dart';
 import '../providers/quota_provider.dart';
 
+const _progressMorphDuration = Duration(milliseconds: 450);
+const _colorMorphDuration = Duration(milliseconds: 250);
+
 class QuotaStatusBar extends ConsumerWidget {
   const QuotaStatusBar({super.key});
 
@@ -23,10 +26,12 @@ class QuotaStatusBar extends ConsumerWidget {
           QuotaOperation.deleteComment.cost,
         );
 
-        final progressColor = switch (progress) {
+        final defaultProgressColor =
+            Theme.of(context).colorScheme.primary;
+        final targetColor = switch (progress) {
           >= 0.9 => Theme.of(context).colorScheme.error,
           >= 0.75 => Colors.orange,
-          _ => null,
+          _ => defaultProgressColor,
         };
 
         // Build breakdown parts for non-zero operations.
@@ -74,13 +79,24 @@ class QuotaStatusBar extends ConsumerWidget {
               const SizedBox(height: 4),
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 6,
-                  color: progressColor,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).colorScheme.surfaceContainerHighest,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: progress, end: progress),
+                  duration: _progressMorphDuration,
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, _) {
+                    return TweenAnimationBuilder<Color?>(
+                      tween: ColorTween(begin: targetColor, end: targetColor),
+                      duration: _colorMorphDuration,
+                      builder: (context, color, _) => LinearProgressIndicator(
+                        value: value,
+                        minHeight: 6,
+                        color: color,
+                        backgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                      ),
+                    );
+                  },
                 ),
               ),
             ],

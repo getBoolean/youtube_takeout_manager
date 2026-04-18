@@ -1,10 +1,12 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/deletion_item_status.dart';
 import '../models/deletion_queue_item.dart';
 import '../providers/deletion_queue_provider.dart';
+import '../widgets/cue_motion.dart';
 import '../widgets/deletion_queue_item_tile.dart';
 import '../widgets/quota_status_bar.dart';
 
@@ -20,6 +22,11 @@ class DeletionQueueScreen extends ConsumerStatefulWidget {
 class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+
+  /// Items the user has tapped remove on but whose exit animation is still
+  /// playing. Kept so the tile stays rendered as the animation reverses; the
+  /// actual provider removal happens when the animation ends.
+  final Set<String> _removingIds = {};
 
   static const _tabs = ['All', 'Pending', 'Completed', 'Failed'];
 
@@ -135,22 +142,25 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
       child: Wrap(
         spacing: 8,
         children: [
-          if (pending > 0) _chip('Pending: $pending', Colors.grey),
-          if (inProgress > 0) _chip('In Progress: $inProgress', Colors.blue),
-          if (succeeded > 0) _chip('Completed: $succeeded', Colors.green),
-          if (failed > 0) _chip('Failed: $failed', Colors.red),
-          if (quotaExceeded > 0) _chip('Quota: $quotaExceeded', Colors.orange),
+          _AnimatedStatusChip(label: 'Pending', count: pending, color: Colors.grey),
+          _AnimatedStatusChip(
+            label: 'In Progress',
+            count: inProgress,
+            color: Colors.blue,
+          ),
+          _AnimatedStatusChip(
+            label: 'Completed',
+            count: succeeded,
+            color: Colors.green,
+          ),
+          _AnimatedStatusChip(label: 'Failed', count: failed, color: Colors.red),
+          _AnimatedStatusChip(
+            label: 'Quota',
+            count: quotaExceeded,
+            color: Colors.orange,
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _chip(String label, Color color) {
-    return Chip(
-      label: Text(label, style: TextStyle(color: color, fontSize: 12)),
-      backgroundColor: color.withValues(alpha: 0.1),
-      side: BorderSide.none,
-      visualDensity: VisualDensity.compact,
     );
   }
 
@@ -165,12 +175,33 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
       itemCount: items.length,
       itemBuilder: (context, index) {
         final item = items[index];
-        return DeletionQueueItemTile(
-          item: item,
-          onRemove: item.status != DeletionItemStatus.inProgress
-              ? () =>
-                    ref.read(deletionQueueProvider.notifier).removeItem(item.id)
-              : null,
+        final isRemoving = _removingIds.contains(item.id);
+        final motion = premiumSpring(context);
+        return Cue.onToggle(
+          key: ValueKey(item.id),
+          toggled: !isRemoving,
+          motion: motion,
+          reverseMotion: motion,
+          acts: const [
+            ClipAct.height(),
+            OpacityAct.fadeIn(),
+            SlideAct.x(from: 1.0),
+          ],
+          onEnd: (visible) {
+            if (!visible && mounted && _removingIds.contains(item.id)) {
+              ref.read(deletionQueueProvider.notifier).removeItem(item.id);
+              setState(() => _removingIds.remove(item.id));
+            }
+          },
+          child: DeletionQueueItemTile(
+            item: item,
+            onRemove: item.status != DeletionItemStatus.inProgress
+                ? () {
+                    if (_removingIds.contains(item.id)) return;
+                    setState(() => _removingIds.add(item.id));
+                  }
+                : null,
+          ),
         );
       },
     );
@@ -216,6 +247,48 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
               ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AnimatedStatusChip extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+
+  const _AnimatedStatusChip({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = premiumSpring(context);
+    return Cue.onToggle(
+      toggled: count > 0,
+      motion: motion,
+      reverseMotion: motion,
+      acts: const [
+        ClipAct.width(),
+        OpacityAct.fadeIn(),
+        ScaleAct(from: 0.8),
+      ],
+      child: Chip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('$label: ', style: TextStyle(color: color, fontSize: 12)),
+            AnimatedCountText(
+              count,
+              style: TextStyle(color: color, fontSize: 12),
+            ),
+          ],
+        ),
+        backgroundColor: color.withValues(alpha: 0.1),
+        side: BorderSide.none,
+        visualDensity: VisualDensity.compact,
       ),
     );
   }

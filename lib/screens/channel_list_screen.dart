@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -18,6 +19,7 @@ import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/bulk_delete_actions.dart';
 import '../widgets/channel_tile.dart';
+import '../widgets/cue_motion.dart';
 import '../widgets/debounced_search_bar.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/highlighted_text.dart';
@@ -214,6 +216,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
     final hasResults = filteredChannels.isNotEmpty || searchItems.isNotEmpty;
 
+    final hasSelection = ref.watch(
+      deletionSetProvider.select((s) => s.isNotEmpty),
+    );
+
     return ValueListenableBuilder<bool>(
       valueListenable: _selectionMode,
       builder: (context, inSelection, _) {
@@ -241,9 +247,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                   query: query,
                   inSelection: inSelection,
                 ),
-          bottomNavigationBar: inSelection
-              ? _CrossChannelDeletionBar(onExit: _exitSelectionMode)
-              : null,
+          bottomNavigationBar: AnimatedBottomBar(
+            visible: inSelection && hasSelection,
+            child: _CrossChannelDeletionBar(onExit: _exitSelectionMode),
+          ),
         );
       },
     );
@@ -329,10 +336,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (progress.isFetching && progress.total > 0)
-              LinearProgressIndicator(
-                value: progress.fetched / progress.total,
+            Cue.onToggle(
+              toggled: progress.isFetching && progress.total > 0,
+              motion: premiumSpring(context),
+              reverseMotion: premiumSpring(context),
+              acts: const [
+                ClipAct.height(),
+                OpacityAct.fadeIn(),
+              ],
+              child: LinearProgressIndicator(
+                value: progress.total > 0
+                    ? progress.fetched / progress.total
+                    : 0,
               ),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -489,20 +506,30 @@ class _CrossChannelResultTile extends ConsumerWidget {
       );
     }
 
-    return Opacity(
+    return AnimatedOpacity(
       opacity: (isQueued || isFailed) ? 0.6 : 1.0,
+      duration: const Duration(milliseconds: 250),
       child: ListTile(
-        leading: selectionMode.value
-            ? Checkbox(
-                value: isSelected,
-                onChanged: ineligible ? null : (_) => toggleSelection(),
-              )
-            : Icon(
-                isComment ? Icons.comment_outlined : Icons.chat_bubble_outline,
-                color: isComment
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.secondary,
-              ),
+        leading: Cue.onChange(
+          value: selectionMode.value,
+          motion: premiumSpring(context),
+          acts: const [OpacityAct.fadeIn()],
+          child: selectionMode.value
+              ? Checkbox(
+                  key: const ValueKey('checkbox'),
+                  value: isSelected,
+                  onChanged: ineligible ? null : (_) => toggleSelection(),
+                )
+              : Icon(
+                  key: const ValueKey('icon'),
+                  isComment
+                      ? Icons.comment_outlined
+                      : Icons.chat_bubble_outline,
+                  color: isComment
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.secondary,
+                ),
+        ),
         title: HighlightedText.rich(
           spans,
           query: query,
@@ -598,10 +625,9 @@ class _CrossChannelDeletionBar extends ConsumerWidget {
       }
     }
 
-    if (commentIds.isEmpty && liveChatIds.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
+    // Keep rendering even when empty so AnimatedBottomBar has stable content to
+    // fade/slide out during the exit animation. The parent gates visibility via
+    // `inSelection && hasSelection`, so "0 items" only appears mid-animation.
     return SelectionActionBar(
       commentIds: commentIds,
       liveChatIds: liveChatIds,

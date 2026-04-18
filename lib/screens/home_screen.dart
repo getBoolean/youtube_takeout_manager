@@ -16,6 +16,7 @@ import '../providers/takeout_providers.dart';
 import '../providers/quota_provider.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
+import '../widgets/cue_motion.dart';
 import '../widgets/import_progress_indicator.dart';
 
 @RoutePage()
@@ -132,7 +133,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Badge(
       isLabelVisible: pendingCount > 0,
-      label: Text('$pendingCount'),
+      label: AnimatedCountText(
+        pendingCount,
+        style: const TextStyle(fontSize: 12),
+      ),
       child: IconButton(
         icon: const Icon(Icons.delete_sweep_outlined),
         tooltip: 'Deletion Queue',

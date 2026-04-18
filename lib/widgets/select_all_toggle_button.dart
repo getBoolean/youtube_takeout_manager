@@ -1,7 +1,9 @@
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/deletion_providers.dart';
+import 'cue_motion.dart';
 
 /// AppBar action that toggles between selecting every id in [selectableIds]
 /// and clearing the selection. The caller decides what "selectable" means
@@ -19,7 +21,15 @@ class SelectAllToggleButton extends ConsumerWidget {
         selectableIds.difference(selectedIds).isEmpty;
 
     return IconButton(
-      icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+      icon: Cue.onChange(
+        value: allSelected,
+        motion: premiumSpring(context),
+        acts: const [OpacityAct.fadeIn()],
+        child: Icon(
+          allSelected ? Icons.deselect : Icons.select_all,
+          key: ValueKey(allSelected),
+        ),
+      ),
       tooltip: allSelected ? 'Deselect All' : 'Select All',
       onPressed: () {
         final notifier = ref.read(deletionSetProvider.notifier);

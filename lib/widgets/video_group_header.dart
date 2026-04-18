@@ -86,8 +86,15 @@ class VideoGroupHeader extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (selectionMode)
-                  Padding(
+                Cue.onToggle(
+                  toggled: selectionMode,
+                  motion: motion,
+                  reverseMotion: motion,
+                  acts: const [
+                    ClipAct.width(),
+                    OpacityAct.fadeIn(),
+                  ],
+                  child: Padding(
                     padding: const EdgeInsets.only(right: 8, top: 4),
                     child: Checkbox(
                       value: allSelected ? true : (someSelected ? null : false),
@@ -95,6 +102,7 @@ class VideoGroupHeader extends ConsumerWidget {
                       onChanged: (_) => onToggleGroupSelection(),
                     ),
                   ),
+                ),
                 Actor(
                   acts: const [
                     Act.sizedBox(

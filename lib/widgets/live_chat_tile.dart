@@ -1,8 +1,10 @@
+import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 
 import '../models/live_chat.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
+import 'cue_motion.dart';
 import 'highlighted_text.dart';
 import 'superchat_card.dart';
 
@@ -59,24 +61,44 @@ class LiveChatTile extends StatelessWidget {
 
     final theme = Theme.of(context);
 
-    return Opacity(
+    final leadingIcon = _liveChatLeadingIcon(
+      isDeleted: isDeleted,
+      isFailed: isFailed,
+      isQueued: isQueued,
+    );
+    final leadingColor = _liveChatLeadingColor(
+      theme,
+      isDeleted: isDeleted,
+      isFailed: isFailed,
+      isQueued: isQueued,
+    );
+
+    return AnimatedOpacity(
       opacity: isDeleted ? 0.5 : 1.0,
+      duration: const Duration(milliseconds: 250),
       child: ListTile(
-        leading: selectionMode
-            ? Checkbox(value: isSelected, onChanged: (_) => onTap())
-            : Icon(
-                _liveChatLeadingIcon(
-                  isDeleted: isDeleted,
-                  isFailed: isFailed,
-                  isQueued: isQueued,
+        leading: Cue.onChange(
+          value: selectionMode,
+          motion: premiumSpring(context),
+          acts: const [OpacityAct.fadeIn()],
+          child: selectionMode
+              ? Checkbox(
+                  key: const ValueKey('checkbox'),
+                  value: isSelected,
+                  onChanged: (_) => onTap(),
+                )
+              : Cue.onChange(
+                  key: const ValueKey('icon'),
+                  value: leadingIcon.codePoint,
+                  motion: premiumSpring(context),
+                  acts: const [OpacityAct.fadeIn(), ScaleAct(from: 0.7)],
+                  child: Icon(
+                    leadingIcon,
+                    key: ValueKey(leadingIcon.codePoint),
+                    color: leadingColor,
+                  ),
                 ),
-                color: _liveChatLeadingColor(
-                  theme,
-                  isDeleted: isDeleted,
-                  isFailed: isFailed,
-                  isQueued: isQueued,
-                ),
-              ),
+        ),
         title: HighlightedText.rich(
           spans,
           query: highlightQuery,

@@ -26,6 +26,7 @@ import '../router/app_router.dart';
 import '../services/export_service.dart';
 import '../widgets/bulk_delete_actions.dart';
 import '../widgets/comment_tile.dart';
+import '../widgets/cue_motion.dart';
 import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
@@ -184,16 +185,25 @@ class ChannelDetailScreen extends HookConsumerWidget {
             ? TabBar(
                 controller: tabController,
                 tabs: [
-                  Tab(text: 'Comments ($commentCount)'),
-                  Tab(text: 'Live Chats ($liveChatCount)'),
+                  Tab(child: _TabLabel(prefix: 'Comments', count: commentCount)),
+                  Tab(
+                    child: _TabLabel(
+                      prefix: 'Live Chats',
+                      count: liveChatCount,
+                    ),
+                  ),
                 ],
               )
             : null,
       ),
       body: body,
-      bottomNavigationBar: selectionMode.value && hasSelection
-          ? _DeletionBar(channelId: channelId, selectionMode: selectionMode)
-          : null,
+      bottomNavigationBar: AnimatedBottomBar(
+        visible: selectionMode.value && hasSelection,
+        child: _DeletionBar(
+          channelId: channelId,
+          selectionMode: selectionMode,
+        ),
+      ),
     );
   }
 }
@@ -201,6 +211,26 @@ class ChannelDetailScreen extends HookConsumerWidget {
 // =============================================================================
 // AppBar pieces
 // =============================================================================
+
+class _TabLabel extends StatelessWidget {
+  final String prefix;
+  final int count;
+
+  const _TabLabel({required this.prefix, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text('$prefix ('),
+        AnimatedCountText(count),
+        const Text(')'),
+      ],
+    );
+  }
+}
 
 class _ChannelTitle extends StatelessWidget {
   final String channelName;
