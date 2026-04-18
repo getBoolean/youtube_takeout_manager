@@ -450,6 +450,11 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
     super.initState();
     widget.scrollController.addListener(_maybeGrow);
     _applyInitialScrollTarget();
+    if (_highlightId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(suppressHeaderAnimationProvider.notifier).set(active: true);
+      });
+    }
   }
 
   void _applyInitialScrollTarget() {
@@ -812,6 +817,11 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
     super.initState();
     widget.scrollController.addListener(_maybeGrow);
     _applyInitialScrollTarget();
+    if (_highlightId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(suppressHeaderAnimationProvider.notifier).set(active: true);
+      });
+    }
   }
 
   void _applyInitialScrollTarget() {
@@ -1765,7 +1775,7 @@ Future<void> _scrollTileBelowHeader(
   final headerBox = headerKey?.currentContext?.findRenderObject();
   final headerHeight = (headerBox is RenderBox && headerBox.hasSize)
       ? headerBox.size.height
-      : 72.0;
+      : 104.0;
   final targetPixelOffset = headerHeight + gap;
 
   suppressHeaderAnimation.set(active: true);
