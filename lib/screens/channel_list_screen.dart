@@ -510,25 +510,32 @@ class _CrossChannelResultTile extends ConsumerWidget {
       opacity: (isQueued || isFailed) ? 0.6 : 1.0,
       duration: const Duration(milliseconds: 250),
       child: ListTile(
-        leading: Cue.onChange(
-          value: selectionMode.value,
-          motion: premiumSpring(context),
-          acts: const [OpacityAct.fadeIn()],
-          child: selectionMode.value
-              ? Checkbox(
-                  key: const ValueKey('checkbox'),
-                  value: isSelected,
-                  onChanged: ineligible ? null : (_) => toggleSelection(),
-                )
-              : Icon(
-                  key: const ValueKey('icon'),
-                  isComment
-                      ? Icons.comment_outlined
-                      : Icons.chat_bubble_outline,
-                  color: isComment
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.secondary,
-                ),
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: Cue.onChange(
+            value: selectionMode.value,
+            motion: premiumSpring(context),
+            acts: const [OpacityAct.fadeIn()],
+            child: Center(
+              child: selectionMode.value
+                  ? Checkbox(
+                      key: const ValueKey('checkbox'),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      value: isSelected,
+                      onChanged: ineligible ? null : (_) => toggleSelection(),
+                    )
+                  : Icon(
+                      key: const ValueKey('icon'),
+                      isComment
+                          ? Icons.comment_outlined
+                          : Icons.chat_bubble_outline,
+                      color: isComment
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.secondary,
+                    ),
+            ),
+          ),
         ),
         title: HighlightedText.rich(
           spans,

@@ -77,27 +77,34 @@ class LiveChatTile extends StatelessWidget {
       opacity: isDeleted ? 0.5 : 1.0,
       duration: const Duration(milliseconds: 250),
       child: ListTile(
-        leading: Cue.onChange(
-          value: selectionMode,
-          motion: premiumSpring(context),
-          acts: const [OpacityAct.fadeIn()],
-          child: selectionMode
-              ? Checkbox(
-                  key: const ValueKey('checkbox'),
-                  value: isSelected,
-                  onChanged: (_) => onTap(),
-                )
-              : Cue.onChange(
-                  key: const ValueKey('icon'),
-                  value: leadingIcon.codePoint,
-                  motion: premiumSpring(context),
-                  acts: const [OpacityAct.fadeIn(), ScaleAct(from: 0.7)],
-                  child: Icon(
-                    leadingIcon,
-                    key: ValueKey(leadingIcon.codePoint),
-                    color: leadingColor,
-                  ),
-                ),
+        leading: SizedBox(
+          width: 40,
+          height: 40,
+          child: Cue.onChange(
+            value: selectionMode,
+            motion: premiumSpring(context),
+            acts: const [OpacityAct.fadeIn()],
+            child: Center(
+              child: selectionMode
+                  ? Checkbox(
+                      key: const ValueKey('checkbox'),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      value: isSelected,
+                      onChanged: (_) => onTap(),
+                    )
+                  : Cue.onChange(
+                      key: const ValueKey('icon'),
+                      value: leadingIcon.codePoint,
+                      motion: premiumSpring(context),
+                      acts: const [OpacityAct.fadeIn(), ScaleAct(from: 0.7)],
+                      child: Icon(
+                        leadingIcon,
+                        key: ValueKey(leadingIcon.codePoint),
+                        color: leadingColor,
+                      ),
+                    ),
+            ),
+          ),
         ),
         title: HighlightedText.rich(
           spans,
