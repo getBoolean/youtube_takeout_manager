@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/deleted_ids_providers.dart';
@@ -47,9 +48,67 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       );
     }
 
+    final takeout = ref.watch(takeoutProvider).value;
+    final uncertainCount = takeout == null
+        ? 0
+        : takeout.liveChats
+              .where(
+                (c) =>
+                    commentIds.contains(c.liveChatId) &&
+                    c.rawText.trim().isEmpty,
+              )
+              .length;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Delete via My Activity')),
-      body: Stepper(
+      body: Column(
+        children: [
+          if (uncertainCount > 0) _buildUncertainWarning(theme, uncertainCount),
+          Expanded(child: _buildStepper(theme, commentIds)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUncertainWarning(ThemeData theme, int count) {
+    final message = Intl.plural(
+      count,
+      one: '1 item may be a membership event or already-deleted message. '
+          'Deletion may fail for it.',
+      other: '$count items may be membership events or already-deleted '
+          'messages. Deletion may fail for these.',
+    );
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 20,
+            color: theme.colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onTertiaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepper(ThemeData theme, Set<String> commentIds) {
+    return Stepper(
         currentStep: _currentStep,
         onStepContinue: _currentStep < 3
             ? () => setState(() => _currentStep++)
@@ -96,7 +155,6 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
           _buildStep3RunScript(theme),
           _buildStep4ImportResults(theme, commentIds),
         ],
-      ),
     );
   }
 

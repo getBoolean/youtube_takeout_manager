@@ -60,6 +60,7 @@ class LiveChatTile extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
+    final isEmptyText = liveChat.rawText.trim().isEmpty;
 
     final leadingIcon = _liveChatLeadingIcon(
       isDeleted: isDeleted,
@@ -106,15 +107,24 @@ class LiveChatTile extends StatelessWidget {
             ),
           ),
         ),
-        title: HighlightedText.rich(
-          spans,
-          query: highlightQuery,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: isDeleted
-              ? const TextStyle(decoration: TextDecoration.lineThrough)
-              : null,
-        ),
+        title: isEmptyText
+            ? Text(
+                'Likely a membership event or deleted message',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontStyle: FontStyle.italic,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  decoration: isDeleted ? TextDecoration.lineThrough : null,
+                ),
+              )
+            : HighlightedText.rich(
+                spans,
+                query: highlightQuery,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: isDeleted
+                    ? const TextStyle(decoration: TextDecoration.lineThrough)
+                    : null,
+              ),
         subtitle: Text(subtitle),
         selected: isSelected,
         onTap: onTap,

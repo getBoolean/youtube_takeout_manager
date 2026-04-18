@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../providers/script_deletion_provider.dart';
 import '../router/app_router.dart';
@@ -14,6 +15,7 @@ void showDeletionMethodPicker(
   BuildContext context, {
   required WidgetRef ref,
   required Set<String> ids,
+  int uncertainLiveChatCount = 0,
   VoidCallback? onApiChosen,
 }) {
   showModalBottomSheet(
@@ -29,6 +31,8 @@ void showDeletionMethodPicker(
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),
+          if (uncertainLiveChatCount > 0)
+            _UncertainDeletionWarning(count: uncertainLiveChatCount),
           ListTile(
             leading: const Icon(Icons.language),
             title: const Text('Via My Activity'),
@@ -70,17 +74,68 @@ void showDeletionMethodPicker(
   );
 }
 
+class _UncertainDeletionWarning extends StatelessWidget {
+  final int count;
+
+  const _UncertainDeletionWarning({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final message = Intl.plural(
+      count,
+      one: '1 item may be a membership event or already-deleted message. '
+          'Deletion may fail for it.',
+      other: '$count items may be membership events or already-deleted '
+          'messages. Deletion may fail for these.',
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.info_outline,
+              size: 20,
+              color: theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 void _confirmApiDeletion(
   BuildContext context,
   int count,
   VoidCallback? onConfirmed,
 ) {
-  final label = count == 1 ? 'item' : 'items';
+  final message = Intl.plural(
+    count,
+    one: 'Queue 1 item for permanent deletion from YouTube?',
+    other: 'Queue $count items for permanent deletion from YouTube?',
+  );
   showDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       title: const Text('Delete via YouTube API'),
-      content: Text('Queue $count $label for permanent deletion from YouTube?'),
+      content: Text(message),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx),

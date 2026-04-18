@@ -25,10 +25,14 @@ void bulkDeleteViaPicker(
     ).showSnackBar(const SnackBar(content: Text('No items to delete')));
     return;
   }
+  final uncertainLiveChatCount = liveChatSnippets.values
+      .where((s) => s == null || s.trim().isEmpty)
+      .length;
   showDeletionMethodPicker(
     context,
     ref: ref,
     ids: allIds,
+    uncertainLiveChatCount: uncertainLiveChatCount,
     onApiChosen: () {
       final queue = ref.read(deletionQueueProvider.notifier);
       if (commentIds.isNotEmpty) {
