@@ -27,7 +27,11 @@ void showDeletionMethodPicker(
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Delete ${ids.length} item(s)',
+              Intl.plural(
+                ids.length,
+                one: 'Delete 1 item',
+                other: 'Delete ${ids.length} items',
+              ),
               style: Theme.of(context).textTheme.titleMedium,
             ),
           ),

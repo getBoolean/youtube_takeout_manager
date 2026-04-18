@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -381,13 +382,23 @@ class _ChannelAppBarActions extends ConsumerWidget {
               if (matchingCommentCount > 0)
                 PopupMenuItem(
                   value: 'delete_matching_comments',
-                  child: Text('Delete $matchingCommentCount matching comments'),
+                  child: Text(
+                    Intl.plural(
+                      matchingCommentCount,
+                      one: 'Delete 1 matching comment',
+                      other: 'Delete $matchingCommentCount matching comments',
+                    ),
+                  ),
                 ),
               if (matchingLiveChatCount > 0)
                 PopupMenuItem(
                   value: 'delete_matching_chats',
                   child: Text(
-                    'Delete $matchingLiveChatCount matching live chats',
+                    Intl.plural(
+                      matchingLiveChatCount,
+                      one: 'Delete 1 matching live chat',
+                      other: 'Delete $matchingLiveChatCount matching live chats',
+                    ),
                   ),
                 ),
             ],

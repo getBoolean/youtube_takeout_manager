@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_queue_provider.dart';
@@ -44,7 +45,11 @@ void bulkDeleteViaPicker(
       showQueuedForDeletionSnackBar(
         context,
         ref,
-        message: '${allIds.length} item(s) queued for deletion',
+        message: Intl.plural(
+          allIds.length,
+          one: '1 item queued for deletion',
+          other: '${allIds.length} items queued for deletion',
+        ),
       );
       onQueued?.call();
     },
@@ -67,7 +72,7 @@ void confirmLocalDelete(
     builder: (ctx) => AlertDialog(
       title: const Text('Remove Items'),
       content: Text(
-        'Remove $total item(s) from the list?\n\n'
+        '${Intl.plural(total, one: 'Remove 1 item', other: 'Remove $total items')} from the list?\n\n'
         'Use this for items you already deleted manually outside the app. '
         'This does not delete them from YouTube.',
       ),

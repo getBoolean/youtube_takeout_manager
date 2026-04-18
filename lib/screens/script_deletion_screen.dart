@@ -201,7 +201,13 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('This script will delete ${commentIds.length} item(s).'),
+          Text(
+            Intl.plural(
+              commentIds.length,
+              one: 'This script will delete 1 item.',
+              other: 'This script will delete ${commentIds.length} items.',
+            ),
+          ),
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: () => _copyScript(commentIds),

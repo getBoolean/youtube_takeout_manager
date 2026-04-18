@@ -1,6 +1,7 @@
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -51,8 +52,11 @@ class VideoGroupHeader extends ConsumerWidget {
         group.groupType == GroupType.video ? videoMap[group.groupKey] : null;
 
     final title = _resolveTitle(video);
-    final subtitle =
-        '${group.items.length} ${group.items.length == 1 ? 'item' : 'items'}';
+    final subtitle = Intl.plural(
+      group.items.length,
+      one: '1 item',
+      other: '${group.items.length} items',
+    );
     final thumbnailUrl = video?.thumbnailUrl;
     // scrollPercentage hits 1.0 once the header is fully scrolled past the top.
     // Include it so groups above the viewport stay compact instead of trying to
