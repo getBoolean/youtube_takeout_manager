@@ -580,6 +580,12 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
                               }
                             : null,
                       ),
+                    // Bottom slack so the last group's header has room to
+                    // fully commit to its compact layout. Without this, a
+                    // partial shrink near maxScrollExtent would shorten the
+                    // scroll extent, unpin the header, and bounce the last
+                    // tile off-screen.
+                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
                 ),
         ),
@@ -942,6 +948,7 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
                               }
                             : null,
                       ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 80)),
                   ],
                 ),
         ),
