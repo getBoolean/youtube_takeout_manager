@@ -9,19 +9,20 @@ import '../providers/channel_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/cross_channel_search_providers.dart';
 import '../providers/deleted_ids_providers.dart';
-import '../providers/deletion_queue_provider.dart';
+import '../providers/deletion_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
+import '../widgets/bulk_delete_actions.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/debounced_search_bar.dart';
-import '../widgets/deletion_method_picker.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/highlighted_text.dart';
-import '../widgets/queue_snackbar.dart';
+import '../widgets/select_all_toggle_button.dart';
+import '../widgets/selection_action_bar.dart';
 
 @RoutePage()
 class ChannelListScreen extends ConsumerStatefulWidget {
@@ -34,6 +35,7 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   void Function()? _cancelChannelsSub;
   void Function()? _cancelProgressSub;
+  final ValueNotifier<bool> _selectionMode = ValueNotifier(false);
 
   @override
   void initState() {
@@ -59,6 +61,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     });
   }
 
+  void _exitSelectionMode() {
+    _selectionMode.value = false;
+    ref.read(deletionSetProvider.notifier).clear();
+  }
+
   void _handleGlobalDelete(String value) {
     final allComments = ref.read(allCommentsProvider);
     final allLiveChats = ref.read(allLiveChatsProvider);
@@ -74,32 +81,15 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       return;
     }
 
-    final ids = isComments
-        ? allComments.map((c) => c.commentId).toSet()
-        : allLiveChats.map((c) => c.liveChatId).toSet();
-    showDeletionMethodPicker(
+    bulkDeleteViaPicker(
       context,
-      ref: ref,
-      ids: ids,
-      onApiChosen: () {
-        final notifier = ref.read(deletionQueueProvider.notifier);
-        if (isComments) {
-          final snippets = <String, String?>{
-            for (final c in allComments) c.commentId: c.displayText,
-          };
-          notifier.enqueueComments(ids, snippets: snippets);
-        } else {
-          final snippets = <String, String?>{
-            for (final c in allLiveChats) c.liveChatId: c.displayText,
-          };
-          notifier.enqueueLiveChats(ids, snippets: snippets);
-        }
-        showQueuedForDeletionSnackBar(
-          context,
-          ref,
-          message: '$count $label queued for deletion',
-        );
-      },
+      ref,
+      commentSnippets: isComments
+          ? {for (final c in allComments) c.commentId: c.displayText}
+          : const {},
+      liveChatSnippets: isComments
+          ? const {}
+          : {for (final c in allLiveChats) c.liveChatId: c.displayText},
     );
   }
 
@@ -118,31 +108,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       }
     }
 
-    final allIds = {...commentSnippets.keys, ...liveChatSnippets.keys};
-    showDeletionMethodPicker(
+    bulkDeleteViaPicker(
       context,
-      ref: ref,
-      ids: allIds,
-      onApiChosen: () {
-        final notifier = ref.read(deletionQueueProvider.notifier);
-        if (commentSnippets.isNotEmpty) {
-          notifier.enqueueComments(
-            commentSnippets.keys.toSet(),
-            snippets: commentSnippets,
-          );
-        }
-        if (liveChatSnippets.isNotEmpty) {
-          notifier.enqueueLiveChats(
-            liveChatSnippets.keys.toSet(),
-            snippets: liveChatSnippets,
-          );
-        }
-        showQueuedForDeletionSnackBar(
-          context,
-          ref,
-          message: '${allIds.length} item(s) queued for deletion',
-        );
-      },
+      ref,
+      commentSnippets: commentSnippets,
+      liveChatSnippets: liveChatSnippets,
     );
   }
 
@@ -150,6 +120,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   void dispose() {
     _cancelChannelsSub?.call();
     _cancelProgressSub?.call();
+    _selectionMode.dispose();
     super.dispose();
   }
 
@@ -230,95 +201,153 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             query.isEmpty &&
             (progress.isFetching || videoMetadata.isLoading));
 
+    // When the query clears, selection mode makes no sense (results vanish).
+    ref.listen(channelSearchQueryProvider, (_, next) {
+      if (next.isEmpty && _selectionMode.value) {
+        _exitSelectionMode();
+      }
+    });
+
     if (isLoading) {
       return _buildLoadingSkeleton();
     }
 
+    final hasResults = filteredChannels.isNotEmpty || searchItems.isNotEmpty;
+
+    return ValueListenableBuilder<bool>(
+      valueListenable: _selectionMode,
+      builder: (context, inSelection, _) {
+        return Scaffold(
+          appBar: _buildAppBar(
+            context: context,
+            query: query,
+            searchItems: searchItems,
+            inSelection: inSelection,
+          ),
+          body: !hasResults
+              ? EmptyState(
+                  icon: progress.isFetching
+                      ? Icons.hourglass_top
+                      : Icons.search_off,
+                  message: progress.isFetching
+                      ? 'Loading channels...'
+                      : query.isNotEmpty
+                      ? 'No results found'
+                      : 'No channels found',
+                )
+              : _buildResultsList(
+                  channels: filteredChannels,
+                  items: searchItems,
+                  query: query,
+                  inSelection: inSelection,
+                ),
+          bottomNavigationBar: inSelection
+              ? _CrossChannelDeletionBar(onExit: _exitSelectionMode)
+              : null,
+        );
+      },
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar({
+    required BuildContext context,
+    required String query,
+    required List<SearchResultItem> searchItems,
+    required bool inSelection,
+  }) {
+    final progress = ref.watch(videoFetchProgressProvider);
     final hasQuery = query.isNotEmpty;
     final deletableCount = hasQuery
         ? ref.watch(crossChannelDeletableItemsProvider).length
         : 0;
-    final hasResults = filteredChannels.isNotEmpty || searchItems.isNotEmpty;
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: context.router.canPop()
-            ? null
-            : IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () => context.router.replaceAll([const HomeRoute()]),
-              ),
-        title: const Text('Channels'),
-        actions: [
-          if (hasQuery && deletableCount > 0)
-            IconButton(
-              icon: const Icon(Icons.playlist_remove),
-              tooltip: 'Delete search results ($deletableCount)',
-              onPressed: _handleDeleteSearchResults,
-            ),
+    final Widget? leading;
+    final Widget title;
+    final List<Widget> actions;
+
+    if (inSelection) {
+      final visibleIds = {for (final item in searchItems) item.id};
+      final selectedCount = ref
+          .watch(deletionSetProvider)
+          .intersection(visibleIds)
+          .length;
+      final deletableIds = {
+        for (final item in ref.watch(crossChannelDeletableItemsProvider))
+          item.id,
+      };
+      leading = IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: _exitSelectionMode,
+      );
+      title = Text('$selectedCount selected');
+      actions = [SelectAllToggleButton(selectableIds: deletableIds)];
+    } else {
+      leading = context.router.canPop()
+          ? null
+          : IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => context.router.replaceAll([const HomeRoute()]),
+            );
+      title = const Text('Channels');
+      actions = [
+        if (hasQuery && deletableCount > 0)
           IconButton(
-            icon: const Icon(Icons.delete_sweep_outlined),
-            tooltip: 'Deletion Queue',
-            onPressed: () => context.router.push(const DeletionQueueRoute()),
+            icon: const Icon(Icons.playlist_remove),
+            tooltip: 'Delete search results ($deletableCount)',
+            onPressed: _handleDeleteSearchResults,
           ),
-          if (ref.watch(isAuthenticatedProvider))
-            PopupMenuButton<String>(
-              onSelected: (value) => _handleGlobalDelete(value),
-              itemBuilder: (_) => const [
-                PopupMenuItem(
-                  value: 'delete_all_comments',
-                  child: Text('Delete All Comments from YouTube'),
-                ),
-                PopupMenuItem(
-                  value: 'delete_all_chats',
-                  child: Text('Delete All Live Chats from YouTube'),
-                ),
-              ],
-            ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(
-            56 + 4, // search bar + progress indicator
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (progress.isFetching && progress.total > 0)
-                LinearProgressIndicator(
-                  value: progress.fetched / progress.total,
-                ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
-                ),
-                child: DebouncedSearchBar(
-                  hintText: 'Search channels and comments...',
-                  onQueryChanged: (value) => ref
-                      .read(channelSearchQueryProvider.notifier)
-                      .update(value),
-                ),
+        IconButton(
+          icon: const Icon(Icons.delete_sweep_outlined),
+          tooltip: 'Deletion Queue',
+          onPressed: () => context.router.push(const DeletionQueueRoute()),
+        ),
+        if (ref.watch(isAuthenticatedProvider))
+          PopupMenuButton<String>(
+            onSelected: (value) => _handleGlobalDelete(value),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'delete_all_comments',
+                child: Text('Delete All Comments from YouTube'),
+              ),
+              PopupMenuItem(
+                value: 'delete_all_chats',
+                child: Text('Delete All Live Chats from YouTube'),
               ),
             ],
           ),
+      ];
+    }
+
+    return AppBar(
+      leading: leading,
+      title: title,
+      actions: actions,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(
+          56 + 4, // search bar + progress indicator
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (progress.isFetching && progress.total > 0)
+              LinearProgressIndicator(
+                value: progress.fetched / progress.total,
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: DebouncedSearchBar(
+                hintText: 'Search channels and comments...',
+                onQueryChanged: (value) => ref
+                    .read(channelSearchQueryProvider.notifier)
+                    .update(value),
+              ),
+            ),
+          ],
         ),
       ),
-      body: !hasResults
-          ? EmptyState(
-              icon: progress.isFetching
-                  ? Icons.hourglass_top
-                  : Icons.search_off,
-              message: progress.isFetching
-                  ? 'Loading channels...'
-                  : hasQuery
-                  ? 'No results found'
-                  : 'No channels found',
-            )
-          : _buildResultsList(
-              channels: filteredChannels,
-              items: searchItems,
-              query: query,
-            ),
     );
   }
 
@@ -326,6 +355,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     required List<dynamic> channels,
     required List<SearchResultItem> items,
     required String query,
+    required bool inSelection,
   }) {
     // Empty query → plain channel list (preserves pre-existing scroll behavior).
     if (items.isEmpty && query.isEmpty) {
@@ -338,9 +368,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             key: ValueKey(channel.channelId),
             channel: channel,
             highlightQuery: query,
-            onTap: () => context.router.push(
-              ChannelDetailRoute(channelId: channel.channelId),
-            ),
+            onTap: inSelection
+                ? () {}
+                : () => context.router.push(
+                    ChannelDetailRoute(channelId: channel.channelId),
+                  ),
           );
         },
       );
@@ -359,9 +391,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                 key: ValueKey(channel.channelId),
                 channel: channel,
                 highlightQuery: query,
-                onTap: () => context.router.push(
-                  ChannelDetailRoute(channelId: channel.channelId),
-                ),
+                onTap: inSelection
+                    ? () {}
+                    : () => context.router.push(
+                        ChannelDetailRoute(channelId: channel.channelId),
+                      ),
               );
             },
           ),
@@ -376,6 +410,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               key: ValueKey('${items[index].kind}:${items[index].id}'),
               item: items[index],
               query: query,
+              selectionMode: _selectionMode,
             ),
           ),
       ],
@@ -407,11 +442,13 @@ class _SectionHeader extends StatelessWidget {
 class _CrossChannelResultTile extends ConsumerWidget {
   final SearchResultItem item;
   final String query;
+  final ValueNotifier<bool> selectionMode;
 
   const _CrossChannelResultTile({
     super.key,
     required this.item,
     required this.query,
+    required this.selectionMode,
   });
 
   @override
@@ -420,6 +457,10 @@ class _CrossChannelResultTile extends ConsumerWidget {
     final channel = ref.watch(channelByIdProvider(item.channelId));
     final isQueued = _isQueued(ref);
     final isFailed = _isFailed(ref);
+    final ineligible = isQueued || isFailed;
+    final isSelected = ref.watch(
+      deletionSetProvider.select((s) => s.contains(item.id)),
+    );
     final spans = buildCommentSpans(item.rawText, emojiSize: 16);
 
     final isComment = item.kind == QueueItemKind.comment;
@@ -428,15 +469,40 @@ class _CrossChannelResultTile extends ConsumerWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
 
+    void toggleSelection() {
+      ref.read(deletionSetProvider.notifier).toggle(item.id);
+    }
+
+    void navigateToDetail() {
+      // Clear any stale per-channel search queries so the target item
+      // isn't filtered out on the detail screen.
+      ref.read(commentSearchQueryProvider.notifier).update('');
+      ref.read(liveChatSearchQueryProvider.notifier).update('');
+      context.router.push(
+        ChannelDetailRoute(
+          channelId: item.channelId,
+          targetKind: item.kind == QueueItemKind.comment
+              ? 'comment'
+              : 'liveChat',
+          targetId: item.id,
+        ),
+      );
+    }
+
     return Opacity(
       opacity: (isQueued || isFailed) ? 0.6 : 1.0,
       child: ListTile(
-        leading: Icon(
-          isComment ? Icons.comment_outlined : Icons.chat_bubble_outline,
-          color: isComment
-              ? theme.colorScheme.primary
-              : theme.colorScheme.secondary,
-        ),
+        leading: selectionMode.value
+            ? Checkbox(
+                value: isSelected,
+                onChanged: ineligible ? null : (_) => toggleSelection(),
+              )
+            : Icon(
+                isComment ? Icons.comment_outlined : Icons.chat_bubble_outline,
+                color: isComment
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.secondary,
+              ),
         title: HighlightedText.rich(
           spans,
           query: query,
@@ -478,21 +544,16 @@ class _CrossChannelResultTile extends ConsumerWidget {
             : isFailed
             ? Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error)
             : const Icon(Icons.chevron_right),
-        onTap: () {
-          // Clear any stale per-channel search queries so the target item
-          // isn't filtered out on the detail screen.
-          ref.read(commentSearchQueryProvider.notifier).update('');
-          ref.read(liveChatSearchQueryProvider.notifier).update('');
-          context.router.push(
-            ChannelDetailRoute(
-              channelId: item.channelId,
-              targetKind: item.kind == QueueItemKind.comment
-                  ? 'comment'
-                  : 'liveChat',
-              targetId: item.id,
-            ),
-          );
-        },
+        selected: isSelected,
+        onTap: selectionMode.value
+            ? (ineligible ? () {} : toggleSelection)
+            : navigateToDetail,
+        onLongPress: ineligible
+            ? null
+            : () {
+                selectionMode.value = true;
+                toggleSelection();
+              },
       ),
     );
   }
@@ -507,5 +568,46 @@ class _CrossChannelResultTile extends ConsumerWidget {
     return item.kind == QueueItemKind.comment
         ? ref.watch(failedCommentIdsProvider).contains(item.id)
         : ref.watch(failedLiveChatIdsProvider).contains(item.id);
+  }
+}
+
+class _CrossChannelDeletionBar extends ConsumerWidget {
+  final VoidCallback onExit;
+
+  const _CrossChannelDeletionBar({required this.onExit});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(crossChannelSearchItemsProvider);
+    final selectedIds = ref.watch(deletionSetProvider);
+
+    final commentIds = <String>{};
+    final liveChatIds = <String>{};
+    final commentSnippets = <String, String?>{};
+    final liveChatSnippets = <String, String?>{};
+
+    for (final item in items) {
+      if (!selectedIds.contains(item.id)) continue;
+      switch (item) {
+        case CommentResult(:final comment):
+          commentIds.add(comment.commentId);
+          commentSnippets[comment.commentId] = comment.displayText;
+        case LiveChatResult(:final liveChat):
+          liveChatIds.add(liveChat.liveChatId);
+          liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
+      }
+    }
+
+    if (commentIds.isEmpty && liveChatIds.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return SelectionActionBar(
+      commentIds: commentIds,
+      liveChatIds: liveChatIds,
+      commentSnippets: commentSnippets,
+      liveChatSnippets: liveChatSnippets,
+      onExitSelection: onExit,
+    );
   }
 }

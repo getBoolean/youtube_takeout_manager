@@ -24,6 +24,7 @@ import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
 import '../services/export_service.dart';
+import '../widgets/bulk_delete_actions.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_method_picker.dart';
@@ -32,6 +33,8 @@ import '../widgets/live_chat_tile.dart';
 import '../widgets/queue_snackbar.dart';
 import '../widgets/scroll_target_highlight.dart';
 import '../widgets/search_options_menu_button.dart';
+import '../widgets/select_all_toggle_button.dart';
+import '../widgets/selection_action_bar.dart';
 import '../widgets/video_group_header.dart';
 
 @RoutePage()
@@ -391,23 +394,7 @@ class _SelectAllAction extends ConsumerWidget {
           .where((c) => !skipLiveChatIds.contains(c.liveChatId))
           .map((c) => c.liveChatId),
     };
-    final selectedIds = ref.watch(deletionSetProvider);
-    final allSelected =
-        selectableIds.isNotEmpty &&
-        selectableIds.difference(selectedIds).isEmpty;
-
-    return IconButton(
-      icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
-      tooltip: allSelected ? 'Deselect All' : 'Select All',
-      onPressed: () {
-        final notifier = ref.read(deletionSetProvider.notifier);
-        if (allSelected) {
-          notifier.clear();
-        } else {
-          notifier.addAll(selectableIds);
-        }
-      },
-    );
+    return SelectAllToggleButton(selectableIds: selectableIds);
   }
 }
 
@@ -1144,62 +1131,36 @@ class _DeletionBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authenticated = ref.watch(isAuthenticatedProvider);
     final comments = ref.watch(channelCommentsProvider(channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(channelId));
     final selectedIds = ref.watch(deletionSetProvider);
 
-    final commentIdSet = comments.map((c) => c.commentId).toSet();
-    final liveChatIdSet = liveChats.map((c) => c.liveChatId).toSet();
-    final selectedCommentIds = selectedIds.intersection(commentIdSet);
-    final selectedLiveChatIds = selectedIds.intersection(liveChatIdSet);
+    final selectedCommentIds = <String>{};
+    final commentSnippets = <String, String?>{};
+    for (final c in comments) {
+      if (selectedIds.contains(c.commentId)) {
+        selectedCommentIds.add(c.commentId);
+        commentSnippets[c.commentId] = c.displayText;
+      }
+    }
+    final selectedLiveChatIds = <String>{};
+    final liveChatSnippets = <String, String?>{};
+    for (final c in liveChats) {
+      if (selectedIds.contains(c.liveChatId)) {
+        selectedLiveChatIds.add(c.liveChatId);
+        liveChatSnippets[c.liveChatId] = c.displayText;
+      }
+    }
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Tooltip(
-                message: 'For items you already deleted outside the app',
-                child: FilledButton.icon(
-                  onPressed: () => _confirmLocalDelete(
-                    context,
-                    ref,
-                    selectionMode: selectionMode,
-                    commentIds: selectedCommentIds,
-                    liveChatIds: selectedLiveChatIds,
-                  ),
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text('Remove ${selectedIds.length} locally'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Theme.of(context).colorScheme.onError,
-                  ),
-                ),
-              ),
-            ),
-            if (authenticated) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _confirmApiDelete(
-                    context,
-                    ref,
-                    selectionMode: selectionMode,
-                    comments: comments,
-                    liveChats: liveChats,
-                    commentIds: selectedCommentIds,
-                    liveChatIds: selectedLiveChatIds,
-                  ),
-                  icon: const Icon(Icons.cloud_off),
-                  label: Text('Delete ${selectedIds.length} from YouTube'),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+    return SelectionActionBar(
+      commentIds: selectedCommentIds,
+      liveChatIds: selectedLiveChatIds,
+      commentSnippets: commentSnippets,
+      liveChatSnippets: liveChatSnippets,
+      onExitSelection: () {
+        selectionMode.value = false;
+        ref.read(deletionSetProvider.notifier).clear();
+      },
     );
   }
 }
@@ -1515,7 +1476,15 @@ void _showSingleItemActions(
                       FilledButton(
                         onPressed: () {
                           Navigator.pop(dialogCtx);
-                          _removeLocally(ref, {itemId}, isComment);
+                          if (isComment) {
+                            ref
+                                .read(deletedCommentIdsProvider.notifier)
+                                .markDeleted({itemId});
+                          } else {
+                            ref
+                                .read(deletedLiveChatIdsProvider.notifier)
+                                .markDeleted({itemId});
+                          }
                         },
                         child: const Text('Remove'),
                       ),
@@ -1530,49 +1499,6 @@ void _showSingleItemActions(
   );
 }
 
-/// Single composed flow for "bulk delete via picker + snackbar".
-///
-/// Owns the picker → enqueue → snackbar chain for every API-based bulk delete
-/// (channel-wide, selection mode, search results). Callers just build the
-/// snippet maps — ID sets are derived from the map keys.
-void _bulkDeleteViaPicker(
-  BuildContext context,
-  WidgetRef ref, {
-  required Map<String, String?> commentSnippets,
-  required Map<String, String?> liveChatSnippets,
-  VoidCallback? onQueued,
-}) {
-  final commentIds = commentSnippets.keys.toSet();
-  final liveChatIds = liveChatSnippets.keys.toSet();
-  final allIds = {...commentIds, ...liveChatIds};
-  if (allIds.isEmpty) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('No items to delete')));
-    return;
-  }
-  showDeletionMethodPicker(
-    context,
-    ref: ref,
-    ids: allIds,
-    onApiChosen: () {
-      final queue = ref.read(deletionQueueProvider.notifier);
-      if (commentIds.isNotEmpty) {
-        queue.enqueueComments(commentIds, snippets: commentSnippets);
-      }
-      if (liveChatIds.isNotEmpty) {
-        queue.enqueueLiveChats(liveChatIds, snippets: liveChatSnippets);
-      }
-      showQueuedForDeletionSnackBar(
-        context,
-        ref,
-        message: '${allIds.length} item(s) queued for deletion',
-      );
-      onQueued?.call();
-    },
-  );
-}
-
 void _handleChannelDelete(
   BuildContext context,
   WidgetRef ref, {
@@ -1583,7 +1509,7 @@ void _handleChannelDelete(
   required Set<String> skipLiveChatIds,
 }) {
   if (value == 'delete_all_comments') {
-    _bulkDeleteViaPicker(
+    bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: {
@@ -1593,7 +1519,7 @@ void _handleChannelDelete(
       liveChatSnippets: const {},
     );
   } else {
-    _bulkDeleteViaPicker(
+    bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: const {},
@@ -1619,7 +1545,7 @@ void _handleDeleteSearchResults(
       ...ref.read(queuedCommentIdsProvider),
       ...ref.read(failedCommentIdsProvider),
     };
-    _bulkDeleteViaPicker(
+    bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: {
@@ -1635,7 +1561,7 @@ void _handleDeleteSearchResults(
       ...ref.read(queuedLiveChatIdsProvider),
       ...ref.read(failedLiveChatIdsProvider),
     };
-    _bulkDeleteViaPicker(
+    bulkDeleteViaPicker(
       context,
       ref,
       commentSnippets: const {},
@@ -1670,85 +1596,6 @@ void _enqueueSingle(
   );
 }
 
-void _confirmLocalDelete(
-  BuildContext context,
-  WidgetRef ref, {
-  required ValueNotifier<bool> selectionMode,
-  required Set<String> commentIds,
-  required Set<String> liveChatIds,
-}) {
-  final total = commentIds.length + liveChatIds.length;
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Remove Items'),
-      content: Text(
-        'Remove $total item(s) from the list?\n\n'
-        'Use this for items you already deleted manually outside the app. '
-        'This does not delete them from YouTube.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(ctx);
-            if (commentIds.isNotEmpty) {
-              _removeLocally(ref, commentIds, true);
-            }
-            if (liveChatIds.isNotEmpty) {
-              _removeLocally(ref, liveChatIds, false);
-            }
-            selectionMode.value = false;
-            ref.read(deletionSetProvider.notifier).clear();
-          },
-          child: const Text('Remove'),
-        ),
-      ],
-    ),
-  );
-}
-
-void _confirmApiDelete(
-  BuildContext context,
-  WidgetRef ref, {
-  required ValueNotifier<bool> selectionMode,
-  required List<Comment> comments,
-  required List<LiveChat> liveChats,
-  required Set<String> commentIds,
-  required Set<String> liveChatIds,
-}) {
-  _bulkDeleteViaPicker(
-    context,
-    ref,
-    commentSnippets: {
-      for (final c in comments)
-        if (commentIds.contains(c.commentId)) c.commentId: c.displayText,
-    },
-    liveChatSnippets: {
-      for (final c in liveChats)
-        if (liveChatIds.contains(c.liveChatId)) c.liveChatId: c.displayText,
-    },
-    onQueued: () {
-      selectionMode.value = false;
-      ref.read(deletionSetProvider.notifier).clear();
-    },
-  );
-}
-
-Future<void> _removeLocally(
-  WidgetRef ref,
-  Set<String> ids,
-  bool isComment,
-) async {
-  if (isComment) {
-    await ref.read(deletedCommentIdsProvider.notifier).markDeleted(ids);
-  } else {
-    await ref.read(deletedLiveChatIdsProvider.notifier).markDeleted(ids);
-  }
-}
 
 /// Scrolls [scrollController] so the widget at [tileContext] lands just below
 /// the sticky [VideoGroupHeader] instead of being hidden behind it.
