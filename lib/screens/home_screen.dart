@@ -318,16 +318,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _viewChannels() async {
-    if (ref.read(authProvider) == null) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Sign in to fetch video metadata and view channels.'),
-          ),
-        );
-      return;
-    }
     await ref.read(channelThumbnailsProvider.notifier).loadCache();
     if (mounted) context.router.push(const ChannelListRoute());
   }
@@ -399,13 +389,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           const SizedBox(height: 32),
-          FilledButton.icon(
-            onPressed: _viewChannels,
-            icon: const Icon(Icons.list),
-            label: Text(
-              isAuthenticated ? 'View Channels' : 'Sign in to View Channels',
+          if (isAuthenticated)
+            FilledButton.icon(
+              onPressed: _viewChannels,
+              icon: const Icon(Icons.list),
+              label: const Text('View Channels'),
+            )
+          else
+            FilledButton.icon(
+              onPressed: isOAuthConfigured
+                  ? () => ref.read(authProvider.notifier).signIn()
+                  : null,
+              icon: const Icon(Icons.login),
+              label: const Text('Sign in to View Channels'),
             ),
-          ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: _import,
