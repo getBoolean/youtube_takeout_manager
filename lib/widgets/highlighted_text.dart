@@ -77,7 +77,9 @@ List<InlineSpan> _highlightString(String text, String query, TextStyle match) {
       break;
     }
     if (hit > i) spans.add(TextSpan(text: text.substring(i, hit)));
-    spans.add(TextSpan(text: text.substring(hit, hit + q.length), style: match));
+    spans.add(
+      TextSpan(text: text.substring(hit, hit + q.length), style: match),
+    );
     i = hit + q.length;
   }
   return spans;

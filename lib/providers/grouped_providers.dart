@@ -15,15 +15,14 @@ import 'video_providers.dart';
 part 'grouped_providers.g.dart';
 
 @riverpod
-List<VideoGroup<Comment>> groupedChannelComments(
-  Ref ref,
-  String channelId,
-) {
+List<VideoGroup<Comment>> groupedChannelComments(Ref ref, String channelId) {
   final comments = ref.watch(channelCommentsProvider(channelId));
   final groups = <String, List<Comment>>{};
 
   for (final comment in comments) {
-    final key = comment.videoId ?? (comment.postId != null ? 'post:${comment.postId}' : '_orphaned');
+    final key =
+        comment.videoId ??
+        (comment.postId != null ? 'post:${comment.postId}' : '_orphaned');
     groups.putIfAbsent(key, () => []).add(comment);
   }
 
@@ -45,8 +44,16 @@ List<VideoGroup<Comment>> groupedChannelComments(
 
   // Sort: video groups by most recent item first, then posts, then orphaned
   result.sort((a, b) {
-    final aOrder = a.groupType == GroupType.video ? 0 : a.groupType == GroupType.post ? 1 : 2;
-    final bOrder = b.groupType == GroupType.video ? 0 : b.groupType == GroupType.post ? 1 : 2;
+    final aOrder = a.groupType == GroupType.video
+        ? 0
+        : a.groupType == GroupType.post
+        ? 1
+        : 2;
+    final bOrder = b.groupType == GroupType.video
+        ? 0
+        : b.groupType == GroupType.post
+        ? 1
+        : 2;
     if (aOrder != bOrder) return aOrder.compareTo(bOrder);
     return b.items.first.createdAt.compareTo(a.items.first.createdAt);
   });
@@ -55,10 +62,7 @@ List<VideoGroup<Comment>> groupedChannelComments(
 }
 
 @riverpod
-List<VideoGroup<LiveChat>> groupedChannelLiveChats(
-  Ref ref,
-  String channelId,
-) {
+List<VideoGroup<LiveChat>> groupedChannelLiveChats(Ref ref, String channelId) {
   final liveChats = ref.watch(channelLiveChatsProvider(channelId));
   final groups = <String, List<LiveChat>>{};
 
@@ -68,7 +72,9 @@ List<VideoGroup<LiveChat>> groupedChannelLiveChats(
   }
 
   final result = groups.entries.map((entry) {
-    final type = entry.key == '_orphaned' ? GroupType.orphaned : GroupType.video;
+    final type = entry.key == '_orphaned'
+        ? GroupType.orphaned
+        : GroupType.video;
     return VideoGroup<LiveChat>(
       groupKey: entry.key,
       groupType: type,
@@ -123,7 +129,9 @@ List<VideoGroup<T>> _filterGroups<T>({
         .where((item) => extractText(item).toLowerCase().contains(lower))
         .toList();
     if (matching.isNotEmpty) {
-      result.add(options.expandMatchedVideos ? group : rebuild(group, matching));
+      result.add(
+        options.expandMatchedVideos ? group : rebuild(group, matching),
+      );
     }
   }
   return result;
@@ -184,7 +192,8 @@ List<Comment> filteredSearchComments(Ref ref, String channelId) {
   final query = ref.watch(commentSearchQueryProvider);
   if (query.isEmpty) return const [];
   final groups = ref.watch(filteredGroupedChannelCommentsProvider(channelId));
-  final deleted = ref.watch(deletedCommentIdsProvider).value ?? const <String>{};
+  final deleted =
+      ref.watch(deletedCommentIdsProvider).value ?? const <String>{};
   return [
     for (final g in groups)
       for (final c in g.items)

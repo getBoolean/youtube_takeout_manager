@@ -28,10 +28,7 @@ class AnimatedCountText extends StatelessWidget {
     return Cue.onChange(
       value: count,
       motion: premiumSpring(context),
-      acts: const [
-        OpacityAct.fadeIn(),
-        SlideAct.y(from: -0.4),
-      ],
+      acts: const [OpacityAct.fadeIn(), SlideAct.y(from: -0.4)],
       child: Text(
         '$count',
         key: ValueKey(count),

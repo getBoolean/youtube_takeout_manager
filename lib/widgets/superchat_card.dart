@@ -56,10 +56,7 @@ class SuperChatCard extends StatelessWidget {
               decoration: isSelected
                   ? BoxDecoration(
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: scheme.primary,
-                        width: 2,
-                      ),
+                      border: Border.all(color: scheme.primary, width: 2),
                     )
                   : null,
               child: ClipRRect(

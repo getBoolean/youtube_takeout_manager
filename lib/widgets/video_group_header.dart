@@ -48,8 +48,9 @@ class VideoGroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final videoMap = ref.watch(videoMetadataProvider).value ?? {};
-    final Video? video =
-        group.groupType == GroupType.video ? videoMap[group.groupKey] : null;
+    final Video? video = group.groupType == GroupType.video
+        ? videoMap[group.groupKey]
+        : null;
 
     final title = _resolveTitle(video);
     final subtitle = Intl.plural(
@@ -62,7 +63,8 @@ class VideoGroupHeader extends ConsumerWidget {
     // Include it so groups above the viewport stay compact instead of trying to
     // animate back to large (which would grow their sliver extent and shake the
     // whole list).
-    final isCompact = forceCompact ||
+    final isCompact =
+        forceCompact ||
         status.isPinned ||
         !status.isExpanded ||
         status.scrollPercentage >= 1.0;
@@ -94,10 +96,7 @@ class VideoGroupHeader extends ConsumerWidget {
                   toggled: selectionMode,
                   motion: motion,
                   reverseMotion: motion,
-                  acts: const [
-                    ClipAct.width(),
-                    OpacityAct.fadeIn(),
-                  ],
+                  acts: const [ClipAct.width(), OpacityAct.fadeIn()],
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8, top: 4),
                     child: Checkbox(
@@ -158,11 +157,9 @@ class VideoGroupHeader extends ConsumerWidget {
             icon: const Icon(Icons.open_in_new, size: 20),
             tooltip: 'Open on YouTube',
             onPressed: () {
-              final uri = Uri.https(
-                'www.youtube.com',
-                '/watch',
-                {'v': group.groupKey},
-              );
+              final uri = Uri.https('www.youtube.com', '/watch', {
+                'v': group.groupKey,
+              });
               launchUrl(uri, mode: LaunchMode.externalApplication);
             },
           ),

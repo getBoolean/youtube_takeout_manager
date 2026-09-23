@@ -26,8 +26,7 @@ class QuotaStatusBar extends ConsumerWidget {
           QuotaOperation.deleteComment.cost,
         );
 
-        final defaultProgressColor =
-            Theme.of(context).colorScheme.primary;
+        final defaultProgressColor = Theme.of(context).colorScheme.primary;
         final targetColor = switch (progress) {
           >= 0.9 => Theme.of(context).colorScheme.error,
           >= 0.75 => Colors.orange,
