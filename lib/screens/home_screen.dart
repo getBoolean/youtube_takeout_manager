@@ -3,20 +3,18 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../config/oauth_config.dart';
-import '../models/deletion_item_status.dart';
 import '../services/channel_cache_service.dart';
 import '../services/video_cache_service.dart';
 import '../models/takeout_data.dart';
 import '../providers/auth_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/channel_providers.dart';
-import '../providers/deletion_queue_provider.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../providers/quota_provider.dart';
 import '../providers/video_providers.dart';
 import '../router/app_router.dart';
-import '../widgets/cue_motion.dart';
+import '../widgets/deletion_queue_button.dart';
 import '../widgets/import_progress_indicator.dart';
 
 @RoutePage()
@@ -103,7 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
-        actions: [_buildQueueButton(), _buildAuthButton()],
+        actions: [const DeletionQueueButton(), _buildAuthButton()],
       ),
       body: Center(
         child: _importing
@@ -115,32 +113,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ? _buildImportPrompt(theme)
                     : _buildSummary(context, theme, takeout),
               ),
-      ),
-    );
-  }
-
-  Widget _buildQueueButton() {
-    final queueAsync = ref.watch(deletionQueueProvider);
-    final pendingCount =
-        queueAsync.value
-            ?.where(
-              (i) =>
-                  i.status == DeletionItemStatus.pending ||
-                  i.status == DeletionItemStatus.inProgress,
-            )
-            .length ??
-        0;
-
-    return Badge(
-      isLabelVisible: pendingCount > 0,
-      label: AnimatedCountText(
-        pendingCount,
-        style: const TextStyle(fontSize: 12),
-      ),
-      child: IconButton(
-        icon: const Icon(Icons.delete_sweep_outlined),
-        tooltip: 'Deletion Queue',
-        onPressed: () => context.router.push(const DeletionQueueRoute()),
       ),
     );
   }

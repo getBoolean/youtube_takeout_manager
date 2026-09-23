@@ -3,9 +3,9 @@ import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/deletion_targets.dart';
 import '../models/queue_item_kind.dart';
 import '../models/search_result_item.dart';
-import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/cross_channel_search_providers.dart';
@@ -17,10 +17,11 @@ import '../providers/video_providers.dart';
 import '../router/app_router.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
-import '../widgets/bulk_delete_actions.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/cue_motion.dart';
 import '../widgets/debounced_search_bar.dart';
+import '../widgets/deletion_actions.dart';
+import '../widgets/deletion_queue_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/select_all_toggle_button.dart';
@@ -83,15 +84,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       return;
     }
 
-    bulkDeleteViaPicker(
+    deleteFromYouTube(
       context,
       ref,
-      commentSnippets: isComments
-          ? {for (final c in allComments) c.commentId: c.displayText}
-          : const {},
-      liveChatSnippets: isComments
-          ? const {}
-          : {for (final c in allLiveChats) c.liveChatId: c.displayText},
+      isComments
+          ? DeletionTargets(
+              commentSnippets: {
+                for (final c in allComments) c.commentId: c.displayText,
+              },
+            )
+          : DeletionTargets(
+              liveChatSnippets: {
+                for (final c in allLiveChats) c.liveChatId: c.displayText,
+              },
+            ),
     );
   }
 
@@ -99,23 +105,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final deletable = ref.read(crossChannelDeletableItemsProvider);
     if (deletable.isEmpty) return;
 
-    final commentSnippets = <String, String?>{};
-    final liveChatSnippets = <String, String?>{};
-    for (final item in deletable) {
-      switch (item) {
-        case CommentResult(:final comment):
-          commentSnippets[comment.commentId] = comment.displayText;
-        case LiveChatResult(:final liveChat):
-          liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
-      }
-    }
-
-    bulkDeleteViaPicker(
-      context,
-      ref,
-      commentSnippets: commentSnippets,
-      liveChatSnippets: liveChatSnippets,
-    );
+    deleteFromYouTube(context, ref, _deletionTargetsOf(deletable));
   }
 
   @override
@@ -303,25 +293,20 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             tooltip: 'Delete search results ($deletableCount)',
             onPressed: _handleDeleteSearchResults,
           ),
-        IconButton(
-          icon: const Icon(Icons.delete_sweep_outlined),
-          tooltip: 'Deletion Queue',
-          onPressed: () => context.router.push(const DeletionQueueRoute()),
+        const DeletionQueueButton(),
+        PopupMenuButton<String>(
+          onSelected: (value) => _handleGlobalDelete(value),
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: 'delete_all_comments',
+              child: Text('Delete All Comments from YouTube'),
+            ),
+            PopupMenuItem(
+              value: 'delete_all_chats',
+              child: Text('Delete All Live Chats from YouTube'),
+            ),
+          ],
         ),
-        if (ref.watch(isAuthenticatedProvider))
-          PopupMenuButton<String>(
-            onSelected: (value) => _handleGlobalDelete(value),
-            itemBuilder: (_) => const [
-              PopupMenuItem(
-                value: 'delete_all_comments',
-                child: Text('Delete All Comments from YouTube'),
-              ),
-              PopupMenuItem(
-                value: 'delete_all_chats',
-                child: Text('Delete All Live Chats from YouTube'),
-              ),
-            ],
-          ),
       ];
     }
 
@@ -340,10 +325,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               toggled: progress.isFetching && progress.total > 0,
               motion: premiumSpring(context),
               reverseMotion: premiumSpring(context),
-              acts: const [
-                ClipAct.height(),
-                OpacityAct.fadeIn(),
-              ],
+              acts: const [ClipAct.height(), OpacityAct.fadeIn()],
               child: LinearProgressIndicator(
                 value: progress.total > 0
                     ? progress.fetched / progress.total
@@ -351,15 +333,11 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: DebouncedSearchBar(
                 hintText: 'Search channels and comments...',
-                onQueryChanged: (value) => ref
-                    .read(channelSearchQueryProvider.notifier)
-                    .update(value),
+                onQueryChanged: (value) =>
+                    ref.read(channelSearchQueryProvider.notifier).update(value),
               ),
             ),
           ],
@@ -576,7 +554,11 @@ class _CrossChannelResultTile extends ConsumerWidget {
                 color: theme.colorScheme.tertiary,
               )
             : isFailed
-            ? Icon(Icons.error_outline, size: 18, color: theme.colorScheme.error)
+            ? Icon(
+                Icons.error_outline,
+                size: 18,
+                color: theme.colorScheme.error,
+              )
             : const Icon(Icons.chevron_right),
         selected: isSelected,
         onTap: selectionMode.value
@@ -615,32 +597,31 @@ class _CrossChannelDeletionBar extends ConsumerWidget {
     final items = ref.watch(crossChannelSearchItemsProvider);
     final selectedIds = ref.watch(deletionSetProvider);
 
-    final commentIds = <String>{};
-    final liveChatIds = <String>{};
-    final commentSnippets = <String, String?>{};
-    final liveChatSnippets = <String, String?>{};
-
-    for (final item in items) {
-      if (!selectedIds.contains(item.id)) continue;
-      switch (item) {
-        case CommentResult(:final comment):
-          commentIds.add(comment.commentId);
-          commentSnippets[comment.commentId] = comment.displayText;
-        case LiveChatResult(:final liveChat):
-          liveChatIds.add(liveChat.liveChatId);
-          liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
-      }
-    }
-
     // Keep rendering even when empty so AnimatedBottomBar has stable content to
     // fade/slide out during the exit animation. The parent gates visibility via
     // `inSelection && hasSelection`, so "0 items" only appears mid-animation.
     return SelectionActionBar(
-      commentIds: commentIds,
-      liveChatIds: liveChatIds,
-      commentSnippets: commentSnippets,
-      liveChatSnippets: liveChatSnippets,
+      selection: _deletionTargetsOf(
+        items.where((item) => selectedIds.contains(item.id)),
+      ),
       onExitSelection: onExit,
     );
   }
+}
+
+DeletionTargets _deletionTargetsOf(Iterable<SearchResultItem> items) {
+  final commentSnippets = <String, String?>{};
+  final liveChatSnippets = <String, String?>{};
+  for (final item in items) {
+    switch (item) {
+      case CommentResult(:final comment):
+        commentSnippets[comment.commentId] = comment.displayText;
+      case LiveChatResult(:final liveChat):
+        liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
+    }
+  }
+  return DeletionTargets(
+    commentSnippets: commentSnippets,
+    liveChatSnippets: liveChatSnippets,
+  );
 }

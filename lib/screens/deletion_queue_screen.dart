@@ -2,11 +2,17 @@ import 'package:auto_route/auto_route.dart';
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../models/deletion_item_status.dart';
+import '../models/deletion_method.dart';
 import '../models/deletion_queue_item.dart';
+import '../models/deletion_targets.dart';
+import '../providers/auth_providers.dart';
 import '../providers/deletion_queue_provider.dart';
 import '../widgets/cue_motion.dart';
+import '../widgets/deletion_actions.dart';
+import '../widgets/deletion_method_picker.dart';
 import '../widgets/deletion_queue_item_tile.dart';
 import '../widgets/quota_status_bar.dart';
 
@@ -51,22 +57,12 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
       appBar: AppBar(
         title: const Text('Deletion Queue'),
         actions: [
-          if (queueAsync.value?.isNotEmpty == true)
+          if (_isRunning)
             IconButton(
-              icon: Icon(
-                notifier.isProcessing && !notifier.isPaused
-                    ? Icons.pause
-                    : Icons.play_arrow,
-              ),
-              tooltip: notifier.isProcessing && !notifier.isPaused
-                  ? 'Pause'
-                  : 'Start',
+              icon: const Icon(Icons.pause),
+              tooltip: 'Pause',
               onPressed: () {
-                if (notifier.isProcessing && !notifier.isPaused) {
-                  notifier.pauseProcessing();
-                } else {
-                  notifier.startProcessing();
-                }
+                notifier.pauseProcessing();
                 setState(() {});
               },
             ),
@@ -100,6 +96,42 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
       ),
       bottomNavigationBar: _buildBottomActions(queueAsync.value ?? []),
     );
+  }
+
+  bool get _isRunning {
+    final notifier = ref.read(deletionQueueProvider.notifier);
+    return notifier.isProcessing && !notifier.isPaused;
+  }
+
+  /// Asks how to delete the pending items, then starts that method.
+  Future<void> _processQueue() async {
+    final notifier = ref.read(deletionQueueProvider.notifier);
+    final pending = DeletionTargets.fromQueueItems(notifier.pendingItems);
+    final method = await pickDeletionMethod(
+      context,
+      title: Intl.plural(
+        pending.count,
+        one: 'Process 1 queued item',
+        other: 'Process ${pending.count} queued items',
+      ),
+      itemCount: pending.count,
+      possibleMembershipEventCount: pending.possibleMembershipEventCount,
+      offerAddToQueue: false,
+      youtubeApiAvailable: ref.read(isAuthenticatedProvider),
+    );
+    if (!mounted) return;
+
+    switch (method) {
+      case DeletionMethod.myActivityScript:
+        openMyActivityScript(context, ref, pending.allIds);
+      case DeletionMethod.youtubeApi:
+        final processing = notifier.processPendingViaYoutubeApi();
+        setState(() {});
+        await processing;
+        if (mounted) setState(() {});
+      case DeletionMethod.addToQueue || null:
+        return;
+    }
   }
 
   static const _pendingStatuses = {
@@ -142,7 +174,11 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
       child: Wrap(
         spacing: 8,
         children: [
-          _AnimatedStatusChip(label: 'Pending', count: pending, color: Colors.grey),
+          _AnimatedStatusChip(
+            label: 'Pending',
+            count: pending,
+            color: Colors.grey,
+          ),
           _AnimatedStatusChip(
             label: 'In Progress',
             count: inProgress,
@@ -153,7 +189,11 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
             count: succeeded,
             color: Colors.green,
           ),
-          _AnimatedStatusChip(label: 'Failed', count: failed, color: Colors.red),
+          _AnimatedStatusChip(
+            label: 'Failed',
+            count: failed,
+            color: Colors.red,
+          ),
           _AnimatedStatusChip(
             label: 'Quota',
             count: quotaExceeded,
@@ -215,8 +255,17 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
     final hasCompleted = items.any(
       (i) => i.status == DeletionItemStatus.succeeded,
     );
+    final canProcess =
+        !_isRunning &&
+        items.any(
+          (i) =>
+              i.status == DeletionItemStatus.pending ||
+              i.status == DeletionItemStatus.quotaExceeded,
+        );
 
-    if (!hasFailed && !hasQuotaExceeded && !hasCompleted) return null;
+    if (!canProcess && !hasFailed && !hasQuotaExceeded && !hasCompleted) {
+      return null;
+    }
 
     final notifier = ref.read(deletionQueueProvider.notifier);
 
@@ -227,6 +276,12 @@ class _DeletionQueueScreenState extends ConsumerState<DeletionQueueScreen>
           spacing: 8,
           runSpacing: 8,
           children: [
+            if (canProcess)
+              FilledButton.icon(
+                onPressed: _processQueue,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('Process Queue'),
+              ),
             if (hasFailed)
               FilledButton.tonalIcon(
                 onPressed: () => notifier.retryFailed(),
@@ -270,11 +325,7 @@ class _AnimatedStatusChip extends StatelessWidget {
       toggled: count > 0,
       motion: motion,
       reverseMotion: motion,
-      acts: const [
-        ClipAct.width(),
-        OpacityAct.fadeIn(),
-        ScaleAct(from: 0.8),
-      ],
+      acts: const [ClipAct.width(), OpacityAct.fadeIn(), ScaleAct(from: 0.8)],
       child: Chip(
         label: Row(
           mainAxisSize: MainAxisSize.min,

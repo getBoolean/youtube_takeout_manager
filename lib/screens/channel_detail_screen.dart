@@ -8,11 +8,11 @@ import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/comment.dart';
+import '../models/deletion_targets.dart';
 import '../models/export_format.dart';
 import '../models/live_chat.dart';
 import '../models/queue_item_kind.dart';
 import '../models/video_group.dart';
-import '../providers/auth_providers.dart';
 import '../providers/channel_providers.dart';
 import '../providers/comment_providers.dart';
 import '../providers/deleted_ids_providers.dart';
@@ -25,14 +25,13 @@ import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../router/app_router.dart';
 import '../services/export_service.dart';
-import '../widgets/bulk_delete_actions.dart';
 import '../widgets/comment_tile.dart';
 import '../widgets/cue_motion.dart';
 import '../widgets/debounced_search_bar.dart';
-import '../widgets/deletion_method_picker.dart';
+import '../widgets/deletion_actions.dart';
+import '../widgets/deletion_queue_button.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/live_chat_tile.dart';
-import '../widgets/queue_snackbar.dart';
 import '../widgets/scroll_target_highlight.dart';
 import '../widgets/search_options_menu_button.dart';
 import '../widgets/select_all_toggle_button.dart';
@@ -186,7 +185,9 @@ class ChannelDetailScreen extends HookConsumerWidget {
             ? TabBar(
                 controller: tabController,
                 tabs: [
-                  Tab(child: _TabLabel(prefix: 'Comments', count: commentCount)),
+                  Tab(
+                    child: _TabLabel(prefix: 'Comments', count: commentCount),
+                  ),
                   Tab(
                     child: _TabLabel(
                       prefix: 'Live Chats',
@@ -200,10 +201,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
       body: body,
       bottomNavigationBar: AnimatedBottomBar(
         visible: selectionMode.value && hasSelection,
-        child: _DeletionBar(
-          channelId: channelId,
-          selectionMode: selectionMode,
-        ),
+        child: _DeletionBar(channelId: channelId, selectionMode: selectionMode),
       ),
     );
   }
@@ -224,11 +222,7 @@ class _TabLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text('$prefix ('),
-        AnimatedCountText(count),
-        const Text(')'),
-      ],
+      children: [Text('$prefix ('), AnimatedCountText(count), const Text(')')],
     );
   }
 }
@@ -291,7 +285,6 @@ class _ChannelAppBarActions extends ConsumerWidget {
 
     final channel = ref.watch(channelByIdProvider(channelId));
     final channelName = channel?.channelTitle ?? 'Unknown Channel';
-    final authenticated = ref.watch(isAuthenticatedProvider);
     final hasComments = ref.watch(
       channelCommentsProvider(channelId).select((l) => l.isNotEmpty),
     );
@@ -329,80 +322,80 @@ class _ChannelAppBarActions extends ConsumerWidget {
             liveChats: ref.read(channelLiveChatsProvider(channelId)),
           ),
         ),
-        if (authenticated)
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              switch (value) {
-                case 'delete_all_comments':
-                case 'delete_all_chats':
-                  _handleChannelDelete(
-                    context,
-                    ref,
-                    value: value,
-                    comments: ref.read(channelCommentsProvider(channelId)),
-                    liveChats: ref.read(channelLiveChatsProvider(channelId)),
-                    skipCommentIds: {
-                      ...?ref.read(deletedCommentIdsProvider).value,
-                      ...ref.read(queuedCommentIdsProvider),
-                      ...ref.read(failedCommentIdsProvider),
-                    },
-                    skipLiveChatIds: {
-                      ...?ref.read(deletedLiveChatIdsProvider).value,
-                      ...ref.read(queuedLiveChatIdsProvider),
-                      ...ref.read(failedLiveChatIdsProvider),
-                    },
-                  );
-                case 'delete_matching_comments':
-                  _handleDeleteSearchResults(
-                    context,
-                    ref,
-                    isComments: true,
-                    channelId: channelId,
-                  );
-                case 'delete_matching_chats':
-                  _handleDeleteSearchResults(
-                    context,
-                    ref,
-                    isComments: false,
-                    channelId: channelId,
-                  );
-              }
-            },
-            itemBuilder: (_) => [
-              if (hasComments)
-                const PopupMenuItem(
-                  value: 'delete_all_comments',
-                  child: Text('Delete All Comments from Channel'),
-                ),
-              if (hasLiveChats)
-                const PopupMenuItem(
-                  value: 'delete_all_chats',
-                  child: Text('Delete All Live Chats from Channel'),
-                ),
-              if (matchingCommentCount > 0)
-                PopupMenuItem(
-                  value: 'delete_matching_comments',
-                  child: Text(
-                    Intl.plural(
-                      matchingCommentCount,
-                      one: 'Delete 1 matching comment',
-                      other: 'Delete $matchingCommentCount matching comments',
-                    ),
+        const DeletionQueueButton(),
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'delete_all_comments':
+              case 'delete_all_chats':
+                _handleChannelDelete(
+                  context,
+                  ref,
+                  value: value,
+                  comments: ref.read(channelCommentsProvider(channelId)),
+                  liveChats: ref.read(channelLiveChatsProvider(channelId)),
+                  skipCommentIds: {
+                    ...?ref.read(deletedCommentIdsProvider).value,
+                    ...ref.read(queuedCommentIdsProvider),
+                    ...ref.read(failedCommentIdsProvider),
+                  },
+                  skipLiveChatIds: {
+                    ...?ref.read(deletedLiveChatIdsProvider).value,
+                    ...ref.read(queuedLiveChatIdsProvider),
+                    ...ref.read(failedLiveChatIdsProvider),
+                  },
+                );
+              case 'delete_matching_comments':
+                _handleDeleteSearchResults(
+                  context,
+                  ref,
+                  isComments: true,
+                  channelId: channelId,
+                );
+              case 'delete_matching_chats':
+                _handleDeleteSearchResults(
+                  context,
+                  ref,
+                  isComments: false,
+                  channelId: channelId,
+                );
+            }
+          },
+          itemBuilder: (_) => [
+            if (hasComments)
+              const PopupMenuItem(
+                value: 'delete_all_comments',
+                child: Text('Delete All Comments from Channel'),
+              ),
+            if (hasLiveChats)
+              const PopupMenuItem(
+                value: 'delete_all_chats',
+                child: Text('Delete All Live Chats from Channel'),
+              ),
+            if (matchingCommentCount > 0)
+              PopupMenuItem(
+                value: 'delete_matching_comments',
+                child: Text(
+                  Intl.plural(
+                    matchingCommentCount,
+                    one: 'Delete 1 matching comment',
+                    other: 'Delete $matchingCommentCount matching comments',
                   ),
                 ),
-              if (matchingLiveChatCount > 0)
-                PopupMenuItem(
-                  value: 'delete_matching_chats',
-                  child: Text(
-                    Intl.plural(
-                      matchingLiveChatCount,
-                      one: 'Delete 1 matching live chat',
-                      other: 'Delete $matchingLiveChatCount matching live chats',
-                    ),
+              ),
+            if (matchingLiveChatCount > 0)
+              PopupMenuItem(
+                value: 'delete_matching_chats',
+                child: Text(
+                  Intl.plural(
+                    matchingLiveChatCount,
+                    one: 'Delete 1 matching live chat',
+                    other: 'Delete $matchingLiveChatCount matching live chats',
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -1183,28 +1176,17 @@ class _DeletionBar extends ConsumerWidget {
     final liveChats = ref.watch(channelLiveChatsProvider(channelId));
     final selectedIds = ref.watch(deletionSetProvider);
 
-    final selectedCommentIds = <String>{};
-    final commentSnippets = <String, String?>{};
-    for (final c in comments) {
-      if (selectedIds.contains(c.commentId)) {
-        selectedCommentIds.add(c.commentId);
-        commentSnippets[c.commentId] = c.displayText;
-      }
-    }
-    final selectedLiveChatIds = <String>{};
-    final liveChatSnippets = <String, String?>{};
-    for (final c in liveChats) {
-      if (selectedIds.contains(c.liveChatId)) {
-        selectedLiveChatIds.add(c.liveChatId);
-        liveChatSnippets[c.liveChatId] = c.displayText;
-      }
-    }
-
     return SelectionActionBar(
-      commentIds: selectedCommentIds,
-      liveChatIds: selectedLiveChatIds,
-      commentSnippets: commentSnippets,
-      liveChatSnippets: liveChatSnippets,
+      selection: DeletionTargets(
+        commentSnippets: {
+          for (final c in comments)
+            if (selectedIds.contains(c.commentId)) c.commentId: c.displayText,
+        },
+        liveChatSnippets: {
+          for (final c in liveChats)
+            if (selectedIds.contains(c.liveChatId)) c.liveChatId: c.displayText,
+        },
+      ),
       onExitSelection: () {
         selectionMode.value = false;
         ref.read(deletionSetProvider.notifier).clear();
@@ -1430,7 +1412,6 @@ void _showSingleItemActions(
   bool isQueued = false,
   bool isFailed = false,
 }) {
-  final authenticated = ref.read(isAuthenticatedProvider);
   final isComment = kind == QueueItemKind.comment;
 
   showModalBottomSheet(
@@ -1478,24 +1459,21 @@ void _showSingleItemActions(
                     .removeByItemId(itemId, kind);
               },
             )
-          else if (authenticated)
+          else
             ListTile(
               leading: const Icon(Icons.cloud_off),
               title: const Text('Delete from YouTube'),
               subtitle: const Text('Permanently removes from your account'),
               onTap: () {
                 Navigator.pop(ctx);
-                showDeletionMethodPicker(
+                deleteFromYouTube(
                   context,
-                  ref: ref,
-                  ids: {itemId},
-                  onApiChosen: () => _enqueueSingle(
-                    context,
-                    ref,
-                    itemId: itemId,
-                    displayText: displayText,
-                    isComment: isComment,
-                  ),
+                  ref,
+                  isComment
+                      ? DeletionTargets(commentSnippets: {itemId: displayText})
+                      : DeletionTargets(
+                          liveChatSnippets: {itemId: displayText},
+                        ),
                 );
               },
             ),
@@ -1556,28 +1534,25 @@ void _handleChannelDelete(
   required Set<String> skipCommentIds,
   required Set<String> skipLiveChatIds,
 }) {
-  if (value == 'delete_all_comments') {
-    bulkDeleteViaPicker(
-      context,
-      ref,
-      commentSnippets: {
-        for (final c in comments)
-          if (!skipCommentIds.contains(c.commentId)) c.commentId: c.displayText,
-      },
-      liveChatSnippets: const {},
-    );
-  } else {
-    bulkDeleteViaPicker(
-      context,
-      ref,
-      commentSnippets: const {},
-      liveChatSnippets: {
-        for (final c in liveChats)
-          if (!skipLiveChatIds.contains(c.liveChatId))
-            c.liveChatId: c.displayText,
-      },
-    );
-  }
+  deleteFromYouTube(
+    context,
+    ref,
+    value == 'delete_all_comments'
+        ? DeletionTargets(
+            commentSnippets: {
+              for (final c in comments)
+                if (!skipCommentIds.contains(c.commentId))
+                  c.commentId: c.displayText,
+            },
+          )
+        : DeletionTargets(
+            liveChatSnippets: {
+              for (final c in liveChats)
+                if (!skipLiveChatIds.contains(c.liveChatId))
+                  c.liveChatId: c.displayText,
+            },
+          ),
+  );
 }
 
 void _handleDeleteSearchResults(
@@ -1593,14 +1568,15 @@ void _handleDeleteSearchResults(
       ...ref.read(queuedCommentIdsProvider),
       ...ref.read(failedCommentIdsProvider),
     };
-    bulkDeleteViaPicker(
+    deleteFromYouTube(
       context,
       ref,
-      commentSnippets: {
-        for (final c in matches)
-          if (!skip.contains(c.commentId)) c.commentId: c.displayText,
-      },
-      liveChatSnippets: const {},
+      DeletionTargets(
+        commentSnippets: {
+          for (final c in matches)
+            if (!skip.contains(c.commentId)) c.commentId: c.displayText,
+        },
+      ),
     );
   } else {
     final matches = ref.read(filteredSearchLiveChatsProvider(channelId));
@@ -1609,41 +1585,18 @@ void _handleDeleteSearchResults(
       ...ref.read(queuedLiveChatIdsProvider),
       ...ref.read(failedLiveChatIdsProvider),
     };
-    bulkDeleteViaPicker(
+    deleteFromYouTube(
       context,
       ref,
-      commentSnippets: const {},
-      liveChatSnippets: {
-        for (final c in matches)
-          if (!skip.contains(c.liveChatId)) c.liveChatId: c.displayText,
-      },
+      DeletionTargets(
+        liveChatSnippets: {
+          for (final c in matches)
+            if (!skip.contains(c.liveChatId)) c.liveChatId: c.displayText,
+        },
+      ),
     );
   }
 }
-
-void _enqueueSingle(
-  BuildContext context,
-  WidgetRef ref, {
-  required String itemId,
-  required String displayText,
-  required bool isComment,
-}) {
-  final notifier = ref.read(deletionQueueProvider.notifier);
-  final snippets = {itemId: displayText};
-
-  if (isComment) {
-    notifier.enqueueComments({itemId}, snippets: snippets);
-  } else {
-    notifier.enqueueLiveChats({itemId}, snippets: snippets);
-  }
-
-  showQueuedForDeletionSnackBar(
-    context,
-    ref,
-    message: '1 item queued for deletion',
-  );
-}
-
 
 /// Scrolls [scrollController] so the widget at [tileContext] lands just below
 /// the sticky [VideoGroupHeader] instead of being hidden behind it.

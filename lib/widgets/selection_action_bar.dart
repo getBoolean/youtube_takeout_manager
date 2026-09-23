@@ -1,32 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/auth_providers.dart';
-import 'bulk_delete_actions.dart';
+import '../models/deletion_targets.dart';
+import 'deletion_actions.dart';
 
-/// Two-button bottom bar shown when selection mode has items picked. Drives
-/// the local-remove vs API-queue split for both per-channel and cross-channel
-/// selection flows.
+/// Two-button bottom bar shown when selection mode has items picked: remove
+/// the selection locally, or delete it from YouTube.
 class SelectionActionBar extends ConsumerWidget {
-  final Set<String> commentIds;
-  final Set<String> liveChatIds;
-  final Map<String, String?> commentSnippets;
-  final Map<String, String?> liveChatSnippets;
+  final DeletionTargets selection;
   final VoidCallback onExitSelection;
 
   const SelectionActionBar({
     super.key,
-    required this.commentIds,
-    required this.liveChatIds,
-    required this.commentSnippets,
-    required this.liveChatSnippets,
+    required this.selection,
     required this.onExitSelection,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authenticated = ref.watch(isAuthenticatedProvider);
-    final total = commentIds.length + liveChatIds.length;
+    final total = selection.count;
 
     return SafeArea(
       child: Padding(
@@ -37,13 +29,15 @@ class SelectionActionBar extends ConsumerWidget {
               child: Tooltip(
                 message: 'For items you already deleted outside the app',
                 child: FilledButton.icon(
-                  onPressed: () => confirmLocalDelete(
-                    context,
-                    ref,
-                    commentIds: commentIds,
-                    liveChatIds: liveChatIds,
-                    onDone: onExitSelection,
-                  ),
+                  onPressed: () async {
+                    final removed = await confirmLocalRemoval(
+                      context,
+                      ref,
+                      commentIds: selection.commentIds,
+                      liveChatIds: selection.liveChatIds,
+                    );
+                    if (removed) onExitSelection();
+                  },
                   icon: const Icon(Icons.delete_outline),
                   label: Text('Remove $total locally'),
                   style: FilledButton.styleFrom(
@@ -53,22 +47,21 @@ class SelectionActionBar extends ConsumerWidget {
                 ),
               ),
             ),
-            if (authenticated) ...[
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => confirmApiDelete(
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () async {
+                  final handedOff = await deleteFromYouTube(
                     context,
                     ref,
-                    commentSnippets: commentSnippets,
-                    liveChatSnippets: liveChatSnippets,
-                    onDone: onExitSelection,
-                  ),
-                  icon: const Icon(Icons.cloud_off),
-                  label: Text('Delete $total from YouTube'),
-                ),
+                    selection,
+                  );
+                  if (handedOff) onExitSelection();
+                },
+                icon: const Icon(Icons.cloud_off),
+                label: Text('Delete $total from YouTube'),
               ),
-            ],
+            ),
           ],
         ),
       ),

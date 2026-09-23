@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../models/deletion_item_status.dart';
 import '../models/queue_item_kind.dart';
 import '../models/deletion_queue_item.dart';
+import '../models/deletion_targets.dart';
 import '../models/quota_operation.dart';
 import '../services/deletion_queue_persistence_service.dart';
 import '../services/google_auth_service.dart';
@@ -32,26 +33,24 @@ class DeletionQueue extends _$DeletionQueue {
   bool get isProcessing => _isProcessing;
   bool get isPaused => _isPaused;
 
+  /// Items still waiting to be deleted, including those stopped by the quota.
+  List<DeletionQueueItem> get pendingItems => [
+    for (final i in state.value ?? const <DeletionQueueItem>[])
+      if (i.status == DeletionItemStatus.pending ||
+          i.status == DeletionItemStatus.quotaExceeded)
+        i,
+  ];
+
   // ---------------------------------------------------------------------------
   // Enqueue
   // ---------------------------------------------------------------------------
 
-  Future<void> enqueueComments(
-    Set<String> ids, {
-    Map<String, String?> snippets = const {},
-  }) async {
-    await _enqueue(ids, QueueItemKind.comment, snippets);
-  }
-
-  Future<void> enqueueLiveChats(
-    Set<String> ids, {
-    Map<String, String?> snippets = const {},
-  }) async {
-    await _enqueue(ids, QueueItemKind.liveChat, snippets);
+  Future<void> enqueue(DeletionTargets targets) async {
+    await _enqueue(QueueItemKind.comment, targets.commentSnippets);
+    await _enqueue(QueueItemKind.liveChat, targets.liveChatSnippets);
   }
 
   Future<void> _enqueue(
-    Set<String> ids,
     QueueItemKind type,
     Map<String, String?> snippets,
   ) async {
@@ -60,7 +59,7 @@ class DeletionQueue extends _$DeletionQueue {
         .where((i) => i.itemType == type)
         .map((i) => i.itemId)
         .toSet();
-    final newIds = ids.difference(existingItemIds);
+    final newIds = snippets.keys.toSet().difference(existingItemIds);
     if (newIds.isEmpty) return;
 
     final now = DateTime.now().toUtc();
@@ -87,10 +86,17 @@ class DeletionQueue extends _$DeletionQueue {
   // Processing control
   // ---------------------------------------------------------------------------
 
-  Future<void> startProcessing() async {
+  Future<void> startYoutubeApiProcessing() async {
     if (_isProcessing) return;
     _isPaused = false;
-    await _processQueue();
+    await _processQueueViaYoutubeApi();
+  }
+
+  /// Re-queues items stopped by the quota, then deletes every pending item
+  /// via the YouTube API.
+  Future<void> processPendingViaYoutubeApi() async {
+    await retryQuotaExceeded();
+    await startYoutubeApiProcessing();
   }
 
   void pauseProcessing() {
@@ -157,11 +163,46 @@ class DeletionQueue extends _$DeletionQueue {
     await _persistence.saveQueue(updated);
   }
 
+  /// Records the outcome of a My Activity script run on matching queue items.
+  /// IDs that aren't in the queue are ignored.
+  Future<void> recordMyActivityResults({
+    required Set<String> deletedIds,
+    required Map<String, String> errorsById,
+  }) async {
+    final current = await future;
+    final now = DateTime.now().toUtc();
+    var changed = false;
+    final updated = current.map((i) {
+      if (i.status == DeletionItemStatus.succeeded) return i;
+      if (deletedIds.contains(i.itemId)) {
+        changed = true;
+        return i.copyWith(
+          status: DeletionItemStatus.succeeded,
+          errorMessage: null,
+          processedAt: now,
+        );
+      }
+      final error = errorsById[i.itemId];
+      if (error != null) {
+        changed = true;
+        return i.copyWith(
+          status: DeletionItemStatus.failed,
+          errorMessage: error,
+          processedAt: now,
+        );
+      }
+      return i;
+    }).toList();
+    if (!changed) return;
+    state = AsyncData(updated);
+    await _persistence.saveQueue(updated);
+  }
+
   // ---------------------------------------------------------------------------
   // Processing loop
   // ---------------------------------------------------------------------------
 
-  Future<void> _processQueue() async {
+  Future<void> _processQueueViaYoutubeApi() async {
     if (_isProcessing) return;
     _isProcessing = true;
 

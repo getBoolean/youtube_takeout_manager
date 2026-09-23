@@ -2,7 +2,6 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/deletion_queue_provider.dart';
 import '../router/app_router.dart';
 
 void showQueuedForDeletionSnackBar(
@@ -19,12 +18,9 @@ void showQueuedForDeletionSnackBar(
       backgroundColor: scheme.surfaceContainerHigh,
       content: Text(message, style: TextStyle(color: scheme.onSurface)),
       action: SnackBarAction(
-        label: 'Start Queue',
+        label: 'View Queue',
         textColor: scheme.primary,
-        onPressed: () {
-          ref.read(deletionQueueProvider.notifier).startProcessing();
-          context.router.push(const DeletionQueueRoute());
-        },
+        onPressed: () => context.router.push(const DeletionQueueRoute()),
       ),
     ),
   );

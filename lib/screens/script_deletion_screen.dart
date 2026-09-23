@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../providers/deleted_ids_providers.dart';
+import '../providers/deletion_queue_provider.dart';
 import '../providers/script_deletion_provider.dart';
 import '../providers/takeout_providers.dart';
 import '../services/script_generator_service.dart';
@@ -73,9 +74,11 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
   Widget _buildUncertainWarning(ThemeData theme, int count) {
     final message = Intl.plural(
       count,
-      one: '1 item may be a membership event or already-deleted message. '
+      one:
+          '1 item may be a membership event or already-deleted message. '
           'Deletion may fail for it.',
-      other: '$count items may be membership events or already-deleted '
+      other:
+          '$count items may be membership events or already-deleted '
           'messages. Deletion may fail for these.',
     );
     return Container(
@@ -109,52 +112,52 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
 
   Widget _buildStepper(ThemeData theme, Set<String> commentIds) {
     return Stepper(
-        currentStep: _currentStep,
-        onStepContinue: _currentStep < 3
-            ? () => setState(() => _currentStep++)
-            : null,
-        onStepCancel: _currentStep > 0
-            ? () => setState(() => _currentStep--)
-            : null,
-        controlsBuilder: (context, details) {
-          if (_currentStep == 3 && _importResult != null) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: FilledButton(
-                onPressed: () {
-                  ref.read(scriptDeletionIdsProvider.notifier).clear();
-                  context.router.maybePop();
-                },
-                child: const Text('Done'),
-              ),
-            );
-          }
+      currentStep: _currentStep,
+      onStepContinue: _currentStep < 3
+          ? () => setState(() => _currentStep++)
+          : null,
+      onStepCancel: _currentStep > 0
+          ? () => setState(() => _currentStep--)
+          : null,
+      controlsBuilder: (context, details) {
+        if (_currentStep == 3 && _importResult != null) {
           return Padding(
             padding: const EdgeInsets.only(top: 16),
-            child: Row(
-              children: [
-                if (details.onStepContinue != null)
-                  FilledButton(
-                    onPressed: details.onStepContinue,
-                    child: const Text('Next'),
-                  ),
-                if (details.onStepCancel != null) ...[
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: details.onStepCancel,
-                    child: const Text('Back'),
-                  ),
-                ],
-              ],
+            child: FilledButton(
+              onPressed: () {
+                ref.read(scriptDeletionIdsProvider.notifier).clear();
+                context.router.maybePop();
+              },
+              child: const Text('Done'),
             ),
           );
-        },
-        steps: [
-          _buildStep1OpenActivity(theme),
-          _buildStep2CopyScript(theme, commentIds),
-          _buildStep3RunScript(theme),
-          _buildStep4ImportResults(theme, commentIds),
-        ],
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Row(
+            children: [
+              if (details.onStepContinue != null)
+                FilledButton(
+                  onPressed: details.onStepContinue,
+                  child: const Text('Next'),
+                ),
+              if (details.onStepCancel != null) ...[
+                const SizedBox(width: 8),
+                TextButton(
+                  onPressed: details.onStepCancel,
+                  child: const Text('Back'),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+      steps: [
+        _buildStep1OpenActivity(theme),
+        _buildStep2CopyScript(theme, commentIds),
+        _buildStep3RunScript(theme),
+        _buildStep4ImportResults(theme, commentIds),
+      ],
     );
   }
 
@@ -335,6 +338,13 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
               .markDeleted(deletedLiveChats);
         }
       }
+
+      await ref
+          .read(deletionQueueProvider.notifier)
+          .recordMyActivityResults(
+            deletedIds: succeeded,
+            errorsById: {for (final f in failed) f.id: f.error},
+          );
 
       setState(() {
         _importResult = _ImportResult(succeeded: succeeded, failed: failed);
