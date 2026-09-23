@@ -6,6 +6,7 @@ import '../utils/comment_text_parser.dart';
 import 'channel_providers.dart';
 import 'comment_providers.dart';
 import 'deleted_ids_providers.dart';
+import 'emoji_providers.dart';
 import 'live_chat_providers.dart';
 
 part 'cross_channel_search_providers.g.dart';
@@ -17,7 +18,8 @@ part 'cross_channel_search_providers.g.dart';
 List<SearchResultItem> crossChannelSearchItems(Ref ref) {
   final query = ref.watch(channelSearchQueryProvider);
   if (query.isEmpty) return const [];
-  final lower = query.toLowerCase();
+  final lower = normalizeEmojiQuery(query).toLowerCase();
+  final names = ref.watch(emojiNamesByKeyProvider);
 
   final commentsByChannel = ref.watch(commentsByChannelProvider);
   final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
@@ -31,7 +33,10 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
   commentsByChannel.forEach((channelId, comments) {
     for (final c in comments) {
       if (deletedComments.contains(c.commentId)) continue;
-      if (parseCommentText(c.rawCommentText).toLowerCase().contains(lower)) {
+      if (searchableCommentText(
+        c.rawCommentText,
+        names,
+      ).toLowerCase().contains(lower)) {
         results.add(CommentResult(c, channelId: channelId));
       }
     }
@@ -40,7 +45,10 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
   liveChatsByChannel.forEach((channelId, chats) {
     for (final chat in chats) {
       if (deletedLiveChats.contains(chat.liveChatId)) continue;
-      if (parseCommentText(chat.rawText).toLowerCase().contains(lower)) {
+      if (searchableCommentText(
+        chat.rawText,
+        names,
+      ).toLowerCase().contains(lower)) {
         results.add(LiveChatResult(chat, channelId: channelId));
       }
     }

@@ -18,6 +18,7 @@ import '../providers/comment_providers.dart';
 import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_providers.dart';
 import '../providers/deletion_queue_provider.dart';
+import '../providers/emoji_providers.dart';
 import '../providers/export_providers.dart';
 import '../providers/grouped_providers.dart';
 import '../providers/header_animation_providers.dart';
@@ -537,6 +538,9 @@ class _CommentListViewState extends ConsumerState<_CommentListView>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: DebouncedSearchBar(
             hintText: 'Search comments...',
+            emojis: EmojiSearchConfig(
+              groups: ref.watch(channelEmojiGroupsProvider(widget.channelId)),
+            ),
             onQueryChanged: (v) =>
                 ref.read(commentSearchQueryProvider.notifier).update(v),
             trailing: const [SearchOptionsMenuButton()],
@@ -910,6 +914,9 @@ class _LiveChatListViewState extends ConsumerState<_LiveChatListView>
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: DebouncedSearchBar(
             hintText: 'Search live chats...',
+            emojis: EmojiSearchConfig(
+              groups: ref.watch(channelEmojiGroupsProvider(widget.channelId)),
+            ),
             onQueryChanged: (v) =>
                 ref.read(liveChatSearchQueryProvider.notifier).update(v),
             trailing: const [SearchOptionsMenuButton()],

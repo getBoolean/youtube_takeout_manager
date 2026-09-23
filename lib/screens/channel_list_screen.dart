@@ -11,6 +11,7 @@ import '../providers/comment_providers.dart';
 import '../providers/cross_channel_search_providers.dart';
 import '../providers/deleted_ids_providers.dart';
 import '../providers/deletion_providers.dart';
+import '../providers/emoji_providers.dart';
 import '../providers/live_chat_providers.dart';
 import '../providers/takeout_providers.dart';
 import '../providers/video_providers.dart';
@@ -22,6 +23,7 @@ import '../widgets/cue_motion.dart';
 import '../widgets/debounced_search_bar.dart';
 import '../widgets/deletion_actions.dart';
 import '../widgets/deletion_queue_button.dart';
+import '../widgets/emoji_preview.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/highlighted_text.dart';
 import '../widgets/select_all_toggle_button.dart';
@@ -38,6 +40,7 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   void Function()? _cancelChannelsSub;
   void Function()? _cancelProgressSub;
+  void Function()? _cancelLiveChatsSub;
   final ValueNotifier<bool> _selectionMode = ValueNotifier(false);
 
   @override
@@ -61,6 +64,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         }
       });
       _cancelProgressSub = progressSub.close;
+
+      // Look up names for custom emojis once live chats are loaded
+      final liveChatsSub = ref.listenManual(allLiveChatsProvider, (_, next) {
+        if (next.isNotEmpty) {
+          ref.read(emojiNamesProvider.notifier).resolveMissing();
+        }
+      }, fireImmediately: true);
+      _cancelLiveChatsSub = liveChatsSub.close;
     });
   }
 
@@ -112,6 +123,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   void dispose() {
     _cancelChannelsSub?.call();
     _cancelProgressSub?.call();
+    _cancelLiveChatsSub?.call();
     _selectionMode.dispose();
     super.dispose();
   }
@@ -336,6 +348,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: DebouncedSearchBar(
                 hintText: 'Search channels and comments...',
+                emojis: EmojiSearchConfig(
+                  groups: ref.watch(allChannelEmojiGroupsProvider),
+                  groupByChannel: true,
+                ),
                 onQueryChanged: (value) =>
                     ref.read(channelSearchQueryProvider.notifier).update(value),
               ),
@@ -456,7 +472,11 @@ class _CrossChannelResultTile extends ConsumerWidget {
     final isSelected = ref.watch(
       deletionSetProvider.select((s) => s.contains(item.id)),
     );
-    final spans = buildCommentSpans(item.rawText, emojiSize: 16);
+    final spans = buildCommentSpans(
+      item.rawText,
+      emojiSize: 16,
+      emojiBuilder: EmojiPreview.builder,
+    );
 
     final isComment = item.kind == QueueItemKind.comment;
     final channelName = channel?.channelTitle ?? item.channelId;

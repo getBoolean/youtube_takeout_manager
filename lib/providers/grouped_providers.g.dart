@@ -245,7 +245,7 @@ final class FilteredGroupedChannelCommentsProvider
 }
 
 String _$filteredGroupedChannelCommentsHash() =>
-    r'2a772b6e941bb84795b0dbf02efd0191740c2745';
+    r'37cdcd77b3b08f74e12d27492a04777633699a55';
 
 final class FilteredGroupedChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
@@ -331,7 +331,7 @@ final class FilteredGroupedChannelLiveChatsProvider
 }
 
 String _$filteredGroupedChannelLiveChatsHash() =>
-    r'369079e41bba9fddc633b8a3220238f3383c1dac';
+    r'481e86a6feb0be5f46c176e067b59e492713777a';
 
 final class FilteredGroupedChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {

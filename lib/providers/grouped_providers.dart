@@ -8,6 +8,7 @@ import '../models/search_options_state.dart';
 import '../utils/comment_text_parser.dart';
 import 'comment_providers.dart';
 import 'deleted_ids_providers.dart';
+import 'emoji_providers.dart';
 import 'live_chat_providers.dart';
 import 'search_options_providers.dart';
 import 'video_providers.dart';
@@ -115,7 +116,7 @@ List<VideoGroup<T>> _filterGroups<T>({
   required VideoGroup<T> Function(VideoGroup<T> group, List<T> items) rebuild,
 }) {
   if (query.isEmpty) return groups;
-  final lower = query.toLowerCase();
+  final lower = normalizeEmojiQuery(query).toLowerCase();
   final result = <VideoGroup<T>>[];
   for (final group in groups) {
     if (options.matchGroupTitles) {
@@ -147,12 +148,13 @@ List<VideoGroup<Comment>> filteredGroupedChannelComments(
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
+  final names = ref.watch(emojiNamesByKeyProvider);
   return _filterGroups<Comment>(
     groups: groups,
     query: query,
     videoMap: videoMap,
     options: options,
-    extractText: (c) => parseCommentText(c.rawCommentText),
+    extractText: (c) => searchableCommentText(c.rawCommentText, names),
     rebuild: (g, items) => VideoGroup<Comment>(
       groupKey: g.groupKey,
       groupType: g.groupType,
@@ -171,12 +173,13 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
+  final names = ref.watch(emojiNamesByKeyProvider);
   return _filterGroups<LiveChat>(
     groups: groups,
     query: query,
     videoMap: videoMap,
     options: options,
-    extractText: (c) => parseCommentText(c.rawText),
+    extractText: (c) => searchableCommentText(c.rawText, names),
     rebuild: (g, items) => VideoGroup<LiveChat>(
       groupKey: g.groupKey,
       groupType: g.groupType,

@@ -63,8 +63,50 @@ String parseCommentText(String raw) {
       .join();
 }
 
+/// Stable identifier for a custom emoji image, shared between the Takeout
+/// `customEmojiUrl` and the URLs returned by YouTube's live chat API.
+///
+/// Both forms end in the same path segment; YouTube URLs may add a size
+/// suffix (`=w24-h24-c-k-nd`) and use a different host.
+String emojiKey(String url) {
+  final path = Uri.tryParse(url)?.pathSegments;
+  final last = (path != null && path.isNotEmpty) ? path.last : url;
+  final eq = last.indexOf('=');
+  return eq == -1 ? last : last.substring(0, eq);
+}
+
+/// Name used for an emoji whose real name could not be resolved.
+String fallbackEmojiName(String key) =>
+    'emoji_${key.substring(0, key.length < 6 ? key.length : 6)}';
+
+/// Plain text used for search matching. Custom emoji are written as
+/// `:name:` using [namesByKey], falling back to [fallbackEmojiName].
+String searchableCommentText(String raw, Map<String, String> namesByKey) {
+  return parseCommentSegments(raw).map((s) {
+    switch (s) {
+      case TextSegment(:final text):
+        return text;
+      case EmojiSegment(:final url):
+        final key = emojiKey(url);
+        return ':${namesByKey[key] ?? fallbackEmojiName(key)}:';
+    }
+  }).join();
+}
+
+final _underscoreEmojiToken = RegExp(r':_([\w-]+):');
+
+/// Rewrites YouTube's `:_name:` shortcut form to `:name:`.
+String normalizeEmojiQuery(String query) =>
+    query.replaceAllMapped(_underscoreEmojiToken, (m) => ':${m[1]}:');
+
 /// Builds an [InlineSpan] list from raw comment JSON for use in [Text.rich].
-List<InlineSpan> buildCommentSpans(String raw, {required double emojiSize}) {
+///
+/// [emojiBuilder] replaces the default emoji image (e.g. to add a preview).
+List<InlineSpan> buildCommentSpans(
+  String raw, {
+  required double emojiSize,
+  Widget Function(String url, double size)? emojiBuilder,
+}) {
   final segments = parseCommentSegments(raw);
   if (segments.isEmpty) return const [];
 
@@ -74,14 +116,16 @@ List<InlineSpan> buildCommentSpans(String raw, {required double emojiSize}) {
           TextSegment(:final text) => TextSpan(text: text),
           EmojiSegment(:final url) => WidgetSpan(
             alignment: PlaceholderAlignment.middle,
-            child: Image.network(
-              url,
-              width: emojiSize,
-              height: emojiSize,
-              webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-              errorBuilder: (_, _, _) =>
-                  SizedBox(width: emojiSize, height: emojiSize),
-            ),
+            child:
+                emojiBuilder?.call(url, emojiSize) ??
+                Image.network(
+                  url,
+                  width: emojiSize,
+                  height: emojiSize,
+                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                  errorBuilder: (_, _, _) =>
+                      SizedBox(width: emojiSize, height: emojiSize),
+                ),
           ),
         },
       )

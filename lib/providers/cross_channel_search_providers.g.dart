@@ -65,7 +65,7 @@ final class CrossChannelSearchItemsProvider
 }
 
 String _$crossChannelSearchItemsHash() =>
-    r'227195d3682344d12f0bfdf7380c387cbc19ef83';
+    r'017119eaea8ccc11c4c3580627ac51f6877ec845';
 
 /// Subset of [crossChannelSearchItemsProvider] that is eligible for bulk
 /// deletion — strips items already in the deletion queue (pending/in-progress)

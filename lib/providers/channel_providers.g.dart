@@ -101,7 +101,7 @@ final class FilteredChannelsProvider
   }
 }
 
-String _$filteredChannelsHash() => r'f0afa8ba402746c085252d06e07a1f25f9549e5c';
+String _$filteredChannelsHash() => r'47ebc53dde84a9e3d020309f5766d57b6dd8550d';
 
 @ProviderFor(channelTitlesFromVideos)
 final channelTitlesFromVideosProvider = ChannelTitlesFromVideosProvider._();

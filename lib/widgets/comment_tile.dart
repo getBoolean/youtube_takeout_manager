@@ -5,6 +5,7 @@ import '../models/comment.dart';
 import '../utils/comment_text_parser.dart';
 import '../utils/date_formatter.dart';
 import 'cue_motion.dart';
+import 'emoji_preview.dart';
 import 'highlighted_text.dart';
 import 'superchat_card.dart';
 
@@ -34,7 +35,11 @@ class CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final spans = buildCommentSpans(comment.rawCommentText, emojiSize: 20);
+    final spans = buildCommentSpans(
+      comment.rawCommentText,
+      emojiSize: 20,
+      emojiBuilder: EmojiPreview.builder,
+    );
     final subtitle = _subtitleFor(
       isDeleted: isDeleted,
       isFailed: isFailed,
