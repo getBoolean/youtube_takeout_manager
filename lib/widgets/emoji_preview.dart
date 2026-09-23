@@ -5,8 +5,8 @@ import '../providers/emoji_providers.dart';
 import '../utils/comment_text_parser.dart';
 
 /// A custom emoji image that shows a larger preview with its `:name:` on
-/// hover (desktop) or tap (touch), like Discord.
-class EmojiPreview extends ConsumerWidget {
+/// hover (desktop) or tap/click, like Discord.
+class EmojiPreview extends ConsumerStatefulWidget {
   final String url;
   final double size;
 
@@ -27,17 +27,29 @@ class EmojiPreview extends ConsumerWidget {
       EmojiPreview(url: url, size: size);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmojiPreview> createState() => _EmojiPreviewState();
+}
+
+class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
+  final _tooltipKey = GlobalKey<TooltipState>();
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final url = widget.url;
     final key = emojiKey(url);
-    final lookedUp = name == null
+    final lookedUp = widget.name == null
         ? ref.watch(emojiNamesByKeyProvider.select((names) => names[key]))
         : null;
-    final displayName = name ?? lookedUp ?? fallbackEmojiName(key);
-    final isResolved = resolved ?? (name != null || lookedUp != null);
+    final displayName = widget.name ?? lookedUp ?? fallbackEmojiName(key);
+    final isResolved =
+        widget.resolved ?? (widget.name != null || lookedUp != null);
 
     return Tooltip(
-      triggerMode: TooltipTriggerMode.tap,
+      key: _tooltipKey,
+      // Taps are handled below so the emoji wins over an enclosing tappable
+      // (e.g. a comment ListTile) and a click keeps the hover preview open.
+      triggerMode: TooltipTriggerMode.manual,
       waitDuration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -68,7 +80,11 @@ class EmojiPreview extends ConsumerWidget {
           ],
         ),
       ),
-      child: EmojiImage(url: url, size: size),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+        child: EmojiImage(url: url, size: widget.size),
+      ),
     );
   }
 }
