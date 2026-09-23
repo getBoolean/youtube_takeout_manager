@@ -174,5 +174,30 @@ void main() {
       expect(field.controller!.text, ':shypraise:');
       expect(queries.last, ':shypraise:');
     });
+
+    // Desktop text fields select all on focus; inserting must not leave the
+    // text selected or the next insert replaces it.
+    testWidgets('inserting from the picker keeps a collapsed caret', (
+      tester,
+    ) async {
+      await pumpBar(tester);
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'lol ');
+      await tester.pump();
+
+      for (final name in [':shypraise:', ':shortsad:']) {
+        await tester.tap(find.byTooltip('Search by emoji'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsLabel(name));
+        await tester.pumpAndSettle(const Duration(milliseconds: 400));
+      }
+
+      final controller = tester
+          .widget<TextField>(find.byType(TextField))
+          .controller!;
+      expect(controller.text, 'lol :shypraise::shortsad:');
+      expect(controller.selection.isCollapsed, isTrue);
+      expect(controller.selection.baseOffset, controller.text.length);
+    }, variant: TargetPlatformVariant.desktop());
   });
 }

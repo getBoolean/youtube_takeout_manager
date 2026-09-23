@@ -143,12 +143,20 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
     final start = replacing?.start ?? selection.start;
     final end = replacing?.end ?? selection.end;
     final newText = text.replaceRange(start, end, emoji.token);
-    _controller.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: start + emoji.token.length),
-    );
+    final caret = TextSelection.collapsed(offset: start + emoji.token.length);
+    _controller.value = TextEditingValue(text: newText, selection: caret);
     _handleChanged(newText);
-    _focusNode.requestFocus();
+    if (!_focusNode.hasFocus) {
+      _focusNode.requestFocus();
+      // Desktop/web text fields select all when they gain focus, which would
+      // make the next insert replace everything. Restore the caret once the
+      // focus change has been applied.
+      scheduleMicrotask(() {
+        if (mounted && _controller.text == newText) {
+          _controller.selection = caret;
+        }
+      });
+    }
   }
 
   void _updateSuggestions() {
