@@ -101,7 +101,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
-        actions: [const DeletionQueueButton(), _buildAuthButton()],
+        actions: [
+          const DeletionQueueButton(),
+          // Room for the queue badge, which overhangs the button's right edge.
+          const SizedBox(width: 12),
+          _buildAuthButton(),
+        ],
       ),
       body: Center(
         child: _importing
