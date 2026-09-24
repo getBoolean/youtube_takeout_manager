@@ -1,16 +1,16 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
+import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
+import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/service/emoji_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/model/video.dart';
+import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
-import '../domain/search_options_state.dart';
-import '../domain/video_group.dart';
+import '../model/search_options_state.dart';
+import '../model/video_group.dart';
 import 'search_options_providers.dart';
 
 part 'grouped_providers.g.dart';

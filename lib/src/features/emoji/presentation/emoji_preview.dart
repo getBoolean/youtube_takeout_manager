@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
-import '../application/emoji_providers.dart';
+import '../service/emoji_providers.dart';
 
 /// A custom emoji image that shows a larger preview with its `:name:` on
 /// hover (desktop) or tap/click, like Discord.

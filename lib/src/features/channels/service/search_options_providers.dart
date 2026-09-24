@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import '../domain/search_options_state.dart';
+import '../model/search_options_state.dart';
 
 part 'search_options_providers.g.dart';
 

@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import '../domain/quota_operation.dart';
-import '../domain/quota_state.dart';
+import '../model/quota_operation.dart';
+import '../model/quota_state.dart';
 
 part 'quota_repository.g.dart';
 

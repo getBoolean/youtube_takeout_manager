@@ -6,7 +6,7 @@ import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../domain/auth_state.dart';
+import '../model/auth_state.dart';
 
 import 'google_auth_repository_stub.dart'
     if (dart.library.io) 'google_auth_repository_native.dart'

@@ -1,16 +1,16 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/quota/model/quota_operation.dart';
+import 'package:youtube_takeout_manager/src/features/quota/service/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/service/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
 import '../data/channel_cache_repository.dart';
 import '../data/youtube_channel_repository.dart';
-import '../domain/channel.dart';
+import '../model/channel.dart';
 
 part 'channel_providers.g.dart';
 

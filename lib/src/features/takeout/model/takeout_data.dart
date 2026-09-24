@@ -1,7 +1,7 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
 import 'subscription.dart';
 
 part 'takeout_data.mapper.dart';

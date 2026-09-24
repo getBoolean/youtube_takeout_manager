@@ -4,7 +4,7 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../domain/video.dart';
+import '../model/video.dart';
 
 part 'youtube_video_repository.g.dart';
 

@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import '../application/deleted_ids_providers.dart';
-import '../application/deletion_queue_notifier.dart';
-import '../application/script_deletion_ids.dart';
-import '../domain/deletion_method.dart';
-import '../domain/deletion_targets.dart';
+import '../model/deletion_method.dart';
+import '../model/deletion_targets.dart';
+import '../service/deleted_ids_providers.dart';
+import '../service/deletion_queue_notifier.dart';
+import '../service/script_deletion_ids.dart';
 import 'deletion_method_picker.dart';
 import 'queue_snackbar.dart';
 

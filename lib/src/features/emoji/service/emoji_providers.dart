@@ -1,13 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/service/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
 import '../data/youtube_emoji_name_repository.dart';
-import '../domain/channel_emoji.dart';
+import '../model/channel_emoji.dart';
 
 part 'emoji_providers.g.dart';
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../application/emoji_providers.dart';
-import '../domain/channel_emoji.dart';
+import '../model/channel_emoji.dart';
+import '../service/emoji_providers.dart';
 import 'emoji_preview.dart';
 
 /// Emoji picker for the search bars.

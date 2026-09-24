@@ -4,9 +4,9 @@ import 'package:csv/csv.dart';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import '../domain/export_format.dart';
+import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
+import '../model/export_format.dart';
 
 /// Service for exporting comments and live chats to CSV or JSON files.
 class ExportService {

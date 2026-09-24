@@ -1,6 +1,6 @@
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/model/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
 
 /// A unified wrapper around [Comment] or [LiveChat] so cross-channel search
 /// results can render in a single heterogeneous list.

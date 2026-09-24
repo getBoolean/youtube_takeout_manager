@@ -7,7 +7,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_pr
 import 'package:youtube_takeout_manager/src/features/live_chats/presentation/superchat_card.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
-import '../domain/comment.dart';
+import '../model/comment.dart';
 
 class CommentTile extends StatelessWidget {
   final Comment comment;

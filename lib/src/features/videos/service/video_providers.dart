@@ -1,13 +1,13 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/model/quota_operation.dart';
+import 'package:youtube_takeout_manager/src/features/quota/service/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/service/takeout_notifier.dart';
 import '../data/video_cache_repository.dart';
 import '../data/youtube_video_repository.dart';
-import '../domain/video.dart';
+import '../model/video.dart';
 
 part 'video_providers.g.dart';
 

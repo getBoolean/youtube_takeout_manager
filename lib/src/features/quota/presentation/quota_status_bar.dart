@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../application/quota_notifier.dart';
-import '../domain/quota_operation.dart';
+import '../model/quota_operation.dart';
+import '../service/quota_notifier.dart';
 
 const _progressMorphDuration = Duration(milliseconds: 450);
 const _colorMorphDuration = Duration(milliseconds: 250);

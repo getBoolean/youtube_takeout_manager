@@ -6,9 +6,9 @@ import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
-import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
-import '../../domain/video_group.dart';
+import 'package:youtube_takeout_manager/src/features/videos/model/video.dart';
+import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
+import '../../model/video_group.dart';
 import 'header_animation_controller.dart';
 
 class VideoGroupHeader extends ConsumerWidget {

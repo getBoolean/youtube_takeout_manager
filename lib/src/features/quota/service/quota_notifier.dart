@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/quota_repository.dart';
-import '../domain/quota_operation.dart';
-import '../domain/quota_state.dart';
+import '../model/quota_operation.dart';
+import '../model/quota_state.dart';
 
 part 'quota_notifier.g.dart';
 
