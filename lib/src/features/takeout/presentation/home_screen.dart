@@ -6,13 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
-import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_service.dart';
+import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_service.dart';
+import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
 import '../domain/takeout_data.dart';
@@ -250,8 +250,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    await VideoCacheService().clearCache();
-    await ChannelCacheService().clearThumbnails();
+    await ref.read(videoCacheRepositoryProvider).clearCache();
+    await ref.read(channelCacheRepositoryProvider).clearThumbnails();
 
     ref.invalidate(videoMetadataProvider);
     ref.invalidate(channelThumbnailsProvider);

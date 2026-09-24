@@ -3,11 +3,11 @@ import 'package:http/http.dart' as http;
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import '../domain/auth_state.dart';
-import 'google_auth_service.dart';
+import 'google_auth_repository.dart';
 
-GoogleAuthService createGoogleAuthService() => WebGoogleAuthService();
+GoogleAuthRepository createGoogleAuthRepository() => WebGoogleAuthRepository();
 
-class WebGoogleAuthService extends GoogleAuthService {
+class WebGoogleAuthRepository extends GoogleAuthRepository {
   http.Client? _client;
   String? _accessToken;
 

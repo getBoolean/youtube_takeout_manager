@@ -3,8 +3,18 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+
+part 'youtube_emoji_name_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+YoutubeEmojiNameRepository youtubeEmojiNameRepository(Ref ref) {
+  final repository = YoutubeEmojiNameRepository();
+  ref.onDispose(repository.close);
+  return repository;
+}
 
 /// A custom emoji name learned from YouTube's live chat data.
 class ResolvedEmoji {
@@ -77,10 +87,10 @@ const _userAgent =
 /// Uses YouTube's undocumented innertube endpoints (no API key or quota).
 /// Never throws: every failure is reported through [EmojiLookupStatus] so the
 /// caller can back off. Not usable on web because of CORS.
-class YoutubeEmojiNameService {
+class YoutubeEmojiNameRepository {
   final http.Client _client;
 
-  YoutubeEmojiNameService([http.Client? client])
+  YoutubeEmojiNameRepository([http.Client? client])
     : _client = client ?? http.Client();
 
   void close() => _client.close();

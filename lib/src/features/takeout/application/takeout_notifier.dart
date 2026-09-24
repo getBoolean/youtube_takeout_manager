@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/takeout_import_service.dart';
-import '../data/takeout_persistence_service.dart';
+import '../data/takeout_repository.dart';
 import '../domain/takeout_data.dart';
 
 part 'takeout_notifier.g.dart';
@@ -12,8 +12,7 @@ part 'takeout_notifier.g.dart';
 class TakeoutNotifier extends _$TakeoutNotifier {
   @override
   Future<TakeoutData?> build() async {
-    final persistence = TakeoutPersistenceService();
-    final savedCsvs = await persistence.loadCsvs();
+    final savedCsvs = await ref.watch(takeoutRepositoryProvider).loadCsvs();
     if (savedCsvs == null) return null;
 
     return compute(parseCsvFiles, savedCsvs);
@@ -33,7 +32,7 @@ class TakeoutNotifier extends _$TakeoutNotifier {
     final service = TakeoutImportService();
     final result = await service.importFromPickedBytes(zipBytesList);
 
-    await TakeoutPersistenceService().saveCsvs(result.csvFiles);
+    await ref.read(takeoutRepositoryProvider).saveCsvs(result.csvFiles);
 
     state = AsyncData(result.data);
     return true;

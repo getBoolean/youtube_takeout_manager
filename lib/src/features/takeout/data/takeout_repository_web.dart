@@ -4,10 +4,10 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-import 'takeout_persistence_service.dart';
+import 'takeout_repository.dart';
 
 /// Web implementation: persists CSV data in IndexedDB.
-class TakeoutPersistenceServiceImpl implements TakeoutPersistenceService {
+class TakeoutRepositoryImpl implements TakeoutRepository {
   static const _dbName = 'takeout_csvs';
   static const _storeName = 'files';
   static const _version = 1;

@@ -1,15 +1,15 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_service.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import '../data/channel_cache_service.dart';
-import '../data/youtube_channel_service.dart';
+import '../data/channel_cache_repository.dart';
+import '../data/youtube_channel_repository.dart';
 import '../domain/channel.dart';
 
 part 'channel_providers.g.dart';
@@ -48,26 +48,24 @@ Map<String, String> channelTitlesFromVideos(Ref ref) {
 
 @Riverpod(keepAlive: true)
 class ChannelThumbnails extends _$ChannelThumbnails {
-  final _cacheService = ChannelCacheService();
+  ChannelCacheRepository get _cacheRepository =>
+      ref.read(channelCacheRepositoryProvider);
+  YoutubeChannelRepository get _channelRepository =>
+      ref.read(youtubeChannelRepositoryProvider);
+
   final _pendingIds = <String>{};
   bool _fetchInProgress = false;
 
   @override
   Map<String, String> build() {
-    _loadCacheOnInit();
+    ref.watch(channelCacheRepositoryProvider);
+    loadCache();
     return {};
-  }
-
-  Future<void> _loadCacheOnInit() async {
-    final cached = await _cacheService.loadCachedThumbnails();
-    if (cached.isNotEmpty) {
-      state = {...state, ...cached};
-    }
   }
 
   /// Loads cached channel thumbnails from local storage.
   Future<void> loadCache() async {
-    final cached = await _cacheService.loadCachedThumbnails();
+    final cached = await _cacheRepository.loadCachedThumbnails();
     if (cached.isNotEmpty) {
       state = {...state, ...cached};
     }
@@ -101,21 +99,23 @@ class ChannelThumbnails extends _$ChannelThumbnails {
       return;
     }
 
-    final client = GoogleAuthService.instance.getAuthenticatedClient(
-      authState.accessToken,
-    );
-    final service = YoutubeChannelService();
+    final client = ref
+        .read(googleAuthRepositoryProvider)
+        .getAuthenticatedClient(authState.accessToken);
     try {
       while (_pendingIds.isNotEmpty) {
         final batch = _pendingIds.take(10).toSet();
         _pendingIds.removeAll(batch);
-        final fetched = await service.fetchChannelThumbnails(client, batch);
+        final fetched = await _channelRepository.fetchChannelThumbnails(
+          client,
+          batch,
+        );
         await ref
             .read(quotaProvider.notifier)
             .recordUsage(QuotaOperation.channelsList);
         state = {...state, ...fetched};
       }
-      await _cacheService.saveThumbnails(state);
+      await _cacheRepository.saveThumbnails(state);
     } finally {
       client.close();
       _fetchInProgress = false;
@@ -130,13 +130,14 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     final uncachedIds = channelIds.difference(state.keys.toSet());
     if (uncachedIds.isEmpty) return;
 
-    final client = GoogleAuthService.instance.getAuthenticatedClient(
-      authState.accessToken,
-    );
-    final service = YoutubeChannelService();
-
+    final client = ref
+        .read(googleAuthRepositoryProvider)
+        .getAuthenticatedClient(authState.accessToken);
     try {
-      final fetched = await service.fetchChannelThumbnails(client, uncachedIds);
+      final fetched = await _channelRepository.fetchChannelThumbnails(
+        client,
+        uncachedIds,
+      );
       final batchCount = (uncachedIds.length + 49) ~/ 50;
       if (batchCount > 0) {
         await ref
@@ -144,7 +145,7 @@ class ChannelThumbnails extends _$ChannelThumbnails {
             .recordUsage(QuotaOperation.channelsList, count: batchCount);
       }
       state = {...state, ...fetched};
-      await _cacheService.saveThumbnails(state);
+      await _cacheRepository.saveThumbnails(state);
     } finally {
       client.close();
     }

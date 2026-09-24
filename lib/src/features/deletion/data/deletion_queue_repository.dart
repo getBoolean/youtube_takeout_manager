@@ -1,14 +1,24 @@
 import 'dart:convert';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/queue_item_kind.dart';
 
-class DeletionQueuePersistenceService {
+part 'deletion_queue_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+DeletionQueueRepository deletionQueueRepository(Ref ref) =>
+    DeletionQueueRepository(ref.watch(kvStorageServiceProvider));
+
+class DeletionQueueRepository {
   static const _key = 'deletion_queue';
 
-  final _kv = KvStorageService();
+  final KvStorageService _kv;
+
+  DeletionQueueRepository(this._kv);
 
   Future<List<DeletionQueueItem>> loadQueue() async {
     final json = await _kv.getString(_key);

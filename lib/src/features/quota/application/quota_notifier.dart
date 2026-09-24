@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/quota_persistence_service.dart';
+import '../data/quota_repository.dart';
 import '../domain/quota_operation.dart';
 import '../domain/quota_state.dart';
 
@@ -8,11 +8,11 @@ part 'quota_notifier.g.dart';
 
 @Riverpod(keepAlive: true)
 class QuotaNotifier extends _$QuotaNotifier {
-  final _persistence = QuotaPersistenceService();
+  QuotaRepository get _repository => ref.read(quotaRepositoryProvider);
 
   @override
   Future<QuotaState> build() async {
-    return _persistence.loadQuotaState();
+    return ref.watch(quotaRepositoryProvider).loadQuotaState();
   }
 
   /// Whether the current quota can afford the given [cost].
@@ -28,7 +28,7 @@ class QuotaNotifier extends _$QuotaNotifier {
     newUsage[operation] = (newUsage[operation] ?? 0) + (operation.cost * count);
     final updated = current.copyWith(usageByOperation: newUsage);
     state = AsyncData(updated);
-    await _persistence.saveQuotaState(updated);
+    await _repository.saveQuotaState(updated);
   }
 
   /// Resets all quota usage to zero.
@@ -36,12 +36,12 @@ class QuotaNotifier extends _$QuotaNotifier {
     final current = await future;
     final updated = current.copyWith(usageByOperation: {});
     state = AsyncData(updated);
-    await _persistence.saveQuotaState(updated);
+    await _repository.saveQuotaState(updated);
   }
 
   /// Resets the quota if a new day has started (checked via persistence).
   Future<void> resetIfNewDay() async {
-    final fresh = await _persistence.loadQuotaState();
+    final fresh = await _repository.loadQuotaState();
     state = AsyncData(fresh);
   }
 }

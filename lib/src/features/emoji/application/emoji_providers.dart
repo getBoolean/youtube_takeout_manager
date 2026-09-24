@@ -5,8 +5,8 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
-import '../data/emoji_name_cache_service.dart';
-import '../data/youtube_emoji_name_service.dart';
+import '../data/emoji_name_cache_repository.dart';
+import '../data/youtube_emoji_name_repository.dart';
 import '../domain/channel_emoji.dart';
 
 part 'emoji_providers.g.dart';
@@ -46,17 +46,19 @@ const _maxConsecutiveFailures = 2;
 /// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
 @Riverpod(keepAlive: true)
 class EmojiNames extends _$EmojiNames {
-  final _cacheService = EmojiNameCacheService();
+  EmojiNameCacheRepository get _cacheRepository =>
+      ref.read(emojiNameCacheRepositoryProvider);
   late Future<void> _cacheLoaded;
 
   @override
   EmojiNamesState build() {
+    ref.watch(emojiNameCacheRepositoryProvider);
     _cacheLoaded = _loadCache();
     return const EmojiNamesState();
   }
 
   Future<void> _loadCache() async {
-    final cached = await _cacheService.loadNames();
+    final cached = await _cacheRepository.loadNames();
     if (cached.isNotEmpty) {
       state = state.copyWith(names: {...cached, ...state.names});
     }
@@ -80,7 +82,7 @@ class EmojiNames extends _$EmojiNames {
 
   Future<void> _resolveMissing() async {
     await _cacheLoaded;
-    final pausedUntil = await _cacheService.loadPausedUntil();
+    final pausedUntil = await _cacheRepository.loadPausedUntil();
     if (pausedUntil != null && DateTime.now().isBefore(pausedUntil)) {
       state = state.copyWith(lookupUnavailable: true);
       return;
@@ -101,7 +103,7 @@ class EmojiNames extends _$EmojiNames {
     }
     if (keysByVideo.isEmpty) return;
 
-    final attempts = await _cacheService.loadAttempts();
+    final attempts = await _cacheRepository.loadAttempts();
     final now = DateTime.now();
     keysByVideo.removeWhere((videoId, _) {
       final last = attempts[videoId];
@@ -110,51 +112,47 @@ class EmojiNames extends _$EmojiNames {
     if (keysByVideo.isEmpty) return;
 
     state = state.copyWith(isResolving: true, lookupUnavailable: false);
-    final service = YoutubeEmojiNameService();
-    try {
-      var first = true;
-      var networkFailures = 0;
-      var formatFailures = 0;
-      for (final MapEntry(key: videoId, value: keys) in keysByVideo.entries) {
-        final wanted = keys.difference(state.names.keys.toSet());
-        if (wanted.isEmpty) continue;
-        if (!first) await Future<void>.delayed(const Duration(seconds: 1));
-        first = false;
+    final lookupRepository = ref.read(youtubeEmojiNameRepositoryProvider);
+    var first = true;
+    var networkFailures = 0;
+    var formatFailures = 0;
+    for (final MapEntry(key: videoId, value: keys) in keysByVideo.entries) {
+      final wanted = keys.difference(state.names.keys.toSet());
+      if (wanted.isEmpty) continue;
+      if (!first) await Future<void>.delayed(const Duration(seconds: 1));
+      first = false;
 
-        final result = await service.resolveFromVideo(
-          videoId,
-          timesByVideo[videoId]!,
-          wantedKeys: wanted,
-        );
-        if (!ref.mounted) return;
-        if (result.found.isNotEmpty) {
-          state = state.copyWith(names: {...state.names, ...result.found});
-          await _cacheService.saveNames(state.names);
-        }
-
-        switch (result.status) {
-          case EmojiLookupStatus.ok || EmojiLookupStatus.noReplay:
-            networkFailures = 0;
-            formatFailures = 0;
-            attempts[videoId] = DateTime.now();
-            await _cacheService.saveAttempts(attempts);
-          case EmojiLookupStatus.networkError:
-            // Probably offline or rate limited; try again next launch.
-            if (++networkFailures >= _maxConsecutiveFailures) return;
-          case EmojiLookupStatus.unexpectedFormat:
-            // Not recorded as attempted so the video is retried once the
-            // pause ends (e.g. after an app update adapts to the change).
-            if (++formatFailures >= _maxConsecutiveFailures) {
-              await _cacheService.savePausedUntil(
-                DateTime.now().add(_pauseAfterFormatChange),
-              );
-              state = state.copyWith(lookupUnavailable: true);
-              return;
-            }
-        }
+      final result = await lookupRepository.resolveFromVideo(
+        videoId,
+        timesByVideo[videoId]!,
+        wantedKeys: wanted,
+      );
+      if (!ref.mounted) return;
+      if (result.found.isNotEmpty) {
+        state = state.copyWith(names: {...state.names, ...result.found});
+        await _cacheRepository.saveNames(state.names);
       }
-    } finally {
-      service.close();
+
+      switch (result.status) {
+        case EmojiLookupStatus.ok || EmojiLookupStatus.noReplay:
+          networkFailures = 0;
+          formatFailures = 0;
+          attempts[videoId] = DateTime.now();
+          await _cacheRepository.saveAttempts(attempts);
+        case EmojiLookupStatus.networkError:
+          // Probably offline or rate limited; try again next launch.
+          if (++networkFailures >= _maxConsecutiveFailures) return;
+        case EmojiLookupStatus.unexpectedFormat:
+          // Not recorded as attempted so the video is retried once the
+          // pause ends (e.g. after an app update adapts to the change).
+          if (++formatFailures >= _maxConsecutiveFailures) {
+            await _cacheRepository.savePausedUntil(
+              DateTime.now().add(_pauseAfterFormatChange),
+            );
+            state = state.copyWith(lookupUnavailable: true);
+            return;
+          }
+      }
     }
   }
 }

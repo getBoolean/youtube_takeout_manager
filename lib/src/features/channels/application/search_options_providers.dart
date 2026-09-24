@@ -10,12 +10,13 @@ const _keyMatchGroupTitles = 'search.matchGroupTitles';
 
 @Riverpod(keepAlive: true)
 class SearchOptions extends _$SearchOptions {
-  final _storage = KvStorageService();
+  KvStorageService get _storage => ref.read(kvStorageServiceProvider);
 
   @override
   Future<SearchOptionsState> build() async {
-    final expand = await _storage.getBoolean(_keyExpandMatchedVideos);
-    final matchTitles = await _storage.getBoolean(_keyMatchGroupTitles);
+    final storage = ref.watch(kvStorageServiceProvider);
+    final expand = await storage.getBoolean(_keyExpandMatchedVideos);
+    final matchTitles = await storage.getBoolean(_keyMatchGroupTitles);
     return SearchOptionsState(
       expandMatchedVideos: expand ?? false,
       matchGroupTitles: matchTitles ?? true,

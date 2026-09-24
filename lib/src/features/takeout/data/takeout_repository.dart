@@ -1,9 +1,16 @@
 import 'dart:typed_data';
 
-import 'takeout_persistence_service_stub.dart'
-    if (dart.library.io) 'takeout_persistence_service_native.dart'
-    if (dart.library.js_interop) 'takeout_persistence_service_web.dart'
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import 'takeout_repository_stub.dart'
+    if (dart.library.io) 'takeout_repository_native.dart'
+    if (dart.library.js_interop) 'takeout_repository_web.dart'
     as platform;
+
+part 'takeout_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+TakeoutRepository takeoutRepository(Ref ref) => TakeoutRepository();
 
 /// Saves and loads extracted takeout CSV files to/from persistent storage
 /// so users don't need to re-import on every launch.
@@ -11,8 +18,8 @@ import 'takeout_persistence_service_stub.dart'
 /// Platform-specific implementations:
 /// - Native (Windows/macOS/Linux): file-based storage via path_provider
 /// - Web: no-op (data lives in memory for the session only)
-abstract class TakeoutPersistenceService {
-  factory TakeoutPersistenceService() = platform.TakeoutPersistenceServiceImpl;
+abstract class TakeoutRepository {
+  factory TakeoutRepository() = platform.TakeoutRepositoryImpl;
 
   /// Saves extracted CSV files, preserving their relative paths.
   Future<void> saveCsvs(Map<String, Uint8List> csvFiles);

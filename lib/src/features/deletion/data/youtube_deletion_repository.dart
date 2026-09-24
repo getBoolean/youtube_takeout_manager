@@ -1,7 +1,14 @@
 import 'package:googleapis/youtube/v3.dart';
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-/// Unified service for deleting YouTube comments and live chat messages
+part 'youtube_deletion_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+YoutubeDeletionRepository youtubeDeletionRepository(Ref ref) =>
+    YoutubeDeletionRepository();
+
+/// Deletes YouTube comments and live chat messages
 /// via the YouTube Data API v3.
 ///
 /// Live chat messages from Takeout are deletable via `comments.delete` because
@@ -9,7 +16,7 @@ import 'package:http/http.dart' as http;
 /// is not used — it only works on messages in currently-active broadcasts.
 ///
 /// Each delete call costs 50 quota units.
-class YoutubeDeletionService {
+class YoutubeDeletionRepository {
   /// Deletes a single item from YouTube.
   ///
   /// Returns `succeeded: true` on success.

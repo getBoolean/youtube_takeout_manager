@@ -47,7 +47,7 @@ final class EmojiNamesProvider
   }
 }
 
-String _$emojiNamesHash() => r'dad11252f27e3f4767f8135855c3b8940d1ad214';
+String _$emojiNamesHash() => r'a72cf7c199f42c26ec46402d5135b0b565e7fcc2';
 
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
 /// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.

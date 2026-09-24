@@ -1,7 +1,15 @@
 import 'dart:convert';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import 'youtube_emoji_name_service.dart';
+import 'youtube_emoji_name_repository.dart';
+
+part 'emoji_name_cache_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+EmojiNameCacheRepository emojiNameCacheRepository(Ref ref) =>
+    EmojiNameCacheRepository(ref.watch(kvStorageServiceProvider));
 
 const _cachedEmojiNamesKey = 'cached_emoji_names';
 const _emojiResolveAttemptsKey = 'emoji_resolve_attempts';
@@ -10,8 +18,10 @@ const _emojiLookupPausedUntilKey = 'emoji_lookup_paused_until';
 /// Persists custom emoji names resolved from YouTube, keyed by `emojiKey`,
 /// plus when each video was last scanned so failures aren't retried on every
 /// launch. Corrupt entries are dropped instead of failing the load.
-class EmojiNameCacheService {
-  final _kv = KvStorageService();
+class EmojiNameCacheRepository {
+  final KvStorageService _kv;
+
+  EmojiNameCacheRepository(this._kv);
 
   Future<Map<String, ResolvedEmoji>> loadNames() async {
     final map = await _loadMap(_cachedEmojiNamesKey);

@@ -4,13 +4,20 @@ import 'package:flutter/foundation.dart' show protected;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/auth_state.dart';
 
-import 'google_auth_service_stub.dart'
-    if (dart.library.io) 'google_auth_service_native.dart'
-    if (dart.library.js_interop) 'google_auth_service_web.dart'
+import 'google_auth_repository_stub.dart'
+    if (dart.library.io) 'google_auth_repository_native.dart'
+    if (dart.library.js_interop) 'google_auth_repository_web.dart'
     as platform;
+
+part 'google_auth_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+GoogleAuthRepository googleAuthRepository(Ref ref) =>
+    platform.createGoogleAuthRepository();
 
 const scopes = [
   'https://www.googleapis.com/auth/youtube.force-ssl',
@@ -21,15 +28,13 @@ const scopes = [
 
 const credentialsKey = 'google_auth_credentials';
 
-/// Service for Google OAuth2 authentication.
+/// Google OAuth2 authentication.
 ///
 /// Platform-specific implementations handle the actual sign-in flow:
 /// - Native (Windows/macOS/Linux): local HTTP server redirect via `auth_io`
 /// - Web: Google Identity Services popup via `auth_browser`
-abstract class GoogleAuthService {
-  GoogleAuthService();
-
-  static final GoogleAuthService instance = platform.createGoogleAuthService();
+abstract class GoogleAuthRepository {
+  GoogleAuthRepository();
 
   http.Client? get authClient;
 

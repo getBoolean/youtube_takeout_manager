@@ -33,7 +33,7 @@ final class DeletedCommentIdsProvider
   DeletedCommentIds create() => DeletedCommentIds();
 }
 
-String _$deletedCommentIdsHash() => r'084e46f459c0121135c824afb8cb062dcd249b99';
+String _$deletedCommentIdsHash() => r'735e6afe1583388779efa0c10e7d1fbe549a3fc8';
 
 abstract class _$DeletedCommentIds extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();
@@ -78,7 +78,7 @@ final class DeletedLiveChatIdsProvider
 }
 
 String _$deletedLiveChatIdsHash() =>
-    r'38cfc85f93bd0fc8ddbdbc705a1938942048b10e';
+    r'b20c323d73d602c12790fe0ad87917de07de80a6';
 
 abstract class _$DeletedLiveChatIds extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();

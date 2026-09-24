@@ -1,13 +1,23 @@
 import 'dart:convert';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import '../domain/quota_operation.dart';
 import '../domain/quota_state.dart';
 
-class QuotaPersistenceService {
+part 'quota_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+QuotaRepository quotaRepository(Ref ref) =>
+    QuotaRepository(ref.watch(kvStorageServiceProvider));
+
+class QuotaRepository {
   static const _key = 'quota_state';
 
-  final _kv = KvStorageService();
+  final KvStorageService _kv;
+
+  QuotaRepository(this._kv);
 
   Future<QuotaState> loadQuotaState() async {
     final json = await _kv.getString(_key);

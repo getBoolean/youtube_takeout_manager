@@ -2,13 +2,20 @@ import 'dart:math';
 
 import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/video.dart';
 
-/// Service for fetching YouTube video metadata via the YouTube Data API v3.
+part 'youtube_video_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+YoutubeVideoRepository youtubeVideoRepository(Ref ref) =>
+    YoutubeVideoRepository();
+
+/// Fetches YouTube video metadata via the YouTube Data API v3.
 ///
 /// Each `videos.list` call costs 1 quota unit and accepts up to 50 video IDs.
-class YoutubeVideoService {
+class YoutubeVideoRepository {
   static const _batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 

@@ -1,7 +1,14 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import 'kv_storage_service_stub.dart'
     if (dart.library.io) 'kv_storage_service_native.dart'
     if (dart.library.js_interop) 'kv_storage_service_web.dart'
     as platform;
+
+part 'kv_storage_service.g.dart';
+
+@Riverpod(keepAlive: true)
+KvStorageService kvStorageService(Ref ref) => KvStorageService();
 
 /// Platform-agnostic key-value storage.
 ///

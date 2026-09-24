@@ -33,7 +33,7 @@ final class SearchOptionsProvider
   SearchOptions create() => SearchOptions();
 }
 
-String _$searchOptionsHash() => r'ce56b2ed162db343a920522d30879411384bddd4';
+String _$searchOptionsHash() => r'ae91a0375609b7ddfea570b83fbd566d5406e2a2';
 
 abstract class _$SearchOptions extends $AsyncNotifier<SearchOptionsState> {
   FutureOr<SearchOptionsState> build();

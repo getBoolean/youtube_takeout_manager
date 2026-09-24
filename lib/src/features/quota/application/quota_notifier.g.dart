@@ -33,7 +33,7 @@ final class QuotaNotifierProvider
   QuotaNotifier create() => QuotaNotifier();
 }
 
-String _$quotaNotifierHash() => r'4934904c8284414d08898e54ba8286fc48bd09cb';
+String _$quotaNotifierHash() => r'247240ce96e2dc5e38c2407524b782e553248526';
 
 abstract class _$QuotaNotifier extends $AsyncNotifier<QuotaState> {
   FutureOr<QuotaState> build();

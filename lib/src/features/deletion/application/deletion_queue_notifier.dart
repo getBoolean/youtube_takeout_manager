@@ -3,11 +3,11 @@ import 'dart:math';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_service.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import '../data/deletion_queue_persistence_service.dart';
-import '../data/youtube_deletion_service.dart';
+import '../data/deletion_queue_repository.dart';
+import '../data/youtube_deletion_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/deletion_targets.dart';
@@ -20,14 +20,16 @@ part 'deletion_queue_notifier.g.dart';
 class DeletionQueue extends _$DeletionQueue {
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
-  final _persistence = DeletionQueuePersistenceService();
-  final _deletionService = YoutubeDeletionService();
+  DeletionQueueRepository get _repository =>
+      ref.read(deletionQueueRepositoryProvider);
+  YoutubeDeletionRepository get _deletionRepository =>
+      ref.read(youtubeDeletionRepositoryProvider);
   bool _isProcessing = false;
   bool _isPaused = false;
 
   @override
   Future<List<DeletionQueueItem>> build() async {
-    return _persistence.loadQueue();
+    return ref.watch(deletionQueueRepositoryProvider).loadQueue();
   }
 
   bool get isProcessing => _isProcessing;
@@ -79,7 +81,7 @@ class DeletionQueue extends _$DeletionQueue {
 
     final updated = [...current, ...newItems];
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   // ---------------------------------------------------------------------------
@@ -126,14 +128,14 @@ class DeletionQueue extends _$DeletionQueue {
         .where((i) => i.status != DeletionItemStatus.succeeded)
         .toList();
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   Future<void> removeItem(String queueItemId) async {
     final current = await future;
     final updated = current.where((i) => i.id != queueItemId).toList();
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   Future<void> removeByItemId(String itemId, QueueItemKind kind) async {
@@ -143,7 +145,7 @@ class DeletionQueue extends _$DeletionQueue {
         .toList();
     if (updated.length == current.length) return;
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   Future<void> retryByItemId(String itemId, QueueItemKind kind) async {
@@ -160,7 +162,7 @@ class DeletionQueue extends _$DeletionQueue {
         )
         .toList();
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   /// Records the outcome of a My Activity script run on matching queue items.
@@ -195,7 +197,7 @@ class DeletionQueue extends _$DeletionQueue {
     }).toList();
     if (!changed) return;
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   // ---------------------------------------------------------------------------
@@ -212,9 +214,9 @@ class DeletionQueue extends _$DeletionQueue {
       return;
     }
 
-    final client = GoogleAuthService.instance.getAuthenticatedClient(
-      authState.accessToken,
-    );
+    final client = ref
+        .read(googleAuthRepositoryProvider)
+        .getAuthenticatedClient(authState.accessToken);
 
     try {
       await ref.read(quotaProvider.notifier).resetIfNewDay();
@@ -242,7 +244,7 @@ class DeletionQueue extends _$DeletionQueue {
         );
 
         // Call the YouTube API.
-        final result = await _deletionService.deleteItem(
+        final result = await _deletionRepository.deleteItem(
           client,
           nextItem.itemId,
         );
@@ -316,7 +318,7 @@ class DeletionQueue extends _$DeletionQueue {
         .map((i) => i.id == queueItemId ? updated : i)
         .toList();
     state = AsyncData(items);
-    await _persistence.saveQueue(items);
+    await _repository.saveQueue(items);
   }
 
   Future<void> _resetItemsByStatus(DeletionItemStatus status) async {
@@ -333,7 +335,7 @@ class DeletionQueue extends _$DeletionQueue {
         )
         .toList();
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   Future<void> _markRemainingPending(DeletionItemStatus newStatus) async {
@@ -346,7 +348,7 @@ class DeletionQueue extends _$DeletionQueue {
         )
         .toList();
     state = AsyncData(updated);
-    await _persistence.saveQueue(updated);
+    await _repository.saveQueue(updated);
   }
 
   String _generateId() {

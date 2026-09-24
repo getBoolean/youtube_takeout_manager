@@ -4,11 +4,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import '../domain/auth_state.dart';
-import 'google_auth_service.dart';
+import 'google_auth_repository.dart';
 
-GoogleAuthService createGoogleAuthService() => NativeGoogleAuthService();
+GoogleAuthRepository createGoogleAuthRepository() =>
+    NativeGoogleAuthRepository();
 
-class NativeGoogleAuthService extends GoogleAuthService {
+class NativeGoogleAuthRepository extends GoogleAuthRepository {
   auth_io.AutoRefreshingAuthClient? _client;
 
   @override

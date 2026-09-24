@@ -1,15 +1,25 @@
 import 'dart:convert';
 
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import '../domain/video.dart';
+
+part 'video_cache_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+VideoCacheRepository videoCacheRepository(Ref ref) =>
+    VideoCacheRepository(ref.watch(kvStorageServiceProvider));
 
 const _cachedVideosKey = 'cached_video_metadata';
 const _notFoundIdsKey = 'video_not_found_ids';
 
 /// Persists video metadata and not-found IDs to local storage
 /// so they survive app restarts and avoid redundant API calls.
-class VideoCacheService {
-  final _kv = KvStorageService();
+class VideoCacheRepository {
+  final KvStorageService _kv;
+
+  VideoCacheRepository(this._kv);
 
   Future<Map<String, Video>> loadCachedVideos() async {
     final jsonStr = await _kv.getString(_cachedVideosKey);

@@ -1,12 +1,12 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_service.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
-import '../data/video_cache_service.dart';
-import '../data/youtube_video_service.dart';
+import '../data/video_cache_repository.dart';
+import '../data/youtube_video_repository.dart';
 import '../domain/video.dart';
 
 part 'video_providers.g.dart';
@@ -28,12 +28,14 @@ class VideoFetchProgress extends _$VideoFetchProgress {
 
 @Riverpod(keepAlive: true)
 class VideoMetadata extends _$VideoMetadata {
-  final _cacheService = VideoCacheService();
-
   @override
   Stream<Map<String, Video>> build() async* {
+    final cacheRepository = ref.watch(videoCacheRepositoryProvider);
+    final videoRepository = ref.watch(youtubeVideoRepositoryProvider);
+    final authRepository = ref.watch(googleAuthRepositoryProvider);
+
     // Load cache first, yield immediately
-    final cached = await _cacheService.loadCachedVideos();
+    final cached = await cacheRepository.loadCachedVideos();
     yield cached;
 
     // Re-run when auth or takeout changes, but read current values.
@@ -54,7 +56,7 @@ class VideoMetadata extends _$VideoMetadata {
     }
 
     // Subtract already-cached and not-found IDs
-    final notFoundIds = await _cacheService.loadNotFoundIds();
+    final notFoundIds = await cacheRepository.loadNotFoundIds();
     final uncachedIds = videoIds
         .difference(cached.keys.toSet())
         .difference(notFoundIds);
@@ -63,15 +65,12 @@ class VideoMetadata extends _$VideoMetadata {
     final progress = ref.read(videoFetchProgressProvider.notifier);
     progress.start(uncachedIds.length);
 
-    final client = GoogleAuthService.instance.getAuthenticatedClient(
-      authState.accessToken,
-    );
-    final service = YoutubeVideoService();
+    final client = authRepository.getAuthenticatedClient(authState.accessToken);
     final accumulated = Map<String, Video>.from(cached);
     var count = 0;
 
     try {
-      await for (final video in service.fetchVideoMetadataStream(
+      await for (final video in videoRepository.fetchVideoMetadataStream(
         client,
         uncachedIds,
       )) {
@@ -90,13 +89,13 @@ class VideoMetadata extends _$VideoMetadata {
       }
 
       // Persist cache once at the end
-      await _cacheService.saveVideos(accumulated);
+      await cacheRepository.saveVideos(accumulated);
 
       // Persist IDs that were not found
       final newNotFound = uncachedIds.difference(accumulated.keys.toSet());
       if (newNotFound.isNotEmpty) {
         final allNotFound = notFoundIds.union(newNotFound);
-        await _cacheService.saveNotFoundIds(allNotFound);
+        await cacheRepository.saveNotFoundIds(allNotFound);
       }
     } finally {
       client.close();

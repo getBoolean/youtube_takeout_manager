@@ -1,10 +1,17 @@
 import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-/// Service for fetching YouTube channel metadata via the YouTube Data API v3.
+part 'youtube_channel_repository.g.dart';
+
+@Riverpod(keepAlive: true)
+YoutubeChannelRepository youtubeChannelRepository(Ref ref) =>
+    YoutubeChannelRepository();
+
+/// Fetches YouTube channel metadata via the YouTube Data API v3.
 ///
 /// Each `channels.list` call costs 1 quota unit and accepts up to 50 channel IDs.
-class YoutubeChannelService {
+class YoutubeChannelRepository {
   static const _batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 

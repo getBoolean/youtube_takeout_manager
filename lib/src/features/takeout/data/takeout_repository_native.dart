@@ -4,9 +4,9 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
-import 'takeout_persistence_service.dart';
+import 'takeout_repository.dart';
 
-class TakeoutPersistenceServiceImpl implements TakeoutPersistenceService {
+class TakeoutRepositoryImpl implements TakeoutRepository {
   static const _dirName = 'takeout_csvs';
 
   Future<Directory> _getDir() async {

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_service.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
 
 const _key =
     'nqCqL7OuHfRl5bstpirPEbLuD9ldK6pyPVVzCWLjjAWk3lN5EMwErHNozzjGajgr0f3hQ0TXfA';
@@ -146,7 +146,7 @@ void main() {
           headers: {'content-type': 'application/json; charset=utf-8'},
         );
       });
-      final result = await YoutubeEmojiNameService(
+      final result = await YoutubeEmojiNameRepository(
         client,
       ).resolveFromVideo('vid', times, wantedKeys: {_key});
       expect(result.status, EmojiLookupStatus.ok);
@@ -158,7 +158,7 @@ void main() {
         if (request.method == 'GET') return http.Response(_watchPage, 200);
         return http.Response('{"somethingNew":{}}', 200);
       });
-      final result = await YoutubeEmojiNameService(
+      final result = await YoutubeEmojiNameRepository(
         client,
       ).resolveFromVideo('vid', times, wantedKeys: {_key});
       expect(result.status, EmojiLookupStatus.unexpectedFormat);
@@ -169,7 +169,7 @@ void main() {
       () async {
         final limited = MockClient((_) async => http.Response('', 429));
         expect(
-          (await YoutubeEmojiNameService(
+          (await YoutubeEmojiNameRepository(
             limited,
           ).resolveFromVideo('v', times, wantedKeys: {_key})).status,
           EmojiLookupStatus.networkError,
@@ -178,7 +178,7 @@ void main() {
           (_) async => throw http.ClientException('offline'),
         );
         expect(
-          (await YoutubeEmojiNameService(
+          (await YoutubeEmojiNameRepository(
             offline,
           ).resolveFromVideo('v', times, wantedKeys: {_key})).status,
           EmojiLookupStatus.networkError,
