@@ -5,29 +5,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
-import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/model/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/selection_action_bar.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/service/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/service/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
-import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../../model/search_result_item.dart';
 import '../../service/channel_providers.dart';
 import '../../service/cross_channel_search_providers.dart';
 import 'channel_tile.dart';
+import 'cross_channel_deletion_bar.dart';
+import 'cross_channel_result_tile.dart';
+import 'section_header.dart';
 
 @RoutePage()
 class ChannelListScreen extends ConsumerStatefulWidget {
@@ -116,7 +112,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final deletable = ref.read(crossChannelDeletableItemsProvider);
     if (deletable.isEmpty) return;
 
-    deleteFromYouTube(context, ref, _deletionTargetsOf(deletable));
+    deleteFromYouTube(context, ref, deletionTargetsOf(deletable));
   }
 
   @override
@@ -251,7 +247,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                 ),
           bottomNavigationBar: AnimatedBottomBar(
             visible: inSelection && hasSelection,
-            child: _CrossChannelDeletionBar(onExit: _exitSelectionMode),
+            child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
           ),
         );
       },
@@ -412,12 +408,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           ),
         if (items.isNotEmpty)
           const SliverToBoxAdapter(
-            child: _SectionHeader(label: 'Comments & live chats'),
+            child: SectionHeader(label: 'Comments & live chats'),
           ),
         if (items.isNotEmpty)
           SliverList.builder(
             itemCount: items.length,
-            itemBuilder: (context, index) => _CrossChannelResultTile(
+            itemBuilder: (context, index) => CrossChannelResultTile(
               key: ValueKey('${items[index].kind}:${items[index].id}'),
               item: items[index],
               query: query,
@@ -427,221 +423,4 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       ],
     );
   }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        label,
-        style: theme.textTheme.labelLarge?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}
-
-class _CrossChannelResultTile extends ConsumerWidget {
-  final SearchResultItem item;
-  final String query;
-  final ValueNotifier<bool> selectionMode;
-
-  const _CrossChannelResultTile({
-    super.key,
-    required this.item,
-    required this.query,
-    required this.selectionMode,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final channel = ref.watch(channelByIdProvider(item.channelId));
-    final isQueued = _isQueued(ref);
-    final isFailed = _isFailed(ref);
-    final ineligible = isQueued || isFailed;
-    final isSelected = ref.watch(
-      deletionSetProvider.select((s) => s.contains(item.id)),
-    );
-    final spans = buildCommentSpans(
-      item.rawText,
-      emojiSize: 16,
-      emojiBuilder: EmojiPreview.builder,
-    );
-
-    final isComment = item.kind == QueueItemKind.comment;
-    final channelName = channel?.channelTitle ?? item.channelId;
-    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
-
-    void toggleSelection() {
-      ref.read(deletionSetProvider.notifier).toggle(item.id);
-    }
-
-    void navigateToDetail() {
-      // Clear any stale per-channel search queries so the target item
-      // isn't filtered out on the detail screen.
-      ref.read(commentSearchQueryProvider.notifier).update('');
-      ref.read(liveChatSearchQueryProvider.notifier).update('');
-      context.router.push(
-        ChannelDetailRoute(
-          channelId: item.channelId,
-          targetKind: item.kind == QueueItemKind.comment
-              ? 'comment'
-              : 'liveChat',
-          targetId: item.id,
-        ),
-      );
-    }
-
-    return AnimatedOpacity(
-      opacity: (isQueued || isFailed) ? 0.6 : 1.0,
-      duration: const Duration(milliseconds: 250),
-      child: ListTile(
-        leading: SizedBox(
-          width: 40,
-          height: 40,
-          child: Cue.onChange(
-            value: selectionMode.value,
-            motion: premiumSpring(context),
-            acts: const [OpacityAct.fadeIn()],
-            child: Center(
-              child: selectionMode.value
-                  ? Checkbox(
-                      key: const ValueKey('checkbox'),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      value: isSelected,
-                      onChanged: ineligible ? null : (_) => toggleSelection(),
-                    )
-                  : Icon(
-                      key: const ValueKey('icon'),
-                      isComment
-                          ? Icons.comment_outlined
-                          : Icons.chat_bubble_outline,
-                      color: isComment
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.secondary,
-                    ),
-            ),
-          ),
-        ),
-        title: HighlightedText.rich(
-          spans,
-          query: query,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.bodyMedium,
-        ),
-        subtitle: Row(
-          children: [
-            Text('on ', style: subtitleStyle),
-            if (channel?.thumbnailUrl != null) ...[
-              ClipOval(
-                child: Image.network(
-                  channel!.thumbnailUrl!,
-                  width: 14,
-                  height: 14,
-                  fit: BoxFit.cover,
-                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Flexible(
-              child: Text(
-                '$channelName · ${formatDateTime(item.createdAt)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: subtitleStyle,
-              ),
-            ),
-          ],
-        ),
-        trailing: isQueued
-            ? Icon(
-                Icons.hourglass_top,
-                size: 18,
-                color: theme.colorScheme.tertiary,
-              )
-            : isFailed
-            ? Icon(
-                Icons.error_outline,
-                size: 18,
-                color: theme.colorScheme.error,
-              )
-            : const Icon(Icons.chevron_right),
-        selected: isSelected,
-        onTap: selectionMode.value
-            ? (ineligible ? () {} : toggleSelection)
-            : navigateToDetail,
-        onLongPress: ineligible
-            ? null
-            : () {
-                selectionMode.value = true;
-                toggleSelection();
-              },
-      ),
-    );
-  }
-
-  bool _isQueued(WidgetRef ref) {
-    return item.kind == QueueItemKind.comment
-        ? ref.watch(queuedCommentIdsProvider).contains(item.id)
-        : ref.watch(queuedLiveChatIdsProvider).contains(item.id);
-  }
-
-  bool _isFailed(WidgetRef ref) {
-    return item.kind == QueueItemKind.comment
-        ? ref.watch(failedCommentIdsProvider).contains(item.id)
-        : ref.watch(failedLiveChatIdsProvider).contains(item.id);
-  }
-}
-
-class _CrossChannelDeletionBar extends ConsumerWidget {
-  final VoidCallback onExit;
-
-  const _CrossChannelDeletionBar({required this.onExit});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(crossChannelSearchItemsProvider);
-    final selectedIds = ref.watch(deletionSetProvider);
-
-    // Keep rendering even when empty so AnimatedBottomBar has stable content to
-    // fade/slide out during the exit animation. The parent gates visibility via
-    // `inSelection && hasSelection`, so "0 items" only appears mid-animation.
-    return SelectionActionBar(
-      selection: _deletionTargetsOf(
-        items.where((item) => selectedIds.contains(item.id)),
-      ),
-      onExitSelection: onExit,
-    );
-  }
-}
-
-DeletionTargets _deletionTargetsOf(Iterable<SearchResultItem> items) {
-  final commentSnippets = <String, String?>{};
-  final liveChatSnippets = <String, String?>{};
-  for (final item in items) {
-    switch (item) {
-      case CommentResult(:final comment):
-        commentSnippets[comment.commentId] = comment.displayText;
-      case LiveChatResult(:final liveChat):
-        liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
-    }
-  }
-  return DeletionTargets(
-    commentSnippets: commentSnippets,
-    liveChatSnippets: liveChatSnippets,
-  );
 }

@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/videos/service/video_provid
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../model/search_options_state.dart';
 import '../model/video_group.dart';
+import 'channel_content_search_query.dart';
 import 'search_options_providers.dart';
 
 part 'grouped_providers.g.dart';
@@ -144,7 +145,7 @@ List<VideoGroup<Comment>> filteredGroupedChannelComments(
   String channelId,
 ) {
   final groups = ref.watch(groupedChannelCommentsProvider(channelId));
-  final query = ref.watch(commentSearchQueryProvider);
+  final query = ref.watch(channelContentSearchQueryProvider);
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
@@ -169,7 +170,7 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
   String channelId,
 ) {
   final groups = ref.watch(groupedChannelLiveChatsProvider(channelId));
-  final query = ref.watch(liveChatSearchQueryProvider);
+  final query = ref.watch(channelContentSearchQueryProvider);
   final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
@@ -192,7 +193,7 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
 /// already marked as deleted. Empty when the search query is empty.
 @riverpod
 List<Comment> filteredSearchComments(Ref ref, String channelId) {
-  final query = ref.watch(commentSearchQueryProvider);
+  final query = ref.watch(channelContentSearchQueryProvider);
   if (query.isEmpty) return const [];
   final groups = ref.watch(filteredGroupedChannelCommentsProvider(channelId));
   final deleted =
@@ -208,7 +209,7 @@ List<Comment> filteredSearchComments(Ref ref, String channelId) {
 /// already marked as deleted. Empty when the search query is empty.
 @riverpod
 List<LiveChat> filteredSearchLiveChats(Ref ref, String channelId) {
-  final query = ref.watch(liveChatSearchQueryProvider);
+  final query = ref.watch(channelContentSearchQueryProvider);
   if (query.isEmpty) return const [];
   final groups = ref.watch(filteredGroupedChannelLiveChatsProvider(channelId));
   final deleted =

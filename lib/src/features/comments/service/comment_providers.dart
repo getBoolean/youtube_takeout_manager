@@ -32,11 +32,3 @@ List<Comment> channelComments(Ref ref, String channelId) {
   final comments = byChannel[channelId] ?? [];
   return comments..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
-
-@riverpod
-class CommentSearchQuery extends _$CommentSearchQuery {
-  @override
-  String build() => '';
-
-  void update(String query) => state = query;
-}

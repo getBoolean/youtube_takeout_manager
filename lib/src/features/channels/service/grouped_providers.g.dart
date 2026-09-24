@@ -245,7 +245,7 @@ final class FilteredGroupedChannelCommentsProvider
 }
 
 String _$filteredGroupedChannelCommentsHash() =>
-    r'37cdcd77b3b08f74e12d27492a04777633699a55';
+    r'2f03a22c07b70d451e9bed86824f2fd58be81e18';
 
 final class FilteredGroupedChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
@@ -331,7 +331,7 @@ final class FilteredGroupedChannelLiveChatsProvider
 }
 
 String _$filteredGroupedChannelLiveChatsHash() =>
-    r'481e86a6feb0be5f46c176e067b59e492713777a';
+    r'e4a59e37fa293d76fff0c197f32412d3eb5ce5f4';
 
 final class FilteredGroupedChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
@@ -421,7 +421,7 @@ final class FilteredSearchCommentsProvider
 }
 
 String _$filteredSearchCommentsHash() =>
-    r'21b63fe5a2ba0f685c9cc353cd6e09402734e9a7';
+    r'01bde5f486c456ab747d1ff0420d9ee7616c6899';
 
 /// Flat list of comments currently visible in search results, excluding any
 /// already marked as deleted. Empty when the search query is empty.
@@ -514,7 +514,7 @@ final class FilteredSearchLiveChatsProvider
 }
 
 String _$filteredSearchLiveChatsHash() =>
-    r'56dbd2c568c2b8a318825e02c55f4287b26e941a';
+    r'5dd328f66d27a4f5fbd74418f1d235c70580b4be';
 
 /// Flat list of live chats currently visible in search results, excluding any
 /// already marked as deleted. Empty when the search query is empty.
