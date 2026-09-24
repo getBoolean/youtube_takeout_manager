@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/takeout/service/takeout_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
-import '../model/comment.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import '../domain/comment.dart';
 
 part 'comment_providers.g.dart';
 

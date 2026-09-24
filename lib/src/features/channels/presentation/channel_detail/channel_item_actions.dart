@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:youtube_takeout_manager/src/features/deletion/model/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deletion_queue_notifier.dart';
 
 void toggleGroupSelection(
   WidgetRef ref,

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
-import '../model/export_format.dart';
-import '../service/export_service.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../application/export_service.dart';
+import '../domain/export_format.dart';
 import 'export_controller.dart';
 
 /// Offers CSV or JSON export of [comments] and [liveChats] and saves the file.

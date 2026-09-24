@@ -2,16 +2,16 @@ import 'dart:math';
 
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/quota/model/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/quota/service/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import '../data/deletion_queue_repository.dart';
 import '../data/youtube_deletion_repository.dart';
-import '../model/deletion_item_status.dart';
-import '../model/deletion_queue_item.dart';
-import '../model/deletion_targets.dart';
-import '../model/queue_item_kind.dart';
+import '../domain/deletion_item_status.dart';
+import '../domain/deletion_queue_item.dart';
+import '../domain/deletion_targets.dart';
+import '../domain/queue_item_kind.dart';
 import 'deleted_ids_providers.dart';
 
 part 'deletion_queue_notifier.g.dart';

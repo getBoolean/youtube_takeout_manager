@@ -6,7 +6,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
-import '../model/live_chat.dart';
+import '../domain/live_chat.dart';
 import 'superchat_card.dart';
 
 class LiveChatTile extends StatelessWidget {

@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import '../model/deletion_item_status.dart';
-import '../service/deletion_queue_notifier.dart';
+import '../application/deletion_queue_notifier.dart';
+import '../domain/deletion_item_status.dart';
 
 /// App bar button that opens the deletion queue, badged with the number of
 /// items still waiting to be deleted.

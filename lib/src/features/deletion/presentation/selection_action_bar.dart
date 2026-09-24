@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../model/deletion_targets.dart';
+import '../domain/deletion_targets.dart';
 import 'deletion_actions.dart';
 
 /// Two-button bottom bar shown when selection mode has items picked: remove

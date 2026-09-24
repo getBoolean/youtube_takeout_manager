@@ -7,11 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:youtube_takeout_manager/src/features/takeout/service/takeout_notifier.dart';
-import '../service/deleted_ids_providers.dart';
-import '../service/deletion_queue_notifier.dart';
-import '../service/script_deletion_ids.dart';
-import '../service/script_generator_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import '../application/deleted_ids_providers.dart';
+import '../application/deletion_queue_notifier.dart';
+import '../application/script_deletion_ids.dart';
+import '../application/script_generator_service.dart';
 
 @RoutePage()
 class ScriptDeletionScreen extends ConsumerStatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../model/deletion_method.dart';
+import '../domain/deletion_method.dart';
 
 /// Asks the user how to delete [itemCount] items. Returns `null` if they
 /// cancel, including declining the YouTube API confirmation.

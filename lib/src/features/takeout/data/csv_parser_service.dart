@@ -3,10 +3,10 @@ import 'dart:typed_data';
 
 import 'package:csv/csv.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
-import '../model/subscription.dart';
+import '../domain/subscription.dart';
 
 /// Result of parsing a CSV file, including diagnostic counts.
 class CsvParseResult<T> {

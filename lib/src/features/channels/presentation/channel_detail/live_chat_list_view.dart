@@ -5,14 +5,14 @@ import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.
 
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/scroll_target_highlight.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/presentation/live_chat_tile.dart';
-import '../../model/video_group.dart';
-import '../../service/channel_content_search_query.dart';
-import '../../service/grouped_providers.dart';
+import '../../application/channel_content_search_query.dart';
+import '../../application/grouped_providers.dart';
+import '../../domain/video_group.dart';
 import 'channel_item_actions.dart';
 import 'header_animation_controller.dart';
 import 'scroll_to_tile.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../model/channel_emoji.dart';
+import '../domain/channel_emoji.dart';
 import 'emoji_preview.dart';
 
 /// A [TextEditingController] that renders known `:name:` tokens as their

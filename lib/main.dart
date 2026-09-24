@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/app.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

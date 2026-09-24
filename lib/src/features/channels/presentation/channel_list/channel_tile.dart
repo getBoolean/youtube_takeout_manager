@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
-import '../../model/channel.dart';
+import '../../domain/channel.dart';
 
 class ChannelTile extends StatelessWidget {
   final Channel channel;

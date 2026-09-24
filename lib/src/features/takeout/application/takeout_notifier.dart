@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/takeout_import_service.dart';
 import '../data/takeout_repository.dart';
-import '../model/takeout_data.dart';
+import '../domain/takeout_data.dart';
 
 part 'takeout_notifier.g.dart';
 

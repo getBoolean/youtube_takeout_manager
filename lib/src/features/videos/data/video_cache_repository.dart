@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import '../model/video.dart';
+import '../domain/video.dart';
 
 part 'video_cache_repository.g.dart';
 

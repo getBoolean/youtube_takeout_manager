@@ -5,16 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
-import '../../model/search_result_item.dart';
-import '../../service/channel_content_search_query.dart';
-import '../../service/channel_providers.dart';
+import '../../application/channel_content_search_query.dart';
+import '../../application/channel_providers.dart';
+import '../../domain/search_result_item.dart';
 
 class CrossChannelResultTile extends ConsumerWidget {
   final SearchResultItem item;

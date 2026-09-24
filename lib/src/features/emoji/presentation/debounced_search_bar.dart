@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
-import '../model/channel_emoji.dart';
+import '../domain/channel_emoji.dart';
 import 'emoji_picker_panel.dart';
 import 'emoji_preview.dart';
 import 'emoji_text_editing_controller.dart';

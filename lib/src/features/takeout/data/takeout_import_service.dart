@@ -1,10 +1,10 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
-import '../model/subscription.dart';
-import '../model/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../domain/subscription.dart';
+import '../domain/takeout_data.dart';
 import 'csv_parser_service.dart';
 import 'zip_extraction_service.dart';
 

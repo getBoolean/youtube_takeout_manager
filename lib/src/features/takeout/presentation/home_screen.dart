@@ -4,18 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/service/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
-import 'package:youtube_takeout_manager/src/features/channels/service/channel_providers.dart';
-import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/quota/service/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
-import 'package:youtube_takeout_manager/src/features/videos/service/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import '../model/takeout_data.dart';
-import '../service/takeout_notifier.dart';
+import '../application/takeout_notifier.dart';
+import '../domain/takeout_data.dart';
 import 'import_progress_indicator.dart';
 
 @RoutePage()

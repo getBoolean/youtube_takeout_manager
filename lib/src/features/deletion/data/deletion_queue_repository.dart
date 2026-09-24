@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import '../model/deletion_item_status.dart';
-import '../model/deletion_queue_item.dart';
-import '../model/queue_item_kind.dart';
+import '../domain/deletion_item_status.dart';
+import '../domain/deletion_queue_item.dart';
+import '../domain/queue_item_kind.dart';
 
 part 'deletion_queue_repository.g.dart';
 

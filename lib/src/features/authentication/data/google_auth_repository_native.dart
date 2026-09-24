@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
-import '../model/auth_state.dart';
+import '../domain/auth_state.dart';
 import 'google_auth_repository.dart';
 
 GoogleAuthRepository createGoogleAuthRepository() =>

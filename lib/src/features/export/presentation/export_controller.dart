@@ -1,9 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
-import '../model/export_format.dart';
-import '../service/export_service.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../application/export_service.dart';
+import '../domain/export_format.dart';
 
 part 'export_controller.g.dart';
 

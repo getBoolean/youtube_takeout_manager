@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../model/search_options_state.dart';
-import '../../service/search_options_providers.dart';
+import '../../application/search_options_providers.dart';
+import '../../domain/search_options_state.dart';
 
 class SearchOptionsMenuButton extends ConsumerWidget {
   const SearchOptionsMenuButton({super.key});

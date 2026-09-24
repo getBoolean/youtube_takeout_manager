@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/selection_action_bar.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 
 class ChannelDeletionBar extends ConsumerWidget {
   final String channelId;

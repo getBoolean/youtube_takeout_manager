@@ -4,18 +4,18 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
-import 'package:youtube_takeout_manager/src/features/comments/model/comment.dart';
-import 'package:youtube_takeout_manager/src/features/comments/service/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/model/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/service/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/export/presentation/export_sheet.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/model/live_chat.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/service/live_chat_providers.dart';
-import '../../service/channel_providers.dart';
-import '../../service/grouped_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../../application/channel_providers.dart';
+import '../../application/grouped_providers.dart';
 
 class ChannelTabLabel extends StatelessWidget {
   final String prefix;
