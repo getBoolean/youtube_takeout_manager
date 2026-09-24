@@ -2,18 +2,20 @@ import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:sliver_sticky_collapsable_panel/sliver_sticky_collapsable_panel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../../domain/video_group.dart';
-import 'header_animation_controller.dart';
 
 class VideoGroupHeader extends ConsumerWidget {
   final VideoGroup group;
-  final SliverStickyCollapsablePanelStatus status;
+
+  /// Drives the large (0) to compact (1) morph. Owned by the list and shared
+  /// with the group's pinned header copy.
+  final CueController compactMotion;
+  final bool isExpanded;
   final bool selectionMode;
   final bool allSelected;
   final bool someSelected;
@@ -22,18 +24,11 @@ class VideoGroupHeader extends ConsumerWidget {
   final VoidCallback? onLongPress;
   final VoidCallback? onToggleExpanded;
 
-  /// When true the header renders in its compact layout regardless of
-  /// scroll/pin state, and the Cue transition is disabled. Used during
-  /// scroll-to-target so the target group's header has a stable, known
-  /// height from the first frame — the scroll animation can land on a
-  /// single precomputed offset without chasing a layout that shrinks when
-  /// the header pins mid-scroll.
-  final bool forceCompact;
-
   const VideoGroupHeader({
     super.key,
     required this.group,
-    required this.status,
+    required this.compactMotion,
+    required this.isExpanded,
     required this.selectionMode,
     required this.allSelected,
     required this.someSelected,
@@ -41,7 +36,6 @@ class VideoGroupHeader extends ConsumerWidget {
     this.highlightQuery,
     this.onLongPress,
     this.onToggleExpanded,
-    this.forceCompact = false,
   });
 
   @override
@@ -59,17 +53,6 @@ class VideoGroupHeader extends ConsumerWidget {
       other: '${group.items.length} items',
     );
     final thumbnailUrl = video?.thumbnailUrl;
-    // scrollPercentage hits 1.0 once the header is fully scrolled past the top.
-    // Include it so groups above the viewport stay compact instead of trying to
-    // animate back to large (which would grow their sliver extent and shake the
-    // whole list).
-    final isCompact =
-        forceCompact ||
-        status.isPinned ||
-        !status.isExpanded ||
-        status.scrollPercentage >= 1.0;
-    final suppressAnimation =
-        forceCompact || ref.watch(suppressHeaderAnimationProvider);
     const CueMotion springMotion = Spring.smooth();
 
     return Material(
@@ -77,14 +60,8 @@ class VideoGroupHeader extends ConsumerWidget {
       child: InkWell(
         onTap: selectionMode ? onToggleGroupSelection : onToggleExpanded,
         onLongPress: onLongPress,
-        // Suppressed transitions recreate the Cue in its end state rather
-        // than switching its motion: changing a live Cue's motion rebuilds
-        // its timeline and leaves its actors showing stale values.
-        child: Cue.onToggle(
-          key: suppressAnimation ? ValueKey(('instant', isCompact)) : null,
-          toggled: isCompact,
-          motion: springMotion,
-          reverseMotion: springMotion,
+        child: Cue(
+          controller: compactMotion,
           child: Actor(
             acts: const [
               Act.padding(
@@ -168,10 +145,10 @@ class VideoGroupHeader extends ConsumerWidget {
           ),
         IconButton(
           icon: Icon(
-            status.isExpanded ? Icons.expand_less : Icons.expand_more,
+            isExpanded ? Icons.expand_less : Icons.expand_more,
             color: theme.colorScheme.onSurfaceVariant,
           ),
-          tooltip: status.isExpanded ? 'Collapse' : 'Expand',
+          tooltip: isExpanded ? 'Collapse' : 'Expand',
           onPressed: onToggleExpanded,
         ),
       ],
