@@ -71,17 +71,20 @@ class VideoGroupHeader extends ConsumerWidget {
     final suppressAnimation =
         forceCompact || ref.watch(suppressHeaderAnimationProvider);
     const CueMotion springMotion = Spring.smooth();
-    final CueMotion motion = suppressAnimation ? CueMotion.none : springMotion;
 
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: InkWell(
         onTap: selectionMode ? onToggleGroupSelection : onToggleExpanded,
         onLongPress: onLongPress,
+        // Suppressed transitions recreate the Cue in its end state rather
+        // than switching its motion: changing a live Cue's motion rebuilds
+        // its timeline and leaves its actors showing stale values.
         child: Cue.onToggle(
+          key: suppressAnimation ? ValueKey(('instant', isCompact)) : null,
           toggled: isCompact,
-          motion: motion,
-          reverseMotion: motion,
+          motion: springMotion,
+          reverseMotion: springMotion,
           child: Actor(
             acts: const [
               Act.padding(
@@ -92,8 +95,6 @@ class VideoGroupHeader extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Always the spring: suppression only applies to the size
-                // morph, and CueMotion.none leaves this checkbox revealed.
                 Cue.onToggle(
                   toggled: selectionMode,
                   motion: springMotion,
