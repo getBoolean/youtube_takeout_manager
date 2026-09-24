@@ -150,12 +150,14 @@ List<VideoGroup<Comment>> filteredGroupedChannelComments(
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
   final names = ref.watch(emojiNamesByKeyProvider);
+  final emojiNames = queryMentionsEmoji(query);
   return _filterGroups<Comment>(
     groups: groups,
     query: query,
     videoMap: videoMap,
     options: options,
-    extractText: (c) => searchableCommentText(c.rawCommentText, names),
+    extractText: (c) =>
+        searchableCommentText(c.rawCommentText, names, emojiNames: emojiNames),
     rebuild: (g, items) => VideoGroup<Comment>(
       groupKey: g.groupKey,
       groupType: g.groupType,
@@ -175,12 +177,14 @@ List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
   final options =
       ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
   final names = ref.watch(emojiNamesByKeyProvider);
+  final emojiNames = queryMentionsEmoji(query);
   return _filterGroups<LiveChat>(
     groups: groups,
     query: query,
     videoMap: videoMap,
     options: options,
-    extractText: (c) => searchableCommentText(c.rawText, names),
+    extractText: (c) =>
+        searchableCommentText(c.rawText, names, emojiNames: emojiNames),
     rebuild: (g, items) => VideoGroup<LiveChat>(
       groupKey: g.groupKey,
       groupType: g.groupType,

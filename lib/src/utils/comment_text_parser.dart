@@ -81,23 +81,48 @@ String fallbackEmojiName(String key) =>
 
 /// Plain text used for search matching. Custom emoji are written as
 /// `:name:` using [namesByKey], falling back to [fallbackEmojiName].
-String searchableCommentText(String raw, Map<String, String> namesByKey) {
+///
+/// With [emojiNames] false (a search that isn't looking for emojis, see
+/// [queryMentionsEmoji]) each emoji becomes a placeholder that matches
+/// nothing, so a word can't match an emoji's name or run across one.
+String searchableCommentText(
+  String raw,
+  Map<String, String> namesByKey, {
+  bool emojiNames = true,
+}) {
   return parseCommentSegments(raw).map((s) {
     switch (s) {
       case TextSegment(:final text):
         return text;
       case EmojiSegment(:final url):
+        if (!emojiNames) return '\u{FFFC}';
         final key = emojiKey(url);
         return ':${namesByKey[key] ?? fallbackEmojiName(key)}:';
     }
   }).join();
 }
 
-final _underscoreEmojiToken = RegExp(r':_([\w-]+):');
+final _underscoreEmojiToken = RegExp(r':_(?=[\w-])');
 
-/// Rewrites YouTube's `:_name:` shortcut form to `:name:`.
+/// Rewrites YouTube's `:_name:` shortcut form to `:name:`, including a token
+/// still being typed (`:_na`).
 String normalizeEmojiQuery(String query) =>
-    query.replaceAllMapped(_underscoreEmojiToken, (m) => ':${m[1]}:');
+    query.replaceAll(_underscoreEmojiToken, ':');
+
+final _emojiQueryToken = RegExp(r':[\w-]+:?');
+
+/// Whether [query] searches for custom emojis by name (`:name` or `:name:`).
+/// Plain words only match visible text.
+bool queryMentionsEmoji(String query) => _emojiQueryToken.hasMatch(query);
+
+/// Whether the emoji called [name] is one that [query] searches for: its
+/// `:name:` contains one of the query's `:name` / `:name:` tokens.
+bool emojiMatchesQuery(String name, String query) {
+  final token = ':${name.toLowerCase()}:';
+  return _emojiQueryToken
+      .allMatches(normalizeEmojiQuery(query).toLowerCase())
+      .any((match) => token.contains(match[0]!));
+}
 
 /// Builds an [InlineSpan] list from raw comment JSON for use in [Text.rich].
 ///

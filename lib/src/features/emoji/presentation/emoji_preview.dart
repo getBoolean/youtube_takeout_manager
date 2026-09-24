@@ -14,17 +14,29 @@ class EmojiPreview extends ConsumerStatefulWidget {
   final String? name;
   final bool? resolved;
 
+  /// Marks the emoji when this search query looks for it by name (see
+  /// [emojiMatchesQuery]).
+  final String? highlightQuery;
+
   const EmojiPreview({
     super.key,
     required this.url,
     required this.size,
     this.name,
     this.resolved,
+    this.highlightQuery,
   });
+
+  /// Key of the marker drawn around an emoji matched by [highlightQuery].
+  static const searchMatchKey = ValueKey('emoji-search-match');
 
   /// For `buildCommentSpans(emojiBuilder: ...)`.
   static Widget builder(String url, double size) =>
       EmojiPreview(url: url, size: size);
+
+  /// Like [builder], marking emojis that [query] searches for.
+  static Widget Function(String url, double size) highlighting(String? query) =>
+      (url, size) => EmojiPreview(url: url, size: size, highlightQuery: query);
 
   @override
   ConsumerState<EmojiPreview> createState() => _EmojiPreviewState();
@@ -83,7 +95,40 @@ class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
-        child: EmojiImage(url: url, size: widget.size),
+        child: _searchMatchMarker(
+          theme,
+          matched: switch (widget.highlightQuery) {
+            final query? => emojiMatchesQuery(displayName, query),
+            null => false,
+          },
+          child: EmojiImage(url: url, size: widget.size),
+        ),
+      ),
+    );
+  }
+
+  /// A tinted, outlined backdrop the size of the emoji, so the text around it
+  /// doesn't shift.
+  Widget _searchMatchMarker(
+    ThemeData theme, {
+    required bool matched,
+    required Widget child,
+  }) {
+    if (!matched) return child;
+    final radius = BorderRadius.circular(widget.size / 4);
+    return DecoratedBox(
+      key: EmojiPreview.searchMatchKey,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: radius,
+      ),
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.primary, width: 1.5),
+          borderRadius: radius,
+        ),
+        child: child,
       ),
     );
   }

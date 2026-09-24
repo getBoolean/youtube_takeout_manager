@@ -20,6 +20,7 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
   if (query.isEmpty) return const [];
   final lower = normalizeEmojiQuery(query).toLowerCase();
   final names = ref.watch(emojiNamesByKeyProvider);
+  final emojiNames = queryMentionsEmoji(query);
 
   final commentsByChannel = ref.watch(commentsByChannelProvider);
   final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
@@ -36,6 +37,7 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
       if (searchableCommentText(
         c.rawCommentText,
         names,
+        emojiNames: emojiNames,
       ).toLowerCase().contains(lower)) {
         results.add(CommentResult(c, channelId: channelId));
       }
@@ -48,6 +50,7 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
       if (searchableCommentText(
         chat.rawText,
         names,
+        emojiNames: emojiNames,
       ).toLowerCase().contains(lower)) {
         results.add(LiveChatResult(chat, channelId: channelId));
       }

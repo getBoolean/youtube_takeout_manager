@@ -31,6 +31,38 @@ void main() {
       );
       expect(fallbackEmojiName(_key), 'emoji_nqCqL7');
     });
+
+    test('leaves emoji names out for plain-text searches', () {
+      final text = searchableCommentText(_raw, {
+        _key: 'shortsad',
+      }, emojiNames: false);
+      expect(text, startsWith('not the reds again '));
+      expect(text, isNot(contains('short')));
+    });
+  });
+
+  group('queryMentionsEmoji', () {
+    test('only for :name tokens', () {
+      expect(queryMentionsEmoji('short'), isFalse);
+      expect(queryMentionsEmoji('a: b'), isFalse);
+      expect(queryMentionsEmoji(':short'), isTrue);
+      expect(queryMentionsEmoji('gg :shortsad:'), isTrue);
+    });
+  });
+
+  group('emojiMatchesQuery', () {
+    test('matches names containing a :token', () {
+      expect(emojiMatchesQuery('shortcatTiger', ':short'), isTrue);
+      expect(emojiMatchesQuery('shortcatTiger', 'gg :SHORTCAT'), isTrue);
+      expect(emojiMatchesQuery('shortcatTiger', ':_short'), isTrue);
+      expect(emojiMatchesQuery('shortsad', ':shortsad:'), isTrue);
+    });
+
+    test('ignores plain words and other names', () {
+      expect(emojiMatchesQuery('shortcatTiger', 'short'), isFalse);
+      expect(emojiMatchesQuery('shortsadder', ':shortsad:'), isFalse);
+      expect(emojiMatchesQuery('cat', ':short'), isFalse);
+    });
   });
 
   group('normalizeEmojiQuery', () {
@@ -39,6 +71,10 @@ void main() {
         normalizeEmojiQuery('hi :_shortsad: :other:'),
         'hi :shortsad: :other:',
       );
+    });
+
+    test('strips it from a token still being typed', () {
+      expect(normalizeEmojiQuery('hi :_sho'), 'hi :sho');
     });
 
     test('leaves plain text alone', () {

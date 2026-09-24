@@ -74,4 +74,36 @@ void main() {
     await mouse.removePointer();
     await tester.pumpAndSettle(const Duration(seconds: 3));
   }, variant: TargetPlatformVariant.desktop());
+
+  group('search match marker', () {
+    Future<void> pumpEmoji(WidgetTester tester, String query) =>
+        tester.pumpWidget(
+          ProviderScope(
+            child: MaterialApp(
+              home: Scaffold(
+                body: EmojiPreview(
+                  url: 'https://yt3.ggpht.com/k1',
+                  size: 20,
+                  name: 'shortsad',
+                  highlightQuery: query,
+                ),
+              ),
+            ),
+          ),
+        );
+
+    final marker = find.byKey(EmojiPreview.searchMatchKey);
+
+    testWidgets('marks an emoji whose name the query searches for', (
+      tester,
+    ) async {
+      await pumpEmoji(tester, ':short');
+      expect(marker, findsOneWidget);
+    });
+
+    testWidgets('leaves it unmarked for plain words', (tester) async {
+      await pumpEmoji(tester, 'short');
+      expect(marker, findsNothing);
+    });
+  });
 }

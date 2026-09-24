@@ -38,7 +38,7 @@ class CommentTile extends StatelessWidget {
     final spans = buildCommentSpans(
       comment.rawCommentText,
       emojiSize: 20,
-      emojiBuilder: EmojiPreview.builder,
+      emojiBuilder: EmojiPreview.highlighting(highlightQuery),
     );
     final subtitle = _subtitleFor(
       isDeleted: isDeleted,

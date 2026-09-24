@@ -41,7 +41,7 @@ class CrossChannelResultTile extends ConsumerWidget {
     final spans = buildCommentSpans(
       item.rawText,
       emojiSize: 16,
-      emojiBuilder: EmojiPreview.builder,
+      emojiBuilder: EmojiPreview.highlighting(query),
     );
 
     final isComment = item.kind == QueueItemKind.comment;

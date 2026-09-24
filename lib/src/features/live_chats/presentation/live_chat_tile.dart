@@ -38,7 +38,7 @@ class LiveChatTile extends StatelessWidget {
     final spans = buildCommentSpans(
       liveChat.rawText,
       emojiSize: 20,
-      emojiBuilder: EmojiPreview.builder,
+      emojiBuilder: EmojiPreview.highlighting(highlightQuery),
     );
     final subtitle = _liveChatSubtitle(
       isDeleted: isDeleted,
