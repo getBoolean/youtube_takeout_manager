@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'app.dart';
-import 'config/oauth_config.dart';
-import 'providers/auth_providers.dart';
+import 'package:youtube_takeout_manager/src/app.dart';
+import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

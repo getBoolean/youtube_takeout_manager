@@ -1,0 +1,80 @@
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../data/deletion_persistence_service.dart';
+import '../domain/deletion_item_status.dart';
+import '../domain/deletion_queue_item.dart';
+import '../domain/queue_item_kind.dart';
+import 'deletion_queue_notifier.dart';
+
+part 'deleted_ids_providers.g.dart';
+
+@Riverpod(keepAlive: true)
+class DeletedCommentIds extends _$DeletedCommentIds {
+  final _service = DeletionPersistenceService();
+
+  @override
+  Future<Set<String>> build() async {
+    return _service.loadDeletedCommentIds();
+  }
+
+  Future<void> markDeleted(Set<String> ids) async {
+    await _service.addDeletedCommentIds(ids);
+    final current = await future;
+    state = AsyncData({...current, ...ids});
+  }
+}
+
+@Riverpod(keepAlive: true)
+class DeletedLiveChatIds extends _$DeletedLiveChatIds {
+  final _service = DeletionPersistenceService();
+
+  @override
+  Future<Set<String>> build() async {
+    return _service.loadDeletedLiveChatIds();
+  }
+
+  Future<void> markDeleted(Set<String> ids) async {
+    await _service.addDeletedLiveChatIds(ids);
+    final current = await future;
+    state = AsyncData({...current, ...ids});
+  }
+}
+
+bool _isActive(DeletionItemStatus s) =>
+    s == DeletionItemStatus.pending || s == DeletionItemStatus.inProgress;
+
+bool _isFailed(DeletionItemStatus s) =>
+    s == DeletionItemStatus.failed || s == DeletionItemStatus.quotaExceeded;
+
+Set<String> _filterQueueIds(
+  List<DeletionQueueItem> items,
+  QueueItemKind kind,
+  bool Function(DeletionItemStatus) statusFilter,
+) => {
+  for (final i in items)
+    if (i.itemType == kind && statusFilter(i.status)) i.itemId,
+};
+
+@riverpod
+Set<String> queuedCommentIds(Ref ref) {
+  final items = ref.watch(deletionQueueProvider).value ?? const [];
+  return _filterQueueIds(items, QueueItemKind.comment, _isActive);
+}
+
+@riverpod
+Set<String> queuedLiveChatIds(Ref ref) {
+  final items = ref.watch(deletionQueueProvider).value ?? const [];
+  return _filterQueueIds(items, QueueItemKind.liveChat, _isActive);
+}
+
+@riverpod
+Set<String> failedCommentIds(Ref ref) {
+  final items = ref.watch(deletionQueueProvider).value ?? const [];
+  return _filterQueueIds(items, QueueItemKind.comment, _isFailed);
+}
+
+@riverpod
+Set<String> failedLiveChatIds(Ref ref) {
+  final items = ref.watch(deletionQueueProvider).value ?? const [];
+  return _filterQueueIds(items, QueueItemKind.liveChat, _isFailed);
+}
