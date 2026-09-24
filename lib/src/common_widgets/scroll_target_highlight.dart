@@ -33,7 +33,9 @@ class ScrollTargetHighlight extends StatelessWidget {
       builder: (context, t, child) {
         // Up-then-down curve: peaks near t=0.5, fades back to 0 at t=1.
         final intensity = (t < 0.5 ? t * 2 : (1 - t) * 2).clamp(0.0, 1.0);
-        return ColoredBox(
+        // A Material rather than a ColoredBox so ListTile children still
+        // paint their ink on it instead of behind the highlight.
+        return Material(
           color: colorScheme.primaryContainer.withValues(alpha: intensity),
           child: child,
         );

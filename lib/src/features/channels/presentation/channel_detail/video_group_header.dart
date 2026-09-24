@@ -92,10 +92,12 @@ class VideoGroupHeader extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Always the spring: suppression only applies to the size
+                // morph, and CueMotion.none leaves this checkbox revealed.
                 Cue.onToggle(
                   toggled: selectionMode,
-                  motion: motion,
-                  reverseMotion: motion,
+                  motion: springMotion,
+                  reverseMotion: springMotion,
                   acts: const [ClipAct.width(), OpacityAct.fadeIn()],
                   child: Padding(
                     padding: const EdgeInsets.only(right: 8, top: 4),
