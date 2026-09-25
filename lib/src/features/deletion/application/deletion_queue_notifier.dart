@@ -376,7 +376,8 @@ class DeletionQueue extends _$DeletionQueue {
   String _generateId() {
     final random = Random();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final randomPart = random.nextInt(1 << 32);
+    // Not `1 << 32`: on web, JS shifts are 32-bit, so that's 0 and throws.
+    final randomPart = random.nextInt(0xFFFFFFFF);
     return '${timestamp.toRadixString(36)}-${randomPart.toRadixString(36)}';
   }
 }
