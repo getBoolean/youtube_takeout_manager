@@ -19,9 +19,12 @@ class DeletedCommentIds extends _$DeletedCommentIds {
   }
 
   Future<void> markDeleted(Set<String> ids) async {
-    await _repository.addDeletedCommentIds(ids);
-    final current = await future;
-    state = AsyncData({...current, ...ids});
+    await future;
+    // Read and update the state without awaiting in between, so concurrent
+    // calls can't overwrite each other's IDs.
+    final updated = {...state.requireValue, ...ids};
+    state = AsyncData(updated);
+    await _repository.saveDeletedCommentIds(updated);
   }
 }
 
@@ -36,9 +39,10 @@ class DeletedLiveChatIds extends _$DeletedLiveChatIds {
   }
 
   Future<void> markDeleted(Set<String> ids) async {
-    await _repository.addDeletedLiveChatIds(ids);
-    final current = await future;
-    state = AsyncData({...current, ...ids});
+    await future;
+    final updated = {...state.requireValue, ...ids};
+    state = AsyncData(updated);
+    await _repository.saveDeletedLiveChatIds(updated);
   }
 }
 
@@ -80,3 +84,19 @@ Set<String> failedLiveChatIds(Ref ref) {
   final items = ref.watch(deletionQueueProvider).value ?? const [];
   return _filterQueueIds(items, QueueItemKind.liveChat, _isFailed);
 }
+
+/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
+@riverpod
+Set<String> excludedFromDeletionCommentIds(Ref ref) => {
+  ...?ref.watch(deletedCommentIdsProvider).value,
+  ...ref.watch(queuedCommentIdsProvider),
+  ...ref.watch(failedCommentIdsProvider),
+};
+
+/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
+@riverpod
+Set<String> excludedFromDeletionLiveChatIds(Ref ref) => {
+  ...?ref.watch(deletedLiveChatIdsProvider).value,
+  ...ref.watch(queuedLiveChatIdsProvider),
+  ...ref.watch(failedLiveChatIdsProvider),
+};

@@ -141,16 +141,12 @@ class ChannelAppBarActions extends ConsumerWidget {
                   value: value,
                   comments: ref.read(channelCommentsProvider(channelId)),
                   liveChats: ref.read(channelLiveChatsProvider(channelId)),
-                  skipCommentIds: {
-                    ...?ref.read(deletedCommentIdsProvider).value,
-                    ...ref.read(queuedCommentIdsProvider),
-                    ...ref.read(failedCommentIdsProvider),
-                  },
-                  skipLiveChatIds: {
-                    ...?ref.read(deletedLiveChatIdsProvider).value,
-                    ...ref.read(queuedLiveChatIdsProvider),
-                    ...ref.read(failedLiveChatIdsProvider),
-                  },
+                  skipCommentIds: ref.read(
+                    excludedFromDeletionCommentIdsProvider,
+                  ),
+                  skipLiveChatIds: ref.read(
+                    excludedFromDeletionLiveChatIdsProvider,
+                  ),
                 );
               case 'delete_matching_comments':
                 _handleDeleteSearchResults(
@@ -217,16 +213,8 @@ class _SelectAllAction extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final comments = ref.watch(channelCommentsProvider(channelId));
     final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-    final skipCommentIds = {
-      ...?ref.watch(deletedCommentIdsProvider).value,
-      ...ref.watch(queuedCommentIdsProvider),
-      ...ref.watch(failedCommentIdsProvider),
-    };
-    final skipLiveChatIds = {
-      ...?ref.watch(deletedLiveChatIdsProvider).value,
-      ...ref.watch(queuedLiveChatIdsProvider),
-      ...ref.watch(failedLiveChatIdsProvider),
-    };
+    final skipCommentIds = ref.watch(excludedFromDeletionCommentIdsProvider);
+    final skipLiveChatIds = ref.watch(excludedFromDeletionLiveChatIdsProvider);
     final selectableIds = {
       ...comments
           .where((c) => !skipCommentIds.contains(c.commentId))
@@ -277,11 +265,7 @@ void _handleDeleteSearchResults(
 }) {
   if (isComments) {
     final matches = ref.read(filteredSearchCommentsProvider(channelId));
-    final skip = {
-      ...?ref.read(deletedCommentIdsProvider).value,
-      ...ref.read(queuedCommentIdsProvider),
-      ...ref.read(failedCommentIdsProvider),
-    };
+    final skip = ref.read(excludedFromDeletionCommentIdsProvider);
     deleteFromYouTube(
       context,
       ref,
@@ -294,11 +278,7 @@ void _handleDeleteSearchResults(
     );
   } else {
     final matches = ref.read(filteredSearchLiveChatsProvider(channelId));
-    final skip = {
-      ...?ref.read(deletedLiveChatIdsProvider).value,
-      ...ref.read(queuedLiveChatIdsProvider),
-      ...ref.read(failedLiveChatIdsProvider),
-    };
+    final skip = ref.read(excludedFromDeletionLiveChatIdsProvider);
     deleteFromYouTube(
       context,
       ref,

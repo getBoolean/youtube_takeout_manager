@@ -148,6 +148,28 @@ class DeletionQueue extends _$DeletionQueue {
     await _repository.saveQueue(updated);
   }
 
+  /// Removes entries for [itemIds] that are waiting or failed, e.g. because
+  /// the items are already gone from YouTube. In-progress and succeeded
+  /// entries are kept.
+  Future<void> dropUnprocessed(Set<String> itemIds, QueueItemKind kind) async {
+    await future;
+    // Read and update the state without awaiting in between, so concurrent
+    // changes can't overwrite each other.
+    final current = state.requireValue;
+    final updated = current
+        .where(
+          (i) =>
+              !(i.itemType == kind &&
+                  itemIds.contains(i.itemId) &&
+                  i.status != DeletionItemStatus.inProgress &&
+                  i.status != DeletionItemStatus.succeeded),
+        )
+        .toList();
+    if (updated.length == current.length) return;
+    state = AsyncData(updated);
+    await _repository.saveQueue(updated);
+  }
+
   Future<void> retryByItemId(String itemId, QueueItemKind kind) async {
     final current = await future;
     final updated = current

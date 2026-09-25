@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
@@ -77,8 +78,16 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   }
 
   void _handleGlobalDelete(String value) {
-    final allComments = ref.read(allCommentsProvider);
-    final allLiveChats = ref.read(allLiveChatsProvider);
+    final skipCommentIds = ref.read(excludedFromDeletionCommentIdsProvider);
+    final skipLiveChatIds = ref.read(excludedFromDeletionLiveChatIdsProvider);
+    final allComments = [
+      for (final c in ref.read(allCommentsProvider))
+        if (!skipCommentIds.contains(c.commentId)) c,
+    ];
+    final allLiveChats = [
+      for (final c in ref.read(allLiveChatsProvider))
+        if (!skipLiveChatIds.contains(c.liveChatId)) c,
+    ];
 
     final isComments = value == 'delete_all_comments';
     final count = isComments ? allComments.length : allLiveChats.length;

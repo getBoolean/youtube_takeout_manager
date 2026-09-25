@@ -33,7 +33,7 @@ final class DeletedCommentIdsProvider
   DeletedCommentIds create() => DeletedCommentIds();
 }
 
-String _$deletedCommentIdsHash() => r'735e6afe1583388779efa0c10e7d1fbe549a3fc8';
+String _$deletedCommentIdsHash() => r'285bc624b001e501b6d944b265230458603ba553';
 
 abstract class _$DeletedCommentIds extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();
@@ -78,7 +78,7 @@ final class DeletedLiveChatIdsProvider
 }
 
 String _$deletedLiveChatIdsHash() =>
-    r'b20c323d73d602c12790fe0ad87917de07de80a6';
+    r'f3c3d5b9ce3d42367e2c7b86fab38477342545e7';
 
 abstract class _$DeletedLiveChatIds extends $AsyncNotifier<Set<String>> {
   FutureOr<Set<String>> build();
@@ -261,3 +261,99 @@ final class FailedLiveChatIdsProvider
 }
 
 String _$failedLiveChatIdsHash() => r'45827fcbfae5f0f1b56c74edcad3005cc833f521';
+
+/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
+
+@ProviderFor(excludedFromDeletionCommentIds)
+final excludedFromDeletionCommentIdsProvider =
+    ExcludedFromDeletionCommentIdsProvider._();
+
+/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
+
+final class ExcludedFromDeletionCommentIdsProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  /// Comment IDs bulk deletes leave out: already deleted, queued or failed.
+  ExcludedFromDeletionCommentIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'excludedFromDeletionCommentIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$excludedFromDeletionCommentIdsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<String> create(Ref ref) {
+    return excludedFromDeletionCommentIds(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$excludedFromDeletionCommentIdsHash() =>
+    r'e590a9b1b5095566558ad3865d1a6f7db0afc47d';
+
+/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
+
+@ProviderFor(excludedFromDeletionLiveChatIds)
+final excludedFromDeletionLiveChatIdsProvider =
+    ExcludedFromDeletionLiveChatIdsProvider._();
+
+/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
+
+final class ExcludedFromDeletionLiveChatIdsProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  /// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
+  ExcludedFromDeletionLiveChatIdsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'excludedFromDeletionLiveChatIdsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$excludedFromDeletionLiveChatIdsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  Set<String> create(Ref ref) {
+    return excludedFromDeletionLiveChatIds(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$excludedFromDeletionLiveChatIdsHash() =>
+    r'592a10827f89daf63fa424f9c4e49879a65da22c';
