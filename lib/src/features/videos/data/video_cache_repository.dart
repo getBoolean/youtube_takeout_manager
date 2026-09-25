@@ -26,11 +26,24 @@ class VideoCacheRepository {
     if (jsonStr == null) return {};
 
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-    return map.map(
-      (key, value) =>
-          MapEntry(key, VideoMapper.fromMap(value as Map<String, dynamic>)),
-    );
+    return map.map((key, value) {
+      final video = VideoMapper.fromMap(value as Map<String, dynamic>);
+      final thumbnail = video.thumbnailUrl;
+      final upgraded = thumbnail?.replaceFirstMapped(
+        _smallThumbnail,
+        (match) => '/mqdefault${match[1] ?? ''}.jpg',
+      );
+      return MapEntry(
+        key,
+        upgraded == thumbnail ? video : video.copyWith(thumbnailUrl: upgraded),
+      );
+    });
   }
+
+  /// Videos cached before `medium` thumbnails were fetched have the 120x90
+  /// `default` one. YouTube serves `medium` next to it as `mqdefault`, the
+  /// URL the API now returns.
+  static final _smallThumbnail = RegExp(r'/default(_live)?\.jpg$');
 
   Future<void> saveVideos(Map<String, Video> videos) async {
     final map = videos.map((key, value) => MapEntry(key, value.toMap()));

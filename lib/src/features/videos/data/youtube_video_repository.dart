@@ -12,6 +12,13 @@ part 'youtube_video_repository.g.dart';
 YoutubeVideoRepository youtubeVideoRepository(Ref ref) =>
     YoutubeVideoRepository();
 
+/// The thumbnail to show: `medium` (320x180, 16:9) stays sharp in group
+/// headers; `default` is only 120x90, letterboxed.
+String? thumbnailUrlOf(yt.ThumbnailDetails? thumbnails) =>
+    thumbnails?.medium?.url ??
+    thumbnails?.high?.url ??
+    thumbnails?.default_?.url;
+
 /// Fetches YouTube video metadata via the YouTube Data API v3.
 ///
 /// Each `videos.list` call costs 1 quota unit and accepts up to 50 video IDs.
@@ -47,7 +54,7 @@ class YoutubeVideoRepository {
             channelTitle: snippet.channelTitle,
             title: snippet.title,
             description: snippet.description,
-            thumbnailUrl: snippet.thumbnails?.default_?.url,
+            thumbnailUrl: thumbnailUrlOf(snippet.thumbnails),
             publishedAt: snippet.publishedAt,
           );
         }
@@ -89,7 +96,7 @@ class YoutubeVideoRepository {
             channelTitle: snippet.channelTitle,
             title: snippet.title,
             description: snippet.description,
-            thumbnailUrl: snippet.thumbnails?.default_?.url,
+            thumbnailUrl: thumbnailUrlOf(snippet.thumbnails),
             publishedAt: snippet.publishedAt,
           );
         }
