@@ -7,6 +7,7 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../domain/subscription.dart';
+import '../domain/takeout_data.dart';
 
 /// Result of parsing a CSV file, including diagnostic counts.
 class CsvParseResult<T> {
@@ -186,6 +187,54 @@ class CsvParserService {
         channelTitle: _str(row[2]),
       );
     }).toList();
+  }
+
+  /// Parses the meta file written by [encodeTakeoutCsvs].
+  ({
+    DateTime? latestExportAt,
+    int skippedCommentRows,
+    int skippedLiveChatRows,
+    KindSnapshot? commentsSnapshot,
+    KindSnapshot? liveChatsSnapshot,
+  })
+  parseMetaCsv(Uint8List bytes) {
+    final rows = _csv.decode(utf8.decode(bytes));
+    if (rows.length < 2) {
+      return (
+        latestExportAt: null,
+        skippedCommentRows: 0,
+        skippedLiveChatRows: 0,
+        commentsSnapshot: null,
+        liveChatsSnapshot: null,
+      );
+    }
+    final cols = _buildColumnIndex(rows.first);
+    final row = rows[1];
+    String? field(String name) {
+      final i = _col(cols, [name]);
+      return i != null ? _nullableStr(row[i]) : null;
+    }
+
+    DateTime? time(String name) => switch (field(name)) {
+      final value? => DateTime.parse(value),
+      null => null,
+    };
+    int count(String name) => _toDouble(field(name)).toInt();
+    KindSnapshot? snapshot(String kind) => switch (time('$kind exported at')) {
+      final exportedAt? => KindSnapshot(
+        exportedAt: exportedAt,
+        complete: field('$kind complete') == 'true',
+      ),
+      null => null,
+    };
+
+    return (
+      latestExportAt: time('latest export at'),
+      skippedCommentRows: count('skipped comment rows'),
+      skippedLiveChatRows: count('skipped live chat rows'),
+      commentsSnapshot: snapshot('comments'),
+      liveChatsSnapshot: snapshot('live chats'),
+    );
   }
 
   String _str(dynamic value) => value?.toString().trim() ?? '';

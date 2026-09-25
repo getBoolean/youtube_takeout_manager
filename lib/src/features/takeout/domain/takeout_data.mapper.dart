@@ -18,6 +18,7 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
       CommentMapper.ensureInitialized();
       LiveChatMapper.ensureInitialized();
       SubscriptionMapper.ensureInitialized();
+      KindSnapshotMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -84,6 +85,25 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
     opt: true,
     def: 0,
   );
+  static DateTime? _$latestExportAt(TakeoutData v) => v.latestExportAt;
+  static const Field<TakeoutData, DateTime> _f$latestExportAt = Field(
+    'latestExportAt',
+    _$latestExportAt,
+    opt: true,
+  );
+  static KindSnapshot? _$commentsSnapshot(TakeoutData v) => v.commentsSnapshot;
+  static const Field<TakeoutData, KindSnapshot> _f$commentsSnapshot = Field(
+    'commentsSnapshot',
+    _$commentsSnapshot,
+    opt: true,
+  );
+  static KindSnapshot? _$liveChatsSnapshot(TakeoutData v) =>
+      v.liveChatsSnapshot;
+  static const Field<TakeoutData, KindSnapshot> _f$liveChatsSnapshot = Field(
+    'liveChatsSnapshot',
+    _$liveChatsSnapshot,
+    opt: true,
+  );
 
   @override
   final MappableFields<TakeoutData> fields = const {
@@ -96,6 +116,9 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
     #parsedLiveChatRows: _f$parsedLiveChatRows,
     #skippedCommentRows: _f$skippedCommentRows,
     #skippedLiveChatRows: _f$skippedLiveChatRows,
+    #latestExportAt: _f$latestExportAt,
+    #commentsSnapshot: _f$commentsSnapshot,
+    #liveChatsSnapshot: _f$liveChatsSnapshot,
   };
 
   static TakeoutData _instantiate(DecodingData data) {
@@ -109,6 +132,9 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
       parsedLiveChatRows: data.dec(_f$parsedLiveChatRows),
       skippedCommentRows: data.dec(_f$skippedCommentRows),
       skippedLiveChatRows: data.dec(_f$skippedLiveChatRows),
+      latestExportAt: data.dec(_f$latestExportAt),
+      commentsSnapshot: data.dec(_f$commentsSnapshot),
+      liveChatsSnapshot: data.dec(_f$liveChatsSnapshot),
     );
   }
 
@@ -182,6 +208,8 @@ abstract class TakeoutDataCopyWith<$R, $In extends TakeoutData, $Out>
     SubscriptionCopyWith<$R, Subscription, Subscription>
   >
   get subscriptionsByChannelId;
+  KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get commentsSnapshot;
+  KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get liveChatsSnapshot;
   $R call({
     List<Comment>? comments,
     List<LiveChat>? liveChats,
@@ -192,6 +220,9 @@ abstract class TakeoutDataCopyWith<$R, $In extends TakeoutData, $Out>
     int? parsedLiveChatRows,
     int? skippedCommentRows,
     int? skippedLiveChatRows,
+    DateTime? latestExportAt,
+    KindSnapshot? commentsSnapshot,
+    KindSnapshot? liveChatsSnapshot,
   });
   TakeoutDataCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -231,6 +262,16 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
     (v) => call(subscriptionsByChannelId: v),
   );
   @override
+  KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get commentsSnapshot =>
+      $value.commentsSnapshot?.copyWith.$chain(
+        (v) => call(commentsSnapshot: v),
+      );
+  @override
+  KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get liveChatsSnapshot =>
+      $value.liveChatsSnapshot?.copyWith.$chain(
+        (v) => call(liveChatsSnapshot: v),
+      );
+  @override
   $R call({
     List<Comment>? comments,
     List<LiveChat>? liveChats,
@@ -241,6 +282,9 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
     int? parsedLiveChatRows,
     int? skippedCommentRows,
     int? skippedLiveChatRows,
+    Object? latestExportAt = $none,
+    Object? commentsSnapshot = $none,
+    Object? liveChatsSnapshot = $none,
   }) => $apply(
     FieldCopyWithData({
       if (comments != null) #comments: comments,
@@ -254,6 +298,9 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
       if (skippedCommentRows != null) #skippedCommentRows: skippedCommentRows,
       if (skippedLiveChatRows != null)
         #skippedLiveChatRows: skippedLiveChatRows,
+      if (latestExportAt != $none) #latestExportAt: latestExportAt,
+      if (commentsSnapshot != $none) #commentsSnapshot: commentsSnapshot,
+      if (liveChatsSnapshot != $none) #liveChatsSnapshot: liveChatsSnapshot,
     }),
   );
   @override
@@ -282,11 +329,148 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
       #skippedLiveChatRows,
       or: $value.skippedLiveChatRows,
     ),
+    latestExportAt: data.get(#latestExportAt, or: $value.latestExportAt),
+    commentsSnapshot: data.get(#commentsSnapshot, or: $value.commentsSnapshot),
+    liveChatsSnapshot: data.get(
+      #liveChatsSnapshot,
+      or: $value.liveChatsSnapshot,
+    ),
   );
 
   @override
   TakeoutDataCopyWith<$R2, TakeoutData, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
   ) => _TakeoutDataCopyWithImpl<$R2, $Out2>($value, $cast, t);
+}
+
+class KindSnapshotMapper extends ClassMapperBase<KindSnapshot> {
+  KindSnapshotMapper._();
+
+  static KindSnapshotMapper? _instance;
+  static KindSnapshotMapper ensureInitialized() {
+    if (_instance == null) {
+      MapperContainer.globals.use(_instance = KindSnapshotMapper._());
+    }
+    return _instance!;
+  }
+
+  @override
+  final String id = 'KindSnapshot';
+
+  static DateTime _$exportedAt(KindSnapshot v) => v.exportedAt;
+  static const Field<KindSnapshot, DateTime> _f$exportedAt = Field(
+    'exportedAt',
+    _$exportedAt,
+  );
+  static bool _$complete(KindSnapshot v) => v.complete;
+  static const Field<KindSnapshot, bool> _f$complete = Field(
+    'complete',
+    _$complete,
+  );
+
+  @override
+  final MappableFields<KindSnapshot> fields = const {
+    #exportedAt: _f$exportedAt,
+    #complete: _f$complete,
+  };
+
+  static KindSnapshot _instantiate(DecodingData data) {
+    return KindSnapshot(
+      exportedAt: data.dec(_f$exportedAt),
+      complete: data.dec(_f$complete),
+    );
+  }
+
+  @override
+  final Function instantiate = _instantiate;
+
+  static KindSnapshot fromMap(Map<String, dynamic> map) {
+    return ensureInitialized().decodeMap<KindSnapshot>(map);
+  }
+
+  static KindSnapshot fromJson(String json) {
+    return ensureInitialized().decodeJson<KindSnapshot>(json);
+  }
+}
+
+mixin KindSnapshotMappable {
+  String toJson() {
+    return KindSnapshotMapper.ensureInitialized().encodeJson<KindSnapshot>(
+      this as KindSnapshot,
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return KindSnapshotMapper.ensureInitialized().encodeMap<KindSnapshot>(
+      this as KindSnapshot,
+    );
+  }
+
+  KindSnapshotCopyWith<KindSnapshot, KindSnapshot, KindSnapshot> get copyWith =>
+      _KindSnapshotCopyWithImpl<KindSnapshot, KindSnapshot>(
+        this as KindSnapshot,
+        $identity,
+        $identity,
+      );
+  @override
+  String toString() {
+    return KindSnapshotMapper.ensureInitialized().stringifyValue(
+      this as KindSnapshot,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return KindSnapshotMapper.ensureInitialized().equalsValue(
+      this as KindSnapshot,
+      other,
+    );
+  }
+
+  @override
+  int get hashCode {
+    return KindSnapshotMapper.ensureInitialized().hashValue(
+      this as KindSnapshot,
+    );
+  }
+}
+
+extension KindSnapshotValueCopy<$R, $Out>
+    on ObjectCopyWith<$R, KindSnapshot, $Out> {
+  KindSnapshotCopyWith<$R, KindSnapshot, $Out> get $asKindSnapshot =>
+      $base.as((v, t, t2) => _KindSnapshotCopyWithImpl<$R, $Out>(v, t, t2));
+}
+
+abstract class KindSnapshotCopyWith<$R, $In extends KindSnapshot, $Out>
+    implements ClassCopyWith<$R, $In, $Out> {
+  $R call({DateTime? exportedAt, bool? complete});
+  KindSnapshotCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
+}
+
+class _KindSnapshotCopyWithImpl<$R, $Out>
+    extends ClassCopyWithBase<$R, KindSnapshot, $Out>
+    implements KindSnapshotCopyWith<$R, KindSnapshot, $Out> {
+  _KindSnapshotCopyWithImpl(super.value, super.then, super.then2);
+
+  @override
+  late final ClassMapperBase<KindSnapshot> $mapper =
+      KindSnapshotMapper.ensureInitialized();
+  @override
+  $R call({DateTime? exportedAt, bool? complete}) => $apply(
+    FieldCopyWithData({
+      if (exportedAt != null) #exportedAt: exportedAt,
+      if (complete != null) #complete: complete,
+    }),
+  );
+  @override
+  KindSnapshot $make(CopyWithData data) => KindSnapshot(
+    exportedAt: data.get(#exportedAt, or: $value.exportedAt),
+    complete: data.get(#complete, or: $value.complete),
+  );
+
+  @override
+  KindSnapshotCopyWith<$R2, KindSnapshot, $Out2> $chain<$R2, $Out2>(
+    Then<$Out2, $R2> t,
+  ) => _KindSnapshotCopyWithImpl<$R2, $Out2>($value, $cast, t);
 }
 

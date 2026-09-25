@@ -33,7 +33,7 @@ final class TakeoutNotifierProvider
   TakeoutNotifier create() => TakeoutNotifier();
 }
 
-String _$takeoutNotifierHash() => r'd8dbb4c480105832123e22377592f95fb1fa56ef';
+String _$takeoutNotifierHash() => r'd1b51536c5c86b7c87b0c96e51bfa4ef7187486f';
 
 abstract class _$TakeoutNotifier extends $AsyncNotifier<TakeoutData?> {
   FutureOr<TakeoutData?> build();

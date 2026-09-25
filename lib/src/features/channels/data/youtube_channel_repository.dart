@@ -15,6 +15,15 @@ class YoutubeChannelRepository {
   static const _batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
+  /// Returns the ID of the signed-in account's channel, or null if the
+  /// account has none. Request failures are thrown.
+  Future<String?> fetchMyChannelId(http.Client authClient) async {
+    final response = await yt.YouTubeApi(
+      authClient,
+    ).channels.list(['id'], mine: true);
+    return response.items?.firstOrNull?.id;
+  }
+
   /// Fetches channel thumbnails for the given [channelIds].
   ///
   /// Returns a map of channelId → thumbnail URL for channels that were found.

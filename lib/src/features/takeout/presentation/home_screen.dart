@@ -16,6 +16,9 @@ import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_rep
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
 import '../domain/takeout_data.dart';
+import '../domain/takeout_import_plan.dart';
+import 'import_confirm_dialog.dart';
+import 'import_error_dialog.dart';
 import 'import_progress_indicator.dart';
 
 @RoutePage()
@@ -29,7 +32,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _importing = false;
 
-  Future<void> _import() async {
+  /// Imports picked takeout zips. [merge] adds them to the saved data
+  /// instead of replacing it.
+  Future<void> _import({required bool merge}) async {
     // Pick files directly from the click handler — browsers require the file
     // input to be triggered within the user gesture context. Going through
     // setState or async Riverpod hops first can break this on web.
@@ -42,46 +47,64 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (result == null || result.files.isEmpty) return;
     if (!mounted) return;
 
+    final saved = ref.read(takeoutProvider);
+    final hasSavedData = saved.value != null;
+    final savedDataUnreadable = saved.hasError;
     setState(() => _importing = true);
     try {
-      final imported = await ref
-          .read(takeoutProvider.notifier)
-          .importPickedFiles(result);
+      final notifier = ref.read(takeoutProvider.notifier);
+      final plan = await notifier.prepareImport(result, merge: merge);
+      // Replacing can overwrite the takeout account's saved data even when
+      // another account's data is shown.
+      final replacesSavedData =
+          !merge && await notifier.hasSavedData(plan.accountId);
       if (!mounted) return;
-      if (imported) {
-        final takeout = ref.read(takeoutProvider).value;
-        if (takeout != null &&
-            takeout.comments.isEmpty &&
-            takeout.liveChats.isEmpty) {
-          if (mounted) {
-            ScaffoldMessenger.of(context)
-              ..clearSnackBars()
-              ..showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'No comments or live chats found in the selected file(s).',
-                  ),
-                ),
-              );
-          }
-        } else {
-          if (ref.read(authProvider) == null) {
-            if (mounted) {
-              ScaffoldMessenger.of(context)
-                ..clearSnackBars()
-                ..showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Sign in to fetch video metadata and view channels.',
-                    ),
-                  ),
-                );
-            }
-            return;
-          }
-          await ref.read(channelThumbnailsProvider.notifier).loadCache();
-          if (mounted) context.router.push(const ChannelListRoute());
-        }
+
+      if (hasSavedData ||
+          savedDataUnreadable ||
+          replacesSavedData ||
+          _needsReview(plan)) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => ImportConfirmDialog(
+            plan: plan,
+            merge: merge,
+            hasSavedData: hasSavedData,
+            replacesSavedData: replacesSavedData,
+            savedDataUnreadable: savedDataUnreadable,
+          ),
+        );
+        if (confirmed != true || !mounted) return;
+      }
+
+      await notifier.commitImport(plan);
+      if (!mounted) return;
+      if (merge) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(_addedSummary(plan))));
+        return;
+      }
+      if (ref.read(authProvider) == null) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Sign in to fetch video metadata and view channels.',
+              ),
+            ),
+          );
+        return;
+      }
+      await ref.read(channelThumbnailsProvider.notifier).loadCache();
+      if (mounted) context.router.push(const ChannelListRoute());
+    } on TakeoutImportException catch (e) {
+      if (mounted) {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => ImportErrorDialog(error: e),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -92,6 +115,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     } finally {
       if (mounted) setState(() => _importing = false);
     }
+  }
+
+  /// Whether a first import still needs a look before it's saved.
+  bool _needsReview(TakeoutImportPlan plan) =>
+      plan.newlyDeletedCommentCount > 0 ||
+      plan.newlyDeletedLiveChatCount > 0 ||
+      plan.commentCheckSkipped != null ||
+      plan.liveChatCheckSkipped != null ||
+      plan.mergedData.skippedCommentRows > 0 ||
+      plan.mergedData.skippedLiveChatRows > 0;
+
+  String _addedSummary(TakeoutImportPlan plan) {
+    String count(int n, String noun) => '$n ${n == 1 ? noun : '${noun}s'}';
+    final deleted = [
+      if (plan.newlyDeletedCommentCount > 0)
+        count(plan.newlyDeletedCommentCount, 'comment'),
+      if (plan.newlyDeletedLiveChatCount > 0)
+        count(plan.newlyDeletedLiveChatCount, 'live chat'),
+    ];
+    return 'Added ${count(plan.newCommentCount, 'comment')} and '
+        '${count(plan.newLiveChatCount, 'live chat')}.'
+        '${deleted.isEmpty ? '' : ' Marked ${deleted.join(' and ')} deleted.'}';
   }
 
   @override
@@ -199,7 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 32),
         FilledButton.icon(
-          onPressed: _import,
+          onPressed: () => _import(merge: false),
           icon: const Icon(Icons.folder_open),
           label: const Text('Select Zip Files'),
         ),
@@ -218,7 +263,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         Text('$error', style: theme.textTheme.bodySmall),
         const SizedBox(height: 32),
         FilledButton.icon(
-          onPressed: _import,
+          onPressed: () => _import(merge: false),
           icon: const Icon(Icons.folder_open),
           label: const Text('Import New Data'),
         ),
@@ -382,10 +427,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               label: const Text('Sign in to View Channels'),
             ),
           const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: () => _import(merge: true),
+            icon: const Icon(Icons.library_add_outlined),
+            label: const Text('Add Newer Takeout'),
+          ),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: _import,
+            onPressed: () => _import(merge: false),
             icon: const Icon(Icons.refresh),
-            label: const Text('Re-import'),
+            label: const Text('Replace Data'),
           ),
         ],
       ),

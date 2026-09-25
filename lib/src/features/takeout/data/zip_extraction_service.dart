@@ -11,15 +11,16 @@ class ZipExtractionService {
   /// Extracts comment CSVs, live chat CSVs, and subscriptions CSV from the
   /// provided zip file bytes.
   ///
-  /// Returns a map of relative file path to file content bytes.
+  /// Returns a map of `<zip index>/<path in zip>` to file content bytes. The
+  /// index keeps files with the same path in different zips apart.
   Map<String, Uint8List> extractRelevantFiles(List<Uint8List> zipBytesList) {
     final result = <String, Uint8List>{};
 
-    for (final zipBytes in zipBytesList) {
+    for (final (i, zipBytes) in zipBytesList.indexed) {
       final archive = ZipDecoder().decodeBytes(zipBytes);
       for (final file in archive.files) {
         if (file.isFile && _isRelevantPath(file.name)) {
-          result[file.name] = file.content;
+          result['$i/${file.name}'] = file.content;
         }
       }
     }
