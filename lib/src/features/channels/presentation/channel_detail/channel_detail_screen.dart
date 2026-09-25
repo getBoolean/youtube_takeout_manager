@@ -7,6 +7,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
@@ -15,6 +16,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
+import 'channel_actions_header.dart';
 import 'channel_app_bar.dart';
 import 'channel_deletion_bar.dart';
 import 'channel_loading_skeleton.dart';
@@ -128,12 +130,18 @@ class ChannelDetailScreen extends HookConsumerWidget {
             initialScrollTarget: liveChatTargetId,
           );
 
+    final header = ChannelActionsHeader(
+      channelId: channelId,
+      selectionMode: selectionMode,
+    );
+
     // One search bar above both tabs, so comments and live chats share the
     // same query text.
     final body = hasComments || hasLiveChats
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              header,
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -160,9 +168,17 @@ class ChannelDetailScreen extends HookConsumerWidget {
               Expanded(child: lists),
             ],
           )
-        : const EmptyState(
-            icon: Icons.inbox_outlined,
-            message: 'No interactions found',
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              header,
+              const Expanded(
+                child: EmptyState(
+                  icon: Icons.inbox_outlined,
+                  message: 'No interactions found',
+                ),
+              ),
+            ],
           );
 
     final scheme = Theme.of(context).colorScheme;
@@ -193,14 +209,9 @@ class ChannelDetailScreen extends HookConsumerWidget {
                 ]),
               )
             : null,
-        actions: [
-          ChannelAppBarActions(
-            channelId: channelId,
-            channelUrl: channel?.channelUrl,
-            selectionMode: selectionMode,
-          ),
-          if (!inSelection) const AccountButton(),
-        ],
+        actions: inSelection
+            ? [ChannelSelectAllAction(channelId: channelId)]
+            : const [DeletionQueueButton(), AccountButton()],
         bottom: useTabs
             ? TabBar(
                 controller: tabController,

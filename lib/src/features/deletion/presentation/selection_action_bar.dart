@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/deletion_targets.dart';
 import 'deletion_actions.dart';
 
-/// Two-button bottom bar shown when selection mode has items picked: remove
-/// the selection locally, or delete it from YouTube.
+/// Bottom bar shown when selection mode has items picked: queue the selection
+/// for deletion, or remove it from the list only.
 class SelectionActionBar extends ConsumerWidget {
   final DeletionTargets selection;
   final VoidCallback onExitSelection;
@@ -28,7 +28,7 @@ class SelectionActionBar extends ConsumerWidget {
             Expanded(
               child: Tooltip(
                 message: 'For items you already deleted outside the app',
-                child: FilledButton.icon(
+                child: OutlinedButton.icon(
                   onPressed: () async {
                     final removed = await confirmLocalRemoval(
                       context,
@@ -38,12 +38,8 @@ class SelectionActionBar extends ConsumerWidget {
                     );
                     if (removed) onExitSelection();
                   },
-                  icon: const Icon(Icons.delete_outline),
+                  icon: const Icon(Icons.remove_circle_outline),
                   label: Text('Remove $total locally'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.error,
-                    foregroundColor: Theme.of(context).colorScheme.onError,
-                  ),
                 ),
               ),
             ),
@@ -51,15 +47,15 @@ class SelectionActionBar extends ConsumerWidget {
             Expanded(
               child: FilledButton.icon(
                 onPressed: () async {
-                  final handedOff = await deleteFromYouTube(
+                  final queued = await queueForDeletion(
                     context,
                     ref,
                     selection,
                   );
-                  if (handedOff) onExitSelection();
+                  if (queued) onExitSelection();
                 },
-                icon: const Icon(Icons.cloud_off),
-                label: Text('Delete $total from YouTube'),
+                icon: const Icon(Icons.playlist_add),
+                label: Text('Queue $total for deletion'),
               ),
             ),
           ],

@@ -86,12 +86,12 @@ void showSingleItemActions(
             )
           else
             ListTile(
-              leading: const Icon(Icons.cloud_off),
-              title: const Text('Delete from YouTube'),
-              subtitle: const Text('Permanently removes from your account'),
+              leading: const Icon(Icons.playlist_add),
+              title: const Text('Add to deletion queue'),
+              subtitle: const Text('Delete it from YouTube with the rest'),
               onTap: () {
                 Navigator.pop(ctx);
-                deleteFromYouTube(
+                queueForDeletion(
                   context,
                   ref,
                   isComment

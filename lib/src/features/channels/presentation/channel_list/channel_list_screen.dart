@@ -6,10 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
@@ -22,6 +18,7 @@ import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_providers.dart';
 import '../../application/cross_channel_search_providers.dart';
 import '../../domain/search_result_item.dart';
+import 'channel_list_header.dart';
 import 'channel_tile.dart';
 import 'cross_channel_deletion_bar.dart';
 import 'cross_channel_result_tile.dart';
@@ -81,53 +78,6 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   void _exitSelectionMode() {
     _selectionMode.value = false;
     ref.read(deletionSetProvider.notifier).clear();
-  }
-
-  void _handleGlobalDelete(String value) {
-    final skipCommentIds = ref.read(excludedFromDeletionCommentIdsProvider);
-    final skipLiveChatIds = ref.read(excludedFromDeletionLiveChatIdsProvider);
-    final allComments = [
-      for (final c in ref.read(allCommentsProvider))
-        if (!skipCommentIds.contains(c.commentId)) c,
-    ];
-    final allLiveChats = [
-      for (final c in ref.read(allLiveChatsProvider))
-        if (!skipLiveChatIds.contains(c.liveChatId)) c,
-    ];
-
-    final isComments = value == 'delete_all_comments';
-    final count = isComments ? allComments.length : allLiveChats.length;
-    final label = isComments ? 'comments' : 'live chats';
-
-    if (count == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('No $label to delete')));
-      return;
-    }
-
-    deleteFromYouTube(
-      context,
-      ref,
-      isComments
-          ? DeletionTargets(
-              commentSnippets: {
-                for (final c in allComments) c.commentId: c.displayText,
-              },
-            )
-          : DeletionTargets(
-              liveChatSnippets: {
-                for (final c in allLiveChats) c.liveChatId: c.displayText,
-              },
-            ),
-    );
-  }
-
-  void _handleDeleteSearchResults() {
-    final deletable = ref.read(crossChannelDeletableItemsProvider);
-    if (deletable.isEmpty) return;
-
-    deleteFromYouTube(context, ref, deletionTargetsOf(deletable));
   }
 
   @override
@@ -244,23 +194,36 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             searchItems: searchItems,
             inSelection: inSelection,
           ),
-          body: !hasResults
-              ? EmptyState(
-                  icon: progress.isFetching
-                      ? Icons.hourglass_top
-                      : Icons.search_off,
-                  message: progress.isFetching
-                      ? 'Loading channels...'
-                      : query.isNotEmpty
-                      ? 'No results found'
-                      : 'No channels found',
-                )
-              : _buildResultsList(
-                  channels: filteredChannels,
-                  items: searchItems,
-                  query: query,
-                  inSelection: inSelection,
-                ),
+          body: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ChannelListHeader(
+                query: query,
+                channelCount: filteredChannels.length,
+                matchCount: searchItems.length,
+                selectionMode: _selectionMode,
+              ),
+              Expanded(
+                child: !hasResults
+                    ? EmptyState(
+                        icon: progress.isFetching
+                            ? Icons.hourglass_top
+                            : Icons.search_off,
+                        message: progress.isFetching
+                            ? 'Loading channels...'
+                            : query.isNotEmpty
+                            ? 'No results found'
+                            : 'No channels found',
+                      )
+                    : _buildResultsList(
+                        channels: filteredChannels,
+                        items: searchItems,
+                        query: query,
+                        inSelection: inSelection,
+                      ),
+              ),
+            ],
+          ),
           bottomNavigationBar: AnimatedBottomBar(
             visible: inSelection && hasSelection,
             child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
@@ -277,10 +240,6 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     required bool inSelection,
   }) {
     final progress = ref.watch(videoFetchProgressProvider);
-    final hasQuery = query.isNotEmpty;
-    final deletableCount = hasQuery
-        ? ref.watch(crossChannelDeletableItemsProvider).length
-        : 0;
 
     final Widget? leading;
     final Widget title;
@@ -306,29 +265,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               onPressed: () => context.router.replaceAll([const HomeRoute()]),
             );
       title = const Text('Channels');
-      actions = [
-        if (hasQuery && deletableCount > 0)
-          IconButton(
-            icon: const Icon(Icons.playlist_remove),
-            tooltip: 'Delete search results ($deletableCount)',
-            onPressed: _handleDeleteSearchResults,
-          ),
-        const DeletionQueueButton(),
-        PopupMenuButton<String>(
-          onSelected: (value) => _handleGlobalDelete(value),
-          itemBuilder: (_) => const [
-            PopupMenuItem(
-              value: 'delete_all_comments',
-              child: Text('Delete All Comments from YouTube'),
-            ),
-            PopupMenuItem(
-              value: 'delete_all_chats',
-              child: Text('Delete All Live Chats from YouTube'),
-            ),
-          ],
-        ),
-        const AccountButton(),
-      ];
+      actions = const [DeletionQueueButton(), AccountButton()];
     }
 
     final scheme = Theme.of(context).colorScheme;

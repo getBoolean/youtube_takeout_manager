@@ -3,20 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/deleted_ids_providers.dart';
 import '../application/deletion_queue_notifier.dart';
 import '../application/script_deletion_ids.dart';
-import '../domain/deletion_method.dart';
 import '../domain/deletion_targets.dart';
-import 'deletion_method_picker.dart';
 import 'queue_snackbar.dart';
 
-/// Asks the user how to delete [targets] from YouTube and carries out their
-/// choice. Returns true if the targets were handed off for deletion, or false
-/// if the user cancelled.
-Future<bool> deleteFromYouTube(
+/// Adds [targets] to the deletion queue, where the user later picks how to
+/// delete them. Returns false if there was nothing to queue.
+Future<bool> queueForDeletion(
   BuildContext context,
   WidgetRef ref,
   DeletionTargets targets,
@@ -28,27 +24,17 @@ Future<bool> deleteFromYouTube(
     return false;
   }
 
-  final method = await pickDeletionMethod(
+  await ref.read(deletionQueueProvider.notifier).enqueue(targets);
+  if (!context.mounted) return true;
+  showQueuedForDeletionSnackBar(
     context,
-    title: Intl.plural(
+    ref,
+    message: Intl.plural(
       targets.count,
-      one: 'Delete 1 item',
-      other: 'Delete ${targets.count} items',
+      one: '1 item added to the deletion queue',
+      other: '${targets.count} items added to the deletion queue',
     ),
-    itemCount: targets.count,
-    possibleMembershipEventCount: targets.possibleMembershipEventCount,
-    youtubeApiAvailable: ref.read(isAuthenticatedProvider),
   );
-  if (method == null || !context.mounted) return false;
-
-  switch (method) {
-    case DeletionMethod.addToQueue:
-      await _addToQueue(context, ref, targets);
-    case DeletionMethod.myActivityScript:
-      openMyActivityScript(context, ref, targets.allIds);
-    case DeletionMethod.youtubeApi:
-      await _deleteNowViaYoutubeApi(context, ref, targets);
-  }
   return true;
 }
 
@@ -60,44 +46,6 @@ void openMyActivityScript(
 ) {
   ref.read(scriptDeletionIdsProvider.notifier).set(ids);
   context.router.push(const ScriptDeletionRoute());
-}
-
-Future<void> _addToQueue(
-  BuildContext context,
-  WidgetRef ref,
-  DeletionTargets targets,
-) async {
-  await ref.read(deletionQueueProvider.notifier).enqueue(targets);
-  if (!context.mounted) return;
-  showQueuedForDeletionSnackBar(
-    context,
-    ref,
-    message: Intl.plural(
-      targets.count,
-      one: '1 item queued for deletion',
-      other: '${targets.count} items queued for deletion',
-    ),
-  );
-}
-
-Future<void> _deleteNowViaYoutubeApi(
-  BuildContext context,
-  WidgetRef ref,
-  DeletionTargets targets,
-) async {
-  final queue = ref.read(deletionQueueProvider.notifier);
-  await queue.enqueue(targets);
-  queue.startYoutubeApiProcessing();
-  if (!context.mounted) return;
-  showQueuedForDeletionSnackBar(
-    context,
-    ref,
-    message: Intl.plural(
-      targets.count,
-      one: 'Deleting 1 item via YouTube API',
-      other: 'Deleting ${targets.count} items via YouTube API',
-    ),
-  );
 }
 
 /// Asks the user to confirm removing items from the on-device list only (no
