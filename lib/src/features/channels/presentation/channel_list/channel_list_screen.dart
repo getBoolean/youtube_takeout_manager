@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
@@ -183,6 +183,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final hasSelection = ref.watch(
       deletionSetProvider.select((s) => s.isNotEmpty),
     );
+    final queue = DeletionQueueHost.of(context);
 
     return ValueListenableBuilder<bool>(
       valueListenable: _selectionMode,
@@ -193,8 +194,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             query: query,
             searchItems: searchItems,
             inSelection: inSelection,
+            queueActions: queue.appBarActions,
           ),
-          body: Column(
+          endDrawer: queue.endDrawer,
+          body: queue.body(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ChannelListHeader(
@@ -223,10 +226,16 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                       ),
               ),
             ],
-          ),
-          bottomNavigationBar: AnimatedBottomBar(
-            visible: inSelection && hasSelection,
-            child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
+          )),
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBottomBar(
+                visible: inSelection && hasSelection,
+                child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
+              ),
+              if (queue.bottomBar case final bar? when !inSelection) bar,
+            ],
           ),
         );
       },
@@ -238,6 +247,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     required String query,
     required List<SearchResultItem> searchItems,
     required bool inSelection,
+    required List<Widget> queueActions,
   }) {
     final progress = ref.watch(videoFetchProgressProvider);
 
@@ -265,7 +275,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               onPressed: () => context.router.replaceAll([const HomeRoute()]),
             );
       title = const Text('Channels');
-      actions = const [DeletionQueueButton(), AccountButton()];
+      actions = [...queueActions, const AccountButton()];
     }
 
     final scheme = Theme.of(context).colorScheme;

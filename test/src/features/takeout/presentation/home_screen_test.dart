@@ -8,7 +8,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -112,9 +114,13 @@ class _FakeTakeout extends TakeoutNotifier {
       accountsWithData.contains(accountId);
 }
 
-class _EmptyQueue extends DeletionQueue {
+class _FakeQueue extends DeletionQueue {
+  final List<DeletionQueueItem> items;
+
+  _FakeQueue([this.items = const []]);
+
   @override
-  Future<List<DeletionQueueItem>> build() async => [];
+  Future<List<DeletionQueueItem>> build() async => items;
 }
 
 void main() {
@@ -122,6 +128,7 @@ void main() {
     WidgetTester tester,
     _FakeTakeout takeout, {
     FilePickerResult? picked,
+    List<DeletionQueueItem> queued = const [],
   }) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -133,7 +140,7 @@ void main() {
             _FakeZipPicker(picked ?? _pickedZip),
           ),
           channelsProvider.overrideWithValue(const []),
-          deletionQueueProvider.overrideWith(_EmptyQueue.new),
+          deletionQueueProvider.overrideWith(() => _FakeQueue(queued)),
         ],
         child: const MaterialApp(home: HomeScreen()),
       ),
@@ -275,5 +282,41 @@ void main() {
     await pumpHome(tester, _FakeTakeout(saved: _savedData));
 
     expect(find.byTooltip('Account'), findsOneWidget);
+  });
+
+  testWidgets('says nothing about an empty deletion queue', (tester) async {
+    await pumpHome(tester, _FakeTakeout(saved: _savedData));
+    await tester.pump();
+
+    expect(find.textContaining('waiting to be deleted'), findsNothing);
+  });
+
+  testWidgets('says what is waiting in the deletion queue', (tester) async {
+    await pumpHome(
+      tester,
+      _FakeTakeout(saved: _savedData),
+      queued: [
+        for (final (i, status) in [
+          DeletionItemStatus.pending,
+          DeletionItemStatus.quotaExceeded,
+          DeletionItemStatus.failed,
+          DeletionItemStatus.succeeded,
+        ].indexed)
+          DeletionQueueItem(
+            id: '$i',
+            itemId: 'c$i',
+            itemType: QueueItemKind.comment,
+            status: status,
+            createdAt: DateTime.utc(2026),
+          ),
+      ],
+    );
+    // The queue starts loading once the summary shows it.
+    await tester.pump();
+
+    expect(
+      find.text('2 items waiting to be deleted · 1 failed'),
+      findsOneWidget,
+    );
   });
 }

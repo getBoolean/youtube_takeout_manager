@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../application/quota_notifier.dart';
 import '../domain/quota_operation.dart';
@@ -7,12 +8,18 @@ import '../domain/quota_operation.dart';
 const _progressMorphDuration = Duration(milliseconds: 450);
 const _colorMorphDuration = Duration(milliseconds: 250);
 
+/// Today's YouTube API quota usage.
+///
+/// [compact] shows only the deletes left and a note that the quota applies
+/// to API deletes, not My Activity, for where the user picks how to delete.
 class QuotaStatusBar extends ConsumerWidget {
   final EdgeInsetsGeometry padding;
+  final bool compact;
 
   const QuotaStatusBar({
     super.key,
     this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    this.compact = false,
   });
 
   @override
@@ -49,6 +56,59 @@ class QuotaStatusBar extends ConsumerWidget {
         if (videoUnits > 0) parts.add('Videos: $videoUnits');
         if (channelUnits > 0) parts.add('Channels: $channelUnits');
 
+        final theme = Theme.of(context);
+        final bar = ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: TweenAnimationBuilder<double>(
+            tween: Tween<double>(begin: progress, end: progress),
+            duration: _progressMorphDuration,
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) {
+              return TweenAnimationBuilder<Color?>(
+                tween: ColorTween(begin: targetColor, end: targetColor),
+                duration: _colorMorphDuration,
+                builder: (context, color, _) => LinearProgressIndicator(
+                  value: value,
+                  minHeight: compact ? 4 : 6,
+                  color: color,
+                  backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                ),
+              );
+            },
+          ),
+        );
+
+        if (compact) {
+          return Padding(
+            padding: padding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  Intl.plural(
+                    deletesAffordable,
+                    one: 'YouTube API · ~1 delete left today',
+                    other:
+                        'YouTube API · ~$deletesAffordable deletes left today',
+                  ),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                bar,
+                const SizedBox(height: 4),
+                Text(
+                  'Only deletes via the API count. My Activity has no limit.',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return Padding(
           padding: padding,
           child: Column(
@@ -83,28 +143,7 @@ class QuotaStatusBar extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 4),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: progress, end: progress),
-                  duration: _progressMorphDuration,
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, _) {
-                    return TweenAnimationBuilder<Color?>(
-                      tween: ColorTween(begin: targetColor, end: targetColor),
-                      duration: _colorMorphDuration,
-                      builder: (context, color, _) => LinearProgressIndicator(
-                        value: value,
-                        minHeight: 6,
-                        color: color,
-                        backgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                      ),
-                    );
-                  },
-                ),
-              ),
+              bar,
             ],
           ),
         );

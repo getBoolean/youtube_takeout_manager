@@ -1,97 +1,125 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
+import '../application/deletion_queue_notifier.dart';
 import '../domain/deletion_method.dart';
+import '../domain/deletion_targets.dart';
+import 'deletion_actions.dart';
 
-/// Asks the user how to delete [itemCount] items. Returns `null` if they
-/// cancel, including declining the YouTube API confirmation.
-Future<DeletionMethod?> pickDeletionMethod(
-  BuildContext context, {
-  required String title,
-  required int itemCount,
-  int possibleMembershipEventCount = 0,
-  bool offerAddToQueue = true,
-  bool youtubeApiAvailable = true,
-}) async {
-  final method = await showModalBottomSheet<DeletionMethod>(
+/// Asks how to delete the queue's waiting items, then starts that method.
+Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
+  final notifier = ref.read(deletionQueueProvider.notifier);
+  final waiting = DeletionTargets.fromQueueItems(notifier.pendingItems);
+  if (waiting.isEmpty) return;
+
+  final method = await showDialog<DeletionMethod>(
     context: context,
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-          ),
-          if (possibleMembershipEventCount > 0)
-            _PossibleMembershipEventWarning(
-              count: possibleMembershipEventCount,
-            ),
-          if (offerAddToQueue)
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
-              title: const Text('Queue for Deletion'),
-              subtitle: const Text('Choose how to delete them later'),
-              onTap: () =>
-                  Navigator.pop(sheetContext, DeletionMethod.addToQueue),
-            ),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('Via My Activity'),
-            subtitle: const Text('No daily limit — runs in your browser'),
-            trailing: const _RecommendedBadge(),
-            onTap: () =>
-                Navigator.pop(sheetContext, DeletionMethod.myActivityScript),
-          ),
-          ListTile(
-            enabled: youtubeApiAvailable,
-            leading: const Icon(Icons.cloud_off),
-            title: const Text('Via YouTube API'),
-            subtitle: Text(
-              youtubeApiAvailable
-                  ? '~200 deletes/day quota limit'
-                  : 'Sign in required',
-            ),
-            onTap: () => Navigator.pop(sheetContext, DeletionMethod.youtubeApi),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
+    builder: (_) => DeletionMethodDialog(
+      itemCount: waiting.count,
+      possibleMembershipEventCount: waiting.possibleMembershipEventCount,
     ),
   );
+  if (!context.mounted) return;
 
-  if (method == DeletionMethod.youtubeApi && context.mounted) {
-    final confirmed = await _confirmYoutubeApiDeletion(context, itemCount);
-    return confirmed ? method : null;
+  switch (method) {
+    case DeletionMethod.myActivityScript:
+      openMyActivityScript(context, ref, waiting.allIds);
+    case DeletionMethod.youtubeApi:
+      // Runs until the queue is done, paused or out of quota.
+      unawaited(notifier.processPendingViaYoutubeApi());
+    case null:
+      return;
   }
-  return method;
 }
 
-Future<bool> _confirmYoutubeApiDeletion(BuildContext context, int count) async {
-  final confirmed = await showDialog<bool>(
-    context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Delete via YouTube API'),
-      content: Text(
+/// Picks how to delete [itemCount] items from YouTube: via My Activity, or
+/// via the YouTube API when signed in.
+class DeletionMethodDialog extends ConsumerWidget {
+  final int itemCount;
+  final int possibleMembershipEventCount;
+
+  const DeletionMethodDialog({
+    super.key,
+    required this.itemCount,
+    this.possibleMembershipEventCount = 0,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final signedIn = ref.watch(isAuthenticatedProvider);
+    final deletesLeft = ref
+        .watch(quotaProvider)
+        .value
+        ?.affordableOperations(QuotaOperation.deleteComment.cost);
+
+    return AlertDialog(
+      title: Text(
         Intl.plural(
-          count,
-          one: 'Permanently delete 1 item from YouTube now?',
-          other: 'Permanently delete $count items from YouTube now?',
+          itemCount,
+          one: 'Delete 1 item from YouTube',
+          other: 'Delete $itemCount items from YouTube',
+        ),
+      ),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (possibleMembershipEventCount > 0) ...[
+                _PossibleMembershipEventWarning(
+                  count: possibleMembershipEventCount,
+                ),
+                const SizedBox(height: 12),
+              ],
+              OptionCard(
+                icon: Icons.language,
+                title: 'Via My Activity',
+                subtitle:
+                    "No daily limit, doesn't use API quota. Runs in your "
+                    'browser.',
+                badge: const _RecommendedBadge(),
+                onTap: () =>
+                    Navigator.pop(context, DeletionMethod.myActivityScript),
+              ),
+              const SizedBox(height: 8),
+              OptionCard(
+                icon: Icons.cloud_off,
+                title: 'Via YouTube API',
+                subtitle: !signedIn
+                    ? 'Sign in required'
+                    : deletesLeft == null
+                    ? 'Uses API quota'
+                    : Intl.plural(
+                        deletesLeft,
+                        one: 'Uses API quota · ~1 delete left today',
+                        other:
+                            'Uses API quota · ~$deletesLeft deletes left today',
+                      ),
+                onTap: signedIn
+                    ? () => Navigator.pop(context, DeletionMethod.youtubeApi)
+                    : null,
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
+          onPressed: () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Delete'),
-        ),
       ],
-    ),
-  );
-  return confirmed ?? false;
+    );
+  }
 }
 
 class _RecommendedBadge extends StatelessWidget {
@@ -134,33 +162,30 @@ class _PossibleMembershipEventWarning extends StatelessWidget {
           '$count items may be membership events or already-deleted '
           'messages. Deletion may fail for these.',
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.info_outline,
-              size: 20,
-              color: theme.colorScheme.onTertiaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onTertiaryContainer,
-                ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 20,
+            color: theme.colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onTertiaryContainer,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

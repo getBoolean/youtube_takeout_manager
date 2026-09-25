@@ -16,6 +16,24 @@ import 'deleted_ids_providers.dart';
 
 part 'deletion_queue_notifier.g.dart';
 
+enum DeletionProcessingState {
+  idle,
+  running,
+
+  /// Asked to pause; stops after the item being deleted.
+  pausing,
+}
+
+/// Whether the deletion queue is being processed via the YouTube API. Set by
+/// [DeletionQueue].
+@Riverpod(keepAlive: true)
+class DeletionProcessing extends _$DeletionProcessing {
+  @override
+  DeletionProcessingState build() => DeletionProcessingState.idle;
+
+  void set(DeletionProcessingState value) => state = value;
+}
+
 @Riverpod(keepAlive: true)
 class DeletionQueue extends _$DeletionQueue {
   static const _delayBetweenRequests = Duration(milliseconds: 100);
@@ -34,6 +52,20 @@ class DeletionQueue extends _$DeletionQueue {
 
   bool get isProcessing => _isProcessing;
   bool get isPaused => _isPaused;
+
+  void _setProcessing({required bool processing, required bool paused}) {
+    _isProcessing = processing;
+    _isPaused = paused;
+    ref
+        .read(deletionProcessingProvider.notifier)
+        .set(
+          !processing
+              ? DeletionProcessingState.idle
+              : paused
+              ? DeletionProcessingState.pausing
+              : DeletionProcessingState.running,
+        );
+  }
 
   /// Items still waiting to be deleted, including those stopped by the quota.
   List<DeletionQueueItem> get pendingItems => [
@@ -90,7 +122,6 @@ class DeletionQueue extends _$DeletionQueue {
 
   Future<void> startYoutubeApiProcessing() async {
     if (_isProcessing) return;
-    _isPaused = false;
     await _processQueueViaYoutubeApi();
   }
 
@@ -102,12 +133,12 @@ class DeletionQueue extends _$DeletionQueue {
   }
 
   void pauseProcessing() {
-    _isPaused = true;
+    if (!_isProcessing) return;
+    _setProcessing(processing: true, paused: true);
   }
 
   void cancelProcessing() {
-    _isPaused = true;
-    _isProcessing = false;
+    _setProcessing(processing: false, paused: true);
   }
 
   // ---------------------------------------------------------------------------
@@ -228,13 +259,10 @@ class DeletionQueue extends _$DeletionQueue {
 
   Future<void> _processQueueViaYoutubeApi() async {
     if (_isProcessing) return;
-    _isProcessing = true;
 
     final authState = ref.read(authProvider);
-    if (authState == null) {
-      _isProcessing = false;
-      return;
-    }
+    if (authState == null) return;
+    _setProcessing(processing: true, paused: false);
 
     final client = ref
         .read(googleAuthRepositoryProvider)
@@ -323,7 +351,7 @@ class DeletionQueue extends _$DeletionQueue {
       }
     } finally {
       client.close();
-      _isProcessing = false;
+      _setProcessing(processing: false, paused: _isPaused);
     }
   }
 

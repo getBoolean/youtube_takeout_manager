@@ -7,7 +7,6 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
@@ -17,6 +16,7 @@ import '../domain/takeout_import_plan.dart';
 import 'import_confirm_dialog.dart';
 import 'import_error_dialog.dart';
 import 'import_progress_indicator.dart';
+import 'queue_summary_card.dart';
 
 @RoutePage()
 class HomeScreen extends ConsumerStatefulWidget {
@@ -139,12 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
-        actions: const [
-          DeletionQueueButton(),
-          // Room for the queue badge, which overhangs the button's right edge.
-          SizedBox(width: 12),
-          AccountButton(),
-        ],
+        actions: const [AccountButton()],
       ),
       body: Center(
         child: _importing
@@ -277,7 +272,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
+          QueueSummaryCard(
+            onOpenChannels: isAuthenticated ? _viewChannels : null,
+          ),
+          const SizedBox(height: 16),
           if (isAuthenticated)
             FilledButton.icon(
               onPressed: _viewChannels,

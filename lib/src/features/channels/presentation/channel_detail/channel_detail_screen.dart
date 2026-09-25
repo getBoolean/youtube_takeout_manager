@@ -7,8 +7,8 @@ import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
@@ -183,6 +183,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
 
     final scheme = Theme.of(context).colorScheme;
     final inSelection = selectionMode.value;
+    final queue = DeletionQueueHost.of(context, currentChannelId: channelId);
     return Scaffold(
       appBar: AppBar(
         titleSpacing: inSelection ? null : 0,
@@ -211,7 +212,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
             : null,
         actions: inSelection
             ? [ChannelSelectAllAction(channelId: channelId)]
-            : const [DeletionQueueButton(), AccountButton()],
+            : [...queue.appBarActions, const AccountButton()],
         bottom: useTabs
             ? TabBar(
                 controller: tabController,
@@ -232,13 +233,20 @@ class ChannelDetailScreen extends HookConsumerWidget {
               )
             : null,
       ),
-      body: body,
-      bottomNavigationBar: AnimatedBottomBar(
-        visible: selectionMode.value && hasSelection,
-        child: ChannelDeletionBar(
-          channelId: channelId,
-          selectionMode: selectionMode,
-        ),
+      endDrawer: queue.endDrawer,
+      body: queue.body(body),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedBottomBar(
+            visible: inSelection && hasSelection,
+            child: ChannelDeletionBar(
+              channelId: channelId,
+              selectionMode: selectionMode,
+            ),
+          ),
+          if (queue.bottomBar case final bar? when !inSelection) bar,
+        ],
       ),
     );
   }
