@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
@@ -164,24 +165,28 @@ class ChannelDetailScreen extends HookConsumerWidget {
             message: 'No interactions found',
           );
 
+    final scheme = Theme.of(context).colorScheme;
+    final inSelection = selectionMode.value;
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 0,
-        title: ChannelTitle(
-          channelName: channelName,
-          thumbnailUrl: channel?.thumbnailUrl,
-        ),
-        leading: selectionMode.value
-            ? IconButton(
-                icon: const Icon(Icons.close),
+        titleSpacing: inSelection ? null : 0,
+        title: inSelection
+            ? ChannelSelectionTitle(channelId: channelId)
+            : ChannelTitle(
+                channelName: channelName,
+                thumbnailUrl: channel?.thumbnailUrl,
+              ),
+        backgroundColor: inSelection ? scheme.secondaryContainer : null,
+        foregroundColor: inSelection ? scheme.onSecondaryContainer : null,
+        leading: inSelection
+            ? CloseButton(
                 onPressed: () {
                   selectionMode.value = false;
                   ref.read(deletionSetProvider.notifier).clear();
                 },
               )
             : !context.router.canPop()
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
+            ? BackButton(
                 onPressed: () => context.router.replaceAll([
                   const HomeRoute(),
                   const ChannelListRoute(),
@@ -194,6 +199,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
             channelUrl: channel?.channelUrl,
             selectionMode: selectionMode,
           ),
+          if (!inSelection) const AccountButton(),
         ],
         bottom: useTabs
             ? TabBar(

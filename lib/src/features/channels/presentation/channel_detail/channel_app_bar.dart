@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/delete
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
 import 'package:youtube_takeout_manager/src/features/export/presentation/export_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
@@ -69,6 +70,24 @@ class ChannelTitle extends StatelessWidget {
         Expanded(child: Text(channelName, overflow: TextOverflow.ellipsis)),
       ],
     );
+  }
+}
+
+/// "N selected", counting only this channel's comments and live chats.
+class ChannelSelectionTitle extends ConsumerWidget {
+  final String channelId;
+
+  const ChannelSelectionTitle({super.key, required this.channelId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(deletionSetProvider);
+    final comments = ref.watch(channelCommentsProvider(channelId));
+    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
+    final count =
+        comments.where((c) => selected.contains(c.commentId)).length +
+        liveChats.where((c) => selected.contains(c.liveChatId)).length;
+    return Text('$count selected');
   }
 }
 

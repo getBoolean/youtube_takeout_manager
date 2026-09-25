@@ -4,14 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
-import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_button.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
 import '../data/zip_picker_repository.dart';
@@ -142,11 +139,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('YouTube Takeout Manager'),
-        actions: [
-          const DeletionQueueButton(),
+        actions: const [
+          DeletionQueueButton(),
           // Room for the queue badge, which overhangs the button's right edge.
-          const SizedBox(width: 12),
-          _buildAuthButton(),
+          SizedBox(width: 12),
+          AccountButton(),
         ],
       ),
       body: Center(
@@ -160,63 +157,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     : _buildSummary(context, theme, takeout),
               ),
       ),
-    );
-  }
-
-  Widget _buildAuthButton() {
-    final authState = ref.watch(authProvider);
-    if (authState != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (authState.photoUrl != null)
-            ClipOval(
-              child: Image.network(
-                authState.photoUrl!,
-                width: 28,
-                height: 28,
-                fit: BoxFit.cover,
-                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-              ),
-            )
-          else
-            const Icon(Icons.account_circle),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'sign_out') {
-                ref.read(authProvider.notifier).signOut();
-              } else if (value == 'clear_cache') {
-                _clearCache();
-              } else if (value == 'reset_quota') {
-                _resetQuota();
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: 'sign_out',
-                child: Text(
-                  'Sign out${authState.email != null ? ' (${authState.email})' : ''}',
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'clear_cache',
-                child: Text('Clear cache'),
-              ),
-              const PopupMenuItem(
-                value: 'reset_quota',
-                child: Text('Reset quota usage'),
-              ),
-            ],
-          ),
-        ],
-      );
-    }
-    return TextButton.icon(
-      onPressed: isOAuthConfigured
-          ? () => ref.read(authProvider.notifier).signIn()
-          : null,
-      icon: const Icon(Icons.login),
-      label: Text(isOAuthConfigured ? 'Sign In' : 'Sign In (not configured)'),
     );
   }
 
@@ -264,75 +204,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ],
     );
-  }
-
-  Future<void> _clearCache() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Clear Cache'),
-        content: const Text(
-          'This will clear all cached video metadata, channel thumbnails, '
-          'and not-found IDs. Data will be re-fetched from the YouTube API '
-          'on next use.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Clear'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    await ref.read(videoCacheRepositoryProvider).clearCache();
-    await ref.read(channelCacheRepositoryProvider).clearThumbnails();
-
-    ref.invalidate(videoMetadataProvider);
-    ref.invalidate(channelThumbnailsProvider);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Cache cleared.')));
-    }
-  }
-
-  Future<void> _resetQuota() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reset Quota Usage'),
-        content: const Text(
-          'This will reset the tracked API quota usage to zero. '
-          'Use this if the count is out of sync with your actual usage.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Reset'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-
-    await ref.read(quotaProvider.notifier).resetUsage();
-
-    if (mounted) {
-      ScaffoldMessenger.of(context)
-        ..clearSnackBars()
-        ..showSnackBar(const SnackBar(content: Text('Quota usage reset.')));
-    }
   }
 
   Future<void> _viewChannels() async {

@@ -1,6 +1,7 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 
 class ChannelLoadingSkeleton extends StatelessWidget {
@@ -15,14 +16,14 @@ class ChannelLoadingSkeleton extends StatelessWidget {
       appBar: AppBar(
         titleSpacing: 0,
         leading: !context.router.canPop()
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
+            ? BackButton(
                 onPressed: () => context.router.replaceAll([
                   const HomeRoute(),
                   const ChannelListRoute(),
                 ]),
               )
             : null,
+        actions: const [AccountButton()],
         title: Row(
           children: [
             CircleAvatar(radius: 16, backgroundColor: skeletonColor),

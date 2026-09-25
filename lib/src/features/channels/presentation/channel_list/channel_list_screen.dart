@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
@@ -25,6 +26,11 @@ import 'channel_tile.dart';
 import 'cross_channel_deletion_bar.dart';
 import 'cross_channel_result_tile.dart';
 import 'section_header.dart';
+
+const _searchBarPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
+
+/// The app bar's search row: a [SearchBar] (56 tall) plus its padding.
+const _searchBarHeight = 56.0 + 16;
 
 @RoutePage()
 class ChannelListScreen extends ConsumerStatefulWidget {
@@ -140,11 +146,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channels'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56 + 4),
+        actions: const [AccountButton()],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(_searchBarHeight),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: const SearchBar(
+            padding: _searchBarPadding,
+            child: SearchBar(
               hintText: 'Search channels and comments...',
               leading: Icon(Icons.search),
               enabled: false,
@@ -289,17 +296,13 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         for (final item in ref.watch(crossChannelDeletableItemsProvider))
           item.id,
       };
-      leading = IconButton(
-        icon: const Icon(Icons.close),
-        onPressed: _exitSelectionMode,
-      );
+      leading = CloseButton(onPressed: _exitSelectionMode);
       title = Text('$selectedCount selected');
       actions = [SelectAllToggleButton(selectableIds: deletableIds)];
     } else {
       leading = context.router.canPop()
           ? null
-          : IconButton(
-              icon: const Icon(Icons.arrow_back),
+          : BackButton(
               onPressed: () => context.router.replaceAll([const HomeRoute()]),
             );
       title = const Text('Channels');
@@ -324,33 +327,23 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             ),
           ],
         ),
+        const AccountButton(),
       ];
     }
 
+    final scheme = Theme.of(context).colorScheme;
     return AppBar(
       leading: leading,
       title: title,
       actions: actions,
+      backgroundColor: inSelection ? scheme.secondaryContainer : null,
+      foregroundColor: inSelection ? scheme.onSecondaryContainer : null,
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(
-          56 + 4, // search bar + progress indicator
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        preferredSize: const Size.fromHeight(_searchBarHeight),
+        child: Stack(
           children: [
-            Cue.onToggle(
-              toggled: progress.isFetching && progress.total > 0,
-              motion: premiumSpring(context),
-              reverseMotion: premiumSpring(context),
-              acts: const [ClipAct.height(), OpacityAct.fadeIn()],
-              child: LinearProgressIndicator(
-                value: progress.total > 0
-                    ? progress.fetched / progress.total
-                    : 0,
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: _searchBarPadding,
               child: DebouncedSearchBar(
                 hintText: 'Search channels and comments...',
                 emojis: EmojiSearchConfig(
@@ -359,6 +352,24 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                 ),
                 onQueryChanged: (value) =>
                     ref.read(channelSearchQueryProvider.notifier).update(value),
+              ),
+            ),
+            // Overlaid on the bar's bottom edge so it doesn't change the
+            // bar's height.
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Cue.onToggle(
+                toggled: progress.isFetching && progress.total > 0,
+                motion: premiumSpring(context),
+                reverseMotion: premiumSpring(context),
+                acts: const [ClipAct.height(), OpacityAct.fadeIn()],
+                child: LinearProgressIndicator(
+                  value: progress.total > 0
+                      ? progress.fetched / progress.total
+                      : 0,
+                ),
               ),
             ),
           ],

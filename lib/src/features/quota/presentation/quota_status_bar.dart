@@ -8,7 +8,12 @@ const _progressMorphDuration = Duration(milliseconds: 450);
 const _colorMorphDuration = Duration(milliseconds: 250);
 
 class QuotaStatusBar extends ConsumerWidget {
-  const QuotaStatusBar({super.key});
+  final EdgeInsetsGeometry padding;
+
+  const QuotaStatusBar({
+    super.key,
+    this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,12 +50,14 @@ class QuotaStatusBar extends ConsumerWidget {
         if (channelUnits > 0) parts.add('Channels: $channelUnits');
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: padding,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // Wraps onto two lines when narrow, e.g. in the account dialog.
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: 8,
                 children: [
                   Text(
                     '$used / $total units used today',

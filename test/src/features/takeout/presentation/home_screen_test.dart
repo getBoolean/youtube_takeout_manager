@@ -270,4 +270,10 @@ void main() {
     expect(takeout.prepared, isEmpty);
     expect(find.byType(AlertDialog), findsNothing);
   });
+
+  testWidgets('the app bar has the account button', (tester) async {
+    await pumpHome(tester, _FakeTakeout(saved: _savedData));
+
+    expect(find.byTooltip('Account'), findsOneWidget);
+  });
 }
