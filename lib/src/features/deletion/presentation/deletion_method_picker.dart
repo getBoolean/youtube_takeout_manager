@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
@@ -60,6 +61,10 @@ class DeletionMethodDialog extends ConsumerWidget {
         ?.affordableOperations(QuotaOperation.deleteComment.cost);
 
     return AlertDialog(
+      // Title and buttons scroll too, and the margins shrink, so nothing
+      // overflows in a tiny window.
+      scrollable: true,
+      insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
       title: Text(
         Intl.plural(
           itemCount,
@@ -69,47 +74,45 @@ class DeletionMethodDialog extends ConsumerWidget {
       ),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (possibleMembershipEventCount > 0) ...[
-                _PossibleMembershipEventWarning(
-                  count: possibleMembershipEventCount,
-                ),
-                const SizedBox(height: 12),
-              ],
-              OptionCard(
-                icon: Icons.language,
-                title: 'Via My Activity',
-                subtitle:
-                    "No daily limit, doesn't use API quota. Runs in your "
-                    'browser.',
-                badge: const _RecommendedBadge(),
-                onTap: () =>
-                    Navigator.pop(context, DeletionMethod.myActivityScript),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (possibleMembershipEventCount > 0) ...[
+              _PossibleMembershipEventWarning(
+                count: possibleMembershipEventCount,
               ),
-              const SizedBox(height: 8),
-              OptionCard(
-                icon: Icons.cloud_off,
-                title: 'Via YouTube API',
-                subtitle: !signedIn
-                    ? 'Sign in required'
-                    : deletesLeft == null
-                    ? 'Uses API quota'
-                    : Intl.plural(
-                        deletesLeft,
-                        one: 'Uses API quota · ~1 delete left today',
-                        other:
-                            'Uses API quota · ~$deletesLeft deletes left today',
-                      ),
-                onTap: signedIn
-                    ? () => Navigator.pop(context, DeletionMethod.youtubeApi)
-                    : null,
-              ),
+              const SizedBox(height: 12),
             ],
-          ),
+            OptionCard(
+              icon: Icons.language,
+              title: 'Via My Activity',
+              subtitle:
+                  "No daily limit, doesn't use API quota. Runs in your "
+                  'browser.',
+              badge: const _RecommendedBadge(),
+              onTap: () =>
+                  Navigator.pop(context, DeletionMethod.myActivityScript),
+            ),
+            const SizedBox(height: 8),
+            OptionCard(
+              icon: Icons.cloud_off,
+              title: 'Via YouTube API',
+              subtitle: !signedIn
+                  ? 'Sign in required'
+                  : deletesLeft == null
+                  ? 'Uses API quota'
+                  : Intl.plural(
+                      deletesLeft,
+                      one: 'Uses API quota · ~1 delete left today',
+                      other:
+                          'Uses API quota · ~$deletesLeft deletes left today',
+                    ),
+              onTap: signedIn
+                  ? () => Navigator.pop(context, DeletionMethod.youtubeApi)
+                  : null,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -171,12 +174,15 @@ class _PossibleMembershipEventWarning extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.info_outline,
-            size: 20,
-            color: theme.colorScheme.onTertiaryContainer,
-          ),
-          const SizedBox(width: 8),
+          // Left out in the narrowest windows so the text still fits.
+          if (MediaQuery.sizeOf(context).width >= 200) ...[
+            Icon(
+              Icons.info_outline,
+              size: 20,
+              color: theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Text(
               message,

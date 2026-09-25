@@ -94,7 +94,9 @@ void main() {
       ProviderScope(
         overrides: [
           deletionQueueProvider.overrideWith(() => queue),
-          deletionProcessingProvider.overrideWith(() => _Processing(processing)),
+          deletionProcessingProvider.overrideWith(
+            () => _Processing(processing),
+          ),
           queuedItemChannelIdsProvider.overrideWithValue(const {
             'a1': 'UCa',
             'a2': 'UCa',
@@ -130,18 +132,13 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('groups items by channel, current channel first', (
-    tester,
-  ) async {
+  testWidgets('groups items by channel, current channel first', (tester) async {
     await pumpPanel(tester);
 
     final bravo = tester.getTopLeft(find.text('Bravo')).dy;
     final alpha = tester.getTopLeft(find.text('Alpha')).dy;
     expect(bravo, lessThan(alpha));
-    expect(
-      tester.getTopLeft(find.text('text a1')).dy,
-      greaterThan(alpha),
-    );
+    expect(tester.getTopLeft(find.text('text a1')).dy, greaterThan(alpha));
   });
 
   testWidgets('filters by status', (tester) async {
@@ -197,10 +194,7 @@ void main() {
   ) async {
     await pumpPanel(tester, signedIn: true);
 
-    expect(
-      find.text('YouTube API · ~200 deletes left today'),
-      findsOneWidget,
-    );
+    expect(find.text('YouTube API · ~200 deletes left today'), findsOneWidget);
     expect(find.textContaining('My Activity has no limit'), findsOneWidget);
   });
 

@@ -414,42 +414,53 @@ class _DebouncedSearchBarState extends ConsumerState<DebouncedSearchBar> {
   @override
   Widget build(BuildContext context) {
     final motion = premiumSpring(context);
-    final showEmojis = widget.emojis != null && !widget.emojis!.isEmpty;
-    return OverlayPortal(
-      controller: _suggestionsPortal,
-      overlayChildBuilder: _buildSuggestions,
-      child: CompositedTransformTarget(
-        link: _link,
-        child: SearchBar(
-          controller: _controller,
-          focusNode: _focusNode,
-          hintText: widget.hintText,
-          enabled: widget.enabled,
-          leading: const Icon(Icons.search),
-          trailing: [
-            Cue.onToggle(
-              toggled: _hasText,
-              motion: motion,
-              reverseMotion: motion,
-              acts: const [
-                ClipAct.width(),
-                OpacityAct.fadeIn(),
-                ScaleAct(from: 0.7),
+    final hasEmojis = widget.emojis != null && !widget.emojis!.isEmpty;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // In a narrow window, drop the extra buttons before the text field
+        // runs out of room.
+        final width = constraints.maxWidth;
+        return OverlayPortal(
+          controller: _suggestionsPortal,
+          overlayChildBuilder: _buildSuggestions,
+          child: CompositedTransformTarget(
+            link: _link,
+            child: SearchBar(
+              controller: _controller,
+              focusNode: _focusNode,
+              hintText: widget.hintText,
+              enabled: widget.enabled,
+              leading: const Icon(Icons.search),
+              trailing: [
+                Cue.onToggle(
+                  toggled: _hasText,
+                  motion: motion,
+                  reverseMotion: motion,
+                  acts: const [
+                    ClipAct.width(),
+                    OpacityAct.fadeIn(),
+                    ScaleAct(from: 0.7),
+                  ],
+                  child: IconButton(
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Clear',
+                    onPressed: _handleClear,
+                  ),
+                ),
+                if (hasEmojis && width >= _emojiButtonMinWidth)
+                  _buildEmojiButton(),
+                if (width >= _trailingMinWidth) ...?widget.trailing,
               ],
-              child: IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Clear',
-                onPressed: _handleClear,
-              ),
+              onChanged: _handleChanged,
             ),
-            if (showEmojis) _buildEmojiButton(),
-            ...?widget.trailing,
-          ],
-          onChanged: _handleChanged,
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
+
+  static const _emojiButtonMinWidth = 240.0;
+  static const _trailingMinWidth = 180.0;
 }
 
 class _SuggestionTile extends StatelessWidget {

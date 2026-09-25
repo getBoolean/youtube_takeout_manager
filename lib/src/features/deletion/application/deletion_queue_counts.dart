@@ -21,11 +21,7 @@ class DeletionQueueCounts {
   final int failed;
   final int done;
 
-  const DeletionQueueCounts({
-    this.waiting = 0,
-    this.failed = 0,
-    this.done = 0,
-  });
+  const DeletionQueueCounts({this.waiting = 0, this.failed = 0, this.done = 0});
 
   factory DeletionQueueCounts.of(Iterable<DeletionQueueItem> items) {
     var waiting = 0, failed = 0, done = 0;

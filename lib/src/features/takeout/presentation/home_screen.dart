@@ -163,11 +163,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const SizedBox(height: 24),
         Text(
           'Import your Google Takeout data',
+          textAlign: TextAlign.center,
           style: theme.textTheme.headlineSmall,
         ),
         const SizedBox(height: 8),
         Text(
           'Select one or more takeout zip files',
+          textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.outline,
           ),
@@ -176,7 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         FilledButton.icon(
           onPressed: () => _import(merge: false),
           icon: const Icon(Icons.folder_open),
-          label: const Text('Select Zip Files'),
+          label: const Text('Select Zip Files', textAlign: TextAlign.center),
         ),
       ],
     );
@@ -188,14 +190,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
         const SizedBox(height: 16),
-        Text('Failed to load saved data', style: theme.textTheme.headlineSmall),
+        Text(
+          'Failed to load saved data',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineSmall,
+        ),
         const SizedBox(height: 8),
-        Text('$error', style: theme.textTheme.bodySmall),
+        Text(
+          '$error',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall,
+        ),
         const SizedBox(height: 32),
         FilledButton.icon(
           onPressed: () => _import(merge: false),
           icon: const Icon(Icons.folder_open),
-          label: const Text('Import New Data'),
+          label: const Text('Import New Data', textAlign: TextAlign.center),
         ),
       ],
     );
@@ -233,11 +243,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 : theme.colorScheme.primary,
           ),
           const SizedBox(height: 16),
-          Text('Import Complete', style: theme.textTheme.headlineSmall),
+          Text(
+            'Import Complete',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall,
+          ),
           if (droppedComments > 0 || droppedLiveChats > 0) ...[
             const SizedBox(height: 8),
             Text(
               'Some rows could not be parsed',
+              textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.error,
               ),
@@ -281,7 +296,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             FilledButton.icon(
               onPressed: _viewChannels,
               icon: const Icon(Icons.list),
-              label: const Text('View Channels'),
+              label: const Text('View Channels', textAlign: TextAlign.center),
             )
           else
             FilledButton.icon(
@@ -289,19 +304,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ? () => ref.read(authProvider.notifier).signIn()
                   : null,
               icon: const Icon(Icons.login),
-              label: const Text('Sign in to View Channels'),
+              label: const Text(
+                'Sign in to View Channels',
+                textAlign: TextAlign.center,
+              ),
             ),
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: () => _import(merge: true),
             icon: const Icon(Icons.library_add_outlined),
-            label: const Text('Add Newer Takeout'),
+            label: const Text('Add Newer Takeout', textAlign: TextAlign.center),
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => _import(merge: false),
             icon: const Icon(Icons.refresh),
-            label: const Text('Replace Data'),
+            label: const Text('Replace Data', textAlign: TextAlign.center),
           ),
         ],
       ),
@@ -327,19 +345,29 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 20),
-        const SizedBox(width: 8),
-        Text('$count $label'),
-        if (skippedCount > 0) ...[
+        // Left out in the narrowest windows so the text still fits.
+        if (MediaQuery.sizeOf(context).width >= 160) ...[
+          Icon(icon, size: 20),
           const SizedBox(width: 8),
-          Text(
-            '($skippedCount skipped)',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.error,
-              fontSize: 12,
+        ],
+        // One text, so it wraps instead of overflowing when narrow.
+        Flexible(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(text: '$count $label'),
+                if (skippedCount > 0)
+                  TextSpan(
+                    text: '  ($skippedCount skipped)',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 12,
+                    ),
+                  ),
+              ],
             ),
           ),
-        ],
+        ),
       ],
     );
   }

@@ -42,7 +42,10 @@ class AccountAvatar extends StatelessWidget {
     }
     return Text(
       name[0].toUpperCase(),
-      style: TextStyle(fontSize: radius * 0.9, color: scheme.onPrimaryContainer),
+      style: TextStyle(
+        fontSize: radius * 0.9,
+        color: scheme.onPrimaryContainer,
+      ),
     );
   }
 }

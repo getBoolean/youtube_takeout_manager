@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,8 +60,8 @@ class DeletionQueuePaneExpanded extends _$DeletionQueuePaneExpanded {
   void set(bool expanded) => state = expanded;
 }
 
-/// The pieces a screen's [Scaffold] needs to show the deletion queue in the
-/// layout that fits the window.
+/// The pieces a screen needs to show the deletion queue in the layout that
+/// fits the window.
 class DeletionQueueHost {
   final DeletionQueueLayout layout;
 
@@ -69,39 +71,85 @@ class DeletionQueueHost {
   DeletionQueueHost.of(BuildContext context, {this.currentChannelId})
     : layout = deletionQueueLayoutOf(context);
 
-  /// [content] with the docked pane or strip beside it.
-  Widget body(Widget content) => switch (layout) {
+  /// The screen's [scaffold] with the docked pane or strip beside it, full
+  /// height, app bar included.
+  Widget wrap(Widget scaffold) => switch (layout) {
     DeletionQueueLayout.docked || DeletionQueueLayout.strip => Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(child: content),
+        Expanded(child: scaffold),
         const VerticalDivider(width: 1),
         if (layout == DeletionQueueLayout.docked)
           DeletionQueuePane(currentChannelId: currentChannelId)
         else
-          const DeletionQueueStrip(),
+          DeletionQueueStrip(currentChannelId: currentChannelId),
       ],
     ),
-    _ => content,
-  };
-
-  /// The side sheet, for layouts that open one.
-  Widget? get endDrawer => switch (layout) {
-    DeletionQueueLayout.strip ||
-    DeletionQueueLayout.appBarIcon => DeletionQueueDrawer(
-      currentChannelId: currentChannelId,
-    ),
-    _ => null,
+    _ => scaffold,
   };
 
   List<Widget> get appBarActions => layout == DeletionQueueLayout.appBarIcon
-      ? const [DeletionQueueIconButton()]
+      ? [DeletionQueueIconButton(currentChannelId: currentChannelId)]
       : const [];
 
   /// The phone summary bar, for the bottom of the screen.
   Widget? get bottomBar => layout == DeletionQueueLayout.bottomBar
       ? DeletionQueueSummaryBar(currentChannelId: currentChannelId)
       : null;
+}
+
+/// Opens the deletion queue as a full-height side sheet over the screen.
+Future<void> showDeletionQueueSideSheet(
+  BuildContext context, {
+  String? currentChannelId,
+}) {
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (sheetContext, _, _) => _CloseWhenDocked(
+      child: Align(
+        alignment: AlignmentDirectional.centerEnd,
+        child: SizedBox(
+          width: min(
+            deletionQueuePaneWidth,
+            MediaQuery.sizeOf(sheetContext).width,
+          ),
+          height: double.infinity,
+          child: Material(
+            elevation: 1,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadiusDirectional.horizontal(
+                start: Radius.circular(16),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: SafeArea(
+              child: DeletionQueuePanel(
+                currentChannelId: currentChannelId,
+                headerAction: CloseButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (context, animation, _, child) {
+      final fromEnd = Directionality.of(context) == TextDirection.rtl
+          ? -1.0
+          : 1.0;
+      return SlideTransition(
+        position: Tween(begin: Offset(fromEnd, 0), end: Offset.zero).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
+        child: child,
+      );
+    },
+  );
 }
 
 /// Opens the deletion queue as a bottom sheet.
@@ -114,24 +162,62 @@ Future<void> showDeletionQueueSheet(
     isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
-    builder: (sheetContext) => FractionallySizedBox(
-      heightFactor: 0.85,
-      child: DeletionQueuePanel(
-        currentChannelId: currentChannelId,
-        headerAction: CloseButton(onPressed: () => Navigator.pop(sheetContext)),
+    builder: (sheetContext) => _CloseWhenDocked(
+      child: FractionallySizedBox(
+        heightFactor: 0.85,
+        child: DeletionQueuePanel(
+          currentChannelId: currentChannelId,
+          headerAction: CloseButton(
+            onPressed: () => Navigator.pop(sheetContext),
+          ),
+        ),
       ),
     ),
   );
 }
 
-/// A callback that brings the deletion queue into view on the screen around
-/// [context], or null if it's already in view or the screen has no queue.
+/// Closes the queue's side sheet or bottom sheet around it once the window
+/// is wide enough to dock the queue, and expands the docked pane so the
+/// queue stays in view.
+///
+/// Waits while something the user opened from the sheet, like the Delete
+/// dialog, is on top of it, rather than pulling the sheet out from under it.
+class _CloseWhenDocked extends ConsumerStatefulWidget {
+  final Widget child;
+
+  const _CloseWhenDocked({required this.child});
+
+  @override
+  ConsumerState<_CloseWhenDocked> createState() => _CloseWhenDockedState();
+}
+
+class _CloseWhenDockedState extends ConsumerState<_CloseWhenDocked> {
+  var _closing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final docked = deletionQueueLayoutOf(context) == DeletionQueueLayout.docked;
+    // Depending on the route rebuilds this when it's back on top.
+    final onTop = ModalRoute.of(context)?.isCurrent ?? false;
+    if (docked && onTop && !_closing) {
+      _closing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(deletionQueuePaneExpandedProvider.notifier).set(true);
+        Navigator.of(context).pop();
+      });
+    }
+    return widget.child;
+  }
+}
+
+/// A callback that brings the deletion queue into view, or null if it's
+/// already in view.
 ///
 /// Everything it needs is looked up now, so it still works after [context]
 /// is gone, e.g. from a snackbar action.
 VoidCallback? deletionQueueOpener(BuildContext context, WidgetRef ref) {
-  final scaffold = Scaffold.maybeOf(context);
-  if (scaffold == null) return null;
+  final navigator = Navigator.of(context);
 
   switch (deletionQueueLayoutOf(context)) {
     case DeletionQueueLayout.docked:
@@ -139,13 +225,12 @@ VoidCallback? deletionQueueOpener(BuildContext context, WidgetRef ref) {
       final pane = ref.read(deletionQueuePaneExpandedProvider.notifier);
       return () => pane.set(true);
     case DeletionQueueLayout.strip || DeletionQueueLayout.appBarIcon:
-      if (!scaffold.hasEndDrawer) return null;
       return () {
-        if (scaffold.mounted) scaffold.openEndDrawer();
+        if (navigator.mounted) showDeletionQueueSideSheet(navigator.context);
       };
     case DeletionQueueLayout.bottomBar:
       return () {
-        if (scaffold.mounted) showDeletionQueueSheet(scaffold.context);
+        if (navigator.mounted) showDeletionQueueSheet(navigator.context);
       };
   }
 }

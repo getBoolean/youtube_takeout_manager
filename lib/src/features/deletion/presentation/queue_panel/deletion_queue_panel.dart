@@ -67,51 +67,83 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
     final queueAsync = ref.watch(deletionQueueProvider);
     final counts = ref.watch(deletionQueueCountsProvider);
 
+    Widget fill(Widget child) =>
+        SliverFillRemaining(hasScrollBody: false, child: Center(child: child));
+
     return Material(
       color: Theme.of(context).colorScheme.surfaceContainerLow,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _Header(count: counts.total, action: widget.headerAction),
-          if (counts.total > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  for (final filter in _QueueFilter.values)
-                    ChoiceChip(
-                      label: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text('${filter.label} '),
-                          AnimatedCountText(filter.countIn(counts)),
-                        ],
-                      ),
-                      selected: _filter == filter,
-                      onSelected: (_) => setState(() => _filter = filter),
-                    ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _Header(count: counts.total, action: widget.headerAction),
+            // The filters scroll with the list, so wrapped or large-text
+            // chips can't squeeze it out.
+            Expanded(
+              child: CustomScrollView(
+                slivers: [
+                  if (counts.total > 0)
+                    SliverToBoxAdapter(child: _buildFilters(counts)),
+                  const SliverToBoxAdapter(child: Divider(height: 1)),
+                  ...queueAsync.when(
+                    loading: () => [fill(const CircularProgressIndicator())],
+                    error: (e, _) => [fill(Text('Error: $e'))],
+                    data: (items) => items.isEmpty
+                        ? [fill(const _EmptyQueue())]
+                        : _buildListSlivers(items, fill),
+                  ),
                 ],
               ),
             ),
-          const Divider(height: 1),
-          Expanded(
-            child: queueAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
-              data: (items) => items.isEmpty
-                  ? const _EmptyQueue()
-                  : _buildList(items),
+            // At most half the panel, scrolling inside, for the same reason.
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: constraints.hasBoundedHeight
+                    ? constraints.maxHeight / 2
+                    : double.infinity,
+              ),
+              child: SingleChildScrollView(child: _Footer(counts: counts)),
             ),
-          ),
-          _Footer(counts: counts),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilters(DeletionQueueCounts counts) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final filter in _QueueFilter.values)
+            ChoiceChip(
+              // The name gives way before the count when narrow.
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${filter.label} ',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  AnimatedCountText(filter.countIn(counts)),
+                ],
+              ),
+              selected: _filter == filter,
+              onSelected: (_) => setState(() => _filter = filter),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildList(List<DeletionQueueItem> items) {
+  List<Widget> _buildListSlivers(
+    List<DeletionQueueItem> items,
+    Widget Function(Widget child) fill,
+  ) {
     final statuses = _filter.statuses;
     final visible = statuses == null
         ? items
@@ -120,14 +152,16 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
               if (statuses.contains(item.status)) item,
           ];
     if (visible.isEmpty) {
-      return Center(
-        child: Text(
-          'No ${_filter.label.toLowerCase()} items',
-          style: TextStyle(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+      return [
+        fill(
+          Text(
+            'No ${_filter.label.toLowerCase()} items',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
-      );
+      ];
     }
 
     final channelsById = {
@@ -143,20 +177,22 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
       for (final group in groups) ...[group, ...group.items],
     ];
 
-    return ListView.builder(
-      itemCount: rows.length,
-      itemBuilder: (context, index) {
-        final row = rows[index];
-        if (row is QueueChannelGroup) {
-          return _ChannelGroupHeader(
-            key: ValueKey('group:${row.channelId}'),
-            channel: channelsById[row.channelId],
-            count: row.items.length,
-          );
-        }
-        return _buildItem(row as DeletionQueueItem);
-      },
-    );
+    return [
+      SliverList.builder(
+        itemCount: rows.length,
+        itemBuilder: (context, index) {
+          final row = rows[index];
+          if (row is QueueChannelGroup) {
+            return _ChannelGroupHeader(
+              key: ValueKey('group:${row.channelId}'),
+              channel: channelsById[row.channelId],
+              count: row.items.length,
+            );
+          }
+          return _buildItem(row as DeletionQueueItem);
+        },
+      ),
+    ];
   }
 
   Widget _buildItem(DeletionQueueItem item) {
@@ -167,7 +203,11 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
       toggled: !isRemoving,
       motion: motion,
       reverseMotion: motion,
-      acts: const [ClipAct.height(), OpacityAct.fadeIn(), SlideAct.x(from: 1.0)],
+      acts: const [
+        ClipAct.height(),
+        OpacityAct.fadeIn(),
+        SlideAct.x(from: 1.0),
+      ],
       onEnd: (visible) {
         if (!visible && mounted && _removingIds.contains(item.id)) {
           ref.read(deletionQueueProvider.notifier).removeItem(item.id);
@@ -196,25 +236,29 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 4, 4),
-      child: Row(
-        children: [
-          Icon(Icons.delete_sweep_outlined, color: theme.colorScheme.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('Deletion queue', style: theme.textTheme.titleMedium),
-          ),
-          if (count > 0)
-            AnimatedCountText(
-              count,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+    // App bar height, so the title lines up with the screen's beside it.
+    return SizedBox(
+      height: kToolbarHeight,
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 16, end: 4),
+        child: Row(
+          children: [
+            Icon(Icons.delete_sweep_outlined, color: theme.colorScheme.primary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('Deletion queue', style: theme.textTheme.titleMedium),
             ),
-          const SizedBox(width: 4),
-          SizedBox(height: 48, child: action),
-        ],
+            if (count > 0)
+              AnimatedCountText(
+                count,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            const SizedBox(width: 4),
+            ?action,
+          ],
+        ),
       ),
     );
   }
@@ -338,6 +382,7 @@ class _Footer extends ConsumerWidget {
             processing == DeletionProcessingState.running
                 ? 'Pause'
                 : 'Pausing…',
+            textAlign: TextAlign.center,
           ),
         )
       else if (counts.waiting > 0)
@@ -350,28 +395,27 @@ class _Footer extends ConsumerWidget {
               one: 'Delete 1…',
               other: 'Delete ${counts.waiting}…',
             ),
+            textAlign: TextAlign.center,
           ),
         ),
       if (counts.failed > 0 && !running)
         TextButton.icon(
           onPressed: notifier.retryFailed,
           icon: const Icon(Icons.refresh),
-          label: const Text('Retry failed'),
+          label: const Text('Retry failed', textAlign: TextAlign.center),
         ),
       if (counts.done > 0)
         TextButton.icon(
           onPressed: notifier.clearCompleted,
           icon: const Icon(Icons.clear_all),
-          label: const Text('Clear done'),
+          label: const Text('Clear done', textAlign: TextAlign.center),
         ),
     ];
     if (!signedIn && buttons.isEmpty) return const SizedBox.shrink();
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Theme.of(context).dividerColor),
-        ),
+        border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
       ),
       child: SafeArea(
         top: false,

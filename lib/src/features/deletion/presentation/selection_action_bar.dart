@@ -19,48 +19,55 @@ class SelectionActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = selection.count;
+    final removeButton = Tooltip(
+      message: 'For items you already deleted outside the app',
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final removed = await confirmLocalRemoval(
+            context,
+            ref,
+            commentIds: selection.commentIds,
+            liveChatIds: selection.liveChatIds,
+          );
+          if (removed) onExitSelection();
+        },
+        icon: const Icon(Icons.remove_circle_outline),
+        label: Text('Remove $total locally', overflow: TextOverflow.ellipsis),
+      ),
+    );
+    final queueButton = FilledButton.icon(
+      onPressed: () async {
+        final queued = await queueForDeletion(context, ref, selection);
+        if (queued) onExitSelection();
+      },
+      icon: const Icon(Icons.playlist_add),
+      label: Text('Queue $total for deletion', overflow: TextOverflow.ellipsis),
+    );
 
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Expanded(
-              child: Tooltip(
-                message: 'For items you already deleted outside the app',
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final removed = await confirmLocalRemoval(
-                      context,
-                      ref,
-                      commentIds: selection.commentIds,
-                      liveChatIds: selection.liveChatIds,
-                    );
-                    if (removed) onExitSelection();
-                  },
-                  icon: const Icon(Icons.remove_circle_outline),
-                  label: Text('Remove $total locally'),
-                ),
+        // Too narrow for both side by side: stack them, primary on top.
+        child: MediaQuery.sizeOf(context).width < _sideBySideMinWidth
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  queueButton,
+                  const SizedBox(height: 8),
+                  removeButton,
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: removeButton),
+                  const SizedBox(width: 8),
+                  Expanded(child: queueButton),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton.icon(
-                onPressed: () async {
-                  final queued = await queueForDeletion(
-                    context,
-                    ref,
-                    selection,
-                  );
-                  if (queued) onExitSelection();
-                },
-                icon: const Icon(Icons.playlist_add),
-                label: Text('Queue $total for deletion'),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
+
+  static const _sideBySideMinWidth = 360.0;
 }

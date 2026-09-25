@@ -66,44 +66,61 @@ class SuperChatCard extends StatelessWidget {
                   children: [
                     // Header
                     Container(
+                      width: double.infinity,
                       color: tier.headerColor,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
                         vertical: 10,
                       ),
-                      child: Row(
+                      // The price moves under the label when there isn't
+                      // room beside it, rather than shrinking.
+                      child: Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
-                          if (selectionMode) ...[
-                            SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: Checkbox(
-                                value: isSelected,
-                                onChanged: (_) => onTap(),
-                                side: BorderSide(color: tier.textColor),
-                                checkColor: tier.headerColor,
-                                fillColor: WidgetStateProperty.resolveWith(
-                                  (states) =>
-                                      states.contains(WidgetState.selected)
-                                      ? tier.textColor
-                                      : Colors.transparent,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (selectionMode) ...[
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: isSelected,
+                                    onChanged: (_) => onTap(),
+                                    side: BorderSide(color: tier.textColor),
+                                    checkColor: tier.headerColor,
+                                    fillColor: WidgetStateProperty.resolveWith(
+                                      (states) =>
+                                          states.contains(WidgetState.selected)
+                                          ? tier.textColor
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                              ] else if (badgeIcon != null) ...[
+                                Icon(
+                                  badgeIcon,
+                                  size: 18,
+                                  color: tier.textColor,
+                                ),
+                                const SizedBox(width: 8),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  'Super Chat',
+                                  style: TextStyle(
+                                    color: tier.textColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                          ] else if (badgeIcon != null) ...[
-                            Icon(badgeIcon, size: 18, color: tier.textColor),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(
-                            'Super Chat',
-                            style: TextStyle(
-                              color: tier.textColor,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                            ],
                           ),
-                          const Spacer(),
                           Text(
                             priceLabel,
                             style: TextStyle(

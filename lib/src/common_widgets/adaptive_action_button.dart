@@ -4,8 +4,9 @@ import 'breakpoints.dart';
 
 enum ActionEmphasis { text, outlined, tonal }
 
-/// A labeled button that shrinks to an icon button, with [label] as its
-/// tooltip, on compact widths.
+/// A labeled button that drops its label, keeping [label] as its tooltip, on
+/// compact widths. It stays the same kind of button either way, so its shape,
+/// colors and icon size don't change.
 class AdaptiveActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -20,27 +21,35 @@ class AdaptiveActionButton extends StatelessWidget {
     this.emphasis = ActionEmphasis.text,
   });
 
+  static const _iconOnlyStyle = ButtonStyle(
+    padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 12)),
+    minimumSize: WidgetStatePropertyAll(Size(40, 40)),
+  );
+
   @override
   Widget build(BuildContext context) {
     final iconWidget = Icon(icon);
     if (isCompactWidth(context)) {
-      return switch (emphasis) {
-        ActionEmphasis.text => IconButton(
-          icon: iconWidget,
-          tooltip: label,
-          onPressed: onPressed,
-        ),
-        ActionEmphasis.outlined => IconButton.outlined(
-          icon: iconWidget,
-          tooltip: label,
-          onPressed: onPressed,
-        ),
-        ActionEmphasis.tonal => IconButton.filledTonal(
-          icon: iconWidget,
-          tooltip: label,
-          onPressed: onPressed,
-        ),
-      };
+      return Tooltip(
+        message: label,
+        child: switch (emphasis) {
+          ActionEmphasis.text => TextButton(
+            onPressed: onPressed,
+            style: _iconOnlyStyle,
+            child: iconWidget,
+          ),
+          ActionEmphasis.outlined => OutlinedButton(
+            onPressed: onPressed,
+            style: _iconOnlyStyle,
+            child: iconWidget,
+          ),
+          ActionEmphasis.tonal => FilledButton.tonal(
+            onPressed: onPressed,
+            style: _iconOnlyStyle,
+            child: iconWidget,
+          ),
+        },
+      );
     }
     final labelWidget = Text(label);
     return switch (emphasis) {

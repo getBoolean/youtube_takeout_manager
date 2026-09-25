@@ -15,8 +15,21 @@ class ChannelTile extends StatelessWidget {
     this.highlightQuery,
   });
 
+  /// Below this width the counts are left out, so the trailing widget
+  /// always fits beside the title.
+  static const _countsMinWidth = 300.0;
+
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => _buildTile(
+        context,
+        showCounts: constraints.maxWidth >= _countsMinWidth,
+      ),
+    );
+  }
+
+  Widget _buildTile(BuildContext context, {required bool showCounts}) {
     final theme = Theme.of(context);
 
     return ListTile(
@@ -55,21 +68,23 @@ class ChannelTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (channel.commentCount > 0)
-            _Badge(
-              icon: Icons.comment_outlined,
-              count: channel.commentCount,
-              color: theme.colorScheme.primary,
-            ),
-          if (channel.commentCount > 0 && channel.liveChatCount > 0)
-            const SizedBox(width: 8),
-          if (channel.liveChatCount > 0)
-            _Badge(
-              icon: Icons.chat_bubble_outline,
-              count: channel.liveChatCount,
-              color: theme.colorScheme.secondary,
-            ),
-          const SizedBox(width: 4),
+          if (showCounts) ...[
+            if (channel.commentCount > 0)
+              _Badge(
+                icon: Icons.comment_outlined,
+                count: channel.commentCount,
+                color: theme.colorScheme.primary,
+              ),
+            if (channel.commentCount > 0 && channel.liveChatCount > 0)
+              const SizedBox(width: 8),
+            if (channel.liveChatCount > 0)
+              _Badge(
+                icon: Icons.chat_bubble_outline,
+                count: channel.liveChatCount,
+                color: theme.colorScheme.secondary,
+              ),
+            const SizedBox(width: 4),
+          ],
           const Icon(Icons.chevron_right),
         ],
       ),

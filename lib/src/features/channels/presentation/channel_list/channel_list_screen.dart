@@ -174,8 +174,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       }
     });
 
+    final queue = DeletionQueueHost.of(context);
     if (isLoading) {
-      return _buildLoadingSkeleton();
+      return queue.wrap(_buildLoadingSkeleton());
     }
 
     final hasResults = filteredChannels.isNotEmpty || searchItems.isNotEmpty;
@@ -183,62 +184,62 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final hasSelection = ref.watch(
       deletionSetProvider.select((s) => s.isNotEmpty),
     );
-    final queue = DeletionQueueHost.of(context);
 
-    return ValueListenableBuilder<bool>(
-      valueListenable: _selectionMode,
-      builder: (context, inSelection, _) {
-        return Scaffold(
-          appBar: _buildAppBar(
-            context: context,
-            query: query,
-            searchItems: searchItems,
-            inSelection: inSelection,
-            queueActions: queue.appBarActions,
-          ),
-          endDrawer: queue.endDrawer,
-          body: queue.body(Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ChannelListHeader(
-                query: query,
-                channelCount: filteredChannels.length,
-                matchCount: searchItems.length,
-                selectionMode: _selectionMode,
-              ),
-              Expanded(
-                child: !hasResults
-                    ? EmptyState(
-                        icon: progress.isFetching
-                            ? Icons.hourglass_top
-                            : Icons.search_off,
-                        message: progress.isFetching
-                            ? 'Loading channels...'
-                            : query.isNotEmpty
-                            ? 'No results found'
-                            : 'No channels found',
-                      )
-                    : _buildResultsList(
-                        channels: filteredChannels,
-                        items: searchItems,
-                        query: query,
-                        inSelection: inSelection,
-                      ),
-              ),
-            ],
-          )),
-          bottomNavigationBar: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedBottomBar(
-                visible: inSelection && hasSelection,
-                child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
-              ),
-              if (queue.bottomBar case final bar? when !inSelection) bar,
-            ],
-          ),
-        );
-      },
+    return queue.wrap(
+      ValueListenableBuilder<bool>(
+        valueListenable: _selectionMode,
+        builder: (context, inSelection, _) {
+          return Scaffold(
+            appBar: _buildAppBar(
+              context: context,
+              query: query,
+              searchItems: searchItems,
+              inSelection: inSelection,
+              queueActions: queue.appBarActions,
+            ),
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ChannelListHeader(
+                  query: query,
+                  channelCount: filteredChannels.length,
+                  matchCount: searchItems.length,
+                  selectionMode: _selectionMode,
+                ),
+                Expanded(
+                  child: !hasResults
+                      ? EmptyState(
+                          icon: progress.isFetching
+                              ? Icons.hourglass_top
+                              : Icons.search_off,
+                          message: progress.isFetching
+                              ? 'Loading channels...'
+                              : query.isNotEmpty
+                              ? 'No results found'
+                              : 'No channels found',
+                        )
+                      : _buildResultsList(
+                          channels: filteredChannels,
+                          items: searchItems,
+                          query: query,
+                          inSelection: inSelection,
+                        ),
+                ),
+              ],
+            ),
+            bottomNavigationBar: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBottomBar(
+                  visible: inSelection && hasSelection,
+                  child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
+                ),
+                if (queue.bottomBar case final bar? when !inSelection) bar,
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -275,7 +276,12 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               onPressed: () => context.router.replaceAll([const HomeRoute()]),
             );
       title = const Text('Channels');
-      actions = [...queueActions, const AccountButton()];
+      actions = [
+        ...queueActions,
+        // Leaves room for the back button in the narrowest windows; it's
+        // still on Home.
+        if (MediaQuery.sizeOf(context).width >= 200) const AccountButton(),
+      ];
     }
 
     final scheme = Theme.of(context).colorScheme;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
@@ -31,6 +32,7 @@ class AccountDialog extends ConsumerWidget {
     final auth = ref.watch(authProvider);
 
     return Dialog(
+      insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: SingleChildScrollView(
@@ -81,14 +83,20 @@ class _AccountHeader extends ConsumerWidget {
         ? 'Not signed in'
         : auth.displayName ?? auth.email ?? 'Signed in';
     final email = auth?.displayName != null ? auth?.email : null;
+    // A narrow window gets a smaller avatar, and the tiniest none, so the
+    // name has room.
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final tiny = isTinyWidth(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            AccountAvatar(auth: auth, radius: 32),
-            const SizedBox(width: 16),
+            if (!tiny) ...[
+              AccountAvatar(auth: auth, radius: windowWidth < 320 ? 20 : 32),
+              const SizedBox(width: 16),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -110,8 +118,8 @@ class _AccountHeader extends ConsumerWidget {
         if (auth != null)
           OutlinedButton.icon(
             onPressed: () => ref.read(authProvider.notifier).signOut(),
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
+            icon: tiny ? null : const Icon(Icons.logout),
+            label: const Text('Sign out', textAlign: TextAlign.center),
           )
         else ...[
           Text(
@@ -124,8 +132,11 @@ class _AccountHeader extends ConsumerWidget {
             onPressed: oauthConfigured
                 ? () => ref.read(authProvider.notifier).signIn()
                 : null,
-            icon: const Icon(Icons.login),
-            label: const Text('Sign in with Google'),
+            icon: tiny ? null : const Icon(Icons.login),
+            label: const Text(
+              'Sign in with Google',
+              textAlign: TextAlign.center,
+            ),
           ),
           if (!oauthConfigured) ...[
             const SizedBox(height: 4),
@@ -156,8 +167,8 @@ class _QuotaSection extends ConsumerWidget {
       body: const QuotaStatusBar(padding: EdgeInsets.zero),
       action: TextButton.icon(
         onPressed: () => _resetQuota(context, ref),
-        icon: const Icon(Icons.restart_alt),
-        label: const Text('Reset usage'),
+        icon: isTinyWidth(context) ? null : const Icon(Icons.restart_alt),
+        label: const Text('Reset usage', textAlign: TextAlign.center),
       ),
     );
   }
@@ -207,8 +218,10 @@ class _CacheSection extends ConsumerWidget {
           'on this device.',
       action: TextButton.icon(
         onPressed: () => _clearCache(context, ref),
-        icon: const Icon(Icons.cleaning_services_outlined),
-        label: const Text('Clear cache'),
+        icon: isTinyWidth(context)
+            ? null
+            : const Icon(Icons.cleaning_services_outlined),
+        label: const Text('Clear cache', textAlign: TextAlign.center),
       ),
     );
   }

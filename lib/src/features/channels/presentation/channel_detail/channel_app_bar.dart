@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
@@ -24,41 +25,194 @@ class ChannelTabLabel extends StatelessWidget {
   }
 }
 
+/// The Comments and Live Chats tabs. Shows the full labels when they fit,
+/// then icons with counts, then just icons, so both tabs always stay on
+/// screen. A scrolling tab bar would hide one, and can't be scrolled with a
+/// mouse.
+class ChannelTabBar extends StatelessWidget implements PreferredSizeWidget {
+  final TabController controller;
+  final int commentCount;
+  final int liveChatCount;
+
+  const ChannelTabBar({
+    super.key,
+    required this.controller,
+    required this.commentCount,
+    required this.liveChatCount,
+  });
+
+  static const _iconSize = 20.0;
+  static const _iconGap = 6.0;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kTextTabBarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = [
+      (Icons.comment_outlined, 'Comments', commentCount),
+      (Icons.chat_bubble_outline, 'Live Chats', liveChatCount),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final style =
+            TabBarTheme.of(context).labelStyle ??
+            Theme.of(context).textTheme.titleSmall;
+        final scaler = MediaQuery.textScalerOf(context);
+        final direction = Directionality.of(context);
+        double textWidth(String text) {
+          final painter = TextPainter(
+            text: TextSpan(text: text, style: style),
+            textScaler: scaler,
+            textDirection: direction,
+            maxLines: 1,
+          )..layout();
+          final width = painter.width;
+          painter.dispose();
+          return width;
+        }
+
+        // Each tab gets half the bar, less its label padding.
+        final room = constraints.maxWidth / 2 - kTabLabelPadding.horizontal;
+        final labelsFit = tabs.every(
+          (t) => textWidth('${t.$2} (${t.$3})') <= room,
+        );
+        final countsFit = tabs.every(
+          (t) => _iconSize + _iconGap + textWidth('${t.$3}') <= room,
+        );
+
+        return TabBar(
+          controller: controller,
+          tabs: [
+            for (final (icon, label, count) in tabs)
+              Tab(
+                child: labelsFit
+                    ? ChannelTabLabel(prefix: label, count: count)
+                    : Tooltip(
+                        message: '$label ($count)',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(icon, size: _iconSize),
+                            if (countsFit) ...[
+                              const SizedBox(width: _iconGap),
+                              AnimatedCountText(count),
+                            ],
+                          ],
+                        ),
+                      ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// The channel's avatar and name, with a globe when there's room, as one
+/// button that offers to open the channel on YouTube.
 class ChannelTitle extends StatelessWidget {
   final String channelName;
   final String? thumbnailUrl;
 
-  const ChannelTitle({super.key, required this.channelName, this.thumbnailUrl});
+  /// The channel's page on YouTube.
+  final String channelUrl;
+
+  const ChannelTitle({
+    super.key,
+    required this.channelName,
+    this.thumbnailUrl,
+    required this.channelUrl,
+  });
+
+  // In a narrow window the name needs the room more.
+  static const _avatarMinWidth = 100.0;
+  static const _globeMinWidth = 180.0;
+
+  Future<void> _confirmOpen(BuildContext context) async {
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Open $channelName on YouTube?'),
+        content: const Text('The channel opens in your browser.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+    if (open == true) {
+      launchUrl(Uri.parse(channelUrl), mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: theme.colorScheme.primaryContainer,
-          child: thumbnailUrl != null
-              ? ClipOval(
-                  child: Image.network(
-                    thumbnailUrl!,
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.cover,
-                    webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                  ),
-                )
-              : Text(
-                  channelName[0].toUpperCase(),
-                  style: TextStyle(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    fontSize: 14,
+    return LayoutBuilder(
+      builder: (context, constraints) => Row(
+        children: [
+          Flexible(
+            child: Tooltip(
+              message: 'Open on YouTube…',
+              child: InkWell(
+                onTap: () => _confirmOpen(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(0, 4, 8, 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (constraints.maxWidth >= _avatarMinWidth) ...[
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: theme.colorScheme.primaryContainer,
+                          child: thumbnailUrl != null
+                              ? ClipOval(
+                                  child: Image.network(
+                                    thumbnailUrl!,
+                                    width: 32,
+                                    height: 32,
+                                    fit: BoxFit.cover,
+                                    webHtmlElementStrategy:
+                                        WebHtmlElementStrategy.prefer,
+                                  ),
+                                )
+                              : Text(
+                                  channelName[0].toUpperCase(),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onPrimaryContainer,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Flexible(
+                        child: Text(
+                          channelName,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Shows the name can be clicked.
+                      if (constraints.maxWidth >= _globeMinWidth) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.language, size: 18),
+                      ],
+                    ],
                   ),
                 ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(child: Text(channelName, overflow: TextOverflow.ellipsis)),
-      ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

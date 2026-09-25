@@ -32,6 +32,12 @@ class OptionCard extends StatelessWidget {
     final foreground = enabled
         ? scheme.onSurface
         : scheme.onSurface.withValues(alpha: 0.38);
+    // In a very narrow window, drop the icons before the text runs out of
+    // room. Goes by the window, not a LayoutBuilder, since dialogs size
+    // their content by its intrinsic width.
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    final showIcon = windowWidth >= 280;
+    final showIndicator = windowWidth >= 200;
 
     return Semantics(
       button: true,
@@ -52,14 +58,13 @@ class OptionCard extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(showIcon ? 16 : 12),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: enabled ? scheme.primary : foreground,
-                ),
-                const SizedBox(width: 16),
+                if (showIcon) ...[
+                  Icon(icon, color: enabled ? scheme.primary : foreground),
+                  const SizedBox(width: 16),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,16 +97,18 @@ class OptionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                if (selected != null)
-                  Icon(
-                    isSelected
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    color: isSelected ? scheme.primary : foreground,
-                  )
-                else
-                  Icon(Icons.chevron_right, color: foreground),
+                if (showIndicator) ...[
+                  const SizedBox(width: 8),
+                  if (selected != null)
+                    Icon(
+                      isSelected
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: isSelected ? scheme.primary : foreground,
+                    )
+                  else
+                    Icon(Icons.chevron_right, color: foreground),
+                ],
               ],
             ),
           ),

@@ -9,11 +9,26 @@ class DeletionQueueItemTile extends StatelessWidget {
   final DeletionQueueItem item;
   final VoidCallback? onRemove;
 
+  /// Below this width the status moves from a chip beside the text into the
+  /// subtitle, so the trailing widget always fits.
+  static const _statusChipMinWidth = 300.0;
+
   const DeletionQueueItemTile({super.key, required this.item, this.onRemove});
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => _buildTile(
+        context,
+        statusChip: constraints.maxWidth >= _statusChipMinWidth,
+      ),
+    );
+  }
+
+  Widget _buildTile(BuildContext context, {required bool statusChip}) {
     final colorScheme = Theme.of(context).colorScheme;
+    final (statusLabel, statusColor) = _status(item.status);
+    final date = formatDateTime(item.createdAt);
 
     return ListTile(
       leading: Icon(
@@ -30,7 +45,23 @@ class DeletionQueueItemTile extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(formatDateTime(item.createdAt)),
+          if (statusChip)
+            Text(date)
+          else
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: statusLabel,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  TextSpan(text: ' · $date'),
+                ],
+              ),
+            ),
           if (item.errorMessage != null)
             Text(
               item.errorMessage!,
@@ -43,7 +74,7 @@ class DeletionQueueItemTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _StatusChip(status: item.status),
+          if (statusChip) _StatusChip(label: statusLabel, color: statusColor),
           if (onRemove != null)
             IconButton(
               icon: const Icon(Icons.close, size: 18),
@@ -56,21 +87,22 @@ class DeletionQueueItemTile extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final DeletionItemStatus status;
+(String, Color) _status(DeletionItemStatus status) => switch (status) {
+  DeletionItemStatus.pending => ('Pending', Colors.grey),
+  DeletionItemStatus.inProgress => ('Deleting...', Colors.blue),
+  DeletionItemStatus.succeeded => ('Deleted', Colors.green),
+  DeletionItemStatus.failed => ('Failed', Colors.red),
+  DeletionItemStatus.quotaExceeded => ('Quota', Colors.orange),
+};
 
-  const _StatusChip({required this.status});
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _StatusChip({required this.label, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (status) {
-      DeletionItemStatus.pending => ('Pending', Colors.grey),
-      DeletionItemStatus.inProgress => ('Deleting...', Colors.blue),
-      DeletionItemStatus.succeeded => ('Deleted', Colors.green),
-      DeletionItemStatus.failed => ('Failed', Colors.red),
-      DeletionItemStatus.quotaExceeded => ('Quota', Colors.orange),
-    };
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(

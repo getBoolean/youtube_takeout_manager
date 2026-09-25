@@ -54,86 +54,141 @@ class VideoGroupHeader extends ConsumerWidget {
       other: '${group.items.length} items',
     );
     final thumbnailUrl = video?.thumbnailUrl;
-    const CueMotion springMotion = Spring.smooth();
 
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: InkWell(
         onTap: selectionMode ? onToggleGroupSelection : onToggleExpanded,
         onLongPress: onLongPress,
-        child: Cue(
-          controller: compactMotion,
-          child: Actor(
-            acts: const [
-              Act.padding(
-                from: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                to: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        // Narrow windows get a smaller thumbnail, then none, then no open
+        // button, so the row always fits.
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final width = constraints.maxWidth;
+            final thumbnailActs = width >= _fullThumbnailMinWidth
+                ? _fullThumbnailActs
+                : width >= _thumbnailMinWidth
+                ? _smallThumbnailActs
+                : null;
+            return Cue(
+              controller: compactMotion,
+              child: Actor(
+                acts: thumbnailActs != null ? _paddingActs : _narrowPaddingActs,
+                child: _buildRow(
+                  theme,
+                  title: title,
+                  subtitle: subtitle,
+                  thumbnailUrl: thumbnailUrl,
+                  thumbnailActs: thumbnailActs,
+                  showOpenButton: width >= _openButtonMinWidth,
+                ),
               ),
-            ],
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Cue.onToggle(
-                  toggled: selectionMode,
-                  motion: springMotion,
-                  reverseMotion: springMotion,
-                  acts: const [ClipAct.width(), OpacityAct.fadeIn()],
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 8, top: 4),
-                    child: Checkbox(
-                      value: allSelected ? true : (someSelected ? null : false),
-                      tristate: true,
-                      onChanged: (_) => onToggleGroupSelection(),
-                    ),
-                  ),
-                ),
-                Actor(
-                  acts: const [
-                    Act.sizedBox(
-                      width: AnimatableValue.tween(160, 78),
-                      height: AnimatableValue.tween(90, 44),
-                      alignment: Alignment.centerLeft,
-                    ),
-                  ],
-                  child: _buildThumbnail(thumbnailUrl, theme),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      HighlightedText(
-                        title,
-                        query: highlightQuery,
-                        style: theme.textTheme.titleMedium,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _buildTrailingActions(theme),
-              ],
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildTrailingActions(ThemeData theme) {
+  static const _fullThumbnailMinWidth = 400.0;
+  static const _thumbnailMinWidth = 280.0;
+  static const _openButtonMinWidth = 200.0;
+
+  static const _paddingActs = [
+    Act.padding(
+      from: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      to: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    ),
+  ];
+  static const _narrowPaddingActs = [
+    Act.padding(
+      from: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      to: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    ),
+  ];
+  static const _fullThumbnailActs = [
+    Act.sizedBox(
+      width: AnimatableValue.tween(160, 78),
+      height: AnimatableValue.tween(90, 44),
+      alignment: Alignment.centerLeft,
+    ),
+  ];
+  static const _smallThumbnailActs = [
+    Act.sizedBox(
+      width: AnimatableValue.tween(80, 56),
+      height: AnimatableValue.tween(45, 32),
+      alignment: Alignment.centerLeft,
+    ),
+  ];
+
+  Widget _buildRow(
+    ThemeData theme, {
+    required String title,
+    required String subtitle,
+    required String? thumbnailUrl,
+    required List<Act>? thumbnailActs,
+    required bool showOpenButton,
+  }) {
+    const CueMotion springMotion = Spring.smooth();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Cue.onToggle(
+          toggled: selectionMode,
+          motion: springMotion,
+          reverseMotion: springMotion,
+          acts: const [ClipAct.width(), OpacityAct.fadeIn()],
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8, top: 4),
+            child: Checkbox(
+              value: allSelected ? true : (someSelected ? null : false),
+              tristate: true,
+              onChanged: (_) => onToggleGroupSelection(),
+            ),
+          ),
+        ),
+        if (thumbnailActs != null) ...[
+          Actor(
+            acts: thumbnailActs,
+            child: _buildThumbnail(thumbnailUrl, theme),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HighlightedText(
+                title,
+                query: highlightQuery,
+                style: theme.textTheme.titleMedium,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        _buildTrailingActions(theme, showOpenButton: showOpenButton),
+      ],
+    );
+  }
+
+  Widget _buildTrailingActions(
+    ThemeData theme, {
+    required bool showOpenButton,
+  }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (group.groupType == GroupType.video)
+        if (showOpenButton && group.groupType == GroupType.video)
           IconButton(
             icon: const Icon(Icons.open_in_new, size: 20),
             tooltip: 'Open on YouTube',

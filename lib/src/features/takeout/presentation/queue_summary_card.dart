@@ -33,16 +33,31 @@ class QueueSummaryCard extends ConsumerWidget {
     return Card.outlined(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        // The button moves under the text when there isn't room beside it.
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 4,
           children: [
-            Icon(Icons.delete_sweep_outlined, color: theme.colorScheme.primary),
-            const SizedBox(width: 12),
-            Flexible(child: Text(parts.join(' · '))),
-            if (onOpenChannels case final open?) ...[
-              const SizedBox(width: 12),
-              TextButton(onPressed: open, child: const Text('Open channels')),
-            ],
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.delete_sweep_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Flexible(
+                  child: Text(parts.join(' · '), textAlign: TextAlign.center),
+                ),
+              ],
+            ),
+            if (onOpenChannels case final open?)
+              TextButton(
+                onPressed: open,
+                child: const Text('Open channels', textAlign: TextAlign.center),
+              ),
           ],
         ),
       ),

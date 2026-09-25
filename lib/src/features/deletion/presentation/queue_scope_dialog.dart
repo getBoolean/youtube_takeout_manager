@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import '../domain/deletion_targets.dart';
 import 'deletion_actions.dart';
@@ -67,41 +68,41 @@ class _QueueScopeDialogState extends State<QueueScopeDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final selected = _selected;
-    final count = selected == null
-        ? 0
-        : widget.scopes[selected].targets.count;
+    final count = selected == null ? 0 : widget.scopes[selected].targets.count;
 
     return AlertDialog(
+      // Title and buttons scroll too, and the margins shrink, so nothing
+      // overflows in a tiny window.
+      scrollable: true,
+      insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
       title: const Text('Add to deletion queue'),
       content: SizedBox(
         width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Items wait in the deletion queue until you delete them. '
-                'Ones already deleted, queued or failed are left out.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Items wait in the deletion queue until you delete them. '
+              'Ones already deleted, queued or failed are left out.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(height: 16),
-              for (final (i, scope) in widget.scopes.indexed) ...[
-                OptionCard(
-                  icon: scope.icon,
-                  title: scope.title,
-                  subtitle: scope.describeCount(scope.targets.count),
-                  selected: i == selected,
-                  onTap: scope.targets.isEmpty
-                      ? null
-                      : () => setState(() => _selected = i),
-                ),
-                const SizedBox(height: 8),
-              ],
+            ),
+            const SizedBox(height: 16),
+            for (final (i, scope) in widget.scopes.indexed) ...[
+              OptionCard(
+                icon: scope.icon,
+                title: scope.title,
+                subtitle: scope.describeCount(scope.targets.count),
+                selected: i == selected,
+                onTap: scope.targets.isEmpty
+                    ? null
+                    : () => setState(() => _selected = i),
+              ),
+              const SizedBox(height: 8),
             ],
-          ),
+          ],
         ),
       ),
       actions: [
@@ -113,8 +114,11 @@ class _QueueScopeDialogState extends State<QueueScopeDialog> {
           onPressed: selected == null
               ? null
               : () => Navigator.pop(context, widget.scopes[selected].targets),
-          icon: const Icon(Icons.playlist_add),
-          label: Text('Queue $count'),
+          // Left out in the narrowest windows so the button still fits.
+          icon: MediaQuery.sizeOf(context).width >= 200
+              ? const Icon(Icons.playlist_add)
+              : null,
+          label: Text('Queue $count', overflow: TextOverflow.ellipsis),
         ),
       ],
     );

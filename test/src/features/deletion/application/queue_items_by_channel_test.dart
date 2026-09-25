@@ -53,28 +53,31 @@ void main() {
     expect(group([_item('gone'), _item('3')]), ['UCb: 3', 'null: gone']);
   });
 
-  test("maps queued items to their video's channel, not the author's", () async {
-    final container = ProviderContainer(
-      overrides: [
-        deletionQueueProvider.overrideWith(
-          () => _FakeQueue([_item('c1'), _liveChatItem('l1'), _item('gone')]),
-        ),
-        commentsByChannelProvider.overrideWithValue({
-          'UCvideo': [_comment('c1'), _comment('c2')],
-        }),
-        liveChatsByChannelProvider.overrideWithValue({
-          'UCstream': [_liveChat('l1')],
-        }),
-      ],
-    );
-    addTearDown(container.dispose);
-    await container.read(deletionQueueProvider.future);
+  test(
+    "maps queued items to their video's channel, not the author's",
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          deletionQueueProvider.overrideWith(
+            () => _FakeQueue([_item('c1'), _liveChatItem('l1'), _item('gone')]),
+          ),
+          commentsByChannelProvider.overrideWithValue({
+            'UCvideo': [_comment('c1'), _comment('c2')],
+          }),
+          liveChatsByChannelProvider.overrideWithValue({
+            'UCstream': [_liveChat('l1')],
+          }),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(deletionQueueProvider.future);
 
-    expect(container.read(queuedItemChannelIdsProvider), {
-      'c1': 'UCvideo',
-      'l1': 'UCstream',
-    });
-  });
+      expect(container.read(queuedItemChannelIdsProvider), {
+        'c1': 'UCvideo',
+        'l1': 'UCstream',
+      });
+    },
+  );
 }
 
 class _FakeQueue extends DeletionQueue {

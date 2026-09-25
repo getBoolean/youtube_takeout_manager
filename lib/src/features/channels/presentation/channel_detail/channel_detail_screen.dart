@@ -76,10 +76,11 @@ class ChannelDetailScreen extends HookConsumerWidget {
       return null;
     }, [channelId, targetKind, targetId]);
 
+    final queue = DeletionQueueHost.of(context, currentChannelId: channelId);
     final takeoutAsync = ref.watch(takeoutProvider);
     if (takeoutAsync.isLoading ||
         (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {
-      return const ChannelLoadingSkeleton();
+      return queue.wrap(const ChannelLoadingSkeleton());
     }
 
     final commentCount = ref.watch(
@@ -183,70 +184,67 @@ class ChannelDetailScreen extends HookConsumerWidget {
 
     final scheme = Theme.of(context).colorScheme;
     final inSelection = selectionMode.value;
-    final queue = DeletionQueueHost.of(context, currentChannelId: channelId);
-    return Scaffold(
-      appBar: AppBar(
-        titleSpacing: inSelection ? null : 0,
-        title: inSelection
-            ? ChannelSelectionTitle(channelId: channelId)
-            : ChannelTitle(
-                channelName: channelName,
-                thumbnailUrl: channel?.thumbnailUrl,
-              ),
-        backgroundColor: inSelection ? scheme.secondaryContainer : null,
-        foregroundColor: inSelection ? scheme.onSecondaryContainer : null,
-        leading: inSelection
-            ? CloseButton(
-                onPressed: () {
-                  selectionMode.value = false;
-                  ref.read(deletionSetProvider.notifier).clear();
-                },
-              )
-            : !context.router.canPop()
-            ? BackButton(
-                onPressed: () => context.router.replaceAll([
-                  const HomeRoute(),
-                  const ChannelListRoute(),
-                ]),
-              )
-            : null,
-        actions: inSelection
-            ? [ChannelSelectAllAction(channelId: channelId)]
-            : [...queue.appBarActions, const AccountButton()],
-        bottom: useTabs
-            ? TabBar(
-                controller: tabController,
-                tabs: [
-                  Tab(
-                    child: ChannelTabLabel(
-                      prefix: 'Comments',
-                      count: commentCount,
-                    ),
-                  ),
-                  Tab(
-                    child: ChannelTabLabel(
-                      prefix: 'Live Chats',
-                      count: liveChatCount,
-                    ),
-                  ),
+    return queue.wrap(
+      Scaffold(
+        appBar: AppBar(
+          titleSpacing: inSelection ? null : 0,
+          title: inSelection
+              ? ChannelSelectionTitle(channelId: channelId)
+              : ChannelTitle(
+                  channelName: channelName,
+                  thumbnailUrl: channel?.thumbnailUrl,
+                  channelUrl:
+                      channel?.channelUrl ??
+                      'https://www.youtube.com/channel/$channelId',
+                ),
+          backgroundColor: inSelection ? scheme.secondaryContainer : null,
+          foregroundColor: inSelection ? scheme.onSecondaryContainer : null,
+          leading: inSelection
+              ? CloseButton(
+                  onPressed: () {
+                    selectionMode.value = false;
+                    ref.read(deletionSetProvider.notifier).clear();
+                  },
+                )
+              : !context.router.canPop()
+              ? BackButton(
+                  onPressed: () => context.router.replaceAll([
+                    const HomeRoute(),
+                    const ChannelListRoute(),
+                  ]),
+                )
+              : null,
+          actions: inSelection
+              ? [ChannelSelectAllAction(channelId: channelId)]
+              : [
+                  ...queue.appBarActions,
+                  // Leaves room for the back button in the narrowest windows;
+                  // it's still on Home.
+                  if (MediaQuery.sizeOf(context).width >= 200)
+                    const AccountButton(),
                 ],
-              )
-            : null,
-      ),
-      endDrawer: queue.endDrawer,
-      body: queue.body(body),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedBottomBar(
-            visible: inSelection && hasSelection,
-            child: ChannelDeletionBar(
-              channelId: channelId,
-              selectionMode: selectionMode,
+          bottom: useTabs
+              ? ChannelTabBar(
+                  controller: tabController,
+                  commentCount: commentCount,
+                  liveChatCount: liveChatCount,
+                )
+              : null,
+        ),
+        body: body,
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBottomBar(
+              visible: inSelection && hasSelection,
+              child: ChannelDeletionBar(
+                channelId: channelId,
+                selectionMode: selectionMode,
+              ),
             ),
-          ),
-          if (queue.bottomBar case final bar? when !inSelection) bar,
-        ],
+            if (queue.bottomBar case final bar? when !inSelection) bar,
+          ],
+        ),
       ),
     );
   }

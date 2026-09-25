@@ -35,56 +35,77 @@ class ChannelListHeader extends ConsumerWidget {
         ? ref.watch(crossChannelDeletableItemsProvider).length
         : 0;
 
+    final buttons = [
+      if (searching && !selectionMode.value)
+        AdaptiveActionButton(
+          icon: Icons.checklist,
+          label: 'Select',
+          emphasis: ActionEmphasis.outlined,
+          onPressed: deletableMatches > 0
+              ? () => selectionMode.value = true
+              : null,
+        ),
+      AdaptiveActionButton(
+        icon: Icons.playlist_add,
+        label: deletableMatches > 0
+            ? Intl.plural(
+                deletableMatches,
+                one: 'Queue 1 match…',
+                other: 'Queue $deletableMatches matches…',
+              )
+            : 'Queue…',
+        emphasis: ActionEmphasis.tonal,
+        onPressed: () => _queue(context, ref),
+      ),
+    ];
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              searching
-                  ? Intl.plural(
-                      matchCount,
-                      one: '1 matching comment or live chat',
-                      other: '$matchCount matching comments and live chats',
-                    )
-                  : Intl.plural(
-                      channelCount,
-                      one: '1 channel',
-                      other: '$channelCount channels',
-                    ),
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Too narrow for the count beside the buttons: drop it and let the
+          // buttons wrap.
+          if (constraints.maxWidth < _countMinWidth) {
+            return Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 4,
+              children: buttons,
+            );
+          }
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  searching
+                      ? Intl.plural(
+                          matchCount,
+                          one: '1 matching comment or live chat',
+                          other: '$matchCount matching comments and live chats',
+                        )
+                      : Intl.plural(
+                          channelCount,
+                          one: '1 channel',
+                          other: '$channelCount channels',
+                        ),
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (searching && !selectionMode.value) ...[
-            AdaptiveActionButton(
-              icon: Icons.checklist,
-              label: 'Select',
-              emphasis: ActionEmphasis.outlined,
-              onPressed: deletableMatches > 0
-                  ? () => selectionMode.value = true
-                  : null,
-            ),
-            const SizedBox(width: 8),
-          ],
-          AdaptiveActionButton(
-            icon: Icons.playlist_add,
-            label: deletableMatches > 0
-                ? Intl.plural(
-                    deletableMatches,
-                    one: 'Queue 1 match…',
-                    other: 'Queue $deletableMatches matches…',
-                  )
-                : 'Queue…',
-            emphasis: ActionEmphasis.tonal,
-            onPressed: () => _queue(context, ref),
-          ),
-        ],
+              for (final (i, button) in buttons.indexed) ...[
+                if (i > 0) const SizedBox(width: 8),
+                button,
+              ],
+            ],
+          );
+        },
       ),
     );
   }
+
+  static const _countMinWidth = 200.0;
 
   void _queue(BuildContext context, WidgetRef ref) {
     final skipCommentIds = ref.read(excludedFromDeletionCommentIdsProvider);

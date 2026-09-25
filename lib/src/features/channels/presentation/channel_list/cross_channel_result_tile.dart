@@ -107,30 +107,36 @@ class CrossChannelResultTile extends ConsumerWidget {
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.bodyMedium,
         ),
-        subtitle: Row(
-          children: [
-            Text('on ', style: subtitleStyle),
-            if (channel?.thumbnailUrl != null) ...[
-              ClipOval(
-                child: Image.network(
-                  channel!.thumbnailUrl!,
-                  width: 14,
-                  height: 14,
-                  fit: BoxFit.cover,
-                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+        // One line of text with the avatar inline, so it ellipsizes instead
+        // of overflowing when narrow.
+        subtitle: Text.rich(
+          TextSpan(
+            children: [
+              const TextSpan(text: 'on '),
+              if (channel?.thumbnailUrl != null)
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.middle,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: ClipOval(
+                      child: Image.network(
+                        channel!.thumbnailUrl!,
+                        width: 14,
+                        height: 14,
+                        fit: BoxFit.cover,
+                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      ),
+                    ),
+                  ),
                 ),
+              TextSpan(
+                text: '$channelName · ${formatDateTime(item.createdAt)}',
               ),
-              const SizedBox(width: 4),
             ],
-            Flexible(
-              child: Text(
-                '$channelName · ${formatDateTime(item.createdAt)}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: subtitleStyle,
-              ),
-            ),
-          ],
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: subtitleStyle,
         ),
         trailing: isQueued
             ? Icon(
