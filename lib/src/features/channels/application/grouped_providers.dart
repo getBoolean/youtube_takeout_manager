@@ -117,18 +117,18 @@ List<VideoGroup<T>> _filterGroups<T>({
   required VideoGroup<T> Function(VideoGroup<T> group, List<T> items) rebuild,
 }) {
   if (query.isEmpty) return groups;
-  final lower = normalizeEmojiQuery(query).toLowerCase();
+  final folded = foldForSearch(normalizeEmojiQuery(query));
   final result = <VideoGroup<T>>[];
   for (final group in groups) {
     if (options.matchGroupTitles) {
-      final title = _resolveGroupTitle(group, videoMap).toLowerCase();
-      if (title.contains(lower)) {
+      final title = foldForSearch(_resolveGroupTitle(group, videoMap));
+      if (title.contains(folded)) {
         result.add(group);
         continue;
       }
     }
     final matching = group.items
-        .where((item) => extractText(item).toLowerCase().contains(lower))
+        .where((item) => foldForSearch(extractText(item)).contains(folded))
         .toList();
     if (matching.isNotEmpty) {
       result.add(

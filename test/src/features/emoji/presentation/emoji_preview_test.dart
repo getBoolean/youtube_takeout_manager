@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 
 void main() {
@@ -104,6 +106,36 @@ void main() {
     testWidgets('leaves it unmarked for plain words', (tester) async {
       await pumpEmoji(tester, 'short');
       expect(marker, findsNothing);
+    });
+
+    testWidgets('joins the marker of adjacent matched emojis', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            emojiNamesByKeyProvider.overrideWithValue({
+              'k0': 'shortsad',
+              'k2': 'other',
+            }),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(
+              body: EmojiPreview(
+                url: 'https://yt3.ggpht.com/k1',
+                size: 20,
+                name: 'shortsad',
+                highlightQuery: ':shortsad',
+                adjacent: (
+                  previousUrl: 'https://yt3.ggpht.com/k0',
+                  nextUrl: 'https://yt3.ggpht.com/k2',
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      final shape = tester.widget<SearchMatchMarker>(marker);
+      expect(shape.joinsPrevious, isTrue);
+      expect(shape.joinsNext, isFalse);
     });
   });
 }

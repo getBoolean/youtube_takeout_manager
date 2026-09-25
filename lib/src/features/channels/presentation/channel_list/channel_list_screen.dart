@@ -346,7 +346,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
                 hintText: 'Search channels and comments...',
                 emojis: EmojiSearchConfig(
                   groups: ref.watch(allChannelEmojiGroupsProvider),
-                  groupByChannel: true,
+                  standardEmojis: ref.watch(allUsedUnicodeEmojisProvider),
                 ),
                 onQueryChanged: (value) =>
                     ref.read(channelSearchQueryProvider.notifier).update(value),

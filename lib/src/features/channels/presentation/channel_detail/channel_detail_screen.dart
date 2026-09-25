@@ -146,6 +146,9 @@ class ChannelDetailScreen extends HookConsumerWidget {
                       : 'Search live chats...',
                   emojis: EmojiSearchConfig(
                     groups: ref.watch(channelEmojiGroupsProvider(channelId)),
+                    standardEmojis: ref.watch(
+                      channelUnicodeEmojisProvider(channelId),
+                    ),
                   ),
                   onQueryChanged: (v) => ref
                       .read(channelContentSearchQueryProvider.notifier)

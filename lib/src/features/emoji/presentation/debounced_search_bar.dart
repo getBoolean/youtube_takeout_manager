@@ -3,41 +3,49 @@ import 'dart:async';
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
+import '../application/emoji_providers.dart';
 import '../domain/channel_emoji.dart';
+import '../domain/picker_emoji.dart';
+import '../domain/unicode_emoji.dart';
 import 'emoji_picker_panel.dart';
 import 'emoji_preview.dart';
 import 'emoji_text_editing_controller.dart';
 
-/// Custom emojis offered by a [DebouncedSearchBar].
+/// Emojis offered by a [DebouncedSearchBar]: the ones used in the content it
+/// searches.
 class EmojiSearchConfig {
   final List<ChannelEmojiGroup> groups;
 
-  /// Show one picker section per channel (channels page) instead of a single
-  /// grid (channel page).
-  final bool groupByChannel;
+  /// Standard emojis, in picker order.
+  final List<UnicodeEmoji> standardEmojis;
 
-  const EmojiSearchConfig({required this.groups, this.groupByChannel = false});
+  const EmojiSearchConfig({required this.groups, required this.standardEmojis});
 
-  bool get isEmpty => groups.every((g) => g.emojis.isEmpty);
+  bool get isEmpty =>
+      standardEmojis.isEmpty && groups.every((g) => g.emojis.isEmpty);
 
   @override
   bool operator ==(Object other) =>
       other is EmojiSearchConfig &&
       identical(other.groups, groups) &&
-      other.groupByChannel == groupByChannel;
+      identical(other.standardEmojis, standardEmojis);
 
   @override
-  int get hashCode => Object.hash(identityHashCode(groups), groupByChannel);
+  int get hashCode =>
+      Object.hash(identityHashCode(groups), identityHashCode(standardEmojis));
 }
 
 /// A [SearchBar] wrapper that debounces [onQueryChanged] and exposes a clear
 /// button when the field is non-empty.
 ///
 /// When [emojis] is provided, it also offers an emoji picker button, `:name`
-/// autocomplete, and renders complete `:name:` tokens as the emoji image.
-class DebouncedSearchBar extends StatefulWidget {
+/// autocomplete for channel and standard emojis, renders complete channel
+/// `:name:` tokens as the emoji image, and converts typed standard `:name:`s
+/// to the emoji.
+class DebouncedSearchBar extends ConsumerStatefulWidget {
   final String hintText;
   final ValueChanged<String> onQueryChanged;
   final Duration debounce;
@@ -56,14 +64,15 @@ class DebouncedSearchBar extends StatefulWidget {
   });
 
   @override
-  State<DebouncedSearchBar> createState() => _DebouncedSearchBarState();
+  ConsumerState<DebouncedSearchBar> createState() => _DebouncedSearchBarState();
 }
 
 /// Matches an unfinished `:name` directly before the caret.
 final _emojiFragment = RegExp(r':_?([\w-]{2,})$');
+final _wordChar = RegExp(r'\w');
 const _maxSuggestions = 8;
 
-class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
+class _DebouncedSearchBarState extends ConsumerState<DebouncedSearchBar> {
   final EmojiTextEditingController _controller = EmojiTextEditingController();
   late final FocusNode _focusNode = FocusNode(onKeyEvent: _handleKey);
   final OverlayPortalController _suggestionsPortal = OverlayPortalController();
@@ -71,14 +80,18 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
   Timer? _debounce;
   bool _hasText = false;
 
-  List<ChannelEmoji> _allEmojis = const [];
-  List<ChannelEmoji> _suggestions = const [];
+  List<CustomPickerEmoji> _customEmojis = const [];
+  List<UnicodeEmoji> _standardEmojis = const [];
+  Map<String, UnicodeEmoji> _standardByName = const {};
+  List<PickerEmoji> _suggestions = const [];
   int _highlighted = 0;
   TextRange? _fragment;
 
   @override
   void initState() {
     super.initState();
+    _controller.onShortcodeConverted = (emoji) =>
+        _recordUse(UnicodePickerEmoji(emoji));
     _syncEmojis();
     _controller.addListener(_updateSuggestions);
     _focusNode.addListener(_updateSuggestions);
@@ -104,14 +117,30 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
   /// it triggers must not update suggestions (setState during build).
   void _syncEmojis() {
     final groups = widget.emojis?.groups ?? const <ChannelEmojiGroup>[];
-    _allEmojis = [for (final g in groups) ...g.emojis];
+    _customEmojis = [
+      for (final g in groups)
+        for (final emoji in g.emojis) CustomPickerEmoji(emoji),
+    ];
     final byName = <String, ChannelEmoji>{};
-    for (final emoji in _allEmojis) {
+    for (final CustomPickerEmoji(:emoji) in _customEmojis) {
       byName.putIfAbsent(emoji.name.toLowerCase(), () => emoji);
     }
+    _standardEmojis = widget.emojis?.standardEmojis ?? const [];
+    _standardByName = {
+      for (final emoji in _standardEmojis)
+        for (final name in emoji.shortNames) name: emoji,
+    };
     _syncingEmojis = true;
-    _controller.emojisByName = byName;
+    _controller
+      ..unicodeEmojisByName = _standardByName
+      ..emojisByName = byName;
     _syncingEmojis = false;
+  }
+
+  void _recordUse(PickerEmoji emoji) {
+    unawaited(
+      ref.read(frequentEmojisProvider.notifier).recordUse(emoji.usageId),
+    );
   }
 
   void _handleChanged(String value) {
@@ -134,7 +163,7 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
 
   // --- Emoji insertion & autocomplete ---
 
-  void _insertEmoji(ChannelEmoji emoji, {TextRange? replacing}) {
+  void _insertEmoji(PickerEmoji emoji, {TextRange? replacing}) {
     final value = _controller.value;
     final text = value.text;
     final selection = value.selection.isValid
@@ -142,10 +171,12 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
         : TextSelection.collapsed(offset: text.length);
     final start = replacing?.start ?? selection.start;
     final end = replacing?.end ?? selection.end;
-    final newText = text.replaceRange(start, end, emoji.token);
-    final caret = TextSelection.collapsed(offset: start + emoji.token.length);
+    final insert = emoji.insertText;
+    final newText = text.replaceRange(start, end, insert);
+    final caret = TextSelection.collapsed(offset: start + insert.length);
     _controller.value = TextEditingValue(text: newText, selection: caret);
     _handleChanged(newText);
+    _recordUse(emoji);
     if (!_focusNode.hasFocus) {
       _focusNode.requestFocus();
       // Desktop/web text fields select all when they gain focus, which would
@@ -161,18 +192,24 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
 
   void _updateSuggestions() {
     if (_syncingEmojis) return;
-    List<ChannelEmoji> next = const [];
+    List<PickerEmoji> next = const [];
     TextRange? fragment;
     final value = _controller.value;
     if (_focusNode.hasFocus &&
-        _allEmojis.isNotEmpty &&
+        widget.emojis != null &&
         value.selection.isValid &&
         value.selection.isCollapsed) {
       final before = value.text.substring(0, value.selection.baseOffset);
       final match = _emojiFragment.firstMatch(before);
-      if (match != null) {
+      // `10:30` or `word:sh` isn't the start of an emoji name.
+      if (match != null &&
+          !(match.start > 0 && _wordChar.hasMatch(before[match.start - 1]))) {
         fragment = TextRange(start: match.start, end: match.end);
-        next = _rankSuggestions(match[1]!.toLowerCase());
+        next = _rankSuggestions(
+          match[1]!.toLowerCase(),
+          // `:_name` is YouTube's syntax for channel emojis.
+          includeStandard: !match[0]!.startsWith(':_'),
+        );
       }
     }
 
@@ -195,25 +232,74 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
     }
   }
 
-  List<ChannelEmoji> _rankSuggestions(String fragment) {
-    final prefix = <ChannelEmoji>[];
-    final contains = <ChannelEmoji>[];
-    for (final emoji in _allEmojis) {
+  /// Exact matches, then prefix matches, then other matches; channel emojis
+  /// (most used first) before standard ones within each, so an emoji and a
+  /// standard one with the same name are both offered.
+  List<PickerEmoji> _rankSuggestions(
+    String fragment, {
+    required bool includeStandard,
+  }) {
+    final customExact = <CustomPickerEmoji>[];
+    final customPrefix = <CustomPickerEmoji>[];
+    final customContains = <CustomPickerEmoji>[];
+    for (final emoji in _customEmojis) {
       final name = emoji.name.toLowerCase();
-      if (name.startsWith(fragment)) {
-        prefix.add(emoji);
+      if (name == fragment) {
+        customExact.add(emoji);
+      } else if (name.startsWith(fragment)) {
+        customPrefix.add(emoji);
       } else if (name.contains(fragment)) {
-        contains.add(emoji);
+        customContains.add(emoji);
       }
     }
-    int byUsage(ChannelEmoji a, ChannelEmoji b) =>
-        b.usageCount.compareTo(a.usageCount);
-    prefix.sort(byUsage);
-    contains.sort(byUsage);
-    return [...prefix, ...contains].take(_maxSuggestions).toList();
+    int byUsage(CustomPickerEmoji a, CustomPickerEmoji b) =>
+        b.emoji.usageCount.compareTo(a.emoji.usageCount);
+    customPrefix.sort(byUsage);
+    customContains.sort(byUsage);
+
+    final standardExact = <UnicodePickerEmoji>[];
+    final standardPrefix = <(int, UnicodePickerEmoji)>[];
+    final standardContains = <UnicodePickerEmoji>[];
+    if (includeStandard) {
+      for (final (i, emoji) in _standardEmojis.indexed) {
+        String? prefix;
+        String? contains;
+        for (final name in emoji.shortNames) {
+          if (name == fragment) {
+            standardExact.add(UnicodePickerEmoji(emoji, name));
+            prefix = contains = null;
+            break;
+          }
+          if (name.startsWith(fragment)) {
+            prefix ??= name;
+          } else if (name.contains(fragment)) {
+            contains ??= name;
+          }
+        }
+        if (prefix != null) {
+          standardPrefix.add((i, UnicodePickerEmoji(emoji, prefix)));
+        } else if (contains != null) {
+          standardContains.add(UnicodePickerEmoji(emoji, contains));
+        }
+      }
+      // Shortest names first (`:heart` → ❤️ before 😍 heart_eyes).
+      standardPrefix.sort((a, b) {
+        final byLength = a.$2.name.length.compareTo(b.$2.name.length);
+        return byLength != 0 ? byLength : a.$1.compareTo(b.$1);
+      });
+    }
+
+    return [
+      ...customExact,
+      ...standardExact,
+      ...customPrefix,
+      for (final (_, emoji) in standardPrefix) emoji,
+      ...customContains,
+      ...standardContains,
+    ].take(_maxSuggestions).toList();
   }
 
-  void _acceptSuggestion(ChannelEmoji emoji) {
+  void _acceptSuggestion(PickerEmoji emoji) {
     _insertEmoji(emoji, replacing: _fragment);
   }
 
@@ -279,10 +365,14 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
                 for (final (i, emoji) in _suggestions.indexed)
                   _SuggestionTile(
                     emoji: emoji,
-                    channelTitle: widget.emojis?.groups
-                        .where((g) => g.channelId == emoji.channelId)
-                        .firstOrNull
-                        ?.displayTitle,
+                    channelTitle: switch (emoji) {
+                      CustomPickerEmoji(:final emoji) =>
+                        widget.emojis?.groups
+                            .where((g) => g.channelId == emoji.channelId)
+                            .firstOrNull
+                            ?.displayTitle,
+                      UnicodePickerEmoji() => null,
+                    },
                     highlighted: i == _highlighted,
                     onHover: () => setState(() => _highlighted = i),
                     onTap: () => _acceptSuggestion(emoji),
@@ -310,7 +400,7 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
         Builder(
           builder: (context) => EmojiPickerPanel(
             groups: config.groups,
-            groupByChannel: config.groupByChannel,
+            standardEmojis: config.standardEmojis,
             onSelected: (emoji) {
               MenuController.maybeOf(context)?.close();
               _insertEmoji(emoji);
@@ -363,7 +453,7 @@ class _DebouncedSearchBarState extends State<DebouncedSearchBar> {
 }
 
 class _SuggestionTile extends StatelessWidget {
-  final ChannelEmoji emoji;
+  final PickerEmoji emoji;
   final String? channelTitle;
   final bool highlighted;
   final VoidCallback onHover;
@@ -380,6 +470,10 @@ class _SuggestionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final generatedName = switch (emoji) {
+      CustomPickerEmoji(:final emoji) => !emoji.resolved,
+      UnicodePickerEmoji() => false,
+    };
     return MouseRegion(
       onEnter: (_) => onHover(),
       child: InkWell(
@@ -390,14 +484,14 @@ class _SuggestionTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           child: Row(
             children: [
-              EmojiImage(url: emoji.url, size: 24),
+              PickerEmojiImage(emoji: emoji, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   emoji.token,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    fontStyle: emoji.resolved ? null : FontStyle.italic,
+                    fontStyle: generatedName ? FontStyle.italic : null,
                   ),
                 ),
               ),

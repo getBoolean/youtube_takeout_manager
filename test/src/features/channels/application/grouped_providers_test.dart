@@ -10,6 +10,8 @@ import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat
 
 const _channel = 'ch';
 const _emojiKey = 'tigerKey';
+const _heart = '❤';
+const _heartEmoji = '❤️';
 
 LiveChat _chat(String id, String raw) => LiveChat(
   liveChatId: id,
@@ -32,6 +34,8 @@ final _groups = [
             '{"text":"","emoji":{"customEmojiUrl":"https://yt3.ggpht.com/$_emojiKey"}}',
       ),
       _chat('text', '{"text":"he has a short"}'),
+      _chat('heart', '{"text":"love it $_heart"}'),
+      _chat('heart-emoji', '{"text":"love it $_heartEmoji"}'),
     ],
   ),
 ];
@@ -64,5 +68,10 @@ void main() {
   test(':tokens match emoji names', () {
     expect(matchIds(':short'), ['emoji']);
     expect(matchIds('again :shortcat'), ['emoji']);
+  });
+
+  test('❤️ and ❤ match each other', () {
+    expect(matchIds(_heartEmoji), ['heart', 'heart-emoji']);
+    expect(matchIds(_heart), ['heart', 'heart-emoji']);
   });
 }

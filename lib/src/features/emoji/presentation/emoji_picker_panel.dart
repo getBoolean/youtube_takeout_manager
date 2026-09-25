@@ -3,23 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/emoji_providers.dart';
 import '../domain/channel_emoji.dart';
+import '../domain/emoji_use.dart';
+import '../domain/picker_emoji.dart';
+import '../domain/unicode_emoji.dart';
 import 'emoji_preview.dart';
 
-/// Emoji picker for the search bars.
-///
-/// With [groupByChannel], emojis are split into per-channel sections with a
-/// rail of channel avatars for jumping between them (like Discord). Otherwise
-/// the first group's emojis are shown as a single grid (like YouTube live
-/// chat).
+/// Emoji picker for the search bars, laid out like Discord's: Frequently
+/// Used, one section per channel, then the standard emoji categories, with a
+/// rail for jumping between sections.
 class EmojiPickerPanel extends ConsumerStatefulWidget {
   final List<ChannelEmojiGroup> groups;
-  final bool groupByChannel;
-  final ValueChanged<ChannelEmoji> onSelected;
+
+  /// Standard emojis to offer, in picker order.
+  final List<UnicodeEmoji> standardEmojis;
+  final ValueChanged<PickerEmoji> onSelected;
 
   const EmojiPickerPanel({
     super.key,
     required this.groups,
-    required this.groupByChannel,
+    required this.standardEmojis,
     required this.onSelected,
   });
 
@@ -27,34 +29,154 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
   ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
 }
 
+/// One picker section. [id] is [_frequentId], a channel id or a
+/// [UnicodeEmojiCategory].
+typedef _Section = ({
+  Object id,
+  String title,
+  IconData? icon,
+  ChannelEmojiGroup? channel,
+  List<PickerEmoji> emojis,
+});
+
+const _frequentId = #frequent;
+const _maxFrequent = 16;
+
+IconData _categoryIcon(UnicodeEmojiCategory category) => switch (category) {
+  UnicodeEmojiCategory.people => Icons.emoji_emotions_outlined,
+  UnicodeEmojiCategory.nature => Icons.emoji_nature_outlined,
+  UnicodeEmojiCategory.food => Icons.emoji_food_beverage_outlined,
+  UnicodeEmojiCategory.activities => Icons.emoji_events_outlined,
+  UnicodeEmojiCategory.travel => Icons.emoji_transportation_outlined,
+  UnicodeEmojiCategory.objects => Icons.emoji_objects_outlined,
+  UnicodeEmojiCategory.symbols => Icons.emoji_symbols_outlined,
+  UnicodeEmojiCategory.flags => Icons.emoji_flags_outlined,
+};
+
+final _nameSeparators = RegExp('[_-]');
+
 class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   final _scrollController = ScrollController();
-  final _sectionKeys = <String, GlobalKey>{};
+  final _sectionKeys = <Object, GlobalKey>{};
+  final _hovered = ValueNotifier<PickerEmoji?>(null);
   String _filter = '';
-  ChannelEmoji? _hovered;
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _hovered.dispose();
     super.dispose();
   }
 
-  List<ChannelEmojiGroup> get _visibleGroups {
-    final filter = _filter.toLowerCase().replaceAll(':', '');
+  List<UnicodeEmoji>? _standardSource;
+  List<_Section> _standardSections = const [];
+  Map<String, UnicodeEmoji> _standardByEmoji = const {};
+
+  /// Builds the standard emoji sections when [EmojiPickerPanel.standardEmojis]
+  /// changes.
+  void _syncStandardSections() {
+    final source = widget.standardEmojis;
+    if (identical(source, _standardSource)) return;
+    _standardSource = source;
+    final byCategory = <UnicodeEmojiCategory, List<PickerEmoji>>{};
+    for (final emoji in source) {
+      byCategory
+          .putIfAbsent(emoji.category, () => [])
+          .add(UnicodePickerEmoji(emoji));
+    }
+    _standardSections = [
+      for (final category in UnicodeEmojiCategory.values)
+        if (byCategory[category] case final emojis?)
+          (
+            id: category,
+            title: category.label,
+            icon: _categoryIcon(category),
+            channel: null,
+            emojis: emojis,
+          ),
+    ];
+    _standardByEmoji = {for (final emoji in source) emoji.emoji: emoji};
+  }
+
+  /// Every section, unfiltered.
+  List<_Section> _allSections(List<EmojiUse> uses) {
+    final channelSections = <_Section>[];
+    final customById = <String, CustomPickerEmoji>{};
+    for (final group in widget.groups) {
+      if (group.emojis.isEmpty) continue;
+      final emojis = [for (final e in group.emojis) CustomPickerEmoji(e)];
+      for (final emoji in emojis) {
+        customById[emoji.usageId] = emoji;
+      }
+      channelSections.add((
+        id: group.channelId,
+        title: group.displayTitle,
+        icon: null,
+        channel: group,
+        emojis: emojis,
+      ));
+    }
+
+    // Only emojis this picker offers, i.e. used in what the search covers.
+    _syncStandardSections();
+    final frequent = <PickerEmoji>[];
+    for (final use in uses) {
+      final PickerEmoji? emoji = use.id.startsWith('u:')
+          ? switch (_standardByEmoji[use.id.substring(2)]) {
+              final e? => UnicodePickerEmoji(e),
+              null => null,
+            }
+          : customById[use.id];
+      if (emoji == null) continue;
+      frequent.add(emoji);
+      if (frequent.length == _maxFrequent) break;
+    }
+
     return [
-      for (final group in widget.groups)
-        if (filter.isEmpty)
-          group
-        else if (group.emojis
-                .where((e) => e.name.toLowerCase().contains(filter))
-                .toList()
-            case final matches when matches.isNotEmpty)
-          group.copyWith(emojis: matches),
+      if (frequent.isNotEmpty)
+        (
+          id: _frequentId,
+          title: 'Frequently Used',
+          icon: Icons.schedule,
+          channel: null,
+          emojis: frequent,
+        ),
+      ...channelSections,
+      ..._standardSections,
     ];
   }
 
-  void _jumpTo(String channelId) {
-    final context = _sectionKeys[channelId]?.currentContext;
+  /// [all] narrowed to emojis matching the filter. Frequently Used is hidden
+  /// while filtering, since its emojis also appear in their own section.
+  List<_Section> _visibleSections(List<_Section> all) {
+    final filter = _filter.toLowerCase().replaceAll(':', '');
+    if (filter.isEmpty) return all;
+    final spaced = filter.replaceAll(_nameSeparators, ' ');
+    bool matches(PickerEmoji emoji) => switch (emoji) {
+      CustomPickerEmoji(:final emoji) => emoji.name.toLowerCase().contains(
+        filter,
+      ),
+      UnicodePickerEmoji(:final emoji) =>
+        emoji.shortNames.any((name) => name.contains(filter)) ||
+            emoji.name.toLowerCase().contains(spaced),
+    };
+    return [
+      for (final section in all)
+        if (section.id != _frequentId)
+          if (section.emojis.where(matches).toList() case final emojis
+              when emojis.isNotEmpty)
+            (
+              id: section.id,
+              title: section.title,
+              icon: section.icon,
+              channel: section.channel,
+              emojis: emojis,
+            ),
+    ];
+  }
+
+  void _jumpTo(Object id) {
+    final context = _sectionKeys[id]?.currentContext;
     if (context == null) return;
     Scrollable.ensureVisible(
       context,
@@ -63,13 +185,21 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     );
   }
 
+  void _setFilter(String value) {
+    setState(() => _filter = value.trim());
+    if (_scrollController.hasClients) _scrollController.jumpTo(0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final groups = _visibleGroups;
-    final showRail = widget.groupByChannel && widget.groups.length > 1;
+    final uses = ref.watch(frequentEmojisProvider).value ?? const [];
+    final all = _allSections(uses);
+    final sections = _visibleSections(all);
     final width = (MediaQuery.sizeOf(context).width - 32).clamp(240.0, 380.0);
 
+    // The size must stay tight: MenuAnchor measures its children's intrinsic
+    // width, which a scroll view can't report.
     return SizedBox(
       width: width,
       height: 420,
@@ -86,55 +216,67 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
                 hintText: 'Find emoji',
                 border: OutlineInputBorder(),
               ),
-              onChanged: (v) => setState(() => _filter = v.trim()),
+              onChanged: _setFilter,
             ),
           ),
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (showRail) ...[
-                  _ChannelRail(
-                    groups: widget.groups,
-                    onTap: (g) => _jumpTo(g.channelId),
-                  ),
-                  const VerticalDivider(width: 1),
-                ],
+                _SectionRail(sections: all, onTap: (s) => _jumpTo(s.id)),
+                const VerticalDivider(width: 1),
                 Expanded(
-                  child: groups.isEmpty
+                  child: sections.isEmpty
                       ? Center(
                           child: Text(
-                            widget.groups.isEmpty
-                                ? 'No custom emojis found'
-                                : 'No emoji match',
+                            'No emoji match',
                             style: theme.textTheme.bodyMedium,
                           ),
                         )
-                      : SingleChildScrollView(
+                      : CustomScrollView(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              for (final group in groups)
-                                _EmojiSection(
+                          slivers: [
+                            for (final section in sections) ...[
+                              SliverToBoxAdapter(
+                                child: _SectionHeader(
                                   key: _sectionKeys.putIfAbsent(
-                                    group.channelId,
+                                    section.id,
                                     GlobalKey.new,
                                   ),
-                                  group: group,
-                                  onSelected: widget.onSelected,
-                                  onHover: (e) => setState(() => _hovered = e),
+                                  section: section,
                                 ),
+                              ),
+                              SliverPadding(
+                                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                                sliver: SliverGrid.builder(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 40,
+                                      ),
+                                  itemCount: section.emojis.length,
+                                  itemBuilder: (context, i) {
+                                    final emoji = section.emojis[i];
+                                    return _EmojiCell(
+                                      emoji: emoji,
+                                      hovered: _hovered,
+                                      onTap: () => widget.onSelected(emoji),
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
-                          ),
+                          ],
                         ),
                 ),
               ],
             ),
           ),
           const Divider(height: 1),
-          _PreviewFooter(emoji: _hovered, groups: widget.groups),
+          ValueListenableBuilder(
+            valueListenable: _hovered,
+            builder: (context, emoji, _) =>
+                _PreviewFooter(emoji: emoji, groups: widget.groups),
+          ),
         ],
       ),
     );
@@ -175,89 +317,95 @@ class _ChannelAvatar extends StatelessWidget {
   }
 }
 
-class _ChannelRail extends StatelessWidget {
-  final List<ChannelEmojiGroup> groups;
-  final ValueChanged<ChannelEmojiGroup> onTap;
+/// A section's channel avatar or category icon.
+class _SectionIcon extends StatelessWidget {
+  final _Section section;
+  final double size;
 
-  const _ChannelRail({required this.groups, required this.onTap});
+  const _SectionIcon({required this.section, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    if (section.channel case final channel?) {
+      return _ChannelAvatar(group: channel, radius: size / 2);
+    }
+    return SizedBox.square(
+      dimension: size,
+      child: Icon(
+        section.icon,
+        size: size * 0.8,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+}
+
+class _SectionRail extends StatelessWidget {
+  final List<_Section> sections;
+  final ValueChanged<_Section> onTap;
+
+  const _SectionRail({required this.sections, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
       width: 52,
       child: ListView(
+        // The menu's own scroll view uses the primary controller.
+        primary: false,
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
-          for (final group in groups)
+          for (final (i, section) in sections.indexed) ...[
+            // Separates Frequently Used and channels from the categories.
+            if (i > 0 &&
+                section.id is UnicodeEmojiCategory &&
+                sections[i - 1].id is! UnicodeEmojiCategory)
+              const Divider(height: 9, indent: 12, endIndent: 12),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Tooltip(
-                message: group.displayTitle,
+                message: section.title,
                 preferBelow: false,
                 child: InkWell(
                   customBorder: const CircleBorder(),
-                  onTap: () => onTap(group),
+                  onTap: () => onTap(section),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
-                    child: _ChannelAvatar(group: group, radius: 16),
+                    child: _SectionIcon(section: section, size: 32),
                   ),
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _EmojiSection extends StatelessWidget {
-  final ChannelEmojiGroup group;
-  final ValueChanged<ChannelEmoji> onSelected;
-  final ValueChanged<ChannelEmoji?> onHover;
+class _SectionHeader extends StatelessWidget {
+  final _Section section;
 
-  const _EmojiSection({
-    super.key,
-    required this.group,
-    required this.onSelected,
-    required this.onHover,
-  });
+  const _SectionHeader({super.key, required this.section});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      child: Row(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
-            child: Row(
-              children: [
-                _ChannelAvatar(group: group, radius: 9),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    group.displayTitle.toUpperCase(),
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
-                ),
-              ],
+          _SectionIcon(section: section, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              section.title.toUpperCase(),
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                letterSpacing: 0.6,
+              ),
             ),
-          ),
-          Wrap(
-            children: [
-              for (final emoji in group.emojis)
-                _EmojiButton(
-                  emoji: emoji,
-                  onTap: () => onSelected(emoji),
-                  onHover: onHover,
-                ),
-            ],
           ),
         ],
       ),
@@ -265,16 +413,24 @@ class _EmojiSection extends StatelessWidget {
   }
 }
 
-class _EmojiButton extends StatelessWidget {
-  final ChannelEmoji emoji;
+class _EmojiCell extends StatelessWidget {
+  final PickerEmoji emoji;
+  final ValueNotifier<PickerEmoji?> hovered;
   final VoidCallback onTap;
-  final ValueChanged<ChannelEmoji?> onHover;
 
-  const _EmojiButton({
+  const _EmojiCell({
     required this.emoji,
+    required this.hovered,
     required this.onTap,
-    required this.onHover,
   });
+
+  void _setHovered(bool value) {
+    if (value) {
+      hovered.value = emoji;
+    } else if (hovered.value == emoji) {
+      hovered.value = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -284,11 +440,12 @@ class _EmojiButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: onTap,
-        onHover: (hovering) => onHover(hovering ? emoji : null),
-        onFocusChange: (focused) => onHover(focused ? emoji : null),
-        child: Padding(
-          padding: const EdgeInsets.all(4),
-          child: EmojiImage(url: emoji.url, size: 32),
+        onHover: _setHovered,
+        onFocusChange: _setHovered,
+        child: Center(
+          child: ExcludeSemantics(
+            child: PickerEmojiImage(emoji: emoji, size: 32),
+          ),
         ),
       ),
     );
@@ -296,7 +453,7 @@ class _EmojiButton extends StatelessWidget {
 }
 
 class _PreviewFooter extends ConsumerWidget {
-  final ChannelEmoji? emoji;
+  final PickerEmoji? emoji;
   final List<ChannelEmojiGroup> groups;
 
   const _PreviewFooter({required this.emoji, required this.groups});
@@ -305,16 +462,13 @@ class _PreviewFooter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final status = ref.watch(emojiNamesProvider);
-    final emoji = this.emoji;
+    final hasChannelEmojis = groups.any((g) => g.emojis.isNotEmpty);
 
-    final Widget content;
-    if (emoji != null) {
-      final channel = groups
-          .where((g) => g.channelId == emoji.channelId)
-          .firstOrNull;
-      content = Row(
+    Widget details(PickerEmoji emoji, String? subtitle, {bool? resolved}) {
+      final generated = resolved == false;
+      return Row(
         children: [
-          EmojiImage(url: emoji.url, size: 28),
+          PickerEmojiImage(emoji: emoji, size: 28),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -322,20 +476,18 @@ class _PreviewFooter extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  emoji.resolved
-                      ? emoji.token
-                      : '${emoji.token}  (generated name)',
+                  generated ? '${emoji.token}  (generated name)' : emoji.token,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall?.copyWith(
-                    fontStyle: emoji.resolved ? null : FontStyle.italic,
-                    color: emoji.resolved
-                        ? null
-                        : theme.colorScheme.onSurfaceVariant,
+                    fontStyle: generated ? FontStyle.italic : null,
+                    color: generated
+                        ? theme.colorScheme.onSurfaceVariant
+                        : null,
                   ),
                 ),
-                if (channel != null)
+                if (subtitle != null)
                   Text(
-                    '${channel.displayTitle} · used ${emoji.usageCount}×',
+                    subtitle,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall,
                   ),
@@ -344,27 +496,49 @@ class _PreviewFooter extends ConsumerWidget {
           ),
         ],
       );
-    } else if (status.isResolving) {
-      content = Row(
-        children: [
-          const SizedBox.square(
-            dimension: 14,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-          const SizedBox(width: 10),
-          Text('Looking up emoji names…', style: theme.textTheme.bodySmall),
-        ],
-      );
-    } else if (status.lookupUnavailable) {
-      content = Text(
-        'Emoji name lookup is unavailable right now; some names are generated.',
-        style: theme.textTheme.bodySmall,
-      );
-    } else {
-      content = Text(
-        'Pick an emoji to search for it',
-        style: theme.textTheme.bodySmall,
-      );
+    }
+
+    final Widget content;
+    switch (emoji) {
+      case final CustomPickerEmoji picked:
+        final channel = groups
+            .where((g) => g.channelId == picked.emoji.channelId)
+            .firstOrNull;
+        content = details(
+          picked,
+          channel == null
+              ? null
+              : '${channel.displayTitle} · used ${picked.emoji.usageCount}×',
+          resolved: picked.emoji.resolved,
+        );
+      case final UnicodePickerEmoji picked:
+        final name = picked.emoji.name;
+        content = details(
+          picked,
+          '${name[0].toUpperCase()}${name.substring(1)} · '
+          '${picked.emoji.category.label}',
+        );
+      case null when hasChannelEmojis && status.isResolving:
+        content = Row(
+          children: [
+            const SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 10),
+            Text('Looking up emoji names…', style: theme.textTheme.bodySmall),
+          ],
+        );
+      case null when hasChannelEmojis && status.lookupUnavailable:
+        content = Text(
+          'Emoji name lookup is unavailable right now; some names are generated.',
+          style: theme.textTheme.bodySmall,
+        );
+      case null:
+        content = Text(
+          'Pick an emoji to search for it',
+          style: theme.textTheme.bodySmall,
+        );
     }
 
     return SizedBox(

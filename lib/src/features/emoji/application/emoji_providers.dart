@@ -1,13 +1,20 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
+import '../data/unicode_emoji_catalog.dart';
 import '../data/youtube_emoji_name_repository.dart';
 import '../domain/channel_emoji.dart';
+import '../domain/emoji_use.dart';
+import '../domain/unicode_emoji.dart';
 
 part 'emoji_providers.g.dart';
 
@@ -230,6 +237,71 @@ List<ChannelEmojiGroup> allChannelEmojiGroups(Ref ref) {
   ];
 }
 
+const _frequentEmojisKey = 'emoji.frequentlyUsed';
+const _maxFrequentEmojis = 50;
+
+/// Emojis the user inserted into a search, most used first (ties: most
+/// recent). Once full, the least recently used entry makes room for a new one.
+@Riverpod(keepAlive: true)
+class FrequentEmojis extends _$FrequentEmojis {
+  KvStorageService get _storage => ref.read(kvStorageServiceProvider);
+
+  @override
+  Future<List<EmojiUse>> build() async {
+    final storage = ref.watch(kvStorageServiceProvider);
+    final raw = await storage.getString(_frequentEmojisKey);
+    if (raw == null) return const [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return [for (final item in decoded) ?_tryDecode(item)]..sort(_byUse);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static EmojiUse? _tryDecode(Object? item) {
+    try {
+      return EmojiUseMapper.fromMap(item! as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static int _byUse(EmojiUse a, EmojiUse b) {
+    final byCount = b.count.compareTo(a.count);
+    return byCount != 0 ? byCount : b.lastUsed.compareTo(a.lastUsed);
+  }
+
+  Future<void> recordUse(String id) async {
+    final current = await future;
+    final previous = current.where((u) => u.id == id).firstOrNull;
+    final uses = [
+      for (final use in current)
+        if (use.id != id) use,
+    ];
+    if (uses.length >= _maxFrequentEmojis) {
+      uses.remove(
+        uses.reduce((a, b) => a.lastUsed.isBefore(b.lastUsed) ? a : b),
+      );
+    }
+    uses
+      ..add(
+        EmojiUse(
+          id: id,
+          count: (previous?.count ?? 0) + 1,
+          lastUsed: DateTime.now(),
+        ),
+      )
+      ..sort(_byUse);
+    state = AsyncData(uses);
+    await _storage.setString(
+      _frequentEmojisKey,
+      jsonEncode([for (final use in uses) use.toMap()]),
+    );
+  }
+}
+
 /// Emoji picker section for a single channel (empty if it has no emojis).
 @riverpod
 List<ChannelEmojiGroup> channelEmojiGroups(Ref ref, String channelId) {
@@ -243,5 +315,71 @@ List<ChannelEmojiGroup> channelEmojiGroups(Ref ref, String channelId) {
       thumbnailUrl: channel?.thumbnailUrl,
       emojis: emojis,
     ),
+  ];
+}
+
+/// Standard emojis in each channel's comments and live chats: the ones a
+/// search there would find (see [UnicodeEmojiCatalog.find]).
+@Riverpod(keepAlive: true)
+Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
+  final commentsByChannel = ref.watch(commentsByChannelProvider);
+  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
+
+  final result = <String, Set<UnicodeEmoji>>{};
+  void scan(String channelId, String raw) {
+    if (!_hasNonAscii(raw)) return;
+    for (final segment in parseCommentSegments(raw)) {
+      if (segment is! TextSegment) continue;
+      for (final char in segment.text.characters) {
+        if (unicodeEmojiCatalog.find(char) case final emoji?) {
+          result.putIfAbsent(channelId, () => {}).add(emoji);
+        }
+      }
+    }
+  }
+
+  commentsByChannel.forEach((channelId, comments) {
+    for (final comment in comments) {
+      scan(channelId, comment.rawCommentText);
+    }
+  });
+  liveChatsByChannel.forEach((channelId, chats) {
+    for (final chat in chats) {
+      scan(channelId, chat.rawText);
+    }
+  });
+  return result;
+}
+
+/// Whether [raw] may contain emojis: non-ASCII text, or a JSON escape of it.
+bool _hasNonAscii(String raw) {
+  for (final unit in raw.codeUnits) {
+    if (unit > 0x7F) return true;
+  }
+  return raw.contains(r'\u');
+}
+
+/// Standard emojis used in any comment or live chat, in picker order.
+@riverpod
+List<UnicodeEmoji> allUsedUnicodeEmojis(Ref ref) {
+  final used = {
+    for (final emojis in ref.watch(unicodeEmojisByChannelProvider).values)
+      ...emojis,
+  };
+  return [
+    for (final emoji in unicodeEmojiCatalog.all)
+      if (used.contains(emoji)) emoji,
+  ];
+}
+
+/// Standard emojis used in [channelId]'s comments and live chats, in picker
+/// order.
+@riverpod
+List<UnicodeEmoji> channelUnicodeEmojis(Ref ref, String channelId) {
+  final used = ref.watch(unicodeEmojisByChannelProvider)[channelId];
+  if (used == null) return const [];
+  return [
+    for (final emoji in unicodeEmojiCatalog.all)
+      if (used.contains(emoji)) emoji,
   ];
 }

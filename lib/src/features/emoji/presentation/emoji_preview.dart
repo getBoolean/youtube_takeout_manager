@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../application/emoji_providers.dart';
+import '../domain/picker_emoji.dart';
 
 /// A custom emoji image that shows a larger preview with its `:name:` on
 /// hover (desktop) or tap/click, like Discord.
@@ -18,6 +20,14 @@ class EmojiPreview extends ConsumerStatefulWidget {
   /// [emojiMatchesQuery]).
   final String? highlightQuery;
 
+  /// The emojis directly before and after this one, so a run of matched
+  /// emojis gets one continuous marker.
+  final AdjacentEmojis adjacent;
+
+  /// Whether a tap/click opens the preview. When false, taps pass through
+  /// (e.g. to place the caret in a text field) and only hover previews.
+  final bool tapToPreview;
+
   const EmojiPreview({
     super.key,
     required this.url,
@@ -25,18 +35,22 @@ class EmojiPreview extends ConsumerStatefulWidget {
     this.name,
     this.resolved,
     this.highlightQuery,
+    this.adjacent = (previousUrl: null, nextUrl: null),
+    this.tapToPreview = true,
   });
 
   /// Key of the marker drawn around an emoji matched by [highlightQuery].
   static const searchMatchKey = ValueKey('emoji-search-match');
 
-  /// For `buildCommentSpans(emojiBuilder: ...)`.
-  static Widget builder(String url, double size) =>
-      EmojiPreview(url: url, size: size);
-
-  /// Like [builder], marking emojis that [query] searches for.
-  static Widget Function(String url, double size) highlighting(String? query) =>
-      (url, size) => EmojiPreview(url: url, size: size, highlightQuery: query);
+  /// For `buildCommentSpans(emojiBuilder: ...)`, marking emojis that [query]
+  /// searches for.
+  static EmojiSpanBuilder highlighting(String? query) =>
+      (url, size, adjacent) => EmojiPreview(
+        url: url,
+        size: size,
+        highlightQuery: query,
+        adjacent: adjacent,
+      );
 
   @override
   ConsumerState<EmojiPreview> createState() => _EmojiPreviewState();
@@ -56,6 +70,26 @@ class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
     final displayName = widget.name ?? lookedUp ?? fallbackEmojiName(key);
     final isResolved =
         widget.resolved ?? (widget.name != null || lookedUp != null);
+
+    final query = widget.highlightQuery;
+    bool adjacentMatches(String? url) {
+      if (url == null) return false;
+      final key = emojiKey(url);
+      final name =
+          ref.watch(emojiNamesByKeyProvider.select((names) => names[key])) ??
+          fallbackEmojiName(key);
+      return emojiMatchesQuery(name, query!);
+    }
+
+    Widget emoji = EmojiImage(url: url, size: widget.size);
+    if (query != null && emojiMatchesQuery(displayName, query)) {
+      emoji = SearchMatchMarker(
+        key: EmojiPreview.searchMatchKey,
+        joinsPrevious: adjacentMatches(widget.adjacent.previousUrl),
+        joinsNext: adjacentMatches(widget.adjacent.nextUrl),
+        child: emoji,
+      );
+    }
 
     return Tooltip(
       key: _tooltipKey,
@@ -92,43 +126,57 @@ class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
           ],
         ),
       ),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
-        child: _searchMatchMarker(
-          theme,
-          matched: switch (widget.highlightQuery) {
-            final query? => emojiMatchesQuery(displayName, query),
-            null => false,
-          },
-          child: EmojiImage(url: url, size: widget.size),
-        ),
-      ),
+      child: widget.tapToPreview
+          ? GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+              child: emoji,
+            )
+          : emoji,
     );
   }
+}
 
-  /// A tinted, outlined backdrop the size of the emoji, so the text around it
-  /// doesn't shift.
-  Widget _searchMatchMarker(
-    ThemeData theme, {
-    required bool matched,
-    required Widget child,
-  }) {
-    if (!matched) return child;
-    final radius = BorderRadius.circular(widget.size / 4);
-    return DecoratedBox(
-      key: EmojiPreview.searchMatchKey,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: radius,
+/// A picker emoji: a channel's image or a standard emoji's glyph.
+class PickerEmojiImage extends StatelessWidget {
+  final PickerEmoji emoji;
+  final double size;
+
+  const PickerEmojiImage({super.key, required this.emoji, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (emoji) {
+      CustomPickerEmoji(:final emoji) => EmojiImage(url: emoji.url, size: size),
+      UnicodePickerEmoji(:final emoji) => EmojiGlyph(
+        emoji: emoji.emoji,
+        size: size,
       ),
-      child: DecoratedBox(
-        position: DecorationPosition.foreground,
-        decoration: BoxDecoration(
-          border: Border.all(color: theme.colorScheme.primary, width: 1.5),
-          borderRadius: radius,
+    };
+  }
+}
+
+/// A standard emoji drawn with the platform emoji font in a [size] square,
+/// so it lines up with [EmojiImage]s.
+class EmojiGlyph extends StatelessWidget {
+  final String emoji;
+  final double size;
+
+  const EmojiGlyph({super.key, required this.emoji, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: Center(
+        child: Text(
+          emoji,
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
+          textScaler: TextScaler.noScaling,
+          style: TextStyle(fontSize: size * 0.8, height: 1),
         ),
-        child: child,
       ),
     );
   }

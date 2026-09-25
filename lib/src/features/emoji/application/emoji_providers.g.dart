@@ -235,6 +235,60 @@ final class AllChannelEmojiGroupsProvider
 String _$allChannelEmojiGroupsHash() =>
     r'd015f9dc7250f39aae55e6b7a78d0ab62a3473df';
 
+/// Emojis the user inserted into a search, most used first (ties: most
+/// recent). Once full, the least recently used entry makes room for a new one.
+
+@ProviderFor(FrequentEmojis)
+final frequentEmojisProvider = FrequentEmojisProvider._();
+
+/// Emojis the user inserted into a search, most used first (ties: most
+/// recent). Once full, the least recently used entry makes room for a new one.
+final class FrequentEmojisProvider
+    extends $AsyncNotifierProvider<FrequentEmojis, List<EmojiUse>> {
+  /// Emojis the user inserted into a search, most used first (ties: most
+  /// recent). Once full, the least recently used entry makes room for a new one.
+  FrequentEmojisProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'frequentEmojisProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$frequentEmojisHash();
+
+  @$internal
+  @override
+  FrequentEmojis create() => FrequentEmojis();
+}
+
+String _$frequentEmojisHash() => r'0af6917bc8d80a4c3618e10e0f367aed837ef2d0';
+
+/// Emojis the user inserted into a search, most used first (ties: most
+/// recent). Once full, the least recently used entry makes room for a new one.
+
+abstract class _$FrequentEmojis extends $AsyncNotifier<List<EmojiUse>> {
+  FutureOr<List<EmojiUse>> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<List<EmojiUse>>, List<EmojiUse>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<List<EmojiUse>>, List<EmojiUse>>,
+              AsyncValue<List<EmojiUse>>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 /// Emoji picker section for a single channel (empty if it has no emojis).
 
 @ProviderFor(channelEmojiGroups)
@@ -326,4 +380,213 @@ final class ChannelEmojiGroupsFamily extends $Family
 
   @override
   String toString() => r'channelEmojiGroupsProvider';
+}
+
+/// Standard emojis in each channel's comments and live chats: the ones a
+/// search there would find (see [UnicodeEmojiCatalog.find]).
+
+@ProviderFor(unicodeEmojisByChannel)
+final unicodeEmojisByChannelProvider = UnicodeEmojisByChannelProvider._();
+
+/// Standard emojis in each channel's comments and live chats: the ones a
+/// search there would find (see [UnicodeEmojiCatalog.find]).
+
+final class UnicodeEmojisByChannelProvider
+    extends
+        $FunctionalProvider<
+          Map<String, Set<UnicodeEmoji>>,
+          Map<String, Set<UnicodeEmoji>>,
+          Map<String, Set<UnicodeEmoji>>
+        >
+    with $Provider<Map<String, Set<UnicodeEmoji>>> {
+  /// Standard emojis in each channel's comments and live chats: the ones a
+  /// search there would find (see [UnicodeEmojiCatalog.find]).
+  UnicodeEmojisByChannelProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'unicodeEmojisByChannelProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$unicodeEmojisByChannelHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, Set<UnicodeEmoji>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<String, Set<UnicodeEmoji>> create(Ref ref) {
+    return unicodeEmojisByChannel(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, Set<UnicodeEmoji>> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, Set<UnicodeEmoji>>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$unicodeEmojisByChannelHash() =>
+    r'17ef29b55196cd3bd792c4017ac0eb60881d9a2b';
+
+/// Standard emojis used in any comment or live chat, in picker order.
+
+@ProviderFor(allUsedUnicodeEmojis)
+final allUsedUnicodeEmojisProvider = AllUsedUnicodeEmojisProvider._();
+
+/// Standard emojis used in any comment or live chat, in picker order.
+
+final class AllUsedUnicodeEmojisProvider
+    extends
+        $FunctionalProvider<
+          List<UnicodeEmoji>,
+          List<UnicodeEmoji>,
+          List<UnicodeEmoji>
+        >
+    with $Provider<List<UnicodeEmoji>> {
+  /// Standard emojis used in any comment or live chat, in picker order.
+  AllUsedUnicodeEmojisProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'allUsedUnicodeEmojisProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$allUsedUnicodeEmojisHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<UnicodeEmoji>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<UnicodeEmoji> create(Ref ref) {
+    return allUsedUnicodeEmojis(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<UnicodeEmoji> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<UnicodeEmoji>>(value),
+    );
+  }
+}
+
+String _$allUsedUnicodeEmojisHash() =>
+    r'06b9c2d96ca2384fb58ab87eb9b0b18f6eefc476';
+
+/// Standard emojis used in [channelId]'s comments and live chats, in picker
+/// order.
+
+@ProviderFor(channelUnicodeEmojis)
+final channelUnicodeEmojisProvider = ChannelUnicodeEmojisFamily._();
+
+/// Standard emojis used in [channelId]'s comments and live chats, in picker
+/// order.
+
+final class ChannelUnicodeEmojisProvider
+    extends
+        $FunctionalProvider<
+          List<UnicodeEmoji>,
+          List<UnicodeEmoji>,
+          List<UnicodeEmoji>
+        >
+    with $Provider<List<UnicodeEmoji>> {
+  /// Standard emojis used in [channelId]'s comments and live chats, in picker
+  /// order.
+  ChannelUnicodeEmojisProvider._({
+    required ChannelUnicodeEmojisFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'channelUnicodeEmojisProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelUnicodeEmojisHash();
+
+  @override
+  String toString() {
+    return r'channelUnicodeEmojisProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<List<UnicodeEmoji>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<UnicodeEmoji> create(Ref ref) {
+    final argument = this.argument as String;
+    return channelUnicodeEmojis(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<UnicodeEmoji> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<UnicodeEmoji>>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ChannelUnicodeEmojisProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$channelUnicodeEmojisHash() =>
+    r'90a176132fe325685d8c72d11c056fcd49398052';
+
+/// Standard emojis used in [channelId]'s comments and live chats, in picker
+/// order.
+
+final class ChannelUnicodeEmojisFamily extends $Family
+    with $FunctionalFamilyOverride<List<UnicodeEmoji>, String> {
+  ChannelUnicodeEmojisFamily._()
+    : super(
+        retry: null,
+        name: r'channelUnicodeEmojisProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Standard emojis used in [channelId]'s comments and live chats, in picker
+  /// order.
+
+  ChannelUnicodeEmojisProvider call(String channelId) =>
+      ChannelUnicodeEmojisProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'channelUnicodeEmojisProvider';
 }

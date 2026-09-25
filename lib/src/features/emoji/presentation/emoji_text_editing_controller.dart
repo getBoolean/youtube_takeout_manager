@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/channel_emoji.dart';
+import '../domain/unicode_emoji.dart';
 import 'emoji_preview.dart';
 
 /// A [TextEditingController] that renders known `:name:` tokens as their
@@ -10,10 +11,22 @@ import 'emoji_preview.dart';
 /// by the rest of the token as invisible zero-size text, so span offsets stay
 /// equal to text offsets. The caret can't rest inside a token, and deleting a
 /// token's edge character removes the whole token.
+///
+/// Typing the closing colon of a standard emoji's `:name:` replaces it with
+/// the emoji (like Discord), unless a channel emoji has that name.
 class EmojiTextEditingController extends TextEditingController {
   EmojiTextEditingController({super.text});
 
   static final _token = RegExp(r':_?([\w-]+):');
+  static final _wordChar = RegExp(r'\w');
+  static final _plainName = RegExp(r'^[\w-]+$');
+
+  /// Standard emojis a typed `:name:` converts to, keyed by lowercase short
+  /// name.
+  Map<String, UnicodeEmoji> unicodeEmojisByName = const {};
+
+  /// Called after a typed `:name:` was converted to [UnicodeEmoji.emoji].
+  ValueChanged<UnicodeEmoji>? onShortcodeConverted;
 
   Map<String, ChannelEmoji> _emojisByName = const {};
 
@@ -80,6 +93,9 @@ class EmojiTextEditingController extends TextEditingController {
       }
     }
 
+    final converted = _convertShortcode(old, next);
+    if (converted != null) return converted;
+
     // Keep the caret / selection edges out of token interiors.
     if (!nextSel.isValid) return next;
     final tokens = emojiTokens(next.text);
@@ -106,6 +122,48 @@ class EmojiTextEditingController extends TextEditingController {
     }
     return next.copyWith(
       selection: nextSel.copyWith(baseOffset: base, extentOffset: extent),
+    );
+  }
+
+  /// When [next] types a single `:` that closes `:name:` for a standard
+  /// emoji, the value with that token replaced by the emoji.
+  TextEditingValue? _convertShortcode(
+    TextEditingValue old,
+    TextEditingValue next,
+  ) {
+    final oldSel = old.selection;
+    final nextSel = next.selection;
+    if (unicodeEmojisByName.isEmpty ||
+        !oldSel.isValid ||
+        !oldSel.isCollapsed ||
+        !nextSel.isValid ||
+        !nextSel.isCollapsed) {
+      return null;
+    }
+    final caret = nextSel.baseOffset;
+    if (caret != oldSel.baseOffset + 1 ||
+        next.text.length != old.text.length + 1 ||
+        next.text[caret - 1] != ':' ||
+        next.text != old.text.replaceRange(caret - 1, caret - 1, ':')) {
+      return null;
+    }
+
+    final open = caret >= 2 ? next.text.lastIndexOf(':', caret - 2) : -1;
+    if (open < 0) return null;
+    // `10:30:` or `word:fire:` isn't a shortcode.
+    if (open > 0 && _wordChar.hasMatch(next.text[open - 1])) return null;
+    final name = next.text.substring(open + 1, caret - 1).toLowerCase();
+    // A channel emoji with this name wins; `:_name:` never matches.
+    if (!_plainName.hasMatch(name) || _emojisByName.containsKey(name)) {
+      return null;
+    }
+    final emoji = unicodeEmojisByName[name];
+    if (emoji == null) return null;
+
+    onShortcodeConverted?.call(emoji);
+    return TextEditingValue(
+      text: next.text.replaceRange(open, caret, emoji.emoji),
+      selection: TextSelection.collapsed(offset: open + emoji.emoji.length),
     );
   }
 
@@ -141,11 +199,13 @@ class EmojiTextEditingController extends TextEditingController {
         ..add(
           WidgetSpan(
             alignment: PlaceholderAlignment.middle,
+            // A click places the caret instead of opening the preview.
             child: EmojiPreview(
               url: emoji.url,
               size: emojiSize,
               name: emoji.name,
               resolved: emoji.resolved,
+              tapToPreview: false,
             ),
           ),
         )

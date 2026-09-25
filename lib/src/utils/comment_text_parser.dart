@@ -102,6 +102,13 @@ String searchableCommentText(
   }).join();
 }
 
+/// Lowercases [text] and drops U+FE0F (emoji presentation selector) so `❤️`
+/// and `❤` match each other. Apply to both the query and the searched text.
+String foldForSearch(String text) {
+  final lower = text.toLowerCase();
+  return lower.contains('\u{FE0F}') ? lower.replaceAll('\u{FE0F}', '') : lower;
+}
+
 final _underscoreEmojiToken = RegExp(r':_(?=[\w-])');
 
 /// Rewrites YouTube's `:_name:` shortcut form to `:name:`, including a token
@@ -124,25 +131,40 @@ bool emojiMatchesQuery(String name, String query) {
       .any((match) => token.contains(match[0]!));
 }
 
+/// The custom emojis directly before and after one, with no text between.
+typedef AdjacentEmojis = ({String? previousUrl, String? nextUrl});
+
+typedef EmojiSpanBuilder =
+    Widget Function(String url, double size, AdjacentEmojis adjacent);
+
 /// Builds an [InlineSpan] list from raw comment JSON for use in [Text.rich].
 ///
 /// [emojiBuilder] replaces the default emoji image (e.g. to add a preview).
 List<InlineSpan> buildCommentSpans(
   String raw, {
   required double emojiSize,
-  Widget Function(String url, double size)? emojiBuilder,
+  EmojiSpanBuilder? emojiBuilder,
 }) {
   final segments = parseCommentSegments(raw);
   if (segments.isEmpty) return const [];
 
-  return segments
+  String? emojiUrlAt(int i) =>
+      switch (i >= 0 && i < segments.length ? segments[i] : null) {
+        EmojiSegment(:final url) => url,
+        _ => null,
+      };
+
+  return segments.indexed
       .map<InlineSpan>(
-        (s) => switch (s) {
+        (entry) => switch (entry.$2) {
           TextSegment(:final text) => TextSpan(text: text),
           EmojiSegment(:final url) => WidgetSpan(
             alignment: PlaceholderAlignment.middle,
             child:
-                emojiBuilder?.call(url, emojiSize) ??
+                emojiBuilder?.call(url, emojiSize, (
+                  previousUrl: emojiUrlAt(entry.$1 - 1),
+                  nextUrl: emojiUrlAt(entry.$1 + 1),
+                )) ??
                 Image.network(
                   url,
                   width: emojiSize,

@@ -4,8 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/features/emoji/data/unicode_emoji_catalog.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/channel_emoji.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_picker_panel.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_text_editing_controller.dart';
 
 const _shortsad = ChannelEmoji(
@@ -25,6 +29,23 @@ const _shypraise = ChannelEmoji(
   resolved: true,
 );
 
+const _customFire = ChannelEmoji(
+  key: 'k3',
+  url: 'https://yt3.ggpht.com/k3',
+  name: 'fire',
+  channelId: 'UC1',
+  usageCount: 2,
+  resolved: true,
+);
+const _shylily = [
+  ChannelEmojiGroup(
+    channelId: 'UC1',
+    channelTitle: 'Shylily',
+    emojis: [_shortsad, _shypraise],
+  ),
+];
+const _fire = '\u{1F525}';
+
 EmojiTextEditingController _controller(String text) =>
     EmojiTextEditingController()
       ..emojisByName = {'shortsad': _shortsad}
@@ -32,6 +53,15 @@ EmojiTextEditingController _controller(String text) =>
         text: text,
         selection: TextSelection.collapsed(offset: text.length),
       );
+
+/// Types [char] at the caret, like a keyboard.
+void _type(EmojiTextEditingController controller, String char) {
+  final caret = controller.selection.baseOffset;
+  controller.value = TextEditingValue(
+    text: controller.text.replaceRange(caret, caret, char),
+    selection: TextSelection.collapsed(offset: caret + char.length),
+  );
+}
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -99,8 +129,67 @@ void main() {
     });
   });
 
+  group('EmojiTextEditingController shortcodes', () {
+    EmojiTextEditingController typing(
+      String text, {
+      Map<String, ChannelEmoji> channelEmojis = const {},
+      ValueChanged<UnicodeEmoji>? onConverted,
+    }) => EmojiTextEditingController()
+      ..unicodeEmojisByName = unicodeEmojiCatalog.byShortName
+      ..onShortcodeConverted = onConverted
+      ..emojisByName = channelEmojis
+      ..value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+
+    test('typing the closing colon converts a standard :name:', () {
+      final converted = <String>[];
+      final controller = typing(
+        'hi :fire',
+        onConverted: (e) => converted.add(e.shortName),
+      );
+      _type(controller, ':');
+      expect(controller.text, 'hi $_fire');
+      expect(controller.selection.baseOffset, controller.text.length);
+      expect(converted, ['fire']);
+    });
+
+    test('a channel emoji with the same name wins', () {
+      final controller = typing(
+        'hi :fire',
+        channelEmojis: {'fire': _customFire},
+      );
+      _type(controller, ':');
+      expect(controller.text, 'hi :fire:');
+    });
+
+    test('leaves other colons alone', () {
+      for (final text in [':nope', ':_fire', 'x:fire', '10:30']) {
+        final controller = typing(text);
+        _type(controller, ':');
+        expect(controller.text, '$text:');
+      }
+    });
+
+    test('a pasted :name: is not converted', () {
+      final controller = typing('hi :fire:');
+      expect(controller.text, 'hi :fire:');
+    });
+
+    test('nothing converts without a catalog', () {
+      final controller = typing('hi :fire')..unicodeEmojisByName = const {};
+      _type(controller, ':');
+      expect(controller.text, 'hi :fire:');
+    });
+  });
+
   group('DebouncedSearchBar emoji autocomplete', () {
-    Future<List<String>> pumpBar(WidgetTester tester) async {
+    Future<List<String>> pumpBar(
+      WidgetTester tester, {
+      List<ChannelEmojiGroup> groups = _shylily,
+      List<UnicodeEmoji>? standard,
+    }) async {
       final queries = <String>[];
       await tester.pumpWidget(
         ProviderScope(
@@ -109,14 +198,9 @@ void main() {
               body: DebouncedSearchBar(
                 hintText: 'Search',
                 onQueryChanged: queries.add,
-                emojis: const EmojiSearchConfig(
-                  groups: [
-                    ChannelEmojiGroup(
-                      channelId: 'UC1',
-                      channelTitle: 'Shylily',
-                      emojis: [_shortsad, _shypraise],
-                    ),
-                  ],
+                emojis: EmojiSearchConfig(
+                  groups: groups,
+                  standardEmojis: standard ?? unicodeEmojiCatalog.all,
                 ),
               ),
             ),
@@ -124,6 +208,25 @@ void main() {
         ),
       );
       return queries;
+    }
+
+    String fieldText(WidgetTester tester) =>
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text;
+
+    Future<void> openPicker(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Search by emoji'));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> findInPicker(WidgetTester tester, String text) async {
+      await tester.enterText(
+        find.descendant(
+          of: find.byType(EmojiPickerPanel),
+          matching: find.byType(TextField),
+        ),
+        text,
+      );
+      await tester.pump();
     }
 
     testWidgets('typing :sh suggests and Enter inserts the token', (
@@ -200,5 +303,189 @@ void main() {
       expect(controller.selection.isCollapsed, isTrue);
       expect(controller.selection.baseOffset, controller.text.length);
     }, variant: TargetPlatformVariant.desktop());
+
+    testWidgets('picker lists standard emojis by category', (tester) async {
+      await pumpBar(tester);
+      await openPicker(tester);
+
+      expect(find.text('SHYLILY'), findsOneWidget);
+      expect(find.text('PEOPLE'), findsOneWidget);
+      expect(find.text('FREQUENTLY USED'), findsNothing);
+    });
+
+    testWidgets('finding and picking a standard emoji inserts it', (
+      tester,
+    ) async {
+      final queries = await pumpBar(tester);
+      await openPicker(tester);
+      await findInPicker(tester, 'fire');
+
+      expect(find.text('SHYLILY'), findsNothing);
+      await tester.tap(find.bySemanticsLabel(':fire:'));
+      await tester.pumpAndSettle(const Duration(milliseconds: 400));
+
+      expect(fieldText(tester), _fire);
+      expect(queries.last, _fire);
+    });
+
+    testWidgets('picked emojis show under Frequently Used', (tester) async {
+      await pumpBar(tester);
+      await openPicker(tester);
+      await findInPicker(tester, 'fire');
+      await tester.tap(find.bySemanticsLabel(':fire:'));
+      await tester.pumpAndSettle();
+
+      await openPicker(tester);
+      expect(find.text('FREQUENTLY USED'), findsOneWidget);
+      expect(find.bySemanticsLabel(':fire:'), findsWidgets);
+
+      // Hidden while filtering, like Discord.
+      await findInPicker(tester, 'fire');
+      expect(find.text('FREQUENTLY USED'), findsNothing);
+    });
+
+    testWidgets('the rail jumps to a category', (tester) async {
+      await pumpBar(tester);
+      await openPicker(tester);
+      expect(find.text('FLAGS').hitTestable(), findsNothing);
+
+      final rail = find.descendant(
+        of: find.byType(EmojiPickerPanel),
+        matching: find.byType(ListView),
+      );
+      await tester.scrollUntilVisible(
+        find.byTooltip('Flags'),
+        100,
+        scrollable: find.descendant(
+          of: rail,
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.tap(find.byTooltip('Flags'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('FLAGS').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('standard emojis are offered without channel emojis', (
+      tester,
+    ) async {
+      await pumpBar(tester, groups: const []);
+      await openPicker(tester);
+
+      expect(find.text('PEOPLE'), findsOneWidget);
+    });
+
+    testWidgets('offers only the given standard emojis', (tester) async {
+      final fire = unicodeEmojiCatalog.byShortName['fire']!;
+      await pumpBar(tester, standard: [fire]);
+      await openPicker(tester);
+
+      expect(find.text('NATURE'), findsOneWidget);
+      expect(find.text('PEOPLE'), findsNothing);
+      expect(find.byTooltip('People'), findsNothing);
+      expect(find.bySemanticsLabel(':fire:'), findsOneWidget);
+      expect(find.bySemanticsLabel(':grinning:'), findsNothing);
+
+      // Suggestions and typed names are limited the same way.
+      await tester.tapAt(Offset.zero);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), ':fi');
+      await tester.pump();
+      expect(find.text(':fire:'), findsOneWidget);
+      expect(find.text(':fish:'), findsNothing);
+
+      await tester.enterText(find.byType(TextField), ':fish');
+      await tester.enterText(find.byType(TextField), ':fish:');
+      await tester.pump();
+      expect(fieldText(tester), ':fish:');
+    });
+
+    testWidgets('no emoji button without any emojis', (tester) async {
+      await pumpBar(tester, groups: const [], standard: const []);
+      expect(find.byTooltip('Search by emoji'), findsNothing);
+    });
+
+    testWidgets(':fir suggests 🔥 and Enter inserts it', (tester) async {
+      await pumpBar(tester);
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'lit :fir');
+      await tester.pump();
+
+      expect(find.text(':fire:'), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(fieldText(tester), 'lit $_fire');
+    });
+
+    testWidgets('typing :fire: converts it', (tester) async {
+      final queries = await pumpBar(tester);
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), ':fire');
+      await tester.enterText(find.byType(TextField), ':fire:');
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(fieldText(tester), _fire);
+      expect(queries.last, _fire);
+    });
+
+    testWidgets('a channel emoji and a standard one can share a name', (
+      tester,
+    ) async {
+      await pumpBar(
+        tester,
+        groups: const [
+          ChannelEmojiGroup(channelId: 'UC1', emojis: [_customFire]),
+        ],
+      );
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), ':fire');
+      await tester.pump();
+
+      // The channel emoji first, then the standard one.
+      expect(find.text(':fire:'), findsNWidgets(2));
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      expect(fieldText(tester), _fire);
+
+      // Typing the name in full keeps the channel emoji.
+      await tester.enterText(find.byType(TextField), ':fire');
+      await tester.enterText(find.byType(TextField), ':fire:');
+      await tester.pump();
+      expect(fieldText(tester), ':fire:');
+    });
+
+    testWidgets('clicking an emoji in the field places the caret', (
+      tester,
+    ) async {
+      await pumpBar(tester);
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'a :shortsad: b');
+      await tester.pump();
+
+      await tester.tap(find.byType(EmojiPreview));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text(':shortsad:'), findsNothing); // no preview
+      final selection = tester
+          .widget<TextField>(find.byType(TextField))
+          .controller!
+          .selection;
+      expect(selection.isCollapsed, isTrue);
+      expect(selection.baseOffset, anyOf(2, 12));
+      await tester.pumpAndSettle(const Duration(seconds: 3));
+    });
+
+    testWidgets('a time is not an emoji name', (tester) async {
+      await pumpBar(tester);
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'at 10:30');
+      await tester.pump();
+
+      expect(find.textContaining('EMOJI MATCHING'), findsNothing);
+    });
   });
 }

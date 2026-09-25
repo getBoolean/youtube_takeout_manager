@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/channel_cache_repository.dart';
 import '../data/youtube_channel_repository.dart';
 import '../domain/channel.dart';
@@ -25,11 +26,11 @@ class ChannelSearchQuery extends _$ChannelSearchQuery {
 @riverpod
 List<Channel> filteredChannels(Ref ref) {
   final channels = ref.watch(channelsProvider);
-  final query = ref.watch(channelSearchQueryProvider).toLowerCase();
+  final query = foldForSearch(ref.watch(channelSearchQueryProvider));
   if (query.isEmpty) return channels;
   return channels.where((c) {
-    final title = c.channelTitle?.toLowerCase();
-    if (title != null) return title.contains(query);
+    final title = c.channelTitle;
+    if (title != null) return foldForSearch(title).contains(query);
     return c.channelId.toLowerCase().contains(query);
   }).toList();
 }
