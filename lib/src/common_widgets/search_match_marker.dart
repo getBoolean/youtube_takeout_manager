@@ -8,12 +8,12 @@ import 'package:flutter/rendering.dart';
 /// the marked part of [child] (all of it, less [inset]).
 ///
 /// The outline sits far enough outside the marked area that its rounded
-/// corners clear even a square emoji, so it never covers the emoji. It may
-/// reach above and below [child] into the line spacing, so lines keep their
-/// height, and adds room at the ends of a run so it doesn't cover neighbours.
+/// corners clear even a square emoji, so it never covers the emoji. The
+/// marker makes room for it, so it doesn't cover neighbours or other lines.
 ///
 /// A run of adjacent matches reads as one highlight: [joinsPrevious] and
-/// [joinsNext] drop the rounded end and side line where the run continues.
+/// [joinsNext] drop the rounded end and side line where the run continues on
+/// the same line, and space the emojis like the outline.
 class SearchMatchMarker extends SingleChildRenderObjectWidget {
   /// The part of [child] not to mark, e.g. the space a text line reserves
   /// around its glyphs.
@@ -32,26 +32,26 @@ class SearchMatchMarker extends SingleChildRenderObjectWidget {
   @override
   RenderObject createRenderObject(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     return _RenderSearchMatchMarker(
       fill: colorScheme.primaryContainer,
       outline: colorScheme.primary,
       inset: inset,
-      joinsLeft: rtl ? joinsNext : joinsPrevious,
-      joinsRight: rtl ? joinsPrevious : joinsNext,
+      joinsPrevious: joinsPrevious,
+      joinsNext: joinsNext,
+      textDirection: Directionality.of(context),
     );
   }
 
   @override
   void updateRenderObject(BuildContext context, RenderObject renderObject) {
     final colorScheme = Theme.of(context).colorScheme;
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     (renderObject as _RenderSearchMatchMarker)
       ..fill = colorScheme.primaryContainer
       ..outline = colorScheme.primary
       ..inset = inset
-      ..joinsLeft = rtl ? joinsNext : joinsPrevious
-      ..joinsRight = rtl ? joinsPrevious : joinsNext;
+      ..joinsPrevious = joinsPrevious
+      ..joinsNext = joinsNext
+      ..textDirection = Directionality.of(context);
   }
 }
 
@@ -65,13 +65,15 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
     required Color fill,
     required Color outline,
     required EdgeInsets inset,
-    required bool joinsLeft,
-    required bool joinsRight,
+    required bool joinsPrevious,
+    required bool joinsNext,
+    required TextDirection textDirection,
   }) : _fill = fill,
        _outline = outline,
        _inset = inset,
-       _joinsLeft = joinsLeft,
-       _joinsRight = joinsRight,
+       _joinsPrevious = joinsPrevious,
+       _joinsNext = joinsNext,
+       _textDirection = textDirection,
        super(null);
 
   Color _fill;
@@ -95,19 +97,30 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
     markNeedsLayout();
   }
 
-  bool _joinsLeft;
-  set joinsLeft(bool value) {
-    if (value == _joinsLeft) return;
-    _joinsLeft = value;
+  bool _joinsPrevious;
+  set joinsPrevious(bool value) {
+    if (value == _joinsPrevious) return;
+    _joinsPrevious = value;
     markNeedsLayout();
   }
 
-  bool _joinsRight;
-  set joinsRight(bool value) {
-    if (value == _joinsRight) return;
-    _joinsRight = value;
+  bool _joinsNext;
+  set joinsNext(bool value) {
+    if (value == _joinsNext) return;
+    _joinsNext = value;
     markNeedsLayout();
   }
+
+  TextDirection _textDirection;
+  set textDirection(TextDirection value) {
+    if (value == _textDirection) return;
+    _textDirection = value;
+    markNeedsLayout();
+  }
+
+  bool get _rtl => _textDirection == TextDirection.rtl;
+  bool get _joinsLeft => _rtl ? _joinsNext : _joinsPrevious;
+  bool get _joinsRight => _rtl ? _joinsPrevious : _joinsNext;
 
   /// How far the outline's outer edge sits outside a marked area this tall.
   /// With radius r = (height + 2 * spread) / 4, the outline's inner edge
@@ -116,35 +129,63 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
       (_strokeWidth * (1 - _cornerCut) + _cornerCut * markedHeight / 4) /
       (1 - _cornerCut / 2);
 
-  /// Room beside [childSize] for the outline, at the ends of a run.
-  (double, double) _sidePadding(Size childSize) {
+  /// Room around a child of [childSize] for the outline, plus half the gap
+  /// between an emoji and its outline: emojis in a run, and a marker and
+  /// whatever is next to it (another line's marker, say), are that far
+  /// apart.
+  EdgeInsets _padding(Size childSize) {
     final spread = _spread(childSize.height - _inset.vertical);
-    return (
-      _joinsLeft ? 0.0 : math.max(0.0, spread - _inset.left),
-      _joinsRight ? 0.0 : math.max(0.0, spread - _inset.right),
+    final halfGap = (spread - _strokeWidth) / 2;
+    double side(double inset, {required bool joined}) =>
+        math.max(0.0, (joined ? halfGap : spread + halfGap) - inset);
+    return EdgeInsets.fromLTRB(
+      side(_inset.left, joined: _joinsLeft),
+      side(_inset.top, joined: false),
+      side(_inset.right, joined: _joinsRight),
+      side(_inset.bottom, joined: false),
     );
   }
 
-  Size _sizeFor(Size childSize, BoxConstraints constraints) {
-    final (left, right) = _sidePadding(childSize);
-    return constraints.constrain(
-      Size(childSize.width + left + right, childSize.height),
+  Size _sizeFor(Size childSize, BoxConstraints constraints) =>
+      constraints.constrain(_padding(childSize).inflateSize(childSize));
+
+  @override
+  double computeMinIntrinsicWidth(double height) {
+    final child = this.child;
+    if (child == null) return 0;
+    final childSize = Size(
+      child.getMinIntrinsicWidth(height),
+      child.getMinIntrinsicHeight(double.infinity),
     );
-  }
-
-  double _intrinsicWidth(double childWidth) {
-    final childHeight = child!.getMinIntrinsicHeight(double.infinity);
-    final (left, right) = _sidePadding(Size(childWidth, childHeight));
-    return childWidth + left + right;
+    return _padding(childSize).inflateSize(childSize).width;
   }
 
   @override
-  double computeMinIntrinsicWidth(double height) =>
-      child == null ? 0 : _intrinsicWidth(child!.getMinIntrinsicWidth(height));
+  double computeMaxIntrinsicWidth(double height) {
+    final child = this.child;
+    if (child == null) return 0;
+    final childSize = Size(
+      child.getMaxIntrinsicWidth(height),
+      child.getMinIntrinsicHeight(double.infinity),
+    );
+    return _padding(childSize).inflateSize(childSize).width;
+  }
 
   @override
-  double computeMaxIntrinsicWidth(double height) =>
-      child == null ? 0 : _intrinsicWidth(child!.getMaxIntrinsicWidth(height));
+  double computeMinIntrinsicHeight(double width) {
+    final child = this.child;
+    if (child == null) return 0;
+    final height = child.getMinIntrinsicHeight(width);
+    return height + _padding(Size(width, height)).vertical;
+  }
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    final child = this.child;
+    if (child == null) return 0;
+    final height = child.getMaxIntrinsicHeight(width);
+    return height + _padding(Size(width, height)).vertical;
+  }
 
   @override
   Size computeDryLayout(BoxConstraints constraints) {
@@ -157,7 +198,14 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
   double? computeDryBaseline(
     BoxConstraints constraints,
     TextBaseline baseline,
-  ) => child?.getDryBaseline(constraints.loosen(), baseline);
+  ) {
+    final child = this.child;
+    if (child == null) return null;
+    final childConstraints = constraints.loosen();
+    final childBaseline = child.getDryBaseline(childConstraints, baseline);
+    if (childBaseline == null) return null;
+    return childBaseline + _padding(child.getDryLayout(childConstraints)).top;
+  }
 
   @override
   void performLayout() {
@@ -167,9 +215,31 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
       return;
     }
     child.layout(constraints.loosen(), parentUsesSize: true);
-    final (left, _) = _sidePadding(child.size);
-    (child.parentData! as BoxParentData).offset = Offset(left, 0);
+    (child.parentData! as BoxParentData).offset = _padding(child.size).topLeft;
     size = _sizeFor(child.size, constraints);
+  }
+
+  /// Whether the emoji beside this one on [left] (in a run) is on the same
+  /// line. A run can wrap: then each line's part gets its own rounded end.
+  bool _neighbourOnSameLine({required bool left}) {
+    RenderObject? inline = this;
+    while (inline != null && inline.parent is! RenderParagraph) {
+      inline = inline.parent;
+    }
+    if (inline is! RenderBox) return true;
+    final data = inline.parentData! as TextParentData;
+    final neighbour = left == _rtl ? data.nextSibling : data.previousSibling;
+    final mine = data.offset;
+    final theirs = (neighbour?.parentData as TextParentData?)?.offset;
+    if (neighbour == null || mine == null || theirs == null) return false;
+    // Boxes on consecutive lines can touch; ones on the same line mostly
+    // coincide.
+    final myBox = mine & inline.size;
+    final theirBox = theirs & neighbour.size;
+    final shared =
+        math.min(myBox.bottom, theirBox.bottom) -
+        math.max(myBox.top, theirBox.top);
+    return shared > math.min(myBox.height, theirBox.height) / 2;
   }
 
   @override
@@ -178,27 +248,40 @@ class _RenderSearchMatchMarker extends RenderShiftedBox {
     if (child == null) return;
     final childOffset = offset + (child.parentData! as BoxParentData).offset;
     final marked = _inset.deflateRect(childOffset & child.size);
-    final box = marked.inflate(_spread(marked.height));
-    final radius = box.height / 4;
+    final spread = _spread(marked.height);
+    final joinsLeft = _joinsLeft && _neighbourOnSameLine(left: true);
+    final joinsRight = _joinsRight && _neighbourOnSameLine(left: false);
 
-    // A joined side runs past this emoji's edge and is clipped there, so the
-    // rounding and side line only appear at the ends of a run.
+    // A joined side stops at this emoji's edge, where the neighbour's part
+    // of the run continues.
     final bounds = offset & size;
-    final clip = Rect.fromLTRB(
-      _joinsLeft ? bounds.left : box.left,
-      box.top,
-      _joinsRight ? bounds.right : box.right,
-      box.bottom,
+    final box = Rect.fromLTRB(
+      joinsLeft ? bounds.left : marked.left - spread,
+      marked.top - spread,
+      joinsRight ? bounds.right : marked.right + spread,
+      marked.bottom + spread,
     );
+    final radius = box.height / 4;
+    // The shape runs past a joined side and is clipped there, so the rounding
+    // and side line only appear at the ends of a run.
     final overhang = radius + _strokeWidth;
     RRect shape(double strokeInset) => RRect.fromRectAndRadius(
       Rect.fromLTRB(
-        _joinsLeft ? box.left - overhang : box.left + strokeInset,
+        joinsLeft ? box.left - overhang : box.left + strokeInset,
         box.top + strokeInset,
-        _joinsRight ? box.right + overhang : box.right - strokeInset,
+        joinsRight ? box.right + overhang : box.right - strokeInset,
         box.bottom - strokeInset,
       ),
       Radius.circular(radius),
+    );
+    // Overlap the neighbour's half of the gap so the two parts leave no
+    // anti-aliased seam; it's clear of both emojis and painted alike.
+    final joinOverlap = (spread - _strokeWidth) / 2;
+    final clip = Rect.fromLTRB(
+      joinsLeft ? box.left - joinOverlap : box.left,
+      box.top,
+      joinsRight ? box.right + joinOverlap : box.right,
+      box.bottom,
     );
 
     context.canvas

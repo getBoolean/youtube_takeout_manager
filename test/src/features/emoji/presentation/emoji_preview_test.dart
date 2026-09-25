@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
+import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -136,6 +137,66 @@ void main() {
       final shape = tester.widget<SearchMatchMarker>(marker);
       expect(shape.joinsPrevious, isTrue);
       expect(shape.joinsNext, isFalse);
+    });
+
+    testWidgets('spaces a run apart and keeps wrapped lines apart', (
+      tester,
+    ) async {
+      String emoji(String key) =>
+          '{"text":"","emoji":{"customEmojiUrl":"https://yt3.ggpht.com/$key"}}';
+      final raw = [for (var i = 0; i < 9; i++) emoji('k$i')].join(',');
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            emojiNamesByKeyProvider.overrideWithValue({
+              for (var i = 0; i < 9; i++) 'k$i': 'shortsad',
+            }),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: SizedBox(
+                width: 120,
+                child: Text.rich(
+                  TextSpan(
+                    children: buildCommentSpans(
+                      raw,
+                      emojiSize: 20,
+                      emojiBuilder: EmojiPreview.highlighting(':shortsad'),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      Rect rectOf(Element element) {
+        final box = element.renderObject! as RenderBox;
+        return box.localToGlobal(Offset.zero) & box.size;
+      }
+
+      final images = find.byType(EmojiImage).evaluate().map(rectOf).toList();
+      final markers = marker.evaluate().map(rectOf).toList();
+      final lines = {for (final rect in images) rect.top}.length;
+      expect(lines, greaterThan(1));
+      // Emojis in a run are a gap apart: half from each marker's padding.
+      final gaps = [
+        for (var i = 1; i < images.length; i++)
+          if (images[i - 1].top == images[i].top)
+            images[i].left - images[i - 1].right,
+      ];
+      expect(gaps, everyElement(greaterThan(0)));
+      // Each marker also keeps half a gap clear above and below its pill, so
+      // pills on consecutive lines don't touch while the markers overlap by
+      // less than a gap (text layout may place them a fraction apart).
+      for (final a in markers) {
+        for (final b in markers) {
+          if (a.top < b.top && a.bottom > b.top) {
+            expect(a.bottom - b.top, lessThan(gaps.first));
+          }
+        }
+      }
     });
   });
 }
