@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../../domain/video_group.dart';
@@ -169,12 +170,16 @@ class VideoGroupHeader extends ConsumerWidget {
 
   Widget _buildThumbnail(String? thumbnailUrl, ThemeData theme) {
     if (thumbnailUrl != null) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          thumbnailUrl,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => _placeholderIcon(theme),
+      // Right-click only: a long press on the header starts selection.
+      return ImageUrlMenu(
+        url: thumbnailUrl,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            thumbnailUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, _, _) => _placeholderIcon(theme),
+          ),
         ),
       );
     }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../application/emoji_providers.dart';
@@ -141,19 +141,9 @@ class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
   }
 }
 
-/// Copies a channel emoji's image URL from the Takeout, e.g. to check one
-/// that won't load.
-Future<void> copyEmojiUrl(BuildContext context, String url) async {
-  await Clipboard.setData(ClipboardData(text: url));
-  if (!context.mounted) return;
-  ScaffoldMessenger.maybeOf(
-    context,
-  )?.showSnackBar(const SnackBar(content: Text('Image URL copied')));
-}
-
-/// Offers "Copy image URL" for a channel emoji on right-click, and on long
-/// press when [longPress] is set.
-class EmojiUrlMenu extends StatefulWidget {
+/// Offers "Copy image URL" for a channel emoji's Takeout URL (see
+/// [ImageUrlMenu]).
+class EmojiUrlMenu extends StatelessWidget {
   final String url;
   final bool longPress;
   final Widget child;
@@ -166,50 +156,13 @@ class EmojiUrlMenu extends StatefulWidget {
   });
 
   @override
-  State<EmojiUrlMenu> createState() => _EmojiUrlMenuState();
-}
-
-class _EmojiUrlMenuState extends State<EmojiUrlMenu> {
-  final _controller = MenuController();
-
-  @override
-  Widget build(BuildContext context) {
-    return MenuAnchor(
-      controller: _controller,
-      menuChildren: [
-        // Inside the emoji picker (itself a menu) a click elsewhere in the
-        // picker doesn't count as outside this menu, so close it here.
-        TapRegion(onTapOutside: (_) => _controller.close(), child: _item()),
-      ],
-      child: GestureDetector(
-        onSecondaryTapUp: (details) =>
-            _controller.open(position: details.localPosition),
-        onLongPressStart: widget.longPress
-            ? (details) => _controller.open(position: details.localPosition)
-            : null,
-        child: widget.child,
-      ),
-    );
-  }
-
-  Widget _item() {
-    if (!isEmojiImageUrl(widget.url)) {
-      return const MenuItemButton(
-        leadingIcon: Icon(Icons.link_off),
-        child: Text('No image URL in Takeout'),
-      );
-    }
-    return MenuItemButton(
-      leadingIcon: const Icon(Icons.link),
-      // Only this menu: inside the emoji picker the picker stays open.
-      closeOnActivate: false,
-      onPressed: () {
-        _controller.close();
-        copyEmojiUrl(context, widget.url);
-      },
-      child: const Text('Copy image URL'),
-    );
-  }
+  Widget build(BuildContext context) => ImageUrlMenu(
+    url: url,
+    longPress: longPress,
+    // Takeout writes "Failed to get emoji URL" for emojis it couldn't export.
+    unavailableLabel: 'No image URL in Takeout',
+    child: child,
+  );
 }
 
 /// A picker emoji: a channel's image or a standard emoji's glyph.
