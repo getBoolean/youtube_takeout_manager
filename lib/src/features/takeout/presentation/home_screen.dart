@@ -1,5 +1,4 @@
 import 'package:auto_route/auto_route.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -15,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_pr
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
+import '../data/zip_picker_repository.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_import_plan.dart';
 import 'import_confirm_dialog.dart';
@@ -38,12 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Pick files directly from the click handler — browsers require the file
     // input to be triggered within the user gesture context. Going through
     // setState or async Riverpod hops first can break this on web.
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-      allowMultiple: true,
-      withData: true,
-    );
+    final result = await ref.read(zipPickerRepositoryProvider).pickZips();
     if (result == null || result.files.isEmpty) return;
     if (!mounted) return;
 
