@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -55,6 +56,66 @@ void main() {
     expect(preview, findsOneWidget);
     expect(tileTaps.value, 0);
     await tester.pumpAndSettle(const Duration(seconds: 3));
+  });
+
+  testWidgets('right-click copies the image URL, not the tile action', (
+    tester,
+  ) async {
+    String? copied;
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+
+    final tileTaps = await pumpTile(tester);
+    await tester.tap(
+      find.byType(EmojiPreview),
+      buttons: kSecondaryMouseButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Copy image URL'));
+    await tester.pumpAndSettle();
+
+    expect(copied, 'https://yt3.ggpht.com/k1');
+    expect(find.text('Image URL copied'), findsOneWidget);
+    expect(tileTaps.value, 0);
+  });
+
+  testWidgets('offers no URL for an emoji Takeout couldn\'t export', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: EmojiUrlMenu(
+            url: 'Failed to get emoji URL',
+            child: const ColoredBox(
+              color: Colors.orange,
+              child: SizedBox.square(dimension: 20),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(
+      find.byType(EmojiUrlMenu),
+      buttons: kSecondaryMouseButton,
+      kind: PointerDeviceKind.mouse,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Copy image URL'), findsNothing);
+    final item = tester.widget<MenuItemButton>(
+      find.widgetWithText(MenuItemButton, 'No image URL in Takeout'),
+    );
+    expect(item.onPressed, isNull);
   });
 
   testWidgets('hover shows the preview and clicking keeps it open', (

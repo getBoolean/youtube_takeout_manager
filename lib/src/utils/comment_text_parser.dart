@@ -75,6 +75,13 @@ String emojiKey(String url) {
   return eq == -1 ? last : last.substring(0, eq);
 }
 
+/// Whether [url] is an image URL. For emojis it couldn't export, Takeout
+/// writes "Failed to get emoji URL" instead.
+bool isEmojiImageUrl(String url) {
+  final scheme = Uri.tryParse(url)?.scheme;
+  return scheme == 'https' || scheme == 'http';
+}
+
 /// Name used for an emoji whose real name could not be resolved.
 String fallbackEmojiName(String key) =>
     'emoji_${key.substring(0, key.length < 6 ? key.length : 6)}';

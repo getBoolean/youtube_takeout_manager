@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -53,6 +54,22 @@ EmojiTextEditingController _controller(String text) =>
         text: text,
         selection: TextSelection.collapsed(offset: text.length),
       );
+
+/// Records text copied to the clipboard.
+ValueNotifier<String?> mockClipboard(WidgetTester tester) {
+  final copied = ValueNotifier<String?>(null);
+  final messenger = tester.binding.defaultBinaryMessenger;
+  messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+    if (call.method == 'Clipboard.setData') {
+      copied.value = (call.arguments as Map)['text'] as String?;
+    }
+    return null;
+  });
+  addTearDown(
+    () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+  );
+  return copied;
+}
 
 /// Types [char] at the caret, like a keyboard.
 void _type(EmojiTextEditingController controller, String char) {
@@ -400,6 +417,45 @@ void main() {
       await tester.enterText(find.byType(TextField), ':fish:');
       await tester.pump();
       expect(fieldText(tester), ':fish:');
+    });
+
+    testWidgets('a channel emoji can copy its image URL', (tester) async {
+      final clipboard = mockClipboard(tester);
+      await pumpBar(tester);
+      await openPicker(tester);
+
+      await tester.tap(
+        find.bySemanticsLabel(':shypraise:'),
+        buttons: kSecondaryMouseButton,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy image URL'));
+      await tester.pumpAndSettle();
+
+      expect(clipboard.value, _shypraise.url);
+      expect(find.text('SHYLILY'), findsOneWidget); // picker still open
+
+      // A click elsewhere in the picker dismisses the menu, not the picker.
+      // (The mouse now hovers the emoji, so the footer names it too.)
+      await tester.tap(
+        find.bySemanticsLabel(':shypraise:').first,
+        buttons: kSecondaryMouseButton,
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Copy image URL'), findsOneWidget);
+      await tester.tap(find.text('SHYLILY'));
+      await tester.pumpAndSettle();
+      expect(find.text('Copy image URL'), findsNothing);
+      expect(find.text('SHYLILY'), findsOneWidget);
+
+      // Long press works too, for touch.
+      await tester.longPress(find.bySemanticsLabel(':shortsad:'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Copy image URL'));
+      await tester.pumpAndSettle();
+      expect(clipboard.value, _shortsad.url);
     });
 
     testWidgets('no emoji button without any emojis', (tester) async {

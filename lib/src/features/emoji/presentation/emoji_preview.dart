@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
@@ -127,12 +128,86 @@ class _EmojiPreviewState extends ConsumerState<EmojiPreview> {
         ),
       ),
       child: widget.tapToPreview
-          ? GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
-              child: emoji,
+          ? EmojiUrlMenu(
+              url: url,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _tooltipKey.currentState?.ensureTooltipVisible(),
+                child: emoji,
+              ),
             )
           : emoji,
+    );
+  }
+}
+
+/// Copies a channel emoji's image URL from the Takeout, e.g. to check one
+/// that won't load.
+Future<void> copyEmojiUrl(BuildContext context, String url) async {
+  await Clipboard.setData(ClipboardData(text: url));
+  if (!context.mounted) return;
+  ScaffoldMessenger.maybeOf(
+    context,
+  )?.showSnackBar(const SnackBar(content: Text('Image URL copied')));
+}
+
+/// Offers "Copy image URL" for a channel emoji on right-click, and on long
+/// press when [longPress] is set.
+class EmojiUrlMenu extends StatefulWidget {
+  final String url;
+  final bool longPress;
+  final Widget child;
+
+  const EmojiUrlMenu({
+    super.key,
+    required this.url,
+    this.longPress = false,
+    required this.child,
+  });
+
+  @override
+  State<EmojiUrlMenu> createState() => _EmojiUrlMenuState();
+}
+
+class _EmojiUrlMenuState extends State<EmojiUrlMenu> {
+  final _controller = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    return MenuAnchor(
+      controller: _controller,
+      menuChildren: [
+        // Inside the emoji picker (itself a menu) a click elsewhere in the
+        // picker doesn't count as outside this menu, so close it here.
+        TapRegion(onTapOutside: (_) => _controller.close(), child: _item()),
+      ],
+      child: GestureDetector(
+        onSecondaryTapUp: (details) =>
+            _controller.open(position: details.localPosition),
+        onLongPressStart: widget.longPress
+            ? (details) => _controller.open(position: details.localPosition)
+            : null,
+        child: widget.child,
+      ),
+    );
+  }
+
+  Widget _item() {
+    if (!isEmojiImageUrl(widget.url)) {
+      return const MenuItemButton(
+        leadingIcon: Icon(Icons.link_off),
+        child: Text('No image URL in Takeout'),
+      );
+    }
+    return MenuItemButton(
+      leadingIcon: const Icon(Icons.link),
+      // Only this menu: inside the emoji picker the picker stays open.
+      closeOnActivate: false,
+      onPressed: () {
+        _controller.close();
+        copyEmojiUrl(context, widget.url);
+      },
+      child: const Text('Copy image URL'),
     );
   }
 }
@@ -188,7 +263,7 @@ class EmojiImage extends StatelessWidget {
   final String url;
   final double size;
 
-  /// Adds an "Image unavailable" caption under the placeholder.
+  /// Adds a caption under the placeholder saying why there's no image.
   final bool explainMissing;
 
   const EmojiImage({
@@ -200,41 +275,47 @@ class EmojiImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!isEmojiImageUrl(url)) {
+      return _placeholder(context, 'Not included in Takeout');
+    }
     return Image.network(
       url,
       width: size,
       height: size,
       webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-      errorBuilder: (context, _, _) {
-        final theme = Theme.of(context);
-        final placeholder = Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(size / 4),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Icon(
-            Icons.image_not_supported_outlined,
-            size: size * 0.6,
+      errorBuilder: (context, _, _) =>
+          _placeholder(context, 'Image no longer available'),
+    );
+  }
+
+  Widget _placeholder(BuildContext context, String reason) {
+    final theme = Theme.of(context);
+    final placeholder = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(size / 4),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Icon(
+        Icons.image_not_supported_outlined,
+        size: size * 0.6,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+    if (!explainMissing) return placeholder;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        placeholder,
+        const SizedBox(height: 4),
+        Text(
+          reason,
+          style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
-        );
-        if (!explainMissing) return placeholder;
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            placeholder,
-            const SizedBox(height: 4),
-            Text(
-              'Image no longer available',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        );
-      },
+        ),
+      ],
     );
   }
 }

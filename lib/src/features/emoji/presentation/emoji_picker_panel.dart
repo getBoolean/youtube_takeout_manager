@@ -434,7 +434,7 @@ class _EmojiCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
+    final cell = Semantics(
       label: emoji.token,
       button: true,
       child: InkWell(
@@ -449,6 +449,14 @@ class _EmojiCell extends StatelessWidget {
         ),
       ),
     );
+    return switch (emoji) {
+      CustomPickerEmoji(:final emoji) => EmojiUrlMenu(
+        url: emoji.url,
+        longPress: true,
+        child: cell,
+      ),
+      UnicodePickerEmoji() => cell,
+    };
   }
 }
 

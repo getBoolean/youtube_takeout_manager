@@ -27,4 +27,19 @@ void main() {
     expect(find.byIcon(Icons.image_not_supported_outlined), findsNWidgets(2));
     expect(find.text('Image no longer available'), findsOneWidget);
   });
+
+  testWidgets('says when Takeout had no image URL', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: EmojiImage(
+          url: 'Failed to get emoji URL',
+          size: 56,
+          explainMissing: true,
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+    expect(find.text('Not included in Takeout'), findsOneWidget);
+  });
 }

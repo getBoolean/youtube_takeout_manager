@@ -85,6 +85,12 @@ void main() {
     });
   });
 
+  test('isEmojiImageUrl rejects what Takeout writes for missing emojis', () {
+    expect(isEmojiImageUrl('https://yt3.ggpht.com/$_key'), isTrue);
+    expect(isEmojiImageUrl('Failed to get emoji URL'), isFalse);
+    expect(isEmojiImageUrl(''), isFalse);
+  });
+
   group('foldForSearch', () {
     test('lowercases and drops the emoji presentation selector', () {
       expect(foldForSearch('Love ❤️ It'), 'love ❤ it');
