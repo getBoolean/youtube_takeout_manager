@@ -438,7 +438,66 @@ final class UnicodeEmojisByChannelProvider
 }
 
 String _$unicodeEmojisByChannelHash() =>
-    r'17ef29b55196cd3bd792c4017ac0eb60881d9a2b';
+    r'045a70835b3f351f365516ce70992fda01bc4576';
+
+/// Standard emojis in the titles of each channel's videos that have the
+/// user's comments or live chats, which a channel search can match.
+
+@ProviderFor(titleUnicodeEmojisByChannel)
+final titleUnicodeEmojisByChannelProvider =
+    TitleUnicodeEmojisByChannelProvider._();
+
+/// Standard emojis in the titles of each channel's videos that have the
+/// user's comments or live chats, which a channel search can match.
+
+final class TitleUnicodeEmojisByChannelProvider
+    extends
+        $FunctionalProvider<
+          Map<String, Set<UnicodeEmoji>>,
+          Map<String, Set<UnicodeEmoji>>,
+          Map<String, Set<UnicodeEmoji>>
+        >
+    with $Provider<Map<String, Set<UnicodeEmoji>>> {
+  /// Standard emojis in the titles of each channel's videos that have the
+  /// user's comments or live chats, which a channel search can match.
+  TitleUnicodeEmojisByChannelProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'titleUnicodeEmojisByChannelProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$titleUnicodeEmojisByChannelHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, Set<UnicodeEmoji>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<String, Set<UnicodeEmoji>> create(Ref ref) {
+    return titleUnicodeEmojisByChannel(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, Set<UnicodeEmoji>> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, Set<UnicodeEmoji>>>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$titleUnicodeEmojisByChannelHash() =>
+    r'd3d59c451f3b9dfd57eca9683a36052f4fb73718';
 
 /// Standard emojis used in any comment or live chat, in picker order.
 
@@ -493,14 +552,16 @@ final class AllUsedUnicodeEmojisProvider
 String _$allUsedUnicodeEmojisHash() =>
     r'06b9c2d96ca2384fb58ab87eb9b0b18f6eefc476';
 
-/// Standard emojis used in [channelId]'s comments and live chats, in picker
-/// order.
+/// Standard emojis a search of [channelId] can find, in picker order: those
+/// in its comments and live chats, and in its video titles while the search
+/// matches them.
 
 @ProviderFor(channelUnicodeEmojis)
 final channelUnicodeEmojisProvider = ChannelUnicodeEmojisFamily._();
 
-/// Standard emojis used in [channelId]'s comments and live chats, in picker
-/// order.
+/// Standard emojis a search of [channelId] can find, in picker order: those
+/// in its comments and live chats, and in its video titles while the search
+/// matches them.
 
 final class ChannelUnicodeEmojisProvider
     extends
@@ -510,8 +571,9 @@ final class ChannelUnicodeEmojisProvider
           List<UnicodeEmoji>
         >
     with $Provider<List<UnicodeEmoji>> {
-  /// Standard emojis used in [channelId]'s comments and live chats, in picker
-  /// order.
+  /// Standard emojis a search of [channelId] can find, in picker order: those
+  /// in its comments and live chats, and in its video titles while the search
+  /// matches them.
   ChannelUnicodeEmojisProvider._({
     required ChannelUnicodeEmojisFamily super.from,
     required String super.argument,
@@ -565,10 +627,11 @@ final class ChannelUnicodeEmojisProvider
 }
 
 String _$channelUnicodeEmojisHash() =>
-    r'90a176132fe325685d8c72d11c056fcd49398052';
+    r'134ebcc73eeee3d81eaef5319b4bfbd32d9247a7';
 
-/// Standard emojis used in [channelId]'s comments and live chats, in picker
-/// order.
+/// Standard emojis a search of [channelId] can find, in picker order: those
+/// in its comments and live chats, and in its video titles while the search
+/// matches them.
 
 final class ChannelUnicodeEmojisFamily extends $Family
     with $FunctionalFamilyOverride<List<UnicodeEmoji>, String> {
@@ -581,8 +644,9 @@ final class ChannelUnicodeEmojisFamily extends $Family
         isAutoDispose: true,
       );
 
-  /// Standard emojis used in [channelId]'s comments and live chats, in picker
-  /// order.
+  /// Standard emojis a search of [channelId] can find, in picker order: those
+  /// in its comments and live chats, and in its video titles while the search
+  /// matches them.
 
   ChannelUnicodeEmojisProvider call(String channelId) =>
       ChannelUnicodeEmojisProvider._(argument: channelId, from: this);

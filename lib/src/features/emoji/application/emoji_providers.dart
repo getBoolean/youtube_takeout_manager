@@ -5,8 +5,11 @@ import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/search_options_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/search_options_state.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
@@ -329,11 +332,11 @@ Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
   void scan(String channelId, String raw) {
     if (!_hasNonAscii(raw)) return;
     for (final segment in parseCommentSegments(raw)) {
-      if (segment is! TextSegment) continue;
-      for (final char in segment.text.characters) {
-        if (unicodeEmojiCatalog.find(char) case final emoji?) {
-          result.putIfAbsent(channelId, () => {}).add(emoji);
-        }
+      if (segment is TextSegment) {
+        _addUnicodeEmojis(
+          segment.text,
+          result.putIfAbsent(channelId, () => {}),
+        );
       }
     }
   }
@@ -349,6 +352,48 @@ Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
     }
   });
   return result;
+}
+
+/// Standard emojis in the titles of each channel's videos that have the
+/// user's comments or live chats, which a channel search can match.
+@Riverpod(keepAlive: true)
+Map<String, Set<UnicodeEmoji>> titleUnicodeEmojisByChannel(Ref ref) {
+  final commentsByChannel = ref.watch(commentsByChannelProvider);
+  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
+  final videos = ref.watch(videoMetadataProvider).value ?? const {};
+
+  final videoIds = <String, Set<String>>{};
+  commentsByChannel.forEach((channelId, comments) {
+    videoIds
+        .putIfAbsent(channelId, () => {})
+        .addAll(comments.map((c) => c.videoId).nonNulls);
+  });
+  liveChatsByChannel.forEach((channelId, chats) {
+    videoIds
+        .putIfAbsent(channelId, () => {})
+        .addAll(chats.map((c) => c.videoId).nonNulls);
+  });
+
+  final result = <String, Set<UnicodeEmoji>>{};
+  videoIds.forEach((channelId, ids) {
+    final emojis = <UnicodeEmoji>{};
+    for (final id in ids) {
+      final title = videos[id]?.title;
+      if (title != null && _hasNonAscii(title)) {
+        _addUnicodeEmojis(title, emojis);
+      }
+    }
+    if (emojis.isNotEmpty) result[channelId] = emojis;
+  });
+  return result;
+}
+
+/// Adds the standard emojis in [text] that a search would find (see
+/// [UnicodeEmojiCatalog.find]) to [into].
+void _addUnicodeEmojis(String text, Set<UnicodeEmoji> into) {
+  for (final char in text.characters) {
+    if (unicodeEmojiCatalog.find(char) case final emoji?) into.add(emoji);
+  }
 }
 
 /// Whether [raw] may contain emojis: non-ASCII text, or a JSON escape of it.
@@ -372,12 +417,20 @@ List<UnicodeEmoji> allUsedUnicodeEmojis(Ref ref) {
   ];
 }
 
-/// Standard emojis used in [channelId]'s comments and live chats, in picker
-/// order.
+/// Standard emojis a search of [channelId] can find, in picker order: those
+/// in its comments and live chats, and in its video titles while the search
+/// matches them.
 @riverpod
 List<UnicodeEmoji> channelUnicodeEmojis(Ref ref, String channelId) {
-  final used = ref.watch(unicodeEmojisByChannelProvider)[channelId];
-  if (used == null) return const [];
+  final matchTitles =
+      ref.watch(searchOptionsProvider).value?.matchGroupTitles ??
+      const SearchOptionsState().matchGroupTitles;
+  final used = {
+    ...?ref.watch(unicodeEmojisByChannelProvider)[channelId],
+    if (matchTitles)
+      ...?ref.watch(titleUnicodeEmojisByChannelProvider)[channelId],
+  };
+  if (used.isEmpty) return const [];
   return [
     for (final emoji in unicodeEmojiCatalog.all)
       if (used.contains(emoji)) emoji,
