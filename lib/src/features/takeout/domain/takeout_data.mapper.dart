@@ -19,6 +19,7 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
       LiveChatMapper.ensureInitialized();
       SubscriptionMapper.ensureInitialized();
       KindSnapshotMapper.ensureInitialized();
+      OwnChannelMapper.ensureInitialized();
     }
     return _instance!;
   }
@@ -104,6 +105,9 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
     _$liveChatsSnapshot,
     opt: true,
   );
+  static Map<String, OwnChannel> _$ownChannels(TakeoutData v) => v.ownChannels;
+  static const Field<TakeoutData, Map<String, OwnChannel>> _f$ownChannels =
+      Field('ownChannels', _$ownChannels, opt: true, def: const {});
 
   @override
   final MappableFields<TakeoutData> fields = const {
@@ -119,6 +123,7 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
     #latestExportAt: _f$latestExportAt,
     #commentsSnapshot: _f$commentsSnapshot,
     #liveChatsSnapshot: _f$liveChatsSnapshot,
+    #ownChannels: _f$ownChannels,
   };
 
   static TakeoutData _instantiate(DecodingData data) {
@@ -135,6 +140,7 @@ class TakeoutDataMapper extends ClassMapperBase<TakeoutData> {
       latestExportAt: data.dec(_f$latestExportAt),
       commentsSnapshot: data.dec(_f$commentsSnapshot),
       liveChatsSnapshot: data.dec(_f$liveChatsSnapshot),
+      ownChannels: data.dec(_f$ownChannels),
     );
   }
 
@@ -210,6 +216,13 @@ abstract class TakeoutDataCopyWith<$R, $In extends TakeoutData, $Out>
   get subscriptionsByChannelId;
   KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get commentsSnapshot;
   KindSnapshotCopyWith<$R, KindSnapshot, KindSnapshot>? get liveChatsSnapshot;
+  MapCopyWith<
+    $R,
+    String,
+    OwnChannel,
+    OwnChannelCopyWith<$R, OwnChannel, OwnChannel>
+  >
+  get ownChannels;
   $R call({
     List<Comment>? comments,
     List<LiveChat>? liveChats,
@@ -223,6 +236,7 @@ abstract class TakeoutDataCopyWith<$R, $In extends TakeoutData, $Out>
     DateTime? latestExportAt,
     KindSnapshot? commentsSnapshot,
     KindSnapshot? liveChatsSnapshot,
+    Map<String, OwnChannel>? ownChannels,
   });
   TakeoutDataCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -272,6 +286,18 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
         (v) => call(liveChatsSnapshot: v),
       );
   @override
+  MapCopyWith<
+    $R,
+    String,
+    OwnChannel,
+    OwnChannelCopyWith<$R, OwnChannel, OwnChannel>
+  >
+  get ownChannels => MapCopyWith(
+    $value.ownChannels,
+    (v, t) => v.copyWith.$chain(t),
+    (v) => call(ownChannels: v),
+  );
+  @override
   $R call({
     List<Comment>? comments,
     List<LiveChat>? liveChats,
@@ -285,6 +311,7 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
     Object? latestExportAt = $none,
     Object? commentsSnapshot = $none,
     Object? liveChatsSnapshot = $none,
+    Map<String, OwnChannel>? ownChannels,
   }) => $apply(
     FieldCopyWithData({
       if (comments != null) #comments: comments,
@@ -301,6 +328,7 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
       if (latestExportAt != $none) #latestExportAt: latestExportAt,
       if (commentsSnapshot != $none) #commentsSnapshot: commentsSnapshot,
       if (liveChatsSnapshot != $none) #liveChatsSnapshot: liveChatsSnapshot,
+      if (ownChannels != null) #ownChannels: ownChannels,
     }),
   );
   @override
@@ -335,6 +363,7 @@ class _TakeoutDataCopyWithImpl<$R, $Out>
       #liveChatsSnapshot,
       or: $value.liveChatsSnapshot,
     ),
+    ownChannels: data.get(#ownChannels, or: $value.ownChannels),
   );
 
   @override

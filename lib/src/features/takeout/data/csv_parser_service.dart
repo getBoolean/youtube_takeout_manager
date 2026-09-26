@@ -6,6 +6,7 @@ import 'package:csv/csv.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
 
@@ -189,6 +190,63 @@ class CsvParserService {
     }).toList();
   }
 
+  /// Parses a takeout's `channels/channel.csv`: the account's channels and
+  /// their titles. Takeout may list any number of them.
+  List<OwnChannel> parseChannelsCsv(Uint8List bytes) {
+    final rows = _csv.decode(utf8.decode(bytes));
+    if (rows.isEmpty) return [];
+    final cols = _buildColumnIndex(rows.first);
+    final iId = _col(cols, ['channel id']);
+    if (iId == null) return [];
+    final iTitle = _col(cols, ['channel title (original)', 'channel title']);
+    return [
+      for (final row in rows.skip(1))
+        if (_field(row, iId) case final id?)
+          OwnChannel(channelId: id, title: _field(row, iTitle)),
+    ];
+  }
+
+  /// Parses a takeout's `channels/channel URL configs.csv` into each
+  /// channel's vanity URL name, by channel ID.
+  Map<String, String> parseChannelUrlConfigsCsv(Uint8List bytes) {
+    final rows = _csv.decode(utf8.decode(bytes));
+    if (rows.isEmpty) return {};
+    final cols = _buildColumnIndex(rows.first);
+    final iId = _col(cols, ['channel id']);
+    final iName = _col(cols, ['channel vanity url 1 name']);
+    if (iId == null || iName == null) return {};
+    return {
+      for (final row in rows.skip(1))
+        if ((_field(row, iId), _field(row, iName)) case (
+          final id?,
+          final name?,
+        ))
+          id: name,
+    };
+  }
+
+  /// Parses the per-channel counts written by [encodeTakeoutCsvs]: comments
+  /// and live chats by author channel ID, '' for rows without one.
+  Map<String, ({int comments, int liveChats})> parseChannelCountsCsv(
+    Uint8List bytes,
+  ) {
+    final rows = _csv.decode(utf8.decode(bytes));
+    if (rows.isEmpty) return {};
+    final cols = _buildColumnIndex(rows.first);
+    final iId = _col(cols, ['channel id']);
+    final iComments = _col(cols, ['comments']);
+    final iLiveChats = _col(cols, ['live chats']);
+    if (iId == null) return {};
+    return {
+      for (final row in rows.skip(1))
+        if (row.length > iId)
+          _str(row[iId]): (
+            comments: _toDouble(_field(row, iComments)).toInt(),
+            liveChats: _toDouble(_field(row, iLiveChats)).toInt(),
+          ),
+    };
+  }
+
   /// Parses the meta file written by [encodeTakeoutCsvs].
   ({
     DateTime? latestExportAt,
@@ -236,6 +294,11 @@ class CsvParserService {
       liveChatsSnapshot: snapshot('live chats'),
     );
   }
+
+  /// The trimmed value at [index] in [row], or null when it's empty or the
+  /// row is too short.
+  String? _field(List<dynamic> row, int? index) =>
+      index != null && index < row.length ? _nullableStr(row[index]) : null;
 
   String _str(dynamic value) => value?.toString().trim() ?? '';
 

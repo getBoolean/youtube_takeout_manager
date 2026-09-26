@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../domain/channel_id.dart';
+import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_import_plan.dart';
@@ -55,6 +56,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
   final comments = <String, Comment>{};
   final liveChats = <String, LiveChat>{};
   final subscriptions = <String, Subscription>{};
+  final ownChannels = <String, OwnChannel>{};
   for (final source in sources) {
     for (final c in source.data.comments) {
       comments[c.commentId] = c;
@@ -63,6 +65,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
       liveChats[l.liveChatId] = l;
     }
     subscriptions.addAll(source.data.subscriptionsByChannelId);
+    ownChannels.addAll(source.data.ownChannels);
   }
 
   final newestComments = _newestWith(sources, (s) => s.comments);
@@ -89,6 +92,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
     latestExportAt: sources.last.snapshot,
     commentsSnapshot: newestComments?.snapshot,
     liveChatsSnapshot: newestLiveChats?.snapshot,
+    ownChannels: ownChannels,
   );
 
   final baseCommentIds = {...?base?.comments.map((c) => c.commentId)};

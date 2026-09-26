@@ -790,4 +790,21 @@ void main() {
       expect(plan.mergedData.latestExportAt, DateTime.utc(2026, 3));
     });
   });
+
+  test("the newest takeout's channel titles win", () {
+    String channelCsv(String title) =>
+        'Channel ID,Channel Title (Original)\r\nUCme,$title\r\n';
+    final plan = _plan([
+      _zip('takeout-20260301T000000Z-001.zip', {
+        _comments: _commentsCsv([_c('A', '2026-01-01T00:00:00Z')]),
+        '$_dir/channels/channel.csv': channelCsv('New name'),
+      }),
+      _zip('takeout-20260201T000000Z-001.zip', {
+        _comments: _commentsCsv([_c('A', '2026-01-01T00:00:00Z')]),
+        '$_dir/channels/channel.csv': channelCsv('Old name'),
+      }),
+    ], merge: false);
+
+    expect(plan.mergedData.ownChannels['UCme']?.title, 'New name');
+  });
 }

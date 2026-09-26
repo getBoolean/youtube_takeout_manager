@@ -2,6 +2,7 @@ import 'package:dart_mappable/dart_mappable.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import 'own_channel.dart';
 import 'subscription.dart';
 
 part 'takeout_data.mapper.dart';
@@ -33,6 +34,10 @@ class TakeoutData with TakeoutDataMappable {
   final KindSnapshot? commentsSnapshot;
   final KindSnapshot? liveChatsSnapshot;
 
+  /// The channels listed in the takeout's `channels/channel.csv`, by ID.
+  /// Empty for data saved before they were read.
+  final Map<String, OwnChannel> ownChannels;
+
   const TakeoutData({
     required this.comments,
     required this.liveChats,
@@ -46,6 +51,7 @@ class TakeoutData with TakeoutDataMappable {
     this.latestExportAt,
     this.commentsSnapshot,
     this.liveChatsSnapshot,
+    this.ownChannels = const {},
   });
 }
 

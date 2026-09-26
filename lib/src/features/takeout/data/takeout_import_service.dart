@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
 import 'csv_parser_service.dart';
@@ -28,6 +29,8 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
   final comments = <Comment>[];
   final liveChats = <LiveChat>[];
   final subscriptions = <Subscription>[];
+  final ownChannels = <OwnChannel>[];
+  final vanityNames = <String, String>{};
   final CsvPages commentPages = {};
   final CsvPages liveChatPages = {};
   var rawCommentLines = 0;
@@ -72,6 +75,10 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
     } else if (path.contains('subscriptions/subscriptions') &&
         path.endsWith('.csv')) {
       subscriptions.addAll(csvParser.parseSubscriptionsCsv(bytes));
+    } else if (path.endsWith(channelsCsvPath)) {
+      ownChannels.addAll(csvParser.parseChannelsCsv(bytes));
+    } else if (path.endsWith(channelUrlConfigsCsvPath)) {
+      vanityNames.addAll(csvParser.parseChannelUrlConfigsCsv(bytes));
     }
   }
 
@@ -79,6 +86,12 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
   for (final sub in subscriptions) {
     subscriptionsByChannelId[sub.channelId] = sub;
   }
+  final ownChannelsById = <String, OwnChannel>{
+    for (final channel in ownChannels)
+      channel.channelId: channel.copyWith(
+        vanityName: vanityNames[channel.channelId],
+      ),
+  };
 
   return (
     data: TakeoutData(
@@ -94,6 +107,7 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
       latestExportAt: latestExportAt,
       commentsSnapshot: commentsSnapshot,
       liveChatsSnapshot: liveChatsSnapshot,
+      ownChannels: ownChannelsById,
     ),
     commentPages: commentPages,
     liveChatPages: liveChatPages,
