@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+import 'package:youtube_takeout_manager/src/storage/idb_transaction.dart';
 import '../domain/channel_id.dart';
 import 'takeout_repository.dart';
 
@@ -65,7 +66,7 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
       for (final entry in csvFiles.entries) {
         store.put(entry.value.toJS, '$accountId/${entry.key}'.toJS);
       }
-      await _complete(txn, 'save CSVs');
+      await transactionDone(txn, 'save CSVs');
     } finally {
       db.close();
     }
@@ -113,7 +114,7 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     try {
       final txn = db.transaction(_storeName.toJS, 'readwrite');
       txn.objectStore(_storeName).delete(range);
-      await _complete(txn, 'clear CSVs');
+      await transactionDone(txn, 'clear CSVs');
     } finally {
       db.close();
     }
@@ -128,7 +129,7 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     try {
       final txn = db.transaction(_storeName.toJS, 'readwrite');
       txn.objectStore(_storeName).clear();
-      await _complete(txn, 'clear legacy CSVs');
+      await transactionDone(txn, 'clear legacy CSVs');
     } finally {
       db.close();
     }
@@ -193,24 +194,6 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
         Exception('Failed to get keys: ${request.error?.message}'),
       );
     }.toJS;
-    return completer.future;
-  }
-
-  Future<void> _complete(web.IDBTransaction txn, String action) {
-    final completer = Completer<void>();
-    void fail(web.Event _) {
-      if (completer.isCompleted) return;
-      completer.completeError(
-        Exception('Failed to $action: ${txn.error?.message ?? 'aborted'}'),
-      );
-    }
-
-    txn.oncomplete = (web.Event _) {
-      if (!completer.isCompleted) completer.complete();
-    }.toJS;
-    txn.onerror = fail.toJS;
-    // A commit that fails, e.g. over the storage quota, only aborts.
-    txn.onabort = fail.toJS;
     return completer.future;
   }
 }

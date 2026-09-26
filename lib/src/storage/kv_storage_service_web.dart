@@ -4,6 +4,7 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
+import 'idb_transaction.dart';
 import 'kv_storage_service.dart';
 
 /// Web implementation: persists key-value data in IndexedDB.
@@ -62,38 +63,14 @@ class KvStorageServiceImpl implements KvStorageService {
 
   Future<void> _putRaw(web.IDBDatabase db, String key, String value) {
     final txn = db.transaction(_storeName.toJS, 'readwrite');
-    final store = txn.objectStore(_storeName);
-    store.put(value.toJS, key.toJS);
-
-    final completer = Completer<void>();
-    txn.oncomplete = (web.Event _) {
-      completer.complete();
-    }.toJS;
-    txn.onerror = (web.Event _) {
-      completer.completeError(
-        Exception('Failed to put key "$key": ${txn.error?.message}'),
-      );
-    }.toJS;
-
-    return completer.future;
+    txn.objectStore(_storeName).put(value.toJS, key.toJS);
+    return transactionDone(txn, 'put key "$key"');
   }
 
   Future<void> _removeRaw(web.IDBDatabase db, String key) {
     final txn = db.transaction(_storeName.toJS, 'readwrite');
-    final store = txn.objectStore(_storeName);
-    store.delete(key.toJS);
-
-    final completer = Completer<void>();
-    txn.oncomplete = (web.Event _) {
-      completer.complete();
-    }.toJS;
-    txn.onerror = (web.Event _) {
-      completer.completeError(
-        Exception('Failed to remove key "$key": ${txn.error?.message}'),
-      );
-    }.toJS;
-
-    return completer.future;
+    txn.objectStore(_storeName).delete(key.toJS);
+    return transactionDone(txn, 'remove key "$key"');
   }
 
   @override
