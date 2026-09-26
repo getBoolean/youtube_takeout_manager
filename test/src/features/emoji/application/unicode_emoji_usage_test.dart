@@ -3,11 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/search_options_providers.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
@@ -55,13 +55,15 @@ void main() {
   ProviderContainer container() {
     final container = ProviderContainer(
       overrides: [
-        commentsByChannelProvider.overrideWithValue({
+        interactionsByChannelProvider(QueueItemKind.comment).overrideWithValue({
           'a': [
             _comment('a', '{"text":"so lit $_fire$_fire"}'),
             _comment('a', '{"text":"plain text only"}'),
           ],
         }),
-        liveChatsByChannelProvider.overrideWithValue({
+        interactionsByChannelProvider(
+          QueueItemKind.liveChat,
+        ).overrideWithValue({
           'a': [_chat('a', '{"text":"nice $_thumbsUpMedium"}', videoId: 'v1')],
           'b': [
             _chat('b', '{"text":"hi $_grinning"}'),

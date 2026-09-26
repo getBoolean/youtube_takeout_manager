@@ -9,20 +9,20 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/scroll_target_highlight.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/sticky_grouped_list/sticky_grouped_list.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../domain/video_group.dart';
 import 'channel_item_actions.dart';
 import 'header_animation_controller.dart';
 import 'video_group_header.dart';
 
-typedef VideoGroupTileBuilder<T> =
+typedef VideoGroupTileBuilder =
     Widget Function(
       BuildContext context,
-      T item, {
-      required bool isDeleted,
-      required bool isQueued,
-      required bool isFailed,
-    });
+      Interaction item,
+      InteractionStatus status,
+    );
 
 /// Groups loaded before a scroll target is resolved; all but the target's
 /// group are collapsed so the jump lands on a stable layout.
@@ -30,13 +30,10 @@ const _targetSiblingWindow = 15;
 
 /// A channel's comments or live chats grouped by video, with sticky headers
 /// that morph from large to compact as they pin.
-class VideoGroupListView<T> extends HookConsumerWidget {
-  final List<VideoGroup<T>> groups;
-  final String Function(T item) itemId;
-  final VideoGroupTileBuilder<T> tileBuilder;
-  final Set<String> deletedIds;
-  final Set<String> queuedIds;
-  final Set<String> failedIds;
+class VideoGroupListView extends HookConsumerWidget {
+  final List<VideoGroup<Interaction>> groups;
+  final VideoGroupTileBuilder tileBuilder;
+  final InteractionStatuses statuses;
   final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
   final String? initialScrollTarget;
@@ -44,11 +41,8 @@ class VideoGroupListView<T> extends HookConsumerWidget {
   const VideoGroupListView({
     super.key,
     required this.groups,
-    required this.itemId,
     required this.tileBuilder,
-    required this.deletedIds,
-    required this.queuedIds,
-    required this.failedIds,
+    required this.statuses,
     required this.selectionMode,
     required this.scrollController,
     this.initialScrollTarget,
@@ -64,7 +58,7 @@ class VideoGroupListView<T> extends HookConsumerWidget {
       final id = initialScrollTarget;
       if (id == null) return null;
       for (var g = 0; g < groups.length; g++) {
-        if (groups[g].items.any((item) => itemId(item) == id)) {
+        if (groups[g].items.any((item) => item.id == id)) {
           return (index: g, key: groups[g].groupKey, itemId: id);
         }
       }
@@ -114,7 +108,7 @@ class VideoGroupListView<T> extends HookConsumerWidget {
     // Matches sliver_sticky_collapsable_panel, which snapped the scroll
     // percentage to 0 or 1 within one physical pixel's worth of ratio.
     final tolerance = 1 / MediaQuery.devicePixelRatioOf(context);
-    bool isCompact(VideoGroup<T> group, StickyHeaderStatus status) {
+    bool isCompact(VideoGroup<Interaction> group, StickyHeaderStatus status) {
       var scrolled = status.scrollPercentage;
       if (nearZero(scrolled, tolerance)) {
         scrolled = 0;
@@ -127,13 +121,17 @@ class VideoGroupListView<T> extends HookConsumerWidget {
           scrolled >= 1;
     }
 
-    final ineligibleIds = {...deletedIds, ...queuedIds, ...failedIds};
+    final ineligibleIds = statuses.unselectableIds;
 
-    return StickyGroupedListView<VideoGroup<T>, T, CueController>(
+    return StickyGroupedListView<
+      VideoGroup<Interaction>,
+      Interaction,
+      CueController
+    >(
       groups: groups,
       groupKey: (group) => group.groupKey,
       itemsOf: (group) => group.items,
-      itemKey: (item) => itemId(item),
+      itemKey: (item) => item.id,
       controller: controller,
       scrollController: scrollController,
       keepAlive: true,
@@ -158,9 +156,8 @@ class VideoGroupListView<T> extends HookConsumerWidget {
         }
       },
       disposeHeaderState: (motion) => motion.dispose(),
-      headerBuilder: (context, group, motion, status) => _GroupHeader<T>(
+      headerBuilder: (context, group, motion, status) => _GroupHeader(
         group: group,
-        itemId: itemId,
         compactMotion: motion,
         isExpanded: status.isExpanded,
         selectionMode: selectionMode,
@@ -169,14 +166,8 @@ class VideoGroupListView<T> extends HookConsumerWidget {
         onToggleExpanded: () => controller.toggle(group.groupKey),
       ),
       itemBuilder: (context, group, item, index) {
-        final id = itemId(item);
-        final tile = tileBuilder(
-          context,
-          item,
-          isDeleted: deletedIds.contains(id),
-          isQueued: queuedIds.contains(id),
-          isFailed: failedIds.contains(id),
-        );
+        final id = item.id;
+        final tile = tileBuilder(context, item, statuses.of(id));
         if (id != highlightId.value) return tile;
         return ScrollTargetHighlight(
           active: true,
@@ -192,9 +183,8 @@ class VideoGroupListView<T> extends HookConsumerWidget {
   }
 }
 
-class _GroupHeader<T> extends HookConsumerWidget {
-  final VideoGroup<T> group;
-  final String Function(T item) itemId;
+class _GroupHeader extends HookConsumerWidget {
+  final VideoGroup<Interaction> group;
   final CueController compactMotion;
   final bool isExpanded;
   final ValueNotifier<bool> selectionMode;
@@ -203,9 +193,7 @@ class _GroupHeader<T> extends HookConsumerWidget {
   final VoidCallback onToggleExpanded;
 
   const _GroupHeader({
-    super.key,
     required this.group,
-    required this.itemId,
     required this.compactMotion,
     required this.isExpanded,
     required this.selectionMode,
@@ -216,9 +204,10 @@ class _GroupHeader<T> extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final groupItemIds = useMemoized(() => group.items.map(itemId).toSet(), [
-      group,
-    ]);
+    final groupItemIds = useMemoized(
+      () => group.items.map((i) => i.id).toSet(),
+      [group],
+    );
     final selection = ref.watch(
       deletionSetProvider.select((selected) {
         var hits = 0;

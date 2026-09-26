@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
 import '../data/youtube_emoji_name_repository.dart';
@@ -25,7 +26,7 @@ class EmojiNameResolver extends _$EmojiNameResolver {
 
   @override
   void build() {
-    ref.listen(allLiveChatsProvider, (_, liveChats) {
+    ref.listen(allInteractionsProvider(QueueItemKind.liveChat), (_, liveChats) {
       if (liveChats.isNotEmpty) resolveMissing();
     }, fireImmediately: true);
   }
@@ -58,7 +59,9 @@ class EmojiNameResolver extends _$EmojiNameResolver {
     final known = ref.read(emojiNamesProvider).names;
     final keysByVideo = <String, Set<String>>{};
     final timesByVideo = <String, List<DateTime>>{};
-    for (final chat in ref.read(allLiveChatsProvider)) {
+    for (final chat in ref.read(
+      allInteractionsProvider(QueueItemKind.liveChat),
+    )) {
       final videoId = chat.videoId;
       if (videoId == null) continue;
       for (final segment in parseCommentSegments(chat.rawText)) {

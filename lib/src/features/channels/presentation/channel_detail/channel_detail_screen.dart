@@ -6,24 +6,23 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
-import '../../domain/channel.dart';
 import '../unknown_channel_hint.dart';
 import 'channel_actions_header.dart';
 import 'channel_app_bar.dart';
 import 'channel_deletion_bar.dart';
 import 'channel_loading_skeleton.dart';
-import 'comment_list_view.dart';
-import 'live_chat_list_view.dart';
+import 'interaction_list_view.dart';
 import 'search_options_menu_button.dart';
 
 @RoutePage()
@@ -85,10 +84,16 @@ class ChannelDetailScreen extends HookConsumerWidget {
     }
 
     final commentCount = ref.watch(
-      channelCommentsProvider(channelId).select((l) => l.length),
+      channelInteractionsProvider(
+        QueueItemKind.comment,
+        channelId,
+      ).select((l) => l.length),
     );
     final liveChatCount = ref.watch(
-      channelLiveChatsProvider(channelId).select((l) => l.length),
+      channelInteractionsProvider(
+        QueueItemKind.liveChat,
+        channelId,
+      ).select((l) => l.length),
     );
     final hasSelection = ref.watch(
       deletionSetProvider.select((s) => s.isNotEmpty),
@@ -101,37 +106,31 @@ class ChannelDetailScreen extends HookConsumerWidget {
     final hasLiveChats = liveChatCount > 0;
     final useTabs = hasComments && hasLiveChats;
 
+    // Keyed by kind so switching kinds starts a fresh list.
+    Widget listOf(QueueItemKind kind) => ChannelInteractionListView(
+      key: ValueKey(kind),
+      kind: kind,
+      channelId: channelId,
+      selectionMode: selectionMode,
+      scrollController: switch (kind) {
+        QueueItemKind.comment => commentScrollController,
+        QueueItemKind.liveChat => liveChatScrollController,
+      },
+      initialScrollTarget: switch (kind) {
+        QueueItemKind.comment => commentTargetId,
+        QueueItemKind.liveChat => liveChatTargetId,
+      },
+    );
+
     final lists = useTabs
         ? TabBarView(
             controller: tabController,
             children: [
-              ChannelCommentListView(
-                channelId: channelId,
-                selectionMode: selectionMode,
-                scrollController: commentScrollController,
-                initialScrollTarget: commentTargetId,
-              ),
-              ChannelLiveChatListView(
-                channelId: channelId,
-                selectionMode: selectionMode,
-                scrollController: liveChatScrollController,
-                initialScrollTarget: liveChatTargetId,
-              ),
+              listOf(QueueItemKind.comment),
+              listOf(QueueItemKind.liveChat),
             ],
           )
-        : hasComments
-        ? ChannelCommentListView(
-            channelId: channelId,
-            selectionMode: selectionMode,
-            scrollController: commentScrollController,
-            initialScrollTarget: commentTargetId,
-          )
-        : ChannelLiveChatListView(
-            channelId: channelId,
-            selectionMode: selectionMode,
-            scrollController: liveChatScrollController,
-            initialScrollTarget: liveChatTargetId,
-          );
+        : listOf(hasComments ? QueueItemKind.comment : QueueItemKind.liveChat);
 
     final actions = ChannelActionsHeader(
       channelId: channelId,

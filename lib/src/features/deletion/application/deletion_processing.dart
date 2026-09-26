@@ -3,12 +3,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import '../data/youtube_deletion_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
-import '../domain/queue_item_kind.dart';
+import '../domain/deletion_targets.dart';
 import 'deleted_ids_providers.dart';
 import 'deletion_queue_notifier.dart';
 
@@ -132,16 +133,9 @@ class DeletionProcessing extends _$DeletionProcessing {
           );
 
           // Persist as deleted and notify UI to re-render with deleted styling.
-          final idSet = {nextItem.itemId};
-          if (nextItem.itemType == QueueItemKind.comment) {
-            await ref
-                .read(deletedCommentIdsProvider.notifier)
-                .markDeleted(idSet);
-          } else {
-            await ref
-                .read(deletedLiveChatIdsProvider.notifier)
-                .markDeleted(idSet);
-          }
+          await ref
+              .read(deletedIdsProvider.notifier)
+              .markDeleted(DeletionTargets.fromQueueItems([nextItem]));
         } else if (result.signInFailed) {
           // Not the item's fault: keep it to delete once signed in again,
           // and stop instead of failing every other item the same way.

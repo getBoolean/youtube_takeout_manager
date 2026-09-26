@@ -65,7 +65,7 @@ final class CrossChannelSearchItemsProvider
 }
 
 String _$crossChannelSearchItemsHash() =>
-    r'3c276f4dae8ef9cee36268caf36f702c9cf3ff46';
+    r'5b3d48699c622c84872c5b6a5646b7e6de022fa7';
 
 /// Subset of [crossChannelSearchItemsProvider] that is eligible for bulk
 /// deletion — strips items already in the deletion queue (pending/in-progress)
@@ -125,4 +125,4 @@ final class CrossChannelDeletableItemsProvider
 }
 
 String _$crossChannelDeletableItemsHash() =>
-    r'ecb0f91243b0a3e0d3238146e53ec61d85d03ac8';
+    r'd07e76174987206d37e3d5838c2457ef3eb35089';

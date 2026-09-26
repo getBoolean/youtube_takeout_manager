@@ -6,8 +6,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/search_options_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_options_state.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
@@ -99,19 +99,14 @@ Map<String, String> emojiNamesByKey(Ref ref) {
 /// first.
 @Riverpod(keepAlive: true)
 Map<String, List<ChannelEmoji>> channelEmojis(Ref ref) {
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
   final names = ref.watch(emojiNamesByKeyProvider);
 
   final raws = <String, List<String>>{};
-  commentsByChannel.forEach((channelId, comments) {
-    raws
-        .putIfAbsent(channelId, () => [])
-        .addAll(comments.map((c) => c.rawCommentText));
-  });
-  liveChatsByChannel.forEach((channelId, chats) {
-    raws.putIfAbsent(channelId, () => []).addAll(chats.map((c) => c.rawText));
-  });
+  for (final kind in QueueItemKind.values) {
+    ref.watch(interactionsByChannelProvider(kind)).forEach((channelId, items) {
+      raws.putIfAbsent(channelId, () => []).addAll(items.map((i) => i.rawText));
+    });
+  }
 
   final result = <String, List<ChannelEmoji>>{};
   raws.forEach((channelId, texts) {
@@ -246,9 +241,6 @@ List<ChannelEmojiGroup> channelEmojiGroups(Ref ref, String channelId) {
 /// search there would find (see [UnicodeEmojiCatalog.find]).
 @Riverpod(keepAlive: true)
 Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
-
   final result = <String, Set<UnicodeEmoji>>{};
   void scan(String channelId, String raw) {
     if (!_hasNonAscii(raw)) return;
@@ -262,16 +254,13 @@ Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
     }
   }
 
-  commentsByChannel.forEach((channelId, comments) {
-    for (final comment in comments) {
-      scan(channelId, comment.rawCommentText);
-    }
-  });
-  liveChatsByChannel.forEach((channelId, chats) {
-    for (final chat in chats) {
-      scan(channelId, chat.rawText);
-    }
-  });
+  for (final kind in QueueItemKind.values) {
+    ref.watch(interactionsByChannelProvider(kind)).forEach((channelId, items) {
+      for (final item in items) {
+        scan(channelId, item.rawText);
+      }
+    });
+  }
   return result;
 }
 
@@ -279,21 +268,16 @@ Map<String, Set<UnicodeEmoji>> unicodeEmojisByChannel(Ref ref) {
 /// user's comments or live chats, which a channel search can match.
 @Riverpod(keepAlive: true)
 Map<String, Set<UnicodeEmoji>> titleUnicodeEmojisByChannel(Ref ref) {
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
   final videos = ref.watch(videoMetadataProvider).value ?? const {};
 
   final videoIds = <String, Set<String>>{};
-  commentsByChannel.forEach((channelId, comments) {
-    videoIds
-        .putIfAbsent(channelId, () => {})
-        .addAll(comments.map((c) => c.videoId).nonNulls);
-  });
-  liveChatsByChannel.forEach((channelId, chats) {
-    videoIds
-        .putIfAbsent(channelId, () => {})
-        .addAll(chats.map((c) => c.videoId).nonNulls);
-  });
+  for (final kind in QueueItemKind.values) {
+    ref.watch(interactionsByChannelProvider(kind)).forEach((channelId, items) {
+      videoIds
+          .putIfAbsent(channelId, () => {})
+          .addAll(items.map((i) => i.videoId).nonNulls);
+    });
+  }
 
   final result = <String, Set<UnicodeEmoji>>{};
   videoIds.forEach((channelId, ids) {

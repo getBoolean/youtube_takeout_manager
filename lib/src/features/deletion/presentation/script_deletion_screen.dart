@@ -7,11 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../application/deleted_ids_providers.dart';
 import '../application/deletion_queue_notifier.dart';
 import '../application/script_deletion_ids.dart';
 import '../application/script_generator_service.dart';
+import '../domain/deletion_targets.dart';
 
 @RoutePage()
 class ScriptDeletionScreen extends ConsumerStatefulWidget {
@@ -324,19 +326,14 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
         final liveChatIdSet =
             takeout?.liveChats.map((c) => c.liveChatId).toSet() ?? {};
 
-        final deletedComments = succeeded.intersection(commentIdSet);
-        final deletedLiveChats = succeeded.intersection(liveChatIdSet);
-
-        if (deletedComments.isNotEmpty) {
-          await ref
-              .read(deletedCommentIdsProvider.notifier)
-              .markDeleted(deletedComments);
-        }
-        if (deletedLiveChats.isNotEmpty) {
-          await ref
-              .read(deletedLiveChatIdsProvider.notifier)
-              .markDeleted(deletedLiveChats);
-        }
+        await ref
+            .read(deletedIdsProvider.notifier)
+            .markDeleted(
+              DeletionTargets.ids({
+                QueueItemKind.comment: succeeded.intersection(commentIdSet),
+                QueueItemKind.liveChat: succeeded.intersection(liveChatIdSet),
+              }),
+            );
       }
 
       await ref

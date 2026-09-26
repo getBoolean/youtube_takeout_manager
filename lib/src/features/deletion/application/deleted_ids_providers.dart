@@ -1,105 +1,90 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../data/deleted_ids_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
-import '../domain/queue_item_kind.dart';
+import '../domain/deletion_targets.dart';
 import 'deletion_queue_counts.dart';
 import 'deletion_queue_notifier.dart';
 
 part 'deleted_ids_providers.g.dart';
 
+/// The IDs of each kind's items known to be deleted.
 @Riverpod(keepAlive: true)
-class DeletedCommentIds extends _$DeletedCommentIds {
+class DeletedIds extends _$DeletedIds {
   DeletedIdsRepository get _repository =>
       ref.read(deletedIdsRepositoryProvider);
 
   @override
-  Future<Set<String>> build() async {
-    return ref.watch(deletedIdsRepositoryProvider).loadDeletedCommentIds();
+  Future<Map<QueueItemKind, Set<String>>> build() async {
+    final repository = ref.watch(deletedIdsRepositoryProvider);
+    return {
+      for (final kind in QueueItemKind.values)
+        kind: await repository.loadDeletedIds(kind),
+    };
   }
 
-  Future<void> markDeleted(Set<String> ids) async {
+  /// Remembers [targets] as deleted, so they show as deleted and can't be
+  /// picked for deletion again.
+  Future<void> markDeleted(DeletionTargets targets) async {
+    if (targets.isEmpty) return;
     await future;
     // Read and update the state without awaiting in between, so concurrent
     // calls can't overwrite each other's IDs.
-    final updated = {...state.requireValue, ...ids};
+    final current = state.requireValue;
+    final updated = {
+      for (final kind in QueueItemKind.values)
+        kind: {...?current[kind], ...targets.idsOf(kind)},
+    };
     state = AsyncData(updated);
-    await _repository.saveDeletedCommentIds(updated);
-  }
-}
-
-@Riverpod(keepAlive: true)
-class DeletedLiveChatIds extends _$DeletedLiveChatIds {
-  DeletedIdsRepository get _repository =>
-      ref.read(deletedIdsRepositoryProvider);
-
-  @override
-  Future<Set<String>> build() async {
-    return ref.watch(deletedIdsRepositoryProvider).loadDeletedLiveChatIds();
-  }
-
-  Future<void> markDeleted(Set<String> ids) async {
-    await future;
-    final updated = {...state.requireValue, ...ids};
-    state = AsyncData(updated);
-    await _repository.saveDeletedLiveChatIds(updated);
+    await Future.wait([
+      for (final kind in QueueItemKind.values)
+        if (targets.idsOf(kind).isNotEmpty)
+          _repository.saveDeletedIds(kind, updated[kind]!),
+    ]);
   }
 }
 
 // The same statuses the queue shows as waiting and failed, so an item the
 // quota stopped shows as queued everywhere.
-bool _isActive(DeletionItemStatus s) =>
-    DeletionQueueCounts.waitingStatuses.contains(s);
-
-bool _isFailed(DeletionItemStatus s) =>
-    DeletionQueueCounts.failedStatuses.contains(s);
-
-Set<String> _filterQueueIds(
-  List<DeletionQueueItem> items,
+Set<String> _queueIds(
+  List<DeletionQueueItem>? items,
   QueueItemKind kind,
-  bool Function(DeletionItemStatus) statusFilter,
+  Set<DeletionItemStatus> statuses,
 ) => {
-  for (final i in items)
-    if (i.itemType == kind && statusFilter(i.status)) i.itemId,
+  for (final i in items ?? const <DeletionQueueItem>[])
+    if (i.itemType == kind && statuses.contains(i.status)) i.itemId,
 };
 
 @riverpod
-Set<String> queuedCommentIds(Ref ref) {
-  final items = ref.watch(deletionQueueProvider).value ?? const [];
-  return _filterQueueIds(items, QueueItemKind.comment, _isActive);
-}
+Set<String> queuedIds(Ref ref, QueueItemKind kind) => _queueIds(
+  ref.watch(deletionQueueProvider).value,
+  kind,
+  DeletionQueueCounts.waitingStatuses,
+);
 
 @riverpod
-Set<String> queuedLiveChatIds(Ref ref) {
-  final items = ref.watch(deletionQueueProvider).value ?? const [];
-  return _filterQueueIds(items, QueueItemKind.liveChat, _isActive);
-}
+Set<String> failedIds(Ref ref, QueueItemKind kind) => _queueIds(
+  ref.watch(deletionQueueProvider).value,
+  kind,
+  DeletionQueueCounts.failedStatuses,
+);
 
+/// Which of [kind]'s items are deleted, failed or queued.
 @riverpod
-Set<String> failedCommentIds(Ref ref) {
-  final items = ref.watch(deletionQueueProvider).value ?? const [];
-  return _filterQueueIds(items, QueueItemKind.comment, _isFailed);
-}
+InteractionStatuses interactionStatuses(Ref ref, QueueItemKind kind) =>
+    InteractionStatuses(
+      deleted: ref.watch(deletedIdsProvider).value?[kind] ?? const {},
+      failed: ref.watch(failedIdsProvider(kind)),
+      queued: ref.watch(queuedIdsProvider(kind)),
+    );
 
+/// The IDs of each kind's items bulk deletes leave out: already deleted,
+/// queued or failed.
 @riverpod
-Set<String> failedLiveChatIds(Ref ref) {
-  final items = ref.watch(deletionQueueProvider).value ?? const [];
-  return _filterQueueIds(items, QueueItemKind.liveChat, _isFailed);
-}
-
-/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
-@riverpod
-Set<String> excludedFromDeletionCommentIds(Ref ref) => {
-  ...?ref.watch(deletedCommentIdsProvider).value,
-  ...ref.watch(queuedCommentIdsProvider),
-  ...ref.watch(failedCommentIdsProvider),
-};
-
-/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
-@riverpod
-Set<String> excludedFromDeletionLiveChatIds(Ref ref) => {
-  ...?ref.watch(deletedLiveChatIdsProvider).value,
-  ...ref.watch(queuedLiveChatIdsProvider),
-  ...ref.watch(failedLiveChatIdsProvider),
+Map<QueueItemKind, Set<String>> excludedFromDeletionIds(Ref ref) => {
+  for (final kind in QueueItemKind.values)
+    kind: ref.watch(interactionStatusesProvider(kind)).unselectableIds,
 };

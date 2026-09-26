@@ -3,13 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/adaptive_action_button.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletable_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_scope_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/export/presentation/export_sheet.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
 import '../../application/grouped_providers.dart';
@@ -28,13 +31,14 @@ class ChannelActionsHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasItems =
-        ref.watch(
-          channelCommentsProvider(channelId).select((l) => l.isNotEmpty),
-        ) ||
-        ref.watch(
-          channelLiveChatsProvider(channelId).select((l) => l.isNotEmpty),
-        );
+    final hasItems = QueueItemKind.values.any(
+      (kind) => ref.watch(
+        channelInteractionsProvider(
+          kind,
+          channelId,
+        ).select((l) => l.isNotEmpty),
+      ),
+    );
     final matchCount = _deletableMatches(ref).count;
 
     // Wraps, rather than overflowing, when the window is too narrow for one
@@ -83,12 +87,10 @@ class ChannelActionsHeader extends ConsumerWidget {
 
   /// Search matches not yet deleted, queued or failed. Empty when there's no
   /// search.
-  DeletionTargets _deletableMatches(WidgetRef ref) => deletableTargets(
-    comments: ref.watch(filteredSearchCommentsProvider(channelId)),
-    liveChats: ref.watch(filteredSearchLiveChatsProvider(channelId)),
-    skipCommentIds: ref.watch(excludedFromDeletionCommentIdsProvider),
-    skipLiveChatIds: ref.watch(excludedFromDeletionLiveChatIdsProvider),
-  );
+  DeletionTargets _deletableMatches(WidgetRef ref) => deletableTargets([
+    for (final kind in QueueItemKind.values)
+      ...ref.watch(filteredSearchInteractionsProvider(kind, channelId)),
+  ], skipIds: ref.watch(excludedFromDeletionIdsProvider));
 
   void _export(BuildContext context, WidgetRef ref) {
     showExportSheet(
@@ -96,53 +98,47 @@ class ChannelActionsHeader extends ConsumerWidget {
       ref,
       channelId: channelId,
       channelName: _channelName(ref),
-      comments: ref.read(channelCommentsProvider(channelId)),
-      liveChats: ref.read(channelLiveChatsProvider(channelId)),
+      comments: _itemsOf(ref, QueueItemKind.comment).cast<Comment>(),
+      liveChats: _itemsOf(ref, QueueItemKind.liveChat).cast<LiveChat>(),
     );
   }
 
   void _queue(BuildContext context, WidgetRef ref) {
     final query = ref.read(channelContentSearchQueryProvider);
     final channelName = _channelName(ref);
-    final comments = ref.read(channelCommentsProvider(channelId));
-    final liveChats = ref.read(channelLiveChatsProvider(channelId));
-    final skipCommentIds = ref.read(excludedFromDeletionCommentIdsProvider);
-    final skipLiveChatIds = ref.read(excludedFromDeletionLiveChatIdsProvider);
+    final comments = _itemsOf(ref, QueueItemKind.comment);
+    final liveChats = _itemsOf(ref, QueueItemKind.liveChat);
+    final skipIds = ref.read(excludedFromDeletionIdsProvider);
 
     queueWithScopeDialog(context, ref, [
       if (query.isNotEmpty)
         QueueScope(
           icon: Icons.search,
           title: 'Matching “$query”',
-          targets: deletableTargets(
-            comments: ref.read(filteredSearchCommentsProvider(channelId)),
-            liveChats: ref.read(filteredSearchLiveChatsProvider(channelId)),
-            skipCommentIds: skipCommentIds,
-            skipLiveChatIds: skipLiveChatIds,
-          ),
+          targets: deletableTargets([
+            for (final kind in QueueItemKind.values)
+              ...ref.read(filteredSearchInteractionsProvider(kind, channelId)),
+          ], skipIds: skipIds),
         ),
       if (comments.isNotEmpty)
         QueueScope(
           icon: Icons.comment_outlined,
           title: 'All comments in $channelName',
-          targets: deletableTargets(
-            comments: comments,
-            skipCommentIds: skipCommentIds,
-          ),
+          targets: deletableTargets(comments, skipIds: skipIds),
           describeCount: QueueScope.describeComments,
         ),
       if (liveChats.isNotEmpty)
         QueueScope(
           icon: Icons.chat_bubble_outline,
           title: 'All live chats in $channelName',
-          targets: deletableTargets(
-            liveChats: liveChats,
-            skipLiveChatIds: skipLiveChatIds,
-          ),
+          targets: deletableTargets(liveChats, skipIds: skipIds),
           describeCount: QueueScope.describeLiveChats,
         ),
     ]);
   }
+
+  List<Interaction> _itemsOf(WidgetRef ref, QueueItemKind kind) =>
+      ref.read(channelInteractionsProvider(kind, channelId));
 
   String _channelName(WidgetRef ref) =>
       ref.read(channelByIdProvider(channelId))?.channelTitle ??

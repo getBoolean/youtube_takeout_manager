@@ -1,12 +1,8 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
-part 'channel.mapper.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 
-/// Stands in for the channel of comments and live chats whose video's
-/// channel isn't known: its details aren't loaded (e.g. signed out), the
-/// video is gone, or the item is on a post. Never a real channel ID, which
-/// always starts with "UC".
-const unknownChannelId = '_unknown';
+part 'channel.mapper.dart';
 
 @MappableClass()
 class Channel with ChannelMappable {

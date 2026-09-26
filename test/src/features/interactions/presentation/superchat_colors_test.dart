@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:youtube_takeout_manager/src/features/live_chats/presentation/superchat_colors.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/superchat_colors.dart';
 
 void main() {
   group('getSuperChatTier', () {

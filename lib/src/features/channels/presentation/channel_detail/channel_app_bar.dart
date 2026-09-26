@@ -4,11 +4,11 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 class ChannelTabLabel extends StatelessWidget {
   final String prefix;
@@ -214,11 +214,10 @@ class ChannelSelectionTitle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selected = ref.watch(deletionSetProvider);
-    final comments = ref.watch(channelCommentsProvider(channelId));
-    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-    final count =
-        comments.where((c) => selected.contains(c.commentId)).length +
-        liveChats.where((c) => selected.contains(c.liveChatId)).length;
+    final count = [
+      for (final kind in QueueItemKind.values)
+        ...ref.watch(channelInteractionsProvider(kind, channelId)),
+    ].where((i) => selected.contains(i.id)).length;
     return Text('$count selected');
   }
 }
@@ -231,17 +230,13 @@ class ChannelSelectAllAction extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final comments = ref.watch(channelCommentsProvider(channelId));
-    final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-    final skipCommentIds = ref.watch(excludedFromDeletionCommentIdsProvider);
-    final skipLiveChatIds = ref.watch(excludedFromDeletionLiveChatIdsProvider);
+    final skipIds = ref.watch(excludedFromDeletionIdsProvider);
     final selectableIds = {
-      ...comments
-          .where((c) => !skipCommentIds.contains(c.commentId))
-          .map((c) => c.commentId),
-      ...liveChats
-          .where((c) => !skipLiveChatIds.contains(c.liveChatId))
-          .map((c) => c.liveChatId),
+      for (final kind in QueueItemKind.values)
+        for (final item in ref.watch(
+          channelInteractionsProvider(kind, channelId),
+        ))
+          if (!(skipIds[kind]?.contains(item.id) ?? false)) item.id,
     };
     return SelectAllToggleButton(selectableIds: selectableIds);
   }

@@ -8,62 +8,68 @@ part of 'grouped_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// [kind]'s items on [channelId]'s videos, grouped by video.
 
-@ProviderFor(groupedChannelComments)
-final groupedChannelCommentsProvider = GroupedChannelCommentsFamily._();
+@ProviderFor(groupedChannelInteractions)
+final groupedChannelInteractionsProvider = GroupedChannelInteractionsFamily._();
 
-final class GroupedChannelCommentsProvider
+/// [kind]'s items on [channelId]'s videos, grouped by video.
+
+final class GroupedChannelInteractionsProvider
     extends
         $FunctionalProvider<
-          List<VideoGroup<Comment>>,
-          List<VideoGroup<Comment>>,
-          List<VideoGroup<Comment>>
+          List<VideoGroup<Interaction>>,
+          List<VideoGroup<Interaction>>,
+          List<VideoGroup<Interaction>>
         >
-    with $Provider<List<VideoGroup<Comment>>> {
-  GroupedChannelCommentsProvider._({
-    required GroupedChannelCommentsFamily super.from,
-    required String super.argument,
+    with $Provider<List<VideoGroup<Interaction>>> {
+  /// [kind]'s items on [channelId]'s videos, grouped by video.
+  GroupedChannelInteractionsProvider._({
+    required GroupedChannelInteractionsFamily super.from,
+    required (QueueItemKind, String) super.argument,
   }) : super(
          retry: null,
-         name: r'groupedChannelCommentsProvider',
+         name: r'groupedChannelInteractionsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$groupedChannelCommentsHash();
+  String debugGetCreateSourceHash() => _$groupedChannelInteractionsHash();
 
   @override
   String toString() {
-    return r'groupedChannelCommentsProvider'
+    return r'groupedChannelInteractionsProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
   @override
-  $ProviderElement<List<VideoGroup<Comment>>> $createElement(
+  $ProviderElement<List<VideoGroup<Interaction>>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  List<VideoGroup<Comment>> create(Ref ref) {
-    final argument = this.argument as String;
-    return groupedChannelComments(ref, argument);
+  List<VideoGroup<Interaction>> create(Ref ref) {
+    final argument = this.argument as (QueueItemKind, String);
+    return groupedChannelInteractions(ref, argument.$1, argument.$2);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<VideoGroup<Comment>> value) {
+  Override overrideWithValue(List<VideoGroup<Interaction>> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<List<VideoGroup<Comment>>>(value),
+      providerOverride: $SyncValueProvider<List<VideoGroup<Interaction>>>(
+        value,
+      ),
     );
   }
 
   @override
   bool operator ==(Object other) {
-    return other is GroupedChannelCommentsProvider &&
+    return other is GroupedChannelInteractionsProvider &&
         other.argument == argument;
   }
 
@@ -73,82 +79,107 @@ final class GroupedChannelCommentsProvider
   }
 }
 
-String _$groupedChannelCommentsHash() =>
-    r'e33c2d5520a8d8ede0aed0fd2a0100c5a62acca7';
+String _$groupedChannelInteractionsHash() =>
+    r'1958ecb01ef6ee8fa380ec039cd782b8bae4df3b';
 
-final class GroupedChannelCommentsFamily extends $Family
-    with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
-  GroupedChannelCommentsFamily._()
+/// [kind]'s items on [channelId]'s videos, grouped by video.
+
+final class GroupedChannelInteractionsFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          List<VideoGroup<Interaction>>,
+          (QueueItemKind, String)
+        > {
+  GroupedChannelInteractionsFamily._()
     : super(
         retry: null,
-        name: r'groupedChannelCommentsProvider',
+        name: r'groupedChannelInteractionsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  GroupedChannelCommentsProvider call(String channelId) =>
-      GroupedChannelCommentsProvider._(argument: channelId, from: this);
+  /// [kind]'s items on [channelId]'s videos, grouped by video.
+
+  GroupedChannelInteractionsProvider call(
+    QueueItemKind kind,
+    String channelId,
+  ) => GroupedChannelInteractionsProvider._(
+    argument: (kind, channelId),
+    from: this,
+  );
 
   @override
-  String toString() => r'groupedChannelCommentsProvider';
+  String toString() => r'groupedChannelInteractionsProvider';
 }
 
-@ProviderFor(groupedChannelLiveChats)
-final groupedChannelLiveChatsProvider = GroupedChannelLiveChatsFamily._();
+/// The groups of [groupedChannelInteractionsProvider] that match the channel
+/// search: by group title, or by the text of their items.
 
-final class GroupedChannelLiveChatsProvider
+@ProviderFor(filteredGroupedChannelInteractions)
+final filteredGroupedChannelInteractionsProvider =
+    FilteredGroupedChannelInteractionsFamily._();
+
+/// The groups of [groupedChannelInteractionsProvider] that match the channel
+/// search: by group title, or by the text of their items.
+
+final class FilteredGroupedChannelInteractionsProvider
     extends
         $FunctionalProvider<
-          List<VideoGroup<LiveChat>>,
-          List<VideoGroup<LiveChat>>,
-          List<VideoGroup<LiveChat>>
+          List<VideoGroup<Interaction>>,
+          List<VideoGroup<Interaction>>,
+          List<VideoGroup<Interaction>>
         >
-    with $Provider<List<VideoGroup<LiveChat>>> {
-  GroupedChannelLiveChatsProvider._({
-    required GroupedChannelLiveChatsFamily super.from,
-    required String super.argument,
+    with $Provider<List<VideoGroup<Interaction>>> {
+  /// The groups of [groupedChannelInteractionsProvider] that match the channel
+  /// search: by group title, or by the text of their items.
+  FilteredGroupedChannelInteractionsProvider._({
+    required FilteredGroupedChannelInteractionsFamily super.from,
+    required (QueueItemKind, String) super.argument,
   }) : super(
          retry: null,
-         name: r'groupedChannelLiveChatsProvider',
+         name: r'filteredGroupedChannelInteractionsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$groupedChannelLiveChatsHash();
+  String debugGetCreateSourceHash() =>
+      _$filteredGroupedChannelInteractionsHash();
 
   @override
   String toString() {
-    return r'groupedChannelLiveChatsProvider'
+    return r'filteredGroupedChannelInteractionsProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
   @override
-  $ProviderElement<List<VideoGroup<LiveChat>>> $createElement(
+  $ProviderElement<List<VideoGroup<Interaction>>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  List<VideoGroup<LiveChat>> create(Ref ref) {
-    final argument = this.argument as String;
-    return groupedChannelLiveChats(ref, argument);
+  List<VideoGroup<Interaction>> create(Ref ref) {
+    final argument = this.argument as (QueueItemKind, String);
+    return filteredGroupedChannelInteractions(ref, argument.$1, argument.$2);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<VideoGroup<LiveChat>> value) {
+  Override overrideWithValue(List<VideoGroup<Interaction>> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<List<VideoGroup<LiveChat>>>(value),
+      providerOverride: $SyncValueProvider<List<VideoGroup<Interaction>>>(
+        value,
+      ),
     );
   }
 
   @override
   bool operator ==(Object other) {
-    return other is GroupedChannelLiveChatsProvider &&
+    return other is FilteredGroupedChannelInteractionsProvider &&
         other.argument == argument;
   }
 
@@ -158,83 +189,108 @@ final class GroupedChannelLiveChatsProvider
   }
 }
 
-String _$groupedChannelLiveChatsHash() =>
-    r'4031931181184de1637884f0ccb27f41925bf1ae';
+String _$filteredGroupedChannelInteractionsHash() =>
+    r'a3dace395618fb1f8de9af2170ba24e17f5d9796';
 
-final class GroupedChannelLiveChatsFamily extends $Family
-    with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
-  GroupedChannelLiveChatsFamily._()
+/// The groups of [groupedChannelInteractionsProvider] that match the channel
+/// search: by group title, or by the text of their items.
+
+final class FilteredGroupedChannelInteractionsFamily extends $Family
+    with
+        $FunctionalFamilyOverride<
+          List<VideoGroup<Interaction>>,
+          (QueueItemKind, String)
+        > {
+  FilteredGroupedChannelInteractionsFamily._()
     : super(
         retry: null,
-        name: r'groupedChannelLiveChatsProvider',
+        name: r'filteredGroupedChannelInteractionsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  GroupedChannelLiveChatsProvider call(String channelId) =>
-      GroupedChannelLiveChatsProvider._(argument: channelId, from: this);
+  /// The groups of [groupedChannelInteractionsProvider] that match the channel
+  /// search: by group title, or by the text of their items.
+
+  FilteredGroupedChannelInteractionsProvider call(
+    QueueItemKind kind,
+    String channelId,
+  ) => FilteredGroupedChannelInteractionsProvider._(
+    argument: (kind, channelId),
+    from: this,
+  );
 
   @override
-  String toString() => r'groupedChannelLiveChatsProvider';
+  String toString() => r'filteredGroupedChannelInteractionsProvider';
 }
 
-@ProviderFor(filteredGroupedChannelComments)
-final filteredGroupedChannelCommentsProvider =
-    FilteredGroupedChannelCommentsFamily._();
+/// Flat list of [kind]'s items currently visible in search results,
+/// excluding any already marked as deleted. Empty when the search query is
+/// empty.
 
-final class FilteredGroupedChannelCommentsProvider
+@ProviderFor(filteredSearchInteractions)
+final filteredSearchInteractionsProvider = FilteredSearchInteractionsFamily._();
+
+/// Flat list of [kind]'s items currently visible in search results,
+/// excluding any already marked as deleted. Empty when the search query is
+/// empty.
+
+final class FilteredSearchInteractionsProvider
     extends
         $FunctionalProvider<
-          List<VideoGroup<Comment>>,
-          List<VideoGroup<Comment>>,
-          List<VideoGroup<Comment>>
+          List<Interaction>,
+          List<Interaction>,
+          List<Interaction>
         >
-    with $Provider<List<VideoGroup<Comment>>> {
-  FilteredGroupedChannelCommentsProvider._({
-    required FilteredGroupedChannelCommentsFamily super.from,
-    required String super.argument,
+    with $Provider<List<Interaction>> {
+  /// Flat list of [kind]'s items currently visible in search results,
+  /// excluding any already marked as deleted. Empty when the search query is
+  /// empty.
+  FilteredSearchInteractionsProvider._({
+    required FilteredSearchInteractionsFamily super.from,
+    required (QueueItemKind, String) super.argument,
   }) : super(
          retry: null,
-         name: r'filteredGroupedChannelCommentsProvider',
+         name: r'filteredSearchInteractionsProvider',
          isAutoDispose: true,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
 
   @override
-  String debugGetCreateSourceHash() => _$filteredGroupedChannelCommentsHash();
+  String debugGetCreateSourceHash() => _$filteredSearchInteractionsHash();
 
   @override
   String toString() {
-    return r'filteredGroupedChannelCommentsProvider'
+    return r'filteredSearchInteractionsProvider'
         ''
-        '($argument)';
+        '$argument';
   }
 
   @$internal
   @override
-  $ProviderElement<List<VideoGroup<Comment>>> $createElement(
+  $ProviderElement<List<Interaction>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  List<VideoGroup<Comment>> create(Ref ref) {
-    final argument = this.argument as String;
-    return filteredGroupedChannelComments(ref, argument);
+  List<Interaction> create(Ref ref) {
+    final argument = this.argument as (QueueItemKind, String);
+    return filteredSearchInteractions(ref, argument.$1, argument.$2);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<VideoGroup<Comment>> value) {
+  Override overrideWithValue(List<Interaction> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<List<VideoGroup<Comment>>>(value),
+      providerOverride: $SyncValueProvider<List<Interaction>>(value),
     );
   }
 
   @override
   bool operator ==(Object other) {
-    return other is FilteredGroupedChannelCommentsProvider &&
+    return other is FilteredSearchInteractionsProvider &&
         other.argument == argument;
   }
 
@@ -244,298 +300,36 @@ final class FilteredGroupedChannelCommentsProvider
   }
 }
 
-String _$filteredGroupedChannelCommentsHash() =>
-    r'27eb474734e04561f11c1616d3b18970f6769bd5';
+String _$filteredSearchInteractionsHash() =>
+    r'ff7b46c2ffefd2e57cc1bb255f736c090a6a817b';
 
-final class FilteredGroupedChannelCommentsFamily extends $Family
-    with $FunctionalFamilyOverride<List<VideoGroup<Comment>>, String> {
-  FilteredGroupedChannelCommentsFamily._()
+/// Flat list of [kind]'s items currently visible in search results,
+/// excluding any already marked as deleted. Empty when the search query is
+/// empty.
+
+final class FilteredSearchInteractionsFamily extends $Family
+    with $FunctionalFamilyOverride<List<Interaction>, (QueueItemKind, String)> {
+  FilteredSearchInteractionsFamily._()
     : super(
         retry: null,
-        name: r'filteredGroupedChannelCommentsProvider',
+        name: r'filteredSearchInteractionsProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
 
-  FilteredGroupedChannelCommentsProvider call(String channelId) =>
-      FilteredGroupedChannelCommentsProvider._(argument: channelId, from: this);
+  /// Flat list of [kind]'s items currently visible in search results,
+  /// excluding any already marked as deleted. Empty when the search query is
+  /// empty.
+
+  FilteredSearchInteractionsProvider call(
+    QueueItemKind kind,
+    String channelId,
+  ) => FilteredSearchInteractionsProvider._(
+    argument: (kind, channelId),
+    from: this,
+  );
 
   @override
-  String toString() => r'filteredGroupedChannelCommentsProvider';
-}
-
-@ProviderFor(filteredGroupedChannelLiveChats)
-final filteredGroupedChannelLiveChatsProvider =
-    FilteredGroupedChannelLiveChatsFamily._();
-
-final class FilteredGroupedChannelLiveChatsProvider
-    extends
-        $FunctionalProvider<
-          List<VideoGroup<LiveChat>>,
-          List<VideoGroup<LiveChat>>,
-          List<VideoGroup<LiveChat>>
-        >
-    with $Provider<List<VideoGroup<LiveChat>>> {
-  FilteredGroupedChannelLiveChatsProvider._({
-    required FilteredGroupedChannelLiveChatsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'filteredGroupedChannelLiveChatsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$filteredGroupedChannelLiveChatsHash();
-
-  @override
-  String toString() {
-    return r'filteredGroupedChannelLiveChatsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $ProviderElement<List<VideoGroup<LiveChat>>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<VideoGroup<LiveChat>> create(Ref ref) {
-    final argument = this.argument as String;
-    return filteredGroupedChannelLiveChats(ref, argument);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<VideoGroup<LiveChat>> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<VideoGroup<LiveChat>>>(value),
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is FilteredGroupedChannelLiveChatsProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$filteredGroupedChannelLiveChatsHash() =>
-    r'678630a7d440e9d7bea637410ffffc61a7003c6f';
-
-final class FilteredGroupedChannelLiveChatsFamily extends $Family
-    with $FunctionalFamilyOverride<List<VideoGroup<LiveChat>>, String> {
-  FilteredGroupedChannelLiveChatsFamily._()
-    : super(
-        retry: null,
-        name: r'filteredGroupedChannelLiveChatsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  FilteredGroupedChannelLiveChatsProvider call(String channelId) =>
-      FilteredGroupedChannelLiveChatsProvider._(
-        argument: channelId,
-        from: this,
-      );
-
-  @override
-  String toString() => r'filteredGroupedChannelLiveChatsProvider';
-}
-
-/// Flat list of comments currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-@ProviderFor(filteredSearchComments)
-final filteredSearchCommentsProvider = FilteredSearchCommentsFamily._();
-
-/// Flat list of comments currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-final class FilteredSearchCommentsProvider
-    extends $FunctionalProvider<List<Comment>, List<Comment>, List<Comment>>
-    with $Provider<List<Comment>> {
-  /// Flat list of comments currently visible in search results, excluding any
-  /// already marked as deleted. Empty when the search query is empty.
-  FilteredSearchCommentsProvider._({
-    required FilteredSearchCommentsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'filteredSearchCommentsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$filteredSearchCommentsHash();
-
-  @override
-  String toString() {
-    return r'filteredSearchCommentsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $ProviderElement<List<Comment>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<Comment> create(Ref ref) {
-    final argument = this.argument as String;
-    return filteredSearchComments(ref, argument);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<Comment> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<Comment>>(value),
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is FilteredSearchCommentsProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$filteredSearchCommentsHash() =>
-    r'01bde5f486c456ab747d1ff0420d9ee7616c6899';
-
-/// Flat list of comments currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-final class FilteredSearchCommentsFamily extends $Family
-    with $FunctionalFamilyOverride<List<Comment>, String> {
-  FilteredSearchCommentsFamily._()
-    : super(
-        retry: null,
-        name: r'filteredSearchCommentsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Flat list of comments currently visible in search results, excluding any
-  /// already marked as deleted. Empty when the search query is empty.
-
-  FilteredSearchCommentsProvider call(String channelId) =>
-      FilteredSearchCommentsProvider._(argument: channelId, from: this);
-
-  @override
-  String toString() => r'filteredSearchCommentsProvider';
-}
-
-/// Flat list of live chats currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-@ProviderFor(filteredSearchLiveChats)
-final filteredSearchLiveChatsProvider = FilteredSearchLiveChatsFamily._();
-
-/// Flat list of live chats currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-final class FilteredSearchLiveChatsProvider
-    extends $FunctionalProvider<List<LiveChat>, List<LiveChat>, List<LiveChat>>
-    with $Provider<List<LiveChat>> {
-  /// Flat list of live chats currently visible in search results, excluding any
-  /// already marked as deleted. Empty when the search query is empty.
-  FilteredSearchLiveChatsProvider._({
-    required FilteredSearchLiveChatsFamily super.from,
-    required String super.argument,
-  }) : super(
-         retry: null,
-         name: r'filteredSearchLiveChatsProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$filteredSearchLiveChatsHash();
-
-  @override
-  String toString() {
-    return r'filteredSearchLiveChatsProvider'
-        ''
-        '($argument)';
-  }
-
-  @$internal
-  @override
-  $ProviderElement<List<LiveChat>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<LiveChat> create(Ref ref) {
-    final argument = this.argument as String;
-    return filteredSearchLiveChats(ref, argument);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<LiveChat> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<LiveChat>>(value),
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is FilteredSearchLiveChatsProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$filteredSearchLiveChatsHash() =>
-    r'5dd328f66d27a4f5fbd74418f1d235c70580b4be';
-
-/// Flat list of live chats currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-
-final class FilteredSearchLiveChatsFamily extends $Family
-    with $FunctionalFamilyOverride<List<LiveChat>, String> {
-  FilteredSearchLiveChatsFamily._()
-    : super(
-        retry: null,
-        name: r'filteredSearchLiveChatsProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  /// Flat list of live chats currently visible in search results, excluding any
-  /// already marked as deleted. Empty when the search query is empty.
-
-  FilteredSearchLiveChatsProvider call(String channelId) =>
-      FilteredSearchLiveChatsProvider._(argument: channelId, from: this);
-
-  @override
-  String toString() => r'filteredSearchLiveChatsProvider';
+  String toString() => r'filteredSearchInteractionsProvider';
 }

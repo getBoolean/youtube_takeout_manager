@@ -23,12 +23,7 @@ class SelectionActionBar extends ConsumerWidget {
       message: 'For items you already deleted outside the app',
       child: OutlinedButton.icon(
         onPressed: () async {
-          final removed = await confirmLocalRemoval(
-            context,
-            ref,
-            commentIds: selection.commentIds,
-            liveChatIds: selection.liveChatIds,
-          );
+          final removed = await confirmLocalRemoval(context, ref, selection);
           if (removed) onExitSelection();
         },
         icon: const Icon(Icons.remove_circle_outline),

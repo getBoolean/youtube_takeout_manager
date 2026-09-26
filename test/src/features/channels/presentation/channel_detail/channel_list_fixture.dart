@@ -5,10 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/video_group.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/comment_list_view.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/live_chat_list_view.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/interaction_list_view.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
@@ -105,30 +105,33 @@ class _FakeVideoMetadata extends VideoMetadata {
   Stream<Map<String, Video>> build() => Stream.value(videos);
 }
 
-class _FakeDeletedCommentIds extends DeletedCommentIds {
+class _FakeDeletedIds extends DeletedIds {
   @override
-  Future<Set<String>> build() async => {commentId(0, 1)};
-}
-
-class _FakeDeletedLiveChatIds extends DeletedLiveChatIds {
-  @override
-  Future<Set<String>> build() async => {liveChatId(0, 2)};
+  Future<Map<QueueItemKind, Set<String>>> build() async => {
+    QueueItemKind.comment: {commentId(0, 1)},
+    QueueItemKind.liveChat: {liveChatId(0, 2)},
+  };
 }
 
 List<Override> fixtureOverrides() => [
-  filteredGroupedChannelCommentsProvider(
+  filteredGroupedChannelInteractionsProvider(
+    QueueItemKind.comment,
     channelId,
   ).overrideWithValue(commentGroups),
-  filteredGroupedChannelLiveChatsProvider(
+  filteredGroupedChannelInteractionsProvider(
+    QueueItemKind.liveChat,
     channelId,
   ).overrideWithValue(liveChatGroups),
   videoMetadataProvider.overrideWith(_FakeVideoMetadata.new),
-  deletedCommentIdsProvider.overrideWith(_FakeDeletedCommentIds.new),
-  deletedLiveChatIdsProvider.overrideWith(_FakeDeletedLiveChatIds.new),
-  queuedCommentIdsProvider.overrideWithValue({commentId(2, 0)}),
-  failedCommentIdsProvider.overrideWithValue({commentId(2, 1)}),
-  queuedLiveChatIdsProvider.overrideWithValue({liveChatId(1, 0)}),
-  failedLiveChatIdsProvider.overrideWithValue({liveChatId(1, 1)}),
+  deletedIdsProvider.overrideWith(_FakeDeletedIds.new),
+  queuedIdsProvider(QueueItemKind.comment).overrideWithValue({commentId(2, 0)}),
+  failedIdsProvider(QueueItemKind.comment).overrideWithValue({commentId(2, 1)}),
+  queuedIdsProvider(
+    QueueItemKind.liveChat,
+  ).overrideWithValue({liveChatId(1, 0)}),
+  failedIdsProvider(
+    QueueItemKind.liveChat,
+  ).overrideWithValue({liveChatId(1, 1)}),
 ];
 
 enum ListKind { comments, liveChats }
@@ -168,20 +171,16 @@ Future<ListHarness> pumpList(
         home: Scaffold(
           body: ValueListenableBuilder<bool>(
             valueListenable: selection,
-            builder: (context, _, _) => switch (kind) {
-              ListKind.comments => ChannelCommentListView(
-                channelId: channelId,
-                selectionMode: selection,
-                scrollController: scroll,
-                initialScrollTarget: initialScrollTarget,
-              ),
-              ListKind.liveChats => ChannelLiveChatListView(
-                channelId: channelId,
-                selectionMode: selection,
-                scrollController: scroll,
-                initialScrollTarget: initialScrollTarget,
-              ),
-            },
+            builder: (context, _, _) => ChannelInteractionListView(
+              kind: switch (kind) {
+                ListKind.comments => QueueItemKind.comment,
+                ListKind.liveChats => QueueItemKind.liveChat,
+              },
+              channelId: channelId,
+              selectionMode: selection,
+              scrollController: scroll,
+              initialScrollTarget: initialScrollTarget,
+            ),
           ),
         ),
       ),

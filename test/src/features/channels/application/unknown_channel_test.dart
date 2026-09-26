@@ -4,10 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/cross_channel_search_providers.dart';
-import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
@@ -91,8 +91,12 @@ void main() {
       overrides: [
         takeoutProvider.overrideWith(_FakeTakeout.new),
         takeoutSelectionProvider.overrideWith(_Selection.new),
-        allCommentsProvider.overrideWithValue(_comments),
-        allLiveChatsProvider.overrideWithValue(_liveChats),
+        allInteractionsProvider(
+          QueueItemKind.comment,
+        ).overrideWithValue(_comments),
+        allInteractionsProvider(
+          QueueItemKind.liveChat,
+        ).overrideWithValue(_liveChats),
         videoMetadataProvider.overrideWith(_FakeVideoMetadata.new),
       ],
     );
@@ -112,17 +116,19 @@ void main() {
     () async {
       final c = await container();
 
-      final comments = c.read(commentsByChannelProvider);
+      final comments = c.read(
+        interactionsByChannelProvider(QueueItemKind.comment),
+      );
       expect(comments.keys, unorderedEquals(['UCknown', unknownChannelId]));
       expect(
-        comments[unknownChannelId]!.map((c) => c.commentId),
+        comments[unknownChannelId]!.map((c) => c.id),
         unorderedEquals(['needle-missing-video', 'on-post', 'orphan']),
       );
 
-      final liveChats = c.read(liveChatsByChannelProvider);
-      expect(liveChats[unknownChannelId]!.map((c) => c.liveChatId), [
-        'chat-missing',
-      ]);
+      final liveChats = c.read(
+        interactionsByChannelProvider(QueueItemKind.liveChat),
+      );
+      expect(liveChats[unknownChannelId]!.map((c) => c.id), ['chat-missing']);
     },
   );
 
@@ -147,7 +153,7 @@ void main() {
     c.read(channelSearchQueryProvider.notifier).update('needle');
 
     final results = c.read(crossChannelSearchItemsProvider);
-    expect(results.map((r) => r.id), ['needle-missing-video']);
+    expect(results.map((r) => r.item.id), ['needle-missing-video']);
     expect(results.single.channelId, unknownChannelId);
   });
 }

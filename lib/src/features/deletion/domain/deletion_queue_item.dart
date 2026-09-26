@@ -1,7 +1,7 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'deletion_item_status.dart';
-import 'queue_item_kind.dart';
 
 part 'deletion_queue_item.mapper.dart';
 

@@ -1,16 +1,15 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_items_by_channel.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 DeletionQueueItem _item(String itemId) => DeletionQueueItem(
@@ -65,10 +64,14 @@ void main() {
           deletionQueueProvider.overrideWith(
             () => _FakeQueue([_item('c1'), _liveChatItem('l1'), _item('gone')]),
           ),
-          commentsByChannelProvider.overrideWithValue({
+          interactionsByChannelProvider(
+            QueueItemKind.comment,
+          ).overrideWithValue({
             'UCvideo': [_comment('c1'), _comment('c2')],
           }),
-          liveChatsByChannelProvider.overrideWithValue({
+          interactionsByChannelProvider(
+            QueueItemKind.liveChat,
+          ).overrideWithValue({
             'UCstream': [_liveChat('l1')],
           }),
         ],
@@ -92,11 +95,15 @@ void main() {
           deletionQueueProvider.overrideWith(
             () => _FakeQueue([_item('c1'), _item('no-details')]),
           ),
-          commentsByChannelProvider.overrideWithValue({
+          interactionsByChannelProvider(
+            QueueItemKind.comment,
+          ).overrideWithValue({
             'UCvideo': [_comment('c1')],
             unknownChannelId: [_comment('no-details')],
           }),
-          liveChatsByChannelProvider.overrideWithValue(const {}),
+          interactionsByChannelProvider(
+            QueueItemKind.liveChat,
+          ).overrideWithValue(const {}),
         ],
       );
       addTearDown(container.dispose);

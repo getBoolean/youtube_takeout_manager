@@ -14,7 +14,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/data/youtube_delet
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 DeletionQueueItem _item(
   String itemId,

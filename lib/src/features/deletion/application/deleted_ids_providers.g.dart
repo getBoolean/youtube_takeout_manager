@@ -8,44 +8,59 @@ part of 'deleted_ids_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// The IDs of each kind's items known to be deleted.
 
-@ProviderFor(DeletedCommentIds)
-final deletedCommentIdsProvider = DeletedCommentIdsProvider._();
+@ProviderFor(DeletedIds)
+final deletedIdsProvider = DeletedIdsProvider._();
 
-final class DeletedCommentIdsProvider
-    extends $AsyncNotifierProvider<DeletedCommentIds, Set<String>> {
-  DeletedCommentIdsProvider._()
+/// The IDs of each kind's items known to be deleted.
+final class DeletedIdsProvider
+    extends
+        $AsyncNotifierProvider<DeletedIds, Map<QueueItemKind, Set<String>>> {
+  /// The IDs of each kind's items known to be deleted.
+  DeletedIdsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'deletedCommentIdsProvider',
+        name: r'deletedIdsProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$deletedCommentIdsHash();
+  String debugGetCreateSourceHash() => _$deletedIdsHash();
 
   @$internal
   @override
-  DeletedCommentIds create() => DeletedCommentIds();
+  DeletedIds create() => DeletedIds();
 }
 
-String _$deletedCommentIdsHash() => r'285bc624b001e501b6d944b265230458603ba553';
+String _$deletedIdsHash() => r'b7edaac8677c0f17efb55c33af258d9d1c0de881';
 
-abstract class _$DeletedCommentIds extends $AsyncNotifier<Set<String>> {
-  FutureOr<Set<String>> build();
+/// The IDs of each kind's items known to be deleted.
+
+abstract class _$DeletedIds
+    extends $AsyncNotifier<Map<QueueItemKind, Set<String>>> {
+  FutureOr<Map<QueueItemKind, Set<String>>> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<Set<String>>, Set<String>>;
+    final ref =
+        this.ref
+            as $Ref<
+              AsyncValue<Map<QueueItemKind, Set<String>>>,
+              Map<QueueItemKind, Set<String>>
+            >;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<Set<String>>, Set<String>>,
-              AsyncValue<Set<String>>,
+              AnyNotifier<
+                AsyncValue<Map<QueueItemKind, Set<String>>>,
+                Map<QueueItemKind, Set<String>>
+              >,
+              AsyncValue<Map<QueueItemKind, Set<String>>>,
               Object?,
               Object?
             >;
@@ -53,70 +68,32 @@ abstract class _$DeletedCommentIds extends $AsyncNotifier<Set<String>> {
   }
 }
 
-@ProviderFor(DeletedLiveChatIds)
-final deletedLiveChatIdsProvider = DeletedLiveChatIdsProvider._();
+@ProviderFor(queuedIds)
+final queuedIdsProvider = QueuedIdsFamily._();
 
-final class DeletedLiveChatIdsProvider
-    extends $AsyncNotifierProvider<DeletedLiveChatIds, Set<String>> {
-  DeletedLiveChatIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'deletedLiveChatIdsProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$deletedLiveChatIdsHash();
-
-  @$internal
-  @override
-  DeletedLiveChatIds create() => DeletedLiveChatIds();
-}
-
-String _$deletedLiveChatIdsHash() =>
-    r'f3c3d5b9ce3d42367e2c7b86fab38477342545e7';
-
-abstract class _$DeletedLiveChatIds extends $AsyncNotifier<Set<String>> {
-  FutureOr<Set<String>> build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<Set<String>>, Set<String>>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<Set<String>>, Set<String>>,
-              AsyncValue<Set<String>>,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-@ProviderFor(queuedCommentIds)
-final queuedCommentIdsProvider = QueuedCommentIdsProvider._();
-
-final class QueuedCommentIdsProvider
+final class QueuedIdsProvider
     extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
     with $Provider<Set<String>> {
-  QueuedCommentIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'queuedCommentIdsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+  QueuedIdsProvider._({
+    required QueuedIdsFamily super.from,
+    required QueueItemKind super.argument,
+  }) : super(
+         retry: null,
+         name: r'queuedIdsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
 
   @override
-  String debugGetCreateSourceHash() => _$queuedCommentIdsHash();
+  String debugGetCreateSourceHash() => _$queuedIdsHash();
+
+  @override
+  String toString() {
+    return r'queuedIdsProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -125,7 +102,8 @@ final class QueuedCommentIdsProvider
 
   @override
   Set<String> create(Ref ref) {
-    return queuedCommentIds(ref);
+    final argument = this.argument as QueueItemKind;
+    return queuedIds(ref, argument);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -135,29 +113,64 @@ final class QueuedCommentIdsProvider
       providerOverride: $SyncValueProvider<Set<String>>(value),
     );
   }
-}
-
-String _$queuedCommentIdsHash() => r'946ec0644ecc1665a63837c9618dbc7dc11b8368';
-
-@ProviderFor(queuedLiveChatIds)
-final queuedLiveChatIdsProvider = QueuedLiveChatIdsProvider._();
-
-final class QueuedLiveChatIdsProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  QueuedLiveChatIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'queuedLiveChatIdsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
 
   @override
-  String debugGetCreateSourceHash() => _$queuedLiveChatIdsHash();
+  bool operator ==(Object other) {
+    return other is QueuedIdsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$queuedIdsHash() => r'ef18e6c50c91a73ba55414ae1232a615514dc75b';
+
+final class QueuedIdsFamily extends $Family
+    with $FunctionalFamilyOverride<Set<String>, QueueItemKind> {
+  QueuedIdsFamily._()
+    : super(
+        retry: null,
+        name: r'queuedIdsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  QueuedIdsProvider call(QueueItemKind kind) =>
+      QueuedIdsProvider._(argument: kind, from: this);
+
+  @override
+  String toString() => r'queuedIdsProvider';
+}
+
+@ProviderFor(failedIds)
+final failedIdsProvider = FailedIdsFamily._();
+
+final class FailedIdsProvider
+    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
+    with $Provider<Set<String>> {
+  FailedIdsProvider._({
+    required FailedIdsFamily super.from,
+    required QueueItemKind super.argument,
+  }) : super(
+         retry: null,
+         name: r'failedIdsProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$failedIdsHash();
+
+  @override
+  String toString() {
+    return r'failedIdsProvider'
+        ''
+        '($argument)';
+  }
 
   @$internal
   @override
@@ -166,7 +179,8 @@ final class QueuedLiveChatIdsProvider
 
   @override
   Set<String> create(Ref ref) {
-    return queuedLiveChatIds(ref);
+    final argument = this.argument as QueueItemKind;
+    return failedIds(ref, argument);
   }
 
   /// {@macro riverpod.override_with_value}
@@ -176,184 +190,185 @@ final class QueuedLiveChatIdsProvider
       providerOverride: $SyncValueProvider<Set<String>>(value),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    return other is FailedIdsProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
 }
 
-String _$queuedLiveChatIdsHash() => r'4a59a61d713eff6c8cf927db1ff98a8172701a3a';
+String _$failedIdsHash() => r'bb2d244840bcd16d3cedff9ea2984ac242399e76';
 
-@ProviderFor(failedCommentIds)
-final failedCommentIdsProvider = FailedCommentIdsProvider._();
+final class FailedIdsFamily extends $Family
+    with $FunctionalFamilyOverride<Set<String>, QueueItemKind> {
+  FailedIdsFamily._()
+    : super(
+        retry: null,
+        name: r'failedIdsProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
 
-final class FailedCommentIdsProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  FailedCommentIdsProvider._()
+  FailedIdsProvider call(QueueItemKind kind) =>
+      FailedIdsProvider._(argument: kind, from: this);
+
+  @override
+  String toString() => r'failedIdsProvider';
+}
+
+/// Which of [kind]'s items are deleted, failed or queued.
+
+@ProviderFor(interactionStatuses)
+final interactionStatusesProvider = InteractionStatusesFamily._();
+
+/// Which of [kind]'s items are deleted, failed or queued.
+
+final class InteractionStatusesProvider
+    extends
+        $FunctionalProvider<
+          InteractionStatuses,
+          InteractionStatuses,
+          InteractionStatuses
+        >
+    with $Provider<InteractionStatuses> {
+  /// Which of [kind]'s items are deleted, failed or queued.
+  InteractionStatusesProvider._({
+    required InteractionStatusesFamily super.from,
+    required QueueItemKind super.argument,
+  }) : super(
+         retry: null,
+         name: r'interactionStatusesProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$interactionStatusesHash();
+
+  @override
+  String toString() {
+    return r'interactionStatusesProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<InteractionStatuses> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  InteractionStatuses create(Ref ref) {
+    final argument = this.argument as QueueItemKind;
+    return interactionStatuses(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(InteractionStatuses value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<InteractionStatuses>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is InteractionStatusesProvider && other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$interactionStatusesHash() =>
+    r'36c903800ae8fabe90818149e97b44add397cdd7';
+
+/// Which of [kind]'s items are deleted, failed or queued.
+
+final class InteractionStatusesFamily extends $Family
+    with $FunctionalFamilyOverride<InteractionStatuses, QueueItemKind> {
+  InteractionStatusesFamily._()
+    : super(
+        retry: null,
+        name: r'interactionStatusesProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// Which of [kind]'s items are deleted, failed or queued.
+
+  InteractionStatusesProvider call(QueueItemKind kind) =>
+      InteractionStatusesProvider._(argument: kind, from: this);
+
+  @override
+  String toString() => r'interactionStatusesProvider';
+}
+
+/// The IDs of each kind's items bulk deletes leave out: already deleted,
+/// queued or failed.
+
+@ProviderFor(excludedFromDeletionIds)
+final excludedFromDeletionIdsProvider = ExcludedFromDeletionIdsProvider._();
+
+/// The IDs of each kind's items bulk deletes leave out: already deleted,
+/// queued or failed.
+
+final class ExcludedFromDeletionIdsProvider
+    extends
+        $FunctionalProvider<
+          Map<QueueItemKind, Set<String>>,
+          Map<QueueItemKind, Set<String>>,
+          Map<QueueItemKind, Set<String>>
+        >
+    with $Provider<Map<QueueItemKind, Set<String>>> {
+  /// The IDs of each kind's items bulk deletes leave out: already deleted,
+  /// queued or failed.
+  ExcludedFromDeletionIdsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'failedCommentIdsProvider',
+        name: r'excludedFromDeletionIdsProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$failedCommentIdsHash();
+  String debugGetCreateSourceHash() => _$excludedFromDeletionIdsHash();
 
   @$internal
   @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $ProviderElement<Map<QueueItemKind, Set<String>>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
 
   @override
-  Set<String> create(Ref ref) {
-    return failedCommentIds(ref);
+  Map<QueueItemKind, Set<String>> create(Ref ref) {
+    return excludedFromDeletionIds(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
+  Override overrideWithValue(Map<QueueItemKind, Set<String>> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
+      providerOverride: $SyncValueProvider<Map<QueueItemKind, Set<String>>>(
+        value,
+      ),
     );
   }
 }
 
-String _$failedCommentIdsHash() => r'99e5515c48c676c8ee15f001e91c9c32d527cf69';
-
-@ProviderFor(failedLiveChatIds)
-final failedLiveChatIdsProvider = FailedLiveChatIdsProvider._();
-
-final class FailedLiveChatIdsProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  FailedLiveChatIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'failedLiveChatIdsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$failedLiveChatIdsHash();
-
-  @$internal
-  @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Set<String> create(Ref ref) {
-    return failedLiveChatIds(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
-    );
-  }
-}
-
-String _$failedLiveChatIdsHash() => r'45827fcbfae5f0f1b56c74edcad3005cc833f521';
-
-/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
-
-@ProviderFor(excludedFromDeletionCommentIds)
-final excludedFromDeletionCommentIdsProvider =
-    ExcludedFromDeletionCommentIdsProvider._();
-
-/// Comment IDs bulk deletes leave out: already deleted, queued or failed.
-
-final class ExcludedFromDeletionCommentIdsProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  /// Comment IDs bulk deletes leave out: already deleted, queued or failed.
-  ExcludedFromDeletionCommentIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'excludedFromDeletionCommentIdsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$excludedFromDeletionCommentIdsHash();
-
-  @$internal
-  @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Set<String> create(Ref ref) {
-    return excludedFromDeletionCommentIds(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
-    );
-  }
-}
-
-String _$excludedFromDeletionCommentIdsHash() =>
-    r'e590a9b1b5095566558ad3865d1a6f7db0afc47d';
-
-/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
-
-@ProviderFor(excludedFromDeletionLiveChatIds)
-final excludedFromDeletionLiveChatIdsProvider =
-    ExcludedFromDeletionLiveChatIdsProvider._();
-
-/// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
-
-final class ExcludedFromDeletionLiveChatIdsProvider
-    extends $FunctionalProvider<Set<String>, Set<String>, Set<String>>
-    with $Provider<Set<String>> {
-  /// Live chat IDs bulk deletes leave out: already deleted, queued or failed.
-  ExcludedFromDeletionLiveChatIdsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'excludedFromDeletionLiveChatIdsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$excludedFromDeletionLiveChatIdsHash();
-
-  @$internal
-  @override
-  $ProviderElement<Set<String>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  Set<String> create(Ref ref) {
-    return excludedFromDeletionLiveChatIds(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
-    );
-  }
-}
-
-String _$excludedFromDeletionLiveChatIdsHash() =>
-    r'592a10827f89daf63fa424f9c4e49879a65da22c';
+String _$excludedFromDeletionIdsHash() =>
+    r'1ae005e2184e36ab15de46bef4654d819771d5b1';

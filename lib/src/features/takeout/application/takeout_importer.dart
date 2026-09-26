@@ -6,7 +6,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 import '../data/takeout_import_planner.dart';
 import '../data/takeout_repository.dart';
@@ -51,13 +52,14 @@ class TakeoutImporter extends _$TakeoutImporter {
       ref.read(takeoutRepositoryProvider),
       loaded: loaded,
     );
+    final deleted = await ref.read(deletedIdsProvider.future);
     return compute(planTakeoutImport, (
       zips: zips,
       saved: saved,
       savedChannelSets: {for (final s in summaries) s.id: s.channelIds},
       merge: merge,
-      deletedCommentIds: await ref.read(deletedCommentIdsProvider.future),
-      deletedLiveChatIds: await ref.read(deletedLiveChatIdsProvider.future),
+      deletedCommentIds: deleted[QueueItemKind.comment] ?? const {},
+      deletedLiveChatIds: deleted[QueueItemKind.liveChat] ?? const {},
       activeTakeoutId: await _selectedTakeoutId(),
     ));
   }
@@ -75,18 +77,15 @@ class TakeoutImporter extends _$TakeoutImporter {
     // Gone items are gone whether or not the save below works, so mark them
     // first; otherwise a failed save would leave them deletable, and each
     // delete of a missing comment still costs quota.
+    final gone = DeletionTargets.ids({
+      QueueItemKind.comment: plan.goneCommentIds,
+      QueueItemKind.liveChat: plan.goneLiveChatIds,
+    });
+    await ref.read(deletedIdsProvider.notifier).markDeleted(gone);
     final queue = ref.read(deletionQueueProvider.notifier);
-    if (plan.goneCommentIds.isNotEmpty) {
-      await ref
-          .read(deletedCommentIdsProvider.notifier)
-          .markDeleted(plan.goneCommentIds);
-      await queue.dropUnprocessed(plan.goneCommentIds, QueueItemKind.comment);
-    }
-    if (plan.goneLiveChatIds.isNotEmpty) {
-      await ref
-          .read(deletedLiveChatIdsProvider.notifier)
-          .markDeleted(plan.goneLiveChatIds);
-      await queue.dropUnprocessed(plan.goneLiveChatIds, QueueItemKind.liveChat);
+    for (final kind in QueueItemKind.values) {
+      final ids = gone.idsOf(kind);
+      if (ids.isNotEmpty) await queue.dropUnprocessed(ids, kind);
     }
 
     await ref

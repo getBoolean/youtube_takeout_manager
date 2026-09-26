@@ -8,7 +8,8 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
@@ -90,7 +91,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         youtubeEmojiNameRepositoryProvider.overrideWithValue(lookups),
-        allLiveChatsProvider.overrideWithValue([
+        allInteractionsProvider(QueueItemKind.liveChat).overrideWithValue([
           LiveChat(
             liveChatId: 'l1',
             channelId: 'UCme',

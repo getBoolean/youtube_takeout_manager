@@ -22,26 +22,12 @@ class CrossChannelDeletionBar extends ConsumerWidget {
     // `inSelection && hasSelection`, so "0 items" only appears mid-animation.
     return SelectionActionBar(
       selection: deletionTargetsOf(
-        items.where((item) => selectedIds.contains(item.id)),
+        items.where((result) => selectedIds.contains(result.item.id)),
       ),
       onExitSelection: onExit,
     );
   }
 }
 
-DeletionTargets deletionTargetsOf(Iterable<SearchResultItem> items) {
-  final commentSnippets = <String, String?>{};
-  final liveChatSnippets = <String, String?>{};
-  for (final item in items) {
-    switch (item) {
-      case CommentResult(:final comment):
-        commentSnippets[comment.commentId] = comment.displayText;
-      case LiveChatResult(:final liveChat):
-        liveChatSnippets[liveChat.liveChatId] = liveChat.displayText;
-    }
-  }
-  return DeletionTargets(
-    commentSnippets: commentSnippets,
-    liveChatSnippets: liveChatSnippets,
-  );
-}
+DeletionTargets deletionTargetsOf(Iterable<SearchResultItem> items) =>
+    DeletionTargets.of(items.map((result) => result.item));

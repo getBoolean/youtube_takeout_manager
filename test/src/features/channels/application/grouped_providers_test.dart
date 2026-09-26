@@ -6,6 +6,7 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/video_group.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 
 const _channel = 'ch';
@@ -46,7 +47,10 @@ void main() {
   List<String> matchIds(String query) {
     final container = ProviderContainer(
       overrides: [
-        groupedChannelLiveChatsProvider(_channel).overrideWithValue(_groups),
+        groupedChannelInteractionsProvider(
+          QueueItemKind.liveChat,
+          _channel,
+        ).overrideWithValue(_groups),
         emojiNamesByKeyProvider.overrideWithValue({_emojiKey: 'shortcatTiger'}),
       ],
     );
@@ -55,9 +59,12 @@ void main() {
     container.read(channelContentSearchQueryProvider.notifier).update(query);
     return [
       for (final group in container.read(
-        filteredGroupedChannelLiveChatsProvider(_channel),
+        filteredGroupedChannelInteractionsProvider(
+          QueueItemKind.liveChat,
+          _channel,
+        ),
       ))
-        for (final chat in group.items) chat.liveChatId,
+        for (final chat in group.items) chat.id,
     ];
   }
 

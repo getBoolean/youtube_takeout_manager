@@ -1,7 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
@@ -76,8 +77,12 @@ List<Channel> channels(Ref ref) {
   final takeout = ref.watch(viewedTakeoutProvider).value;
   if (takeout == null) return [];
 
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
+  final commentsByChannel = ref.watch(
+    interactionsByChannelProvider(QueueItemKind.comment),
+  );
+  final liveChatsByChannel = ref.watch(
+    interactionsByChannelProvider(QueueItemKind.liveChat),
+  );
   final subscriptions = takeout.subscriptionsByChannelId;
 
   // Collect all unique channel IDs from both comments and live chats
@@ -127,8 +132,12 @@ Channel? channelById(Ref ref, String channelId) {
   final takeout = ref.watch(viewedTakeoutProvider).value;
   if (takeout == null) return null;
 
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
+  final commentsByChannel = ref.watch(
+    interactionsByChannelProvider(QueueItemKind.comment),
+  );
+  final liveChatsByChannel = ref.watch(
+    interactionsByChannelProvider(QueueItemKind.liveChat),
+  );
   if (!commentsByChannel.containsKey(channelId) &&
       !liveChatsByChannel.containsKey(channelId)) {
     return null;

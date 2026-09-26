@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
+import '../domain/interaction_status.dart';
+import 'interaction_status_style.dart';
 import 'superchat_colors.dart';
 
 class SuperChatCard extends StatelessWidget {
@@ -9,9 +11,7 @@ class SuperChatCard extends StatelessWidget {
   final List<InlineSpan> messageSpans;
   final String subtitleText;
   final bool isSelected;
-  final bool isDeleted;
-  final bool isQueued;
-  final bool isFailed;
+  final InteractionStatus status;
   final bool selectionMode;
   final String? highlightQuery;
   final VoidCallback onTap;
@@ -24,9 +24,7 @@ class SuperChatCard extends StatelessWidget {
     required this.messageSpans,
     required this.subtitleText,
     required this.isSelected,
-    this.isDeleted = false,
-    this.isQueued = false,
-    this.isFailed = false,
+    this.status = InteractionStatus.active,
     required this.selectionMode,
     required this.onTap,
     required this.onLongPress,
@@ -39,7 +37,8 @@ class SuperChatCard extends StatelessWidget {
     if (tier == null) return const SizedBox.shrink();
 
     final priceLabel = formatSuperChatPrice(priceMicros, currencyCode);
-    final badgeIcon = _badgeIcon();
+    final badgeIcon = status.icon;
+    final isDeleted = status == InteractionStatus.deleted;
     final scheme = Theme.of(context).colorScheme;
 
     return Opacity(
@@ -182,12 +181,5 @@ class SuperChatCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  IconData? _badgeIcon() {
-    if (isDeleted) return Icons.delete_outline;
-    if (isFailed) return Icons.error_outline;
-    if (isQueued) return Icons.schedule;
-    return null;
   }
 }

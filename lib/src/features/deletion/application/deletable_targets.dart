@@ -1,25 +1,14 @@
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../domain/deletion_targets.dart';
 
-/// [comments] and [liveChats] as deletion targets, leaving out the IDs in
-/// [skipCommentIds] and [skipLiveChatIds] (e.g. ones already deleted, queued
-/// or failed).
-DeletionTargets deletableTargets({
-  Iterable<Comment> comments = const [],
-  Iterable<LiveChat> liveChats = const [],
-  Set<String> skipCommentIds = const {},
-  Set<String> skipLiveChatIds = const {},
+/// [items] as deletion targets, leaving out the IDs in [skipIds] for their
+/// kind (e.g. ones already deleted, queued or failed).
+DeletionTargets deletableTargets(
+  Iterable<Interaction> items, {
+  Map<QueueItemKind, Set<String>> skipIds = const {},
 }) {
-  return DeletionTargets(
-    commentSnippets: {
-      for (final c in comments)
-        if (!skipCommentIds.contains(c.commentId)) c.commentId: c.displayText,
-    },
-    liveChatSnippets: {
-      for (final c in liveChats)
-        if (!skipLiveChatIds.contains(c.liveChatId))
-          c.liveChatId: c.displayText,
-    },
+  return DeletionTargets.of(
+    items.where((i) => !(skipIds[i.kind]?.contains(i.id) ?? false)),
   );
 }

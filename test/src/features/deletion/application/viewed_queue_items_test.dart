@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_counts.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -9,8 +9,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/queue_
 import 'package:youtube_takeout_manager/src/features/deletion/application/viewed_queue_items.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 DeletionQueueItem _item(
@@ -52,10 +51,12 @@ void main() {
       overrides: [
         deletionQueueProvider.overrideWith(_Queue.new),
         viewedChannelIdProvider.overrideWithValue('UCa'),
-        commentsByChannelProvider.overrideWithValue({
+        interactionsByChannelProvider(QueueItemKind.comment).overrideWithValue({
           'UCvideo': [_comment('a1'), _comment('b1')],
         }),
-        liveChatsByChannelProvider.overrideWithValue(const {}),
+        interactionsByChannelProvider(
+          QueueItemKind.liveChat,
+        ).overrideWithValue(const {}),
       ],
     );
     addTearDown(c.dispose);

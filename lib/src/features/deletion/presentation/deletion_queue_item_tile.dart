@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
-import '../domain/queue_item_kind.dart';
 
 class DeletionQueueItemTile extends StatelessWidget {
   final DeletionQueueItem item;

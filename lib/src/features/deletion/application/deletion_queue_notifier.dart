@@ -3,11 +3,11 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../data/deletion_queue_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/deletion_targets.dart';
-import '../domain/queue_item_kind.dart';
 
 part 'deletion_queue_notifier.g.dart';
 

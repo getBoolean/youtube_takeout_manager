@@ -257,14 +257,14 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     final List<Widget> actions;
 
     if (inSelection) {
-      final visibleIds = {for (final item in searchItems) item.id};
+      final visibleIds = {for (final result in searchItems) result.item.id};
       final selectedCount = ref
           .watch(deletionSetProvider)
           .intersection(visibleIds)
           .length;
       final deletableIds = {
-        for (final item in ref.watch(crossChannelDeletableItemsProvider))
-          item.id,
+        for (final result in ref.watch(crossChannelDeletableItemsProvider))
+          result.item.id,
       };
       leading = CloseButton(onPressed: _exitSelectionMode);
       title = Text('$selectedCount selected');
@@ -378,8 +378,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
           SliverList.builder(
             itemCount: items.length,
             itemBuilder: (context, index) => CrossChannelResultTile(
-              key: ValueKey('${items[index].kind}:${items[index].id}'),
-              item: items[index],
+              key: ValueKey(
+                '${items[index].item.kind}:${items[index].item.id}',
+              ),
+              result: items[index],
               query: query,
               selectionMode: _selectionMode,
             ),

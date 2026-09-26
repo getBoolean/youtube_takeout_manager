@@ -1,10 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../domain/search_result_item.dart';
 import 'channel_providers.dart';
@@ -21,39 +20,24 @@ List<SearchResultItem> crossChannelSearchItems(Ref ref) {
   final folded = foldForSearch(normalizeEmojiQuery(query));
   final names = ref.watch(emojiNamesByKeyProvider);
   final emojiNames = queryMentionsEmoji(query);
-
-  final commentsByChannel = ref.watch(commentsByChannelProvider);
-  final liveChatsByChannel = ref.watch(liveChatsByChannelProvider);
-  final deletedComments =
-      ref.watch(deletedCommentIdsProvider).value ?? const <String>{};
-  final deletedLiveChats =
-      ref.watch(deletedLiveChatIdsProvider).value ?? const <String>{};
+  final deletedIds = ref.watch(deletedIdsProvider).value ?? const {};
 
   final results = <SearchResultItem>[];
-
-  commentsByChannel.forEach((channelId, comments) {
-    for (final c in comments) {
-      if (deletedComments.contains(c.commentId)) continue;
-      if (foldForSearch(
-        searchableCommentText(c.rawCommentText, names, emojiNames: emojiNames),
-      ).contains(folded)) {
-        results.add(CommentResult(c, channelId: channelId));
+  for (final kind in QueueItemKind.values) {
+    final deleted = deletedIds[kind] ?? const {};
+    ref.watch(interactionsByChannelProvider(kind)).forEach((channelId, items) {
+      for (final item in items) {
+        if (deleted.contains(item.id)) continue;
+        if (foldForSearch(
+          searchableCommentText(item.rawText, names, emojiNames: emojiNames),
+        ).contains(folded)) {
+          results.add(SearchResultItem(item, channelId: channelId));
+        }
       }
-    }
-  });
+    });
+  }
 
-  liveChatsByChannel.forEach((channelId, chats) {
-    for (final chat in chats) {
-      if (deletedLiveChats.contains(chat.liveChatId)) continue;
-      if (foldForSearch(
-        searchableCommentText(chat.rawText, names, emojiNames: emojiNames),
-      ).contains(folded)) {
-        results.add(LiveChatResult(chat, channelId: channelId));
-      }
-    }
-  });
-
-  results.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  results.sort((a, b) => b.item.createdAt.compareTo(a.item.createdAt));
   return results;
 }
 
@@ -65,18 +49,10 @@ List<SearchResultItem> crossChannelDeletableItems(Ref ref) {
   final items = ref.watch(crossChannelSearchItemsProvider);
   if (items.isEmpty) return const [];
 
-  final queuedComments = ref.watch(queuedCommentIdsProvider);
-  final failedComments = ref.watch(failedCommentIdsProvider);
-  final queuedLiveChats = ref.watch(queuedLiveChatIdsProvider);
-  final failedLiveChats = ref.watch(failedLiveChatIdsProvider);
-
+  final excluded = ref.watch(excludedFromDeletionIdsProvider);
   return [
-    for (final item in items)
-      if (item.kind == QueueItemKind.comment
-          ? !queuedComments.contains(item.id) &&
-                !failedComments.contains(item.id)
-          : !queuedLiveChats.contains(item.id) &&
-                !failedLiveChats.contains(item.id))
-        item,
+    for (final result in items)
+      if (!(excluded[result.item.kind]?.contains(result.item.id) ?? false))
+        result,
   ];
 }

@@ -1,11 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
@@ -16,83 +15,13 @@ import 'search_options_providers.dart';
 
 part 'grouped_providers.g.dart';
 
+/// [kind]'s items on [channelId]'s videos, grouped by video.
 @riverpod
-List<VideoGroup<Comment>> groupedChannelComments(Ref ref, String channelId) {
-  final comments = ref.watch(channelCommentsProvider(channelId));
-  final groups = <String, List<Comment>>{};
-
-  for (final comment in comments) {
-    final key =
-        comment.videoId ??
-        (comment.postId != null ? 'post:${comment.postId}' : '_orphaned');
-    groups.putIfAbsent(key, () => []).add(comment);
-  }
-
-  final result = groups.entries.map((entry) {
-    final GroupType type;
-    if (entry.key == '_orphaned') {
-      type = GroupType.orphaned;
-    } else if (entry.key.startsWith('post:')) {
-      type = GroupType.post;
-    } else {
-      type = GroupType.video;
-    }
-    return VideoGroup<Comment>(
-      groupKey: entry.key,
-      groupType: type,
-      items: entry.value,
-    );
-  }).toList();
-
-  // Sort: video groups by most recent item first, then posts, then orphaned
-  result.sort((a, b) {
-    final aOrder = a.groupType == GroupType.video
-        ? 0
-        : a.groupType == GroupType.post
-        ? 1
-        : 2;
-    final bOrder = b.groupType == GroupType.video
-        ? 0
-        : b.groupType == GroupType.post
-        ? 1
-        : 2;
-    if (aOrder != bOrder) return aOrder.compareTo(bOrder);
-    return b.items.first.createdAt.compareTo(a.items.first.createdAt);
-  });
-
-  return result;
-}
-
-@riverpod
-List<VideoGroup<LiveChat>> groupedChannelLiveChats(Ref ref, String channelId) {
-  final liveChats = ref.watch(channelLiveChatsProvider(channelId));
-  final groups = <String, List<LiveChat>>{};
-
-  for (final chat in liveChats) {
-    final key = chat.videoId ?? '_orphaned';
-    groups.putIfAbsent(key, () => []).add(chat);
-  }
-
-  final result = groups.entries.map((entry) {
-    final type = entry.key == '_orphaned'
-        ? GroupType.orphaned
-        : GroupType.video;
-    return VideoGroup<LiveChat>(
-      groupKey: entry.key,
-      groupType: type,
-      items: entry.value,
-    );
-  }).toList();
-
-  result.sort((a, b) {
-    if (a.groupType != b.groupType) {
-      return a.groupType == GroupType.video ? -1 : 1;
-    }
-    return b.items.first.createdAt.compareTo(a.items.first.createdAt);
-  });
-
-  return result;
-}
+List<VideoGroup<Interaction>> groupedChannelInteractions(
+  Ref ref,
+  QueueItemKind kind,
+  String channelId,
+) => groupByVideo(ref.watch(channelInteractionsProvider(kind, channelId)));
 
 /// Resolves the display title of a group — mirrors `VideoGroupHeader._resolveTitle`
 /// so search can match against what the user actually sees in group headers.
@@ -108,17 +37,25 @@ String _resolveGroupTitle(VideoGroup group, Map<String, Video> videoMap) {
   }
 }
 
-List<VideoGroup<T>> _filterGroups<T>({
-  required List<VideoGroup<T>> groups,
-  required String query,
-  required Map<String, Video> videoMap,
-  required SearchOptionsState options,
-  required String Function(T) extractText,
-  required VideoGroup<T> Function(VideoGroup<T> group, List<T> items) rebuild,
-}) {
+/// The groups of [groupedChannelInteractionsProvider] that match the channel
+/// search: by group title, or by the text of their items.
+@riverpod
+List<VideoGroup<Interaction>> filteredGroupedChannelInteractions(
+  Ref ref,
+  QueueItemKind kind,
+  String channelId,
+) {
+  final groups = ref.watch(groupedChannelInteractionsProvider(kind, channelId));
+  final query = ref.watch(channelContentSearchQueryProvider);
   if (query.isEmpty) return groups;
+  final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
+  final options =
+      ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
+  final names = ref.watch(emojiNamesByKeyProvider);
+  final emojiNames = queryMentionsEmoji(query);
+
   final folded = foldForSearch(normalizeEmojiQuery(query));
-  final result = <VideoGroup<T>>[];
+  final result = <VideoGroup<Interaction>>[];
   for (final group in groups) {
     if (options.matchGroupTitles) {
       final title = foldForSearch(_resolveGroupTitle(group, videoMap));
@@ -128,99 +65,45 @@ List<VideoGroup<T>> _filterGroups<T>({
       }
     }
     final matching = group.items
-        .where((item) => foldForSearch(extractText(item)).contains(folded))
+        .where(
+          (item) => foldForSearch(
+            searchableCommentText(item.rawText, names, emojiNames: emojiNames),
+          ).contains(folded),
+        )
         .toList();
     if (matching.isNotEmpty) {
       result.add(
-        options.expandMatchedVideos ? group : rebuild(group, matching),
+        options.expandMatchedVideos
+            ? group
+            : VideoGroup<Interaction>(
+                groupKey: group.groupKey,
+                groupType: group.groupType,
+                items: matching,
+              ),
       );
     }
   }
   return result;
 }
 
+/// Flat list of [kind]'s items currently visible in search results,
+/// excluding any already marked as deleted. Empty when the search query is
+/// empty.
 @riverpod
-List<VideoGroup<Comment>> filteredGroupedChannelComments(
+List<Interaction> filteredSearchInteractions(
   Ref ref,
+  QueueItemKind kind,
   String channelId,
 ) {
-  final groups = ref.watch(groupedChannelCommentsProvider(channelId));
-  final query = ref.watch(channelContentSearchQueryProvider);
-  final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
-  final options =
-      ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
-  final names = ref.watch(emojiNamesByKeyProvider);
-  final emojiNames = queryMentionsEmoji(query);
-  return _filterGroups<Comment>(
-    groups: groups,
-    query: query,
-    videoMap: videoMap,
-    options: options,
-    extractText: (c) =>
-        searchableCommentText(c.rawCommentText, names, emojiNames: emojiNames),
-    rebuild: (g, items) => VideoGroup<Comment>(
-      groupKey: g.groupKey,
-      groupType: g.groupType,
-      items: items,
-    ),
-  );
-}
-
-@riverpod
-List<VideoGroup<LiveChat>> filteredGroupedChannelLiveChats(
-  Ref ref,
-  String channelId,
-) {
-  final groups = ref.watch(groupedChannelLiveChatsProvider(channelId));
-  final query = ref.watch(channelContentSearchQueryProvider);
-  final videoMap = ref.watch(videoMetadataProvider).value ?? const {};
-  final options =
-      ref.watch(searchOptionsProvider).value ?? const SearchOptionsState();
-  final names = ref.watch(emojiNamesByKeyProvider);
-  final emojiNames = queryMentionsEmoji(query);
-  return _filterGroups<LiveChat>(
-    groups: groups,
-    query: query,
-    videoMap: videoMap,
-    options: options,
-    extractText: (c) =>
-        searchableCommentText(c.rawText, names, emojiNames: emojiNames),
-    rebuild: (g, items) => VideoGroup<LiveChat>(
-      groupKey: g.groupKey,
-      groupType: g.groupType,
-      items: items,
-    ),
-  );
-}
-
-/// Flat list of comments currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-@riverpod
-List<Comment> filteredSearchComments(Ref ref, String channelId) {
   final query = ref.watch(channelContentSearchQueryProvider);
   if (query.isEmpty) return const [];
-  final groups = ref.watch(filteredGroupedChannelCommentsProvider(channelId));
-  final deleted =
-      ref.watch(deletedCommentIdsProvider).value ?? const <String>{};
+  final groups = ref.watch(
+    filteredGroupedChannelInteractionsProvider(kind, channelId),
+  );
+  final deleted = ref.watch(deletedIdsProvider).value?[kind] ?? const {};
   return [
     for (final g in groups)
-      for (final c in g.items)
-        if (!deleted.contains(c.commentId)) c,
-  ];
-}
-
-/// Flat list of live chats currently visible in search results, excluding any
-/// already marked as deleted. Empty when the search query is empty.
-@riverpod
-List<LiveChat> filteredSearchLiveChats(Ref ref, String channelId) {
-  final query = ref.watch(channelContentSearchQueryProvider);
-  if (query.isEmpty) return const [];
-  final groups = ref.watch(filteredGroupedChannelLiveChatsProvider(channelId));
-  final deleted =
-      ref.watch(deletedLiveChatIdsProvider).value ?? const <String>{};
-  return [
-    for (final g in groups)
-      for (final c in g.items)
-        if (!deleted.contains(c.liveChatId)) c,
+      for (final item in g.items)
+        if (!deleted.contains(item.id)) item,
   ];
 }

@@ -20,8 +20,7 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/search_opti
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_result_item.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_actions_header.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_app_bar.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/comment_list_view.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/live_chat_list_view.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/interaction_list_view.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/search_options_menu_button.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_header.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
@@ -29,7 +28,6 @@ import 'package:youtube_takeout_manager/src/features/channels/presentation/chann
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/cross_channel_result_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/unknown_channel_hint.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
@@ -37,7 +35,6 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/queue_
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_method_picker.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_queue_item_tile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
@@ -47,7 +44,9 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/selec
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
@@ -283,16 +282,19 @@ final List<Override> _overrides = [
   takeoutSelectionProvider.overrideWith(_Selection.new),
   channelsProvider.overrideWithValue(const [_channel]),
   channelByIdProvider(fixture.channelId).overrideWithValue(_channel),
-  channelCommentsProvider(
+  channelInteractionsProvider(
+    QueueItemKind.comment,
     fixture.channelId,
   ).overrideWithValue([for (final g in fixture.commentGroups) ...g.items]),
-  channelLiveChatsProvider(
+  channelInteractionsProvider(
+    QueueItemKind.liveChat,
     fixture.channelId,
   ).overrideWithValue([for (final g in fixture.liveChatGroups) ...g.items]),
-  filteredSearchCommentsProvider(fixture.channelId).overrideWithValue(const []),
-  filteredSearchLiveChatsProvider(
-    fixture.channelId,
-  ).overrideWithValue(const []),
+  for (final kind in QueueItemKind.values)
+    filteredSearchInteractionsProvider(
+      kind,
+      fixture.channelId,
+    ).overrideWithValue(const []),
   channelEmojiGroupsProvider(fixture.channelId).overrideWithValue(const []),
   channelUnicodeEmojisProvider(fixture.channelId).overrideWithValue([_fire]),
   crossChannelDeletableItemsProvider.overrideWithValue(const []),
@@ -339,17 +341,12 @@ Widget _channelPage({required bool liveChats, required bool selecting}) {
             ),
           ),
           Expanded(
-            child: liveChats
-                ? ChannelLiveChatListView(
-                    channelId: fixture.channelId,
-                    selectionMode: selection,
-                    scrollController: ScrollController(),
-                  )
-                : ChannelCommentListView(
-                    channelId: fixture.channelId,
-                    selectionMode: selection,
-                    scrollController: ScrollController(),
-                  ),
+            child: ChannelInteractionListView(
+              kind: liveChats ? QueueItemKind.liveChat : QueueItemKind.comment,
+              channelId: fixture.channelId,
+              selectionMode: selection,
+              scrollController: ScrollController(),
+            ),
           ),
         ],
       ),
@@ -384,7 +381,7 @@ Widget _channelListParts() => Scaffold(
       ),
       for (final selecting in [false, true])
         CrossChannelResultTile(
-          item: CommentResult(_comment, channelId: fixture.channelId),
+          result: SearchResultItem(_comment, channelId: fixture.channelId),
           query: 'matched',
           selectionMode: ValueNotifier(selecting),
         ),

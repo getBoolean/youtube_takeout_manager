@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/adaptive_action_button.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletable_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_scope_dialog.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../../application/cross_channel_search_providers.dart';
 import 'cross_channel_deletion_bar.dart';
 
@@ -108,8 +108,7 @@ class ChannelListHeader extends ConsumerWidget {
   static const _countMinWidth = 200.0;
 
   void _queue(BuildContext context, WidgetRef ref) {
-    final skipCommentIds = ref.read(excludedFromDeletionCommentIdsProvider);
-    final skipLiveChatIds = ref.read(excludedFromDeletionLiveChatIdsProvider);
+    final skipIds = ref.read(excludedFromDeletionIdsProvider);
 
     queueWithScopeDialog(context, ref, [
       if (query.isNotEmpty)
@@ -124,8 +123,8 @@ class ChannelListHeader extends ConsumerWidget {
         icon: Icons.comment_outlined,
         title: 'All comments on YouTube',
         targets: deletableTargets(
-          comments: ref.read(allCommentsProvider),
-          skipCommentIds: skipCommentIds,
+          ref.read(allInteractionsProvider(QueueItemKind.comment)),
+          skipIds: skipIds,
         ),
         describeCount: QueueScope.describeComments,
       ),
@@ -133,8 +132,8 @@ class ChannelListHeader extends ConsumerWidget {
         icon: Icons.chat_bubble_outline,
         title: 'All live chats on YouTube',
         targets: deletableTargets(
-          liveChats: ref.read(allLiveChatsProvider),
-          skipLiveChatIds: skipLiveChatIds,
+          ref.read(allInteractionsProvider(QueueItemKind.liveChat)),
+          skipIds: skipIds,
         ),
         describeCount: QueueScope.describeLiveChats,
       ),

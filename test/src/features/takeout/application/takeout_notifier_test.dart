@@ -15,7 +15,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/deleti
 import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queue_repository.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
@@ -156,6 +157,9 @@ void main() {
     for (final i in await c.read(deletionQueueProvider.future)) i.itemId,
   ];
 
+  Future<Set<String>?> deletedCommentIds(ProviderContainer c) async =>
+      (await c.read(deletedIdsProvider.future))[QueueItemKind.comment];
+
   test(
     'adding a newer takeout merges it and marks missing items deleted',
     () async {
@@ -170,7 +174,7 @@ void main() {
       await notifier.commitImport(plan);
 
       expect(await commentIds(c), ['D', 'C', 'B', 'A']);
-      expect(await c.read(deletedCommentIdsProvider.future), {'B'});
+      expect(await deletedCommentIds(c), {'B'});
       expect(await queuedItemIds(c), ['C']);
 
       final restarted = container();
@@ -179,13 +183,19 @@ void main() {
         (await restarted.read(takeoutProvider.future))!.data.latestExportAt,
         DateTime.utc(2026, 3),
       );
-      expect(await restarted.read(deletedCommentIdsProvider.future), {'B'});
+      expect(await deletedCommentIds(restarted), {'B'});
     },
   );
 
   test('items already deleted are not counted as newly deleted', () async {
     final c = container();
-    await c.read(deletedCommentIdsProvider.notifier).markDeleted({'B'});
+    await c
+        .read(deletedIdsProvider.notifier)
+        .markDeleted(
+          DeletionTargets.ids({
+            QueueItemKind.comment: {'B'},
+          }),
+        );
 
     final plan = await c
         .read(takeoutImporterProvider.notifier)
@@ -209,7 +219,7 @@ void main() {
 
     expect(repository.accounts, {'UCme': same(savedFiles)});
     expect(await commentIds(c), ['A', 'B', 'C']);
-    expect(await c.read(deletedCommentIdsProvider.future), isEmpty);
+    expect(await deletedCommentIds(c), isEmpty);
     expect(await queuedItemIds(c), ['B']);
   });
 
@@ -275,7 +285,7 @@ void main() {
       throwsA(isA<FileSystemException>()),
     );
 
-    expect(await c.read(deletedCommentIdsProvider.future), {'B'});
+    expect(await deletedCommentIds(c), {'B'});
     expect(await queuedItemIds(c), isEmpty);
     expect(repository.accounts['UCme'], same(savedFiles));
   });

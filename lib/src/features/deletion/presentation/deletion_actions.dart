@@ -59,11 +59,10 @@ void openMyActivityScript(
 /// true if the items were removed.
 Future<bool> confirmLocalRemoval(
   BuildContext context,
-  WidgetRef ref, {
-  required Set<String> commentIds,
-  required Set<String> liveChatIds,
-}) async {
-  final total = commentIds.length + liveChatIds.length;
+  WidgetRef ref,
+  DeletionTargets targets,
+) async {
+  final total = targets.count;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -87,13 +86,6 @@ Future<bool> confirmLocalRemoval(
   );
   if (confirmed != true) return false;
 
-  if (commentIds.isNotEmpty) {
-    await ref.read(deletedCommentIdsProvider.notifier).markDeleted(commentIds);
-  }
-  if (liveChatIds.isNotEmpty) {
-    await ref
-        .read(deletedLiveChatIdsProvider.notifier)
-        .markDeleted(liveChatIds);
-  }
+  await ref.read(deletedIdsProvider.notifier).markDeleted(targets);
   return true;
 }

@@ -1,10 +1,9 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
-import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../domain/deletion_queue_item.dart';
-import '../domain/queue_item_kind.dart';
 import 'viewed_queue_items.dart';
 
 part 'queue_items_by_channel.g.dart';
@@ -17,27 +16,17 @@ Map<String, String> queuedItemChannelIds(Ref ref) {
   final queue = ref.watch(viewedQueueItemsProvider);
   if (queue.isEmpty) return const {};
 
-  final commentIds = <String>{};
-  final liveChatIds = <String>{};
-  for (final item in queue) {
-    (item.itemType == QueueItemKind.comment ? commentIds : liveChatIds).add(
-      item.itemId,
-    );
-  }
+  final queued = {for (final i in queue) (i.itemType, i.itemId)};
   // Not the items' own channelId: that's the author's channel. Items whose
   // channel is unknown are left out, so they group with items no longer in
   // the takeout.
   return {
-    for (final MapEntry(key: channelId, value: comments)
-        in ref.watch(commentsByChannelProvider).entries)
-      if (channelId != unknownChannelId)
-        for (final c in comments)
-          if (commentIds.contains(c.commentId)) c.commentId: channelId,
-    for (final MapEntry(key: channelId, value: liveChats)
-        in ref.watch(liveChatsByChannelProvider).entries)
-      if (channelId != unknownChannelId)
-        for (final c in liveChats)
-          if (liveChatIds.contains(c.liveChatId)) c.liveChatId: channelId,
+    for (final kind in QueueItemKind.values)
+      for (final MapEntry(key: channelId, value: items)
+          in ref.watch(interactionsByChannelProvider(kind)).entries)
+        if (channelId != unknownChannelId)
+          for (final item in items)
+            if (queued.contains((kind, item.id))) item.id: channelId,
   };
 }
 

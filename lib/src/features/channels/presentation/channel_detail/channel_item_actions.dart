@@ -5,9 +5,11 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 void toggleGroupSelection(
   WidgetRef ref,
@@ -29,15 +31,14 @@ void toggleGroupSelection(
 void showSingleItemActions(
   BuildContext context,
   WidgetRef ref, {
-  required String itemId,
-  required String displayText,
-  required QueueItemKind kind,
-  String? videoId,
-  String? commentId,
-  bool isQueued = false,
-  bool isFailed = false,
+  required Interaction item,
+  InteractionStatus status = InteractionStatus.active,
 }) {
-  final isComment = kind == QueueItemKind.comment;
+  final videoId = item.videoId;
+  // Comments open scrolled to themselves.
+  final commentId = item.kind == QueueItemKind.comment ? item.id : null;
+  final inQueue =
+      status == InteractionStatus.queued || status == InteractionStatus.failed;
 
   showModalBottomSheet(
     context: context,
@@ -60,7 +61,7 @@ void showSingleItemActions(
                 launchUrl(uri, mode: LaunchMode.externalApplication);
               },
             ),
-          if (isFailed)
+          if (status == InteractionStatus.failed)
             ListTile(
               leading: const Icon(Icons.refresh),
               title: const Text('Retry'),
@@ -69,10 +70,10 @@ void showSingleItemActions(
                 Navigator.pop(ctx);
                 await ref
                     .read(deletionQueueProvider.notifier)
-                    .retryByItemId(itemId, kind);
+                    .retryByItemId(item.id, item.kind);
               },
             ),
-          if (isQueued || isFailed)
+          if (inQueue)
             ListTile(
               leading: const Icon(Icons.remove_circle_outline),
               title: const Text('Remove from queue'),
@@ -81,7 +82,7 @@ void showSingleItemActions(
                 Navigator.pop(ctx);
                 await ref
                     .read(deletionQueueProvider.notifier)
-                    .removeByItemId(itemId, kind);
+                    .removeByItemId(item.id, item.kind);
               },
             )
           else
@@ -91,18 +92,10 @@ void showSingleItemActions(
               subtitle: const Text('Delete it from YouTube with the rest'),
               onTap: () {
                 Navigator.pop(ctx);
-                queueForDeletion(
-                  context,
-                  ref,
-                  isComment
-                      ? DeletionTargets(commentSnippets: {itemId: displayText})
-                      : DeletionTargets(
-                          liveChatSnippets: {itemId: displayText},
-                        ),
-                );
+                queueForDeletion(context, ref, DeletionTargets.of([item]));
               },
             ),
-          if (!isQueued && !isFailed)
+          if (!inQueue)
             ListTile(
               leading: const Icon(Icons.delete_outline),
               title: const Text('Remove locally'),
@@ -127,15 +120,9 @@ void showSingleItemActions(
                       FilledButton(
                         onPressed: () {
                           Navigator.pop(dialogCtx);
-                          if (isComment) {
-                            ref
-                                .read(deletedCommentIdsProvider.notifier)
-                                .markDeleted({itemId});
-                          } else {
-                            ref
-                                .read(deletedLiveChatIdsProvider.notifier)
-                                .markDeleted({itemId});
-                          }
+                          ref
+                              .read(deletedIdsProvider.notifier)
+                              .markDeleted(DeletionTargets.of([item]));
                         },
                         child: const Text('Remove'),
                       ),

@@ -181,7 +181,7 @@ final class ChannelEmojisProvider
   }
 }
 
-String _$channelEmojisHash() => r'4750806adeccc5e3e67d4e6ce53ad960847c99c7';
+String _$channelEmojisHash() => r'775ec4be97a98ee97c7fdd4018f04aeadf95fd2c';
 
 /// Emoji picker sections for every channel with custom emojis, in the same
 /// order as the channel list.
@@ -442,7 +442,7 @@ final class UnicodeEmojisByChannelProvider
 }
 
 String _$unicodeEmojisByChannelHash() =>
-    r'045a70835b3f351f365516ce70992fda01bc4576';
+    r'ef01f9f069c2f6e508fce4d4ffe13b084e46fbb4';
 
 /// Standard emojis in the titles of each channel's videos that have the
 /// user's comments or live chats, which a channel search can match.
@@ -501,7 +501,7 @@ final class TitleUnicodeEmojisByChannelProvider
 }
 
 String _$titleUnicodeEmojisByChannelHash() =>
-    r'd3d59c451f3b9dfd57eca9683a36052f4fb73718';
+    r'0d1b638821f0eccc8e05985e36e98fa2038e0d46';
 
 /// Standard emojis used in any comment or live chat, in picker order.
 
