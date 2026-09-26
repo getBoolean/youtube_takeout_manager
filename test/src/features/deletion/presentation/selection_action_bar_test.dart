@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/selection_action_bar.dart';
 
 class _RecordingQueue extends DeletionQueue {
@@ -14,7 +15,10 @@ class _RecordingQueue extends DeletionQueue {
   Future<List<DeletionQueueItem>> build() async => [];
 
   @override
-  Future<void> enqueue(DeletionTargets targets) async => enqueued.add(targets);
+  Future<void> enqueue(
+    DeletionTargets targets, {
+    required String authorChannelId,
+  }) async => enqueued.add(targets);
 }
 
 const _selection = DeletionTargets(
@@ -31,7 +35,10 @@ void main() {
     exits = 0;
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [deletionQueueProvider.overrideWith(() => queue)],
+        overrides: [
+          deletionQueueProvider.overrideWith(() => queue),
+          viewedChannelIdProvider.overrideWithValue('UCme'),
+        ],
         child: MaterialApp(
           home: Scaffold(
             bottomNavigationBar: SelectionActionBar(

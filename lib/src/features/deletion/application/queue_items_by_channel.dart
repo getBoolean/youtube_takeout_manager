@@ -5,7 +5,7 @@ import 'package:youtube_takeout_manager/src/features/comments/application/commen
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/queue_item_kind.dart';
-import 'deletion_queue_notifier.dart';
+import 'viewed_queue_items.dart';
 
 part 'queue_items_by_channel.g.dart';
 
@@ -14,7 +14,7 @@ part 'queue_items_by_channel.g.dart';
 /// unknown, or that are no longer in the takeout, are missing.
 @riverpod
 Map<String, String> queuedItemChannelIds(Ref ref) {
-  final queue = ref.watch(deletionQueueProvider).value ?? const [];
+  final queue = ref.watch(viewedQueueItemsProvider);
   if (queue.isEmpty) return const {};
 
   final commentIds = <String>{};

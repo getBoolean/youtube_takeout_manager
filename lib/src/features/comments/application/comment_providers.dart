@@ -1,7 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../domain/comment.dart';
 
@@ -9,7 +9,7 @@ part 'comment_providers.g.dart';
 
 @riverpod
 List<Comment> allComments(Ref ref) {
-  return ref.watch(takeoutProvider).value?.comments ?? [];
+  return ref.watch(viewedTakeoutProvider).value?.comments ?? [];
 }
 
 /// Comments by the channel their video is on. Comments whose video's channel

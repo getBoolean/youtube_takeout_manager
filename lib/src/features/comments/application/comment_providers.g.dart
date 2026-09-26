@@ -48,7 +48,7 @@ final class AllCommentsProvider
   }
 }
 
-String _$allCommentsHash() => r'b31010c52a56d62b49f287a2c037a714d784c6c9';
+String _$allCommentsHash() => r'cb422f69c5c462a5960a908fef4e7eff3197faa1';
 
 /// Comments by the channel their video is on. Comments whose video's channel
 /// isn't known are kept under [unknownChannelId].

@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/comments/application/commen
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
+import '../application/viewed_takeout_providers.dart';
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_import_plan.dart';
@@ -120,7 +121,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final takeoutAsync = ref.watch(takeoutProvider);
+    final takeoutAsync = ref.watch(viewedTakeoutProvider);
     final theme = Theme.of(context);
 
     return Scaffold(

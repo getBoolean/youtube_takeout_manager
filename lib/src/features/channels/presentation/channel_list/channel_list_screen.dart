@@ -12,7 +12,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/selec
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_providers.dart';
@@ -153,7 +153,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final takeoutAsync = ref.watch(takeoutProvider);
+    final takeoutAsync = ref.watch(viewedTakeoutProvider);
 
     final filteredChannels = ref.watch(filteredChannelsProvider);
     final searchItems = ref.watch(crossChannelSearchItemsProvider);

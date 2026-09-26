@@ -15,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_panel.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 DeletionQueueItem _item(String itemId, DeletionItemStatus status) =>
     DeletionQueueItem(
@@ -24,6 +25,7 @@ DeletionQueueItem _item(String itemId, DeletionItemStatus status) =>
       status: status,
       displayTextSnippet: 'text $itemId',
       createdAt: DateTime.utc(2026),
+      authorChannelId: 'UCme',
     );
 
 final _items = [
@@ -43,13 +45,18 @@ class _FakeQueue extends DeletionQueue {
   Future<List<DeletionQueueItem>> build() async => items;
 
   @override
-  Future<void> retryFailed() async => calls.add('retryFailed');
+  Future<void> retryFailed({required String channelId}) async =>
+      calls.add('retryFailed $channelId');
 
   @override
-  Future<void> clearCompleted() async => calls.add('clearCompleted');
+  Future<void> clearCompleted({required String channelId}) async =>
+      calls.add('clearCompleted $channelId');
 
   @override
   void pauseProcessing() => calls.add('pause');
+
+  @override
+  Future<void> removeUnassigned() async => calls.add('removeUnassigned');
 }
 
 class _Processing extends DeletionProcessing {
@@ -94,6 +101,7 @@ void main() {
       ProviderScope(
         overrides: [
           deletionQueueProvider.overrideWith(() => queue),
+          viewedChannelIdProvider.overrideWithValue('UCme'),
           deletionProcessingProvider.overrideWith(
             () => _Processing(processing),
           ),
@@ -218,7 +226,7 @@ void main() {
     await tester.tap(find.text('Retry failed'));
     await tester.tap(find.text('Clear done'));
 
-    expect(queue.calls, ['retryFailed', 'clearCompleted']);
+    expect(queue.calls, ['retryFailed UCme', 'clearCompleted UCme']);
   });
 
   testWidgets('explains how to add items when empty', (tester) async {
@@ -226,5 +234,30 @@ void main() {
 
     expect(find.text('Nothing queued'), findsOneWidget);
     expect(find.byType(ChoiceChip), findsNothing);
+  });
+
+  testWidgets('sets apart items no takeout has matched to a channel', (
+    tester,
+  ) async {
+    await pumpPanel(
+      tester,
+      items: [
+        ..._items,
+        _item(
+          'old',
+          DeletionItemStatus.pending,
+        ).copyWith(authorChannelId: null),
+      ],
+    );
+
+    expect(
+      find.textContaining('1 item queued before channels were tracked'),
+      findsOneWidget,
+    );
+    // Not in the list or its counts.
+    expect(find.text('text old'), findsNothing);
+
+    await tester.tap(find.text('Remove it'));
+    expect(queue.calls, ['removeUnassigned']);
   });
 }

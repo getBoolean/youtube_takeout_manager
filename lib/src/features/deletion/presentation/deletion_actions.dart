@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/deleted_ids_providers.dart';
 import '../application/deletion_queue_notifier.dart';
@@ -24,7 +25,12 @@ Future<bool> queueForDeletion(
     return false;
   }
 
-  await ref.read(deletionQueueProvider.notifier).enqueue(targets);
+  // Everything on screen is the viewed channel's, so it wrote them.
+  final channelId = ref.read(viewedChannelIdProvider);
+  if (channelId == null) return false;
+  await ref
+      .read(deletionQueueProvider.notifier)
+      .enqueue(targets, authorChannelId: channelId);
   if (!context.mounted) return true;
   showQueuedForDeletionSnackBar(
     context,

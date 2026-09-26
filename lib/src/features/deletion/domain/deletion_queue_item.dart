@@ -16,6 +16,11 @@ class DeletionQueueItem with DeletionQueueItemMappable {
   final DateTime createdAt;
   final DateTime? processedAt;
 
+  /// The channel that wrote the comment or live chat, whose sign-in deletes
+  /// it. Null for items queued before this was saved, until the takeout they
+  /// came from is loaded.
+  final String? authorChannelId;
+
   const DeletionQueueItem({
     required this.id,
     required this.itemId,
@@ -25,5 +30,6 @@ class DeletionQueueItem with DeletionQueueItemMappable {
     this.errorMessage,
     required this.createdAt,
     this.processedAt,
+    this.authorChannelId,
   });
 }

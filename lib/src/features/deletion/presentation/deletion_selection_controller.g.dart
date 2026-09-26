@@ -8,15 +8,18 @@ part of 'deletion_selection_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Manages the set of IDs currently selected for deletion in the UI.
+/// Manages the set of IDs currently selected for deletion in the UI. Clears
+/// when another channel is viewed, whose items these aren't.
 
 @ProviderFor(DeletionSet)
 final deletionSetProvider = DeletionSetProvider._();
 
-/// Manages the set of IDs currently selected for deletion in the UI.
+/// Manages the set of IDs currently selected for deletion in the UI. Clears
+/// when another channel is viewed, whose items these aren't.
 final class DeletionSetProvider
     extends $NotifierProvider<DeletionSet, Set<String>> {
-  /// Manages the set of IDs currently selected for deletion in the UI.
+  /// Manages the set of IDs currently selected for deletion in the UI. Clears
+  /// when another channel is viewed, whose items these aren't.
   DeletionSetProvider._()
     : super(
         from: null,
@@ -44,9 +47,10 @@ final class DeletionSetProvider
   }
 }
 
-String _$deletionSetHash() => r'9e27415d231c52b092bc38c8479fc3baa4aeb811';
+String _$deletionSetHash() => r'de6d1c010a7bbb8acc4da165a2732beaf1a90c46';
 
-/// Manages the set of IDs currently selected for deletion in the UI.
+/// Manages the set of IDs currently selected for deletion in the UI. Clears
+/// when another channel is viewed, whose items these aren't.
 
 abstract class _$DeletionSet extends $Notifier<Set<String>> {
   Set<String> build();

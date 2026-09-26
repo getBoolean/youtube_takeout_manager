@@ -16,6 +16,9 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -25,6 +28,7 @@ class _MemoryTakeoutRepository implements TakeoutRepository {
   final accounts = <String, Map<String, Uint8List>>{};
   Map<String, Uint8List>? legacy;
   bool failSaves = false;
+  var loads = 0;
 
   @override
   Future<void> saveCsvs(
@@ -36,8 +40,10 @@ class _MemoryTakeoutRepository implements TakeoutRepository {
   }
 
   @override
-  Future<Map<String, Uint8List>?> loadCsvs(String accountId) async =>
-      accounts[accountId];
+  Future<Map<String, Uint8List>?> loadCsvs(String accountId) async {
+    loads++;
+    return accounts[accountId];
+  }
 
   @override
   Future<void> clearCsvs(String accountId) async => accounts.remove(accountId);
@@ -131,7 +137,7 @@ void main() {
   }
 
   Future<List<String>> commentIds(ProviderContainer c) async => [
-    for (final comment in (await c.read(takeoutProvider.future))!.comments)
+    for (final comment in (await c.read(takeoutProvider.future))!.data.comments)
       comment.commentId,
   ];
 
@@ -159,7 +165,7 @@ void main() {
       final restarted = container();
       expect(await commentIds(restarted), ['D', 'C', 'B', 'A']);
       expect(
-        (await restarted.read(takeoutProvider.future))!.latestExportAt,
+        (await restarted.read(takeoutProvider.future))!.data.latestExportAt,
         DateTime.utc(2026, 3),
       );
       expect(await restarted.read(deletedCommentIdsProvider.future), {'B'});
@@ -319,8 +325,8 @@ void main() {
     expect(repository.accounts['UCme'], same(savedFiles));
   });
 
-  test('data saved before per-account storage with an odd channel ID loads '
-      'where it is', () async {
+  test('data saved before per-account storage with an odd channel ID fails '
+      'to load and stays where it is', () async {
     SharedPreferences.setMockInitialValues({});
     repository.accounts.clear();
     final legacy = encodeTakeoutCsvs(
@@ -334,7 +340,12 @@ void main() {
     );
     repository.legacy = legacy;
 
-    expect(await commentIds(container()), ['A']);
+    // Home then offers to import, rather than showing data tied to no
+    // channel.
+    await expectLater(
+      container().read(takeoutSelectionProvider.future),
+      throwsA(isA<TakeoutImportException>()),
+    );
     expect(repository.accounts, isEmpty);
     expect(repository.legacy, same(legacy));
   });
@@ -344,5 +355,134 @@ void main() {
 
     expect(await notifier.hasSavedData('UCme'), isTrue);
     expect(await notifier.hasSavedData('UCother'), isFalse);
+  });
+
+  test('fills in the channel of queued items from before it was saved, from '
+      'the loaded takeout', () async {
+    final c = container();
+    await c.read(deletionQueueRepositoryProvider).saveQueue([
+      _pending('A'),
+      _pending('not-in-takeout'),
+    ]);
+
+    await c.read(takeoutProvider.future);
+
+    final channels = {
+      for (final i in await container().read(deletionQueueProvider.future))
+        i.itemId: i.authorChannelId,
+    };
+    expect(channels, {'A': 'UCme', 'not-in-takeout': null});
+  });
+
+  group('switching takeouts', () {
+    final other = TakeoutData(
+      comments: [
+        _comment('X', '2026-01-01T00:00:00Z').copyWith(channelId: 'UCother'),
+      ],
+      liveChats: const [],
+      subscriptionsByChannelId: const {},
+    );
+
+    setUp(() => repository.accounts['UCother'] = encodeTakeoutCsvs(other));
+
+    Future<List<String>> viewedCommentIds(ProviderContainer c) async {
+      await c.read(takeoutProvider.future);
+      return [
+        for (final comment
+            in c.read(viewedTakeoutProvider).requireValue!.comments)
+          comment.commentId,
+      ];
+    }
+
+    test('loads the other takeout', () async {
+      final c = container();
+      c.listen(viewedTakeoutProvider, (_, _) {});
+      expect(await viewedCommentIds(c), ['A', 'B', 'C']);
+
+      await c.read(takeoutSelectionProvider.notifier).select('UCother');
+
+      expect(await viewedCommentIds(c), ['X']);
+    });
+
+    test('never shows the old takeout while the new one loads', () async {
+      final c = container();
+      c.listen(viewedTakeoutProvider, (_, _) {});
+      await viewedCommentIds(c);
+
+      await c.read(takeoutSelectionProvider.notifier).select('UCother');
+
+      final viewed = c.read(viewedTakeoutProvider);
+      expect(viewed.isLoading, isTrue);
+      expect(viewed.value, isNull);
+    });
+
+    test('ends on the last of several quick switches', () async {
+      final c = container();
+      c.listen(viewedTakeoutProvider, (_, _) {});
+      await viewedCommentIds(c);
+      final selection = c.read(takeoutSelectionProvider.notifier);
+
+      final away = selection.select('UCother');
+      await selection.select('UCme');
+      await away;
+
+      expect((await c.read(takeoutProvider.future))!.id, 'UCme');
+      expect(await viewedCommentIds(c), ['A', 'B', 'C']);
+    });
+
+    test(
+      'an import into another takeout shows it without reloading it',
+      () async {
+        final c = container();
+        await c.read(takeoutProvider.future);
+        final notifier = c.read(takeoutProvider.notifier);
+        final plan = await notifier.prepareImport(
+          _newerTakeout(channel: 'UCnew'),
+          merge: false,
+        );
+        final loads = repository.loads;
+
+        await notifier.commitImport(plan);
+
+        expect((await c.read(takeoutProvider.future))!.id, 'UCnew');
+        expect(repository.loads, loads);
+        expect(
+          (await c.read(takeoutSelectionProvider.future))?.takeoutId,
+          'UCnew',
+        );
+      },
+    );
+
+    test("shows only the viewed channel's items", () async {
+      repository.accounts['UCme'] = encodeTakeoutCsvs(
+        _savedAbc.copyWith(
+          comments: [
+            ..._savedAbc.comments,
+            _comment(
+              'Alt',
+              '2026-01-04T00:00:00Z',
+            ).copyWith(channelId: 'UCalt'),
+          ],
+          ownChannels: const {
+            'UCme': OwnChannel(channelId: 'UCme', title: 'Me'),
+            'UCalt': OwnChannel(channelId: 'UCalt', title: 'Alt'),
+          },
+        ),
+      );
+      final c = container();
+      c.listen(viewedTakeoutProvider, (_, _) {});
+
+      expect(await viewedCommentIds(c), ['A', 'B', 'C']);
+      expect(c.read(viewedChannelIdProvider), 'UCme');
+      expect(c.read(takeoutChannelsProvider).map((ch) => ch.channelId), [
+        'UCme',
+        'UCalt',
+      ]);
+
+      await c.read(takeoutSelectionProvider.notifier).selectChannel('UCalt');
+
+      expect(c.read(viewedChannelIdProvider), 'UCalt');
+      expect(await viewedCommentIds(c), ['Alt']);
+    });
   });
 }

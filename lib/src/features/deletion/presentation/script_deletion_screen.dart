@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../application/deleted_ids_providers.dart';
 import '../application/deletion_queue_notifier.dart';
 import '../application/script_deletion_ids.dart';
@@ -49,7 +49,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       );
     }
 
-    final takeout = ref.watch(takeoutProvider).value;
+    final takeout = ref.watch(viewedTakeoutProvider).value;
     final uncertainCount = takeout == null
         ? 0
         : takeout.liveChats
@@ -318,7 +318,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       // Split succeeded IDs into comments vs live chats by checking
       // which set they belong to in the current takeout data.
       if (succeeded.isNotEmpty) {
-        final takeout = ref.read(takeoutProvider).value;
+        final takeout = ref.read(viewedTakeoutProvider).value;
         final commentIdSet =
             takeout?.comments.map((c) => c.commentId).toSet() ?? {};
         final liveChatIdSet =

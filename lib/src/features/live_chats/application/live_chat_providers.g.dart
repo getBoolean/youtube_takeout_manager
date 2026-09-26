@@ -48,7 +48,7 @@ final class AllLiveChatsProvider
   }
 }
 
-String _$allLiveChatsHash() => r'20d0553bbbff085eb00e89a0f145bbe2668825ad';
+String _$allLiveChatsHash() => r'7f5d800ea1e1980117d1b53438f8d0e3e6b2beaf';
 
 /// Live chats by the channel their video is on. Live chats whose video's
 /// channel isn't known are kept under [unknownChannelId].

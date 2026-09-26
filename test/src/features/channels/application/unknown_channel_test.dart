@@ -10,6 +10,9 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
@@ -63,11 +66,21 @@ class _FakeVideoMetadata extends VideoMetadata {
 
 class _FakeTakeout extends TakeoutNotifier {
   @override
-  Future<TakeoutData?> build() async => TakeoutData(
-    comments: _comments,
-    liveChats: _liveChats,
-    subscriptionsByChannelId: const {},
+  Future<LoadedTakeout?> build() async => LoadedTakeout(
+    id: _me,
+    data: TakeoutData(
+      comments: _comments,
+      liveChats: _liveChats,
+      subscriptionsByChannelId: const {},
+    ),
   );
+}
+
+/// Keeps the fake takeout's ID selected.
+class _Selection extends TakeoutSelectionNotifier {
+  @override
+  Future<TakeoutSelection?> build() async =>
+      const TakeoutSelection(takeoutId: _me);
 }
 
 void main() {
@@ -77,6 +90,7 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         takeoutProvider.overrideWith(_FakeTakeout.new),
+        takeoutSelectionProvider.overrideWith(_Selection.new),
         allCommentsProvider.overrideWithValue(_comments),
         allLiveChatsProvider.overrideWithValue(_liveChats),
         videoMetadataProvider.overrideWith(_FakeVideoMetadata.new),
@@ -85,8 +99,10 @@ void main() {
     addTearDown(c.dispose);
     c
       ..listen(takeoutProvider, (_, _) {})
+      ..listen(takeoutSelectionProvider, (_, _) {})
       ..listen(videoMetadataProvider, (_, _) {});
     await c.read(takeoutProvider.future);
+    await c.read(takeoutSelectionProvider.future);
     await c.read(videoMetadataProvider.future);
     return c;
   }

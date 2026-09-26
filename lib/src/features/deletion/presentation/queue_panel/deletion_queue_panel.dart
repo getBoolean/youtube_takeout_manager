@@ -8,9 +8,11 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../../application/deletion_queue_counts.dart';
 import '../../application/deletion_queue_notifier.dart';
 import '../../application/queue_items_by_channel.dart';
+import '../../application/viewed_queue_items.dart';
 import '../../domain/deletion_item_status.dart';
 import '../../domain/deletion_queue_item.dart';
 import '../deletion_method_picker.dart';
@@ -65,6 +67,8 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
   @override
   Widget build(BuildContext context) {
     final queueAsync = ref.watch(deletionQueueProvider);
+    final items = ref.watch(viewedQueueItemsProvider);
+    final unassigned = ref.watch(unassignedQueueItemsProvider).length;
     final counts = ref.watch(deletionQueueCountsProvider);
 
     Widget fill(Widget child) =>
@@ -85,10 +89,14 @@ class _DeletionQueuePanelState extends ConsumerState<DeletionQueuePanel> {
                   if (counts.total > 0)
                     SliverToBoxAdapter(child: _buildFilters(counts)),
                   const SliverToBoxAdapter(child: Divider(height: 1)),
+                  if (unassigned > 0)
+                    SliverToBoxAdapter(
+                      child: _UnassignedNotice(count: unassigned),
+                    ),
                   ...queueAsync.when(
                     loading: () => [fill(const CircularProgressIndicator())],
                     error: (e, _) => [fill(Text('Error: $e'))],
-                    data: (items) => items.isEmpty
+                    data: (_) => items.isEmpty
                         ? [fill(const _EmptyQueue())]
                         : _buildListSlivers(items, fill),
                   ),
@@ -264,6 +272,62 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// Items queued before their channel was saved that the loaded takeout
+/// doesn't have. They wait, undeleted, for the takeout they came from.
+class _UnassignedNotice extends ConsumerWidget {
+  final int count;
+
+  const _UnassignedNotice({required this.count});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                Intl.plural(
+                  count,
+                  one:
+                      "1 item queued before channels were tracked isn't in "
+                      "this takeout. It'll show when you view the takeout it "
+                      'came from.',
+                  other:
+                      "$count items queued before channels were tracked aren't "
+                      "in this takeout. They'll show when you view the "
+                      'takeout they came from.',
+                ),
+                style: theme.textTheme.bodySmall,
+              ),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton(
+                  onPressed: () => ref
+                      .read(deletionQueueProvider.notifier)
+                      .removeUnassigned(),
+                  child: Text(
+                    count == 1 ? 'Remove it' : 'Remove them',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyQueue extends StatelessWidget {
   const _EmptyQueue();
 
@@ -369,6 +433,7 @@ class _Footer extends ConsumerWidget {
     final signedIn = ref.watch(isAuthenticatedProvider);
     final processing = ref.watch(deletionProcessingProvider);
     final notifier = ref.read(deletionQueueProvider.notifier);
+    final channelId = ref.watch(viewedChannelIdProvider);
     final running = processing != DeletionProcessingState.idle;
 
     final buttons = [
@@ -400,13 +465,17 @@ class _Footer extends ConsumerWidget {
         ),
       if (counts.failed > 0 && !running)
         TextButton.icon(
-          onPressed: notifier.retryFailed,
+          onPressed: channelId == null
+              ? null
+              : () => notifier.retryFailed(channelId: channelId),
           icon: const Icon(Icons.refresh),
           label: const Text('Retry failed', textAlign: TextAlign.center),
         ),
       if (counts.done > 0)
         TextButton.icon(
-          onPressed: notifier.clearCompleted,
+          onPressed: channelId == null
+              ? null
+              : () => notifier.clearCompleted(channelId: channelId),
           icon: const Icon(Icons.clear_all),
           label: const Text('Clear done', textAlign: TextAlign.center),
         ),

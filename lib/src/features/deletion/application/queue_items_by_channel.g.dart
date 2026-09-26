@@ -65,4 +65,4 @@ final class QueuedItemChannelIdsProvider
 }
 
 String _$queuedItemChannelIdsHash() =>
-    r'64cb98f3e6b1f4949433a8e794b128c4911d7991';
+    r'c00ce74b93e361b1cb2385029f2b4cd2912d0bd8';

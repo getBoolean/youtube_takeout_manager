@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 DeletionQueueItem _item(String itemId) => DeletionQueueItem(
   id: 'q-$itemId',
@@ -18,6 +19,7 @@ DeletionQueueItem _item(String itemId) => DeletionQueueItem(
   itemType: QueueItemKind.comment,
   status: DeletionItemStatus.pending,
   createdAt: DateTime.utc(2026),
+  authorChannelId: 'UCme',
 );
 
 const _names = {'UCa': 'alpha', 'UCb': 'Bravo', 'UCc': 'charlie'};
@@ -59,6 +61,7 @@ void main() {
     () async {
       final container = ProviderContainer(
         overrides: [
+          viewedChannelIdProvider.overrideWithValue('UCme'),
           deletionQueueProvider.overrideWith(
             () => _FakeQueue([_item('c1'), _liveChatItem('l1'), _item('gone')]),
           ),
@@ -85,6 +88,7 @@ void main() {
     () async {
       final container = ProviderContainer(
         overrides: [
+          viewedChannelIdProvider.overrideWithValue('UCme'),
           deletionQueueProvider.overrideWith(
             () => _FakeQueue([_item('c1'), _item('no-details')]),
           ),
@@ -118,6 +122,7 @@ DeletionQueueItem _liveChatItem(String itemId) => DeletionQueueItem(
   itemType: QueueItemKind.liveChat,
   status: DeletionItemStatus.pending,
   createdAt: DateTime.utc(2026),
+  authorChannelId: 'UCme',
 );
 
 // Authored by the user's own channel, like every takeout item.

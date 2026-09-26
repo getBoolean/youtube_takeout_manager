@@ -6,7 +6,7 @@ import 'package:youtube_takeout_manager/src/features/comments/application/commen
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/channel_cache_repository.dart';
@@ -159,7 +159,7 @@ class ChannelThumbnails extends _$ChannelThumbnails {
 
 @riverpod
 List<Channel> channels(Ref ref) {
-  final takeout = ref.watch(takeoutProvider).value;
+  final takeout = ref.watch(viewedTakeoutProvider).value;
   if (takeout == null) return [];
 
   final commentsByChannel = ref.watch(commentsByChannelProvider);
@@ -210,7 +210,7 @@ Channel _unknownChannel(int commentCount, int liveChatCount) => Channel(
 
 @riverpod
 Channel? channelById(Ref ref, String channelId) {
-  final takeout = ref.watch(takeoutProvider).value;
+  final takeout = ref.watch(viewedTakeoutProvider).value;
   if (takeout == null) return null;
 
   final commentsByChannel = ref.watch(commentsByChannelProvider);

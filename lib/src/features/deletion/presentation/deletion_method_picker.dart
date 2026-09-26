@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../application/deletion_queue_notifier.dart';
 import '../domain/deletion_method.dart';
 import '../domain/deletion_targets.dart';
@@ -16,8 +17,12 @@ import 'deletion_actions.dart';
 
 /// Asks how to delete the queue's waiting items, then starts that method.
 Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
+  final channelId = ref.read(viewedChannelIdProvider);
+  if (channelId == null) return;
   final notifier = ref.read(deletionQueueProvider.notifier);
-  final waiting = DeletionTargets.fromQueueItems(notifier.pendingItems);
+  final waiting = DeletionTargets.fromQueueItems(
+    notifier.pendingItemsFor(channelId),
+  );
   if (waiting.isEmpty) return;
 
   final method = await showDialog<DeletionMethod>(
@@ -34,7 +39,7 @@ Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
       openMyActivityScript(context, ref, waiting.allIds);
     case DeletionMethod.youtubeApi:
       // Runs until the queue is done, paused or out of quota.
-      unawaited(notifier.processPendingViaYoutubeApi());
+      unawaited(notifier.processPendingViaYoutubeApi(channelId: channelId));
     case null:
       return;
   }

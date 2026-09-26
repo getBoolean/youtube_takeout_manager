@@ -67,11 +67,13 @@ class DeletionQueue extends _$DeletionQueue {
         );
   }
 
-  /// Items still waiting to be deleted, including those stopped by the quota.
-  List<DeletionQueueItem> get pendingItems => [
+  /// [channelId]'s items still waiting to be deleted, including those
+  /// stopped by the quota.
+  List<DeletionQueueItem> pendingItemsFor(String channelId) => [
     for (final i in state.value ?? const <DeletionQueueItem>[])
-      if (i.status == DeletionItemStatus.pending ||
-          i.status == DeletionItemStatus.quotaExceeded)
+      if (i.authorChannelId == channelId &&
+          (i.status == DeletionItemStatus.pending ||
+              i.status == DeletionItemStatus.quotaExceeded))
         i,
   ];
 
@@ -79,14 +81,27 @@ class DeletionQueue extends _$DeletionQueue {
   // Enqueue
   // ---------------------------------------------------------------------------
 
-  Future<void> enqueue(DeletionTargets targets) async {
-    await _enqueue(QueueItemKind.comment, targets.commentSnippets);
-    await _enqueue(QueueItemKind.liveChat, targets.liveChatSnippets);
+  /// Queues [targets], written by [authorChannelId].
+  Future<void> enqueue(
+    DeletionTargets targets, {
+    required String authorChannelId,
+  }) async {
+    await _enqueue(
+      QueueItemKind.comment,
+      targets.commentSnippets,
+      authorChannelId,
+    );
+    await _enqueue(
+      QueueItemKind.liveChat,
+      targets.liveChatSnippets,
+      authorChannelId,
+    );
   }
 
   Future<void> _enqueue(
     QueueItemKind type,
     Map<String, String?> snippets,
+    String authorChannelId,
   ) async {
     final current = await future;
     final existingItemIds = current
@@ -108,6 +123,7 @@ class DeletionQueue extends _$DeletionQueue {
             ? '${snippet.substring(0, 80)}...'
             : snippet,
         createdAt: now,
+        authorChannelId: authorChannelId,
       );
     }).toList();
 
@@ -120,16 +136,17 @@ class DeletionQueue extends _$DeletionQueue {
   // Processing control
   // ---------------------------------------------------------------------------
 
-  Future<void> startYoutubeApiProcessing() async {
+  Future<void> startYoutubeApiProcessing({required String channelId}) async {
     if (_isProcessing) return;
-    await _processQueueViaYoutubeApi();
+    await _processQueueViaYoutubeApi(channelId);
   }
 
-  /// Re-queues items stopped by the quota, then deletes every pending item
-  /// via the YouTube API.
-  Future<void> processPendingViaYoutubeApi() async {
-    await retryQuotaExceeded();
-    await startYoutubeApiProcessing();
+  /// Re-queues [channelId]'s items stopped by the quota, then deletes each
+  /// of its pending items via the YouTube API. Other channels' items are
+  /// left alone: only their own channel's sign-in can delete them.
+  Future<void> processPendingViaYoutubeApi({required String channelId}) async {
+    await retryQuotaExceeded(channelId: channelId);
+    await startYoutubeApiProcessing(channelId: channelId);
   }
 
   void pauseProcessing() {
@@ -145,19 +162,67 @@ class DeletionQueue extends _$DeletionQueue {
   // Item management
   // ---------------------------------------------------------------------------
 
-  Future<void> retryFailed() async {
-    await _resetItemsByStatus(DeletionItemStatus.failed);
+  Future<void> retryFailed({required String channelId}) async {
+    await _resetItemsByStatus(DeletionItemStatus.failed, channelId);
   }
 
-  Future<void> retryQuotaExceeded() async {
-    await _resetItemsByStatus(DeletionItemStatus.quotaExceeded);
+  Future<void> retryQuotaExceeded({required String channelId}) async {
+    await _resetItemsByStatus(DeletionItemStatus.quotaExceeded, channelId);
   }
 
-  Future<void> clearCompleted() async {
+  /// Clears [channelId]'s deleted items, and deleted items whose channel
+  /// isn't known.
+  Future<void> clearCompleted({required String channelId}) async {
     final current = await future;
     final updated = current
-        .where((i) => i.status != DeletionItemStatus.succeeded)
+        .where(
+          (i) =>
+              i.status != DeletionItemStatus.succeeded ||
+              (i.authorChannelId != null && i.authorChannelId != channelId),
+        )
         .toList();
+    state = AsyncData(updated);
+    await _repository.saveQueue(updated);
+  }
+
+  /// Removes items queued before their channel was saved that no takeout
+  /// has matched to one, and that aren't done.
+  Future<void> removeUnassigned() async {
+    await future;
+    final current = state.requireValue;
+    final updated = current
+        .where(
+          (i) =>
+              i.authorChannelId != null ||
+              i.status == DeletionItemStatus.succeeded,
+        )
+        .toList();
+    if (updated.length == current.length) return;
+    state = AsyncData(updated);
+    await _repository.saveQueue(updated);
+  }
+
+  /// Fills in the channel of items queued before it was saved, from the
+  /// authors of a loaded takeout's comments and live chats, by item ID.
+  Future<void> assignMissingChannels({
+    required Map<String, String> commentAuthors,
+    required Map<String, String> liveChatAuthors,
+  }) async {
+    await future;
+    // Read and update the state without awaiting in between, so concurrent
+    // changes can't overwrite each other.
+    final current = state.requireValue;
+    var changed = false;
+    final updated = <DeletionQueueItem>[];
+    for (final i in current) {
+      final authors = i.itemType == QueueItemKind.comment
+          ? commentAuthors
+          : liveChatAuthors;
+      final author = i.authorChannelId == null ? authors[i.itemId] : null;
+      if (author != null) changed = true;
+      updated.add(author != null ? i.copyWith(authorChannelId: author) : i);
+    }
+    if (!changed) return;
     state = AsyncData(updated);
     await _repository.saveQueue(updated);
   }
@@ -257,7 +322,9 @@ class DeletionQueue extends _$DeletionQueue {
   // Processing loop
   // ---------------------------------------------------------------------------
 
-  Future<void> _processQueueViaYoutubeApi() async {
+  /// Deletes [channelId]'s pending items one by one until done, paused or
+  /// out of quota.
+  Future<void> _processQueueViaYoutubeApi(String channelId) async {
     if (_isProcessing) return;
 
     final authState = ref.read(authProvider);
@@ -276,13 +343,18 @@ class DeletionQueue extends _$DeletionQueue {
             .read(quotaProvider.notifier)
             .canAfford(QuotaOperation.deleteComment.cost);
         if (!canDelete) {
-          await _markRemainingPending(DeletionItemStatus.quotaExceeded);
+          await _markRemainingPending(
+            DeletionItemStatus.quotaExceeded,
+            channelId,
+          );
           break;
         }
 
         final items = await future;
         final nextItem = items.cast<DeletionQueueItem?>().firstWhere(
-          (i) => i!.status == DeletionItemStatus.pending,
+          (i) =>
+              i!.status == DeletionItemStatus.pending &&
+              i.authorChannelId == channelId,
           orElse: () => null,
         );
         if (nextItem == null) break;
@@ -334,7 +406,10 @@ class DeletionQueue extends _$DeletionQueue {
               processedAt: now,
             ),
           );
-          await _markRemainingPending(DeletionItemStatus.quotaExceeded);
+          await _markRemainingPending(
+            DeletionItemStatus.quotaExceeded,
+            channelId,
+          );
           break;
         } else {
           await _updateItem(
@@ -371,11 +446,14 @@ class DeletionQueue extends _$DeletionQueue {
     await _repository.saveQueue(items);
   }
 
-  Future<void> _resetItemsByStatus(DeletionItemStatus status) async {
+  Future<void> _resetItemsByStatus(
+    DeletionItemStatus status,
+    String channelId,
+  ) async {
     final current = await future;
     final updated = current
         .map(
-          (i) => i.status == status
+          (i) => i.status == status && i.authorChannelId == channelId
               ? i.copyWith(
                   status: DeletionItemStatus.pending,
                   errorMessage: null,
@@ -388,11 +466,16 @@ class DeletionQueue extends _$DeletionQueue {
     await _repository.saveQueue(updated);
   }
 
-  Future<void> _markRemainingPending(DeletionItemStatus newStatus) async {
+  Future<void> _markRemainingPending(
+    DeletionItemStatus newStatus,
+    String channelId,
+  ) async {
     final current = await future;
     final updated = current
         .map(
-          (i) => i.status == DeletionItemStatus.pending
+          (i) =>
+              i.status == DeletionItemStatus.pending &&
+                  i.authorChannelId == channelId
               ? i.copyWith(status: newStatus)
               : i,
         )

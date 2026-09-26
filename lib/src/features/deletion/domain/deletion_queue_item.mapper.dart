@@ -65,6 +65,12 @@ class DeletionQueueItemMapper extends ClassMapperBase<DeletionQueueItem> {
     _$processedAt,
     opt: true,
   );
+  static String? _$authorChannelId(DeletionQueueItem v) => v.authorChannelId;
+  static const Field<DeletionQueueItem, String> _f$authorChannelId = Field(
+    'authorChannelId',
+    _$authorChannelId,
+    opt: true,
+  );
 
   @override
   final MappableFields<DeletionQueueItem> fields = const {
@@ -76,6 +82,7 @@ class DeletionQueueItemMapper extends ClassMapperBase<DeletionQueueItem> {
     #errorMessage: _f$errorMessage,
     #createdAt: _f$createdAt,
     #processedAt: _f$processedAt,
+    #authorChannelId: _f$authorChannelId,
   };
 
   static DeletionQueueItem _instantiate(DecodingData data) {
@@ -88,6 +95,7 @@ class DeletionQueueItemMapper extends ClassMapperBase<DeletionQueueItem> {
       errorMessage: data.dec(_f$errorMessage),
       createdAt: data.dec(_f$createdAt),
       processedAt: data.dec(_f$processedAt),
+      authorChannelId: data.dec(_f$authorChannelId),
     );
   }
 
@@ -171,6 +179,7 @@ abstract class DeletionQueueItemCopyWith<
     String? errorMessage,
     DateTime? createdAt,
     DateTime? processedAt,
+    String? authorChannelId,
   });
   DeletionQueueItemCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -195,6 +204,7 @@ class _DeletionQueueItemCopyWithImpl<$R, $Out>
     Object? errorMessage = $none,
     DateTime? createdAt,
     Object? processedAt = $none,
+    Object? authorChannelId = $none,
   }) => $apply(
     FieldCopyWithData({
       if (id != null) #id: id,
@@ -205,6 +215,7 @@ class _DeletionQueueItemCopyWithImpl<$R, $Out>
       if (errorMessage != $none) #errorMessage: errorMessage,
       if (createdAt != null) #createdAt: createdAt,
       if (processedAt != $none) #processedAt: processedAt,
+      if (authorChannelId != $none) #authorChannelId: authorChannelId,
     }),
   );
   @override
@@ -220,6 +231,7 @@ class _DeletionQueueItemCopyWithImpl<$R, $Out>
     errorMessage: data.get(#errorMessage, or: $value.errorMessage),
     createdAt: data.get(#createdAt, or: $value.createdAt),
     processedAt: data.get(#processedAt, or: $value.processedAt),
+    authorChannelId: data.get(#authorChannelId, or: $value.authorChannelId),
   );
 
   @override

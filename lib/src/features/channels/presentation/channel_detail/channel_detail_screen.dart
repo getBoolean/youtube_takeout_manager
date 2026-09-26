@@ -12,7 +12,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
@@ -79,7 +79,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
     }, [channelId, targetKind, targetId]);
 
     final queue = DeletionQueueHost.of(context, currentChannelId: channelId);
-    final takeoutAsync = ref.watch(takeoutProvider);
+    final takeoutAsync = ref.watch(viewedTakeoutProvider);
     if (takeoutAsync.isLoading ||
         (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {
       return queue.wrap(const ChannelLoadingSkeleton());

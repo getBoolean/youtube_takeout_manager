@@ -14,6 +14,9 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
@@ -90,9 +93,10 @@ class _FakeTakeout extends TakeoutNotifier {
   });
 
   @override
-  Future<TakeoutData?> build() async {
+  Future<LoadedTakeout?> build() async {
     if (loadError case final error?) throw error;
-    return saved;
+    final data = saved;
+    return data == null ? null : LoadedTakeout(id: 'UCme', data: data);
   }
 
   @override
@@ -108,12 +112,19 @@ class _FakeTakeout extends TakeoutNotifier {
   @override
   Future<void> commitImport(TakeoutImportPlan plan) async {
     committed.add(plan);
-    state = AsyncData(plan.mergedData);
+    state = AsyncData(LoadedTakeout(id: 'UCme', data: plan.mergedData));
   }
 
   @override
   Future<bool> hasSavedData(String accountId) async =>
       accountsWithData.contains(accountId);
+}
+
+/// Keeps the fake takeout's ID selected.
+class _Selection extends TakeoutSelectionNotifier {
+  @override
+  Future<TakeoutSelection?> build() async =>
+      const TakeoutSelection(takeoutId: 'UCme');
 }
 
 class _FakeQueue extends DeletionQueue {
@@ -155,6 +166,7 @@ void main() {
         retry: (_, _) => null,
         overrides: [
           takeoutProvider.overrideWith(() => takeout),
+          takeoutSelectionProvider.overrideWith(_Selection.new),
           zipPickerRepositoryProvider.overrideWithValue(
             _FakeZipPicker(picked ?? _pickedZip),
           ),
@@ -342,6 +354,7 @@ void main() {
             itemType: QueueItemKind.comment,
             status: status,
             createdAt: DateTime.utc(2026),
+            authorChannelId: 'UCme',
           ),
       ],
     );

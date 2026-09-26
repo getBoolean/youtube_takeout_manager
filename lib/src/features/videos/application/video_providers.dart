@@ -4,7 +4,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../data/video_cache_repository.dart';
 import '../data/youtube_video_repository.dart';
 import '../domain/video.dart';
@@ -40,10 +40,10 @@ class VideoMetadata extends _$VideoMetadata {
 
     // Re-run when auth or takeout changes, but read current values.
     ref.listen(authProvider, (_, _) => ref.invalidateSelf());
-    ref.listen(takeoutProvider, (_, _) => ref.invalidateSelf());
+    ref.listen(viewedTakeoutProvider, (_, _) => ref.invalidateSelf());
 
     final authState = ref.read(authProvider);
-    final takeout = ref.read(takeoutProvider).value;
+    final takeout = ref.read(viewedTakeoutProvider).value;
     if (authState == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats

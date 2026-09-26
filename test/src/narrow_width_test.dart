@@ -42,6 +42,9 @@ import 'package:youtube_takeout_manager/src/features/live_chats/application/live
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -91,7 +94,16 @@ class _Queue extends DeletionQueue {
             ? 'The comment was not found'
             : null,
         createdAt: DateTime(2026, 4, 6),
+        authorChannelId: 'UCme',
       ),
+    // Queued before channels were tracked, so the notice shows too.
+    DeletionQueueItem(
+      id: 'old',
+      itemId: 'old',
+      itemType: QueueItemKind.comment,
+      status: DeletionItemStatus.pending,
+      createdAt: DateTime(2026, 4, 6),
+    ),
   ];
 }
 
@@ -108,12 +120,22 @@ class _SearchOptions extends SearchOptions {
 
 class _Takeout extends TakeoutNotifier {
   @override
-  Future<TakeoutData?> build() async => TakeoutData(
-    comments: [_comment],
-    liveChats: const [],
-    subscriptionsByChannelId: const {},
-    skippedCommentRows: 12,
+  Future<LoadedTakeout?> build() async => LoadedTakeout(
+    id: 'UCme',
+    data: TakeoutData(
+      comments: [_comment],
+      liveChats: const [],
+      subscriptionsByChannelId: const {},
+      skippedCommentRows: 12,
+    ),
   );
+}
+
+/// Keeps the fake takeout's ID selected.
+class _Selection extends TakeoutSelectionNotifier {
+  @override
+  Future<TakeoutSelection?> build() async =>
+      const TakeoutSelection(takeoutId: 'UCme');
 }
 
 final List<Override> _overrides = [
@@ -122,6 +144,7 @@ final List<Override> _overrides = [
   quotaProvider.overrideWith(_Quota.new),
   searchOptionsProvider.overrideWith(_SearchOptions.new),
   takeoutProvider.overrideWith(_Takeout.new),
+  takeoutSelectionProvider.overrideWith(_Selection.new),
   channelsProvider.overrideWithValue(const [_channel]),
   channelByIdProvider(fixture.channelId).overrideWithValue(_channel),
   channelCommentsProvider(

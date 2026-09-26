@@ -104,7 +104,7 @@ final class VideoMetadataProvider
   VideoMetadata create() => VideoMetadata();
 }
 
-String _$videoMetadataHash() => r'542807192cf680c451e3ee604548d68994b04052';
+String _$videoMetadataHash() => r'3bce61a23486944e21380c5c9ca29e77212216ad';
 
 abstract class _$VideoMetadata extends $StreamNotifier<Map<String, Video>> {
   Stream<Map<String, Video>> build();
