@@ -31,6 +31,6 @@ Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
 @riverpod
 List<LiveChat> channelLiveChats(Ref ref, String channelId) {
   final byChannel = ref.watch(liveChatsByChannelProvider);
-  final chats = byChannel[channelId] ?? [];
-  return chats..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  final chats = byChannel[channelId] ?? const [];
+  return [...chats]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }

@@ -33,6 +33,6 @@ Map<String, List<Comment>> commentsByChannel(Ref ref) {
 @riverpod
 List<Comment> channelComments(Ref ref, String channelId) {
   final byChannel = ref.watch(commentsByChannelProvider);
-  final comments = byChannel[channelId] ?? [];
-  return comments..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  final comments = byChannel[channelId] ?? const [];
+  return [...comments]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 }
