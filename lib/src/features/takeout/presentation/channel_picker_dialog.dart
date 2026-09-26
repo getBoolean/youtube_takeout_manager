@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/label_badge.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import '../domain/takeout_channel.dart';
@@ -39,6 +40,11 @@ class ChannelPickerDialog extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: 8),
                 child: OptionCard(
                   icon: Icons.account_circle_outlined,
+                  leading: ChannelAvatar(
+                    name: channel.title ?? channel.channelId,
+                    thumbnailUrl: channel.thumbnailUrl,
+                    radius: 16,
+                  ),
                   title: channel.title ?? channel.channelId,
                   subtitle: describeChannel(
                     channel,

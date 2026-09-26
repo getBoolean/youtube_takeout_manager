@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 /// and it shows a chevron. A null [onTap] disables it.
 class OptionCard extends StatelessWidget {
   final IconData icon;
+
+  /// Shown in place of [icon] when set, e.g. a channel's picture.
+  final Widget? leading;
   final String title;
   final String? subtitle;
   final Widget? badge;
@@ -16,6 +19,7 @@ class OptionCard extends StatelessWidget {
   const OptionCard({
     super.key,
     required this.icon,
+    this.leading,
     required this.title,
     this.subtitle,
     this.badge,
@@ -62,7 +66,8 @@ class OptionCard extends StatelessWidget {
             child: Row(
               children: [
                 if (showIcon) ...[
-                  Icon(icon, color: enabled ? scheme.primary : foreground),
+                  leading ??
+                      Icon(icon, color: enabled ? scheme.primary : foreground),
                   const SizedBox(width: 16),
                 ],
                 Expanded(

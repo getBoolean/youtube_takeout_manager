@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 
 import '../domain/takeout_channel.dart';
 import '../domain/takeout_data.dart';
@@ -19,11 +20,22 @@ List<TakeoutChannel> takeoutChannels(Ref ref) {
     takeoutSelectionProvider.select((s) => s.value?.takeoutId),
   );
   if (loaded == null || loaded.id != takeoutId) return const [];
-  return withTitles(
-    takeoutChannelsOf(loaded.data, takeoutId: loaded.id),
-    ref.watch(signedInChannelTitlesProvider),
+  return withThumbnails(
+    withTitles(
+      takeoutChannelsOf(loaded.data, takeoutId: loaded.id),
+      ref.watch(signedInChannelTitlesProvider),
+    ),
+    ref.watch(ownChannelThumbnailsProvider),
   );
 }
+
+/// Pictures for takeout channels: from saved sign-ins, else channel pictures
+/// already loaded, by channel ID.
+@Riverpod(keepAlive: true)
+Map<String, String> ownChannelThumbnails(Ref ref) => {
+  ...ref.watch(channelThumbnailsProvider),
+  ...ref.watch(signedInChannelThumbnailsProvider),
+};
 
 /// The channel being viewed: the one last chosen in the selected takeout
 /// while it's still there, otherwise the takeout's main channel.

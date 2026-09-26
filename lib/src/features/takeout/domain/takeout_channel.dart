@@ -25,6 +25,10 @@ class TakeoutChannel with TakeoutChannelMappable {
   final int commentCount;
   final int liveChatCount;
 
+  /// The channel's picture, when known. Takeouts don't have it; it comes
+  /// from a saved sign-in or pictures already loaded.
+  final String? thumbnailUrl;
+
   const TakeoutChannel({
     required this.channelId,
     this.title,
@@ -33,6 +37,7 @@ class TakeoutChannel with TakeoutChannelMappable {
     required this.listed,
     this.commentCount = 0,
     this.liveChatCount = 0,
+    this.thumbnailUrl,
   });
 }
 
@@ -168,6 +173,19 @@ List<TakeoutChannel> withTitles(
   for (final c in channels)
     if (c.title == null && titles[c.channelId] != null)
       c.copyWith(title: titles[c.channelId])
+    else
+      c,
+];
+
+/// [channels], each without a picture taking one from [thumbnails] by
+/// channel ID.
+List<TakeoutChannel> withThumbnails(
+  List<TakeoutChannel> channels,
+  Map<String, String> thumbnails,
+) => [
+  for (final c in channels)
+    if (c.thumbnailUrl == null && thumbnails[c.channelId] != null)
+      c.copyWith(thumbnailUrl: thumbnails[c.channelId])
     else
       c,
 ];

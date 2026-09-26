@@ -58,7 +58,63 @@ final class TakeoutChannelsProvider
   }
 }
 
-String _$takeoutChannelsHash() => r'e36f376f1d7a57f38be14fe7656c076345ec0c0b';
+String _$takeoutChannelsHash() => r'649f08d870c329c01e2c832d29256ed55708071c';
+
+/// Pictures for takeout channels: from saved sign-ins, else channel pictures
+/// already loaded, by channel ID.
+
+@ProviderFor(ownChannelThumbnails)
+final ownChannelThumbnailsProvider = OwnChannelThumbnailsProvider._();
+
+/// Pictures for takeout channels: from saved sign-ins, else channel pictures
+/// already loaded, by channel ID.
+
+final class OwnChannelThumbnailsProvider
+    extends
+        $FunctionalProvider<
+          Map<String, String>,
+          Map<String, String>,
+          Map<String, String>
+        >
+    with $Provider<Map<String, String>> {
+  /// Pictures for takeout channels: from saved sign-ins, else channel pictures
+  /// already loaded, by channel ID.
+  OwnChannelThumbnailsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'ownChannelThumbnailsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$ownChannelThumbnailsHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<String, String> create(Ref ref) {
+    return ownChannelThumbnails(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, String>>(value),
+    );
+  }
+}
+
+String _$ownChannelThumbnailsHash() =>
+    r'c4a2c628dd9fd13079fa790587f922803a3911e6';
 
 /// The channel being viewed: the one last chosen in the selected takeout
 /// while it's still there, otherwise the takeout's main channel.

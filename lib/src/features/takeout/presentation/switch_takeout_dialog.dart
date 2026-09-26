@@ -132,7 +132,11 @@ class _TakeoutCard extends ConsumerWidget {
               runSpacing: 4,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                ChannelIdentity(channelId: main.channelId, title: main.title),
+                ChannelIdentity(
+                  channelId: main.channelId,
+                  title: main.title,
+                  thumbnailUrl: main.thumbnailUrl,
+                ),
                 if (viewing) const LabelBadge('Viewing'),
               ],
             ),
@@ -235,6 +239,7 @@ class RemoveTakeoutDialog extends StatelessWidget {
               ChannelIdentity(
                 channelId: channel.channelId,
                 title: channel.title,
+                thumbnailUrl: channel.thumbnailUrl,
               ),
               const SizedBox(height: 8),
             ],

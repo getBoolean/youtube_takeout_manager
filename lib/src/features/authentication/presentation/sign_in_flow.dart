@@ -43,6 +43,9 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
           viewedTitle: viewed?.channelId == viewedChannelId
               ? viewed?.title
               : null,
+          viewedThumbnailUrl: viewed?.channelId == viewedChannelId
+              ? viewed?.thumbnailUrl
+              : null,
           canViewChosen: chosenTakeout != null,
         ),
       );
@@ -69,6 +72,7 @@ class SignedInOtherChannelDialog extends StatelessWidget {
   final SignInProfile chosen;
   final String viewedChannelId;
   final String? viewedTitle;
+  final String? viewedThumbnailUrl;
 
   /// Whether a saved takeout has the chosen channel, so it can be viewed.
   /// The dialog then returns true if the user chooses to.
@@ -79,6 +83,7 @@ class SignedInOtherChannelDialog extends StatelessWidget {
     required this.chosen,
     required this.viewedChannelId,
     this.viewedTitle,
+    this.viewedThumbnailUrl,
     this.canViewChosen = false,
   });
 
@@ -101,12 +106,14 @@ class SignedInOtherChannelDialog extends StatelessWidget {
               label: 'You chose',
               channelId: chosen.channelId,
               title: chosen.channelTitle,
+              thumbnailUrl: chosen.channelThumbnailUrl,
             ),
             const SizedBox(height: 12),
             ChannelIdentity(
               label: "You're viewing",
               channelId: viewedChannelId,
               title: viewedTitle,
+              thumbnailUrl: viewedThumbnailUrl,
             ),
             const SizedBox(height: 16),
             Text(

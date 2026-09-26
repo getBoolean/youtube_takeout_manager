@@ -8,6 +8,7 @@ import '../data/takeout_summary_parser.dart';
 import '../domain/takeout_channel.dart';
 import 'takeout_notifier.dart';
 import 'takeout_selection_notifier.dart';
+import 'viewed_takeout_providers.dart';
 
 part 'saved_takeouts.g.dart';
 
@@ -23,9 +24,12 @@ class SavedTakeouts extends _$SavedTakeouts {
       loaded: ref.watch(takeoutProvider).value,
     );
     final titles = ref.watch(signedInChannelTitlesProvider);
+    final thumbnails = ref.watch(ownChannelThumbnailsProvider);
     return [
       for (final s in summaries)
-        s.copyWith(channels: withTitles(s.channels, titles)),
+        s.copyWith(
+          channels: withThumbnails(withTitles(s.channels, titles), thumbnails),
+        ),
     ]..sort(_newestFirst);
   }
 

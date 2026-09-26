@@ -28,6 +28,15 @@ Map<String, String> signedInChannelTitles(Ref ref) => {
     profile.channelId: ?profile.channelTitle,
 };
 
+/// Pictures of the channels with a saved sign-in, by channel ID, from the
+/// YouTube API at sign-in.
+@Riverpod(keepAlive: true)
+Map<String, String> signedInChannelThumbnails(Ref ref) => {
+  for (final profile
+      in (ref.watch(savedSignInsProvider).value ?? const {}).values)
+    profile.channelId: ?profile.channelThumbnailUrl,
+};
+
 /// A sign-in that stopped working and was removed. Compared by identity, so
 /// each loss is reported even if the same channel's is lost twice.
 class LostSignIn {

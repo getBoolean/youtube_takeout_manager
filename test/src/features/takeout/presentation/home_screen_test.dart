@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/deleti
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
@@ -177,6 +178,7 @@ void main() {
     FilePickerResult? picked,
     List<DeletionQueueItem> queued = const [],
     Map<String, String> titles = const {},
+    Map<String, String> thumbnails = const {},
   }) async {
     selection = _Selection();
     await tester.pumpWidget(
@@ -187,6 +189,7 @@ void main() {
           takeoutProvider.overrideWith(() => takeout),
           takeoutSelectionProvider.overrideWith(() => selection),
           signedInChannelTitlesProvider.overrideWithValue(titles),
+          signedInChannelThumbnailsProvider.overrideWithValue(thumbnails),
           zipPickerRepositoryProvider.overrideWithValue(
             _FakeZipPicker(picked ?? _pickedZip),
           ),
@@ -428,6 +431,22 @@ void main() {
         expect(find.text('UCme'), findsNothing);
       },
     );
+
+    testWidgets("shows the channel's picture from its sign-in", (tester) async {
+      await pumpHome(
+        tester,
+        _FakeTakeout(saved: _savedData),
+        thumbnails: const {'UCme': 'https://yt3.example/me'},
+      );
+
+      expect(
+        find.byWidgetPredicate(
+          (w) =>
+              w is ChannelAvatar && w.thumbnailUrl == 'https://yt3.example/me',
+        ),
+        findsOneWidget,
+      );
+    });
 
     testWidgets('a takeout with one channel has nothing to change', (
       tester,

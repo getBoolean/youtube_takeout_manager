@@ -63,6 +63,12 @@ class TakeoutChannelMapper extends ClassMapperBase<TakeoutChannel> {
     opt: true,
     def: 0,
   );
+  static String? _$thumbnailUrl(TakeoutChannel v) => v.thumbnailUrl;
+  static const Field<TakeoutChannel, String> _f$thumbnailUrl = Field(
+    'thumbnailUrl',
+    _$thumbnailUrl,
+    opt: true,
+  );
 
   @override
   final MappableFields<TakeoutChannel> fields = const {
@@ -73,6 +79,7 @@ class TakeoutChannelMapper extends ClassMapperBase<TakeoutChannel> {
     #listed: _f$listed,
     #commentCount: _f$commentCount,
     #liveChatCount: _f$liveChatCount,
+    #thumbnailUrl: _f$thumbnailUrl,
   };
 
   static TakeoutChannel _instantiate(DecodingData data) {
@@ -84,6 +91,7 @@ class TakeoutChannelMapper extends ClassMapperBase<TakeoutChannel> {
       listed: data.dec(_f$listed),
       commentCount: data.dec(_f$commentCount),
       liveChatCount: data.dec(_f$liveChatCount),
+      thumbnailUrl: data.dec(_f$thumbnailUrl),
     );
   }
 
@@ -157,6 +165,7 @@ abstract class TakeoutChannelCopyWith<$R, $In extends TakeoutChannel, $Out>
     bool? listed,
     int? commentCount,
     int? liveChatCount,
+    String? thumbnailUrl,
   });
   TakeoutChannelCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -180,6 +189,7 @@ class _TakeoutChannelCopyWithImpl<$R, $Out>
     bool? listed,
     int? commentCount,
     int? liveChatCount,
+    Object? thumbnailUrl = $none,
   }) => $apply(
     FieldCopyWithData({
       if (channelId != null) #channelId: channelId,
@@ -189,6 +199,7 @@ class _TakeoutChannelCopyWithImpl<$R, $Out>
       if (listed != null) #listed: listed,
       if (commentCount != null) #commentCount: commentCount,
       if (liveChatCount != null) #liveChatCount: liveChatCount,
+      if (thumbnailUrl != $none) #thumbnailUrl: thumbnailUrl,
     }),
   );
   @override
@@ -200,6 +211,7 @@ class _TakeoutChannelCopyWithImpl<$R, $Out>
     listed: data.get(#listed, or: $value.listed),
     commentCount: data.get(#commentCount, or: $value.commentCount),
     liveChatCount: data.get(#liveChatCount, or: $value.liveChatCount),
+    thumbnailUrl: data.get(#thumbnailUrl, or: $value.thumbnailUrl),
   );
 
   @override

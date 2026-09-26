@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
@@ -250,15 +251,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            droppedComments > 0 || droppedLiveChats > 0
-                ? Icons.warning_amber_outlined
-                : Icons.check_circle_outline,
-            size: 64,
-            color: droppedComments > 0 || droppedLiveChats > 0
-                ? theme.colorScheme.error
-                : theme.colorScheme.primary,
-          ),
+          if (droppedComments > 0 || droppedLiveChats > 0)
+            Icon(
+              Icons.warning_amber_outlined,
+              size: 64,
+              color: theme.colorScheme.error,
+            )
+          else if (viewed != null)
+            ChannelAvatar(
+              name: viewed.title ?? viewed.channelId,
+              thumbnailUrl: viewed.thumbnailUrl,
+              radius: 32,
+            )
+          else
+            Icon(
+              Icons.check_circle_outline,
+              size: 64,
+              color: theme.colorScheme.primary,
+            ),
           const SizedBox(height: 16),
           Text(
             viewed?.title ?? viewed?.channelId ?? 'Import Complete',

@@ -161,6 +161,7 @@ final _longTakeout = TakeoutSummary(
       listed: true,
       commentCount: 123456,
       liveChatCount: 7890,
+      thumbnailUrl: 'https://yt3.example/avatar',
     ),
     TakeoutChannel(
       channelId: 'UCanotherLongChannelIdentifier',

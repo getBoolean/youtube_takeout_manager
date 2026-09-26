@@ -26,7 +26,11 @@ class TakeoutAccountSection extends ConsumerWidget {
         if (viewed == null)
           Text('No takeout imported', style: theme.textTheme.bodyMedium)
         else ...[
-          ChannelIdentity(channelId: viewed.channelId, title: viewed.title),
+          ChannelIdentity(
+            channelId: viewed.channelId,
+            title: viewed.title,
+            thumbnailUrl: viewed.thumbnailUrl,
+          ),
           if (channels.length > 1) ...[
             const SizedBox(height: 4),
             Text(
