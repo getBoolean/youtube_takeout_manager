@@ -85,4 +85,29 @@ void main() {
     });
     expect(c.read(excludedFromDeletionLiveChatIdsProvider), {'chat'});
   });
+
+  test('items the quota stopped show as queued, as in the queue', () async {
+    SharedPreferences.setMockInitialValues({});
+    final c = container();
+    await c.read(deletionQueueRepositoryProvider).saveQueue([
+      for (final (id, status, kind) in [
+        ('quota', DeletionItemStatus.quotaExceeded, QueueItemKind.comment),
+        ('failed', DeletionItemStatus.failed, QueueItemKind.comment),
+        ('chat', DeletionItemStatus.quotaExceeded, QueueItemKind.liveChat),
+      ])
+        DeletionQueueItem(
+          id: 'q-$id',
+          itemId: id,
+          itemType: kind,
+          status: status,
+          createdAt: DateTime.utc(2026),
+        ),
+    ]);
+    await c.read(deletionQueueProvider.future);
+
+    expect(c.read(queuedCommentIdsProvider), {'quota'});
+    expect(c.read(failedCommentIdsProvider), {'failed'});
+    expect(c.read(queuedLiveChatIdsProvider), {'chat'});
+    expect(c.read(failedLiveChatIdsProvider), isEmpty);
+  });
 }

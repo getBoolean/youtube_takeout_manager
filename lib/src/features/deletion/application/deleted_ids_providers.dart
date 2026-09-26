@@ -4,6 +4,7 @@ import '../data/deleted_ids_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/queue_item_kind.dart';
+import 'deletion_queue_counts.dart';
 import 'deletion_queue_notifier.dart';
 
 part 'deleted_ids_providers.g.dart';
@@ -46,11 +47,13 @@ class DeletedLiveChatIds extends _$DeletedLiveChatIds {
   }
 }
 
+// The same statuses the queue shows as waiting and failed, so an item the
+// quota stopped shows as queued everywhere.
 bool _isActive(DeletionItemStatus s) =>
-    s == DeletionItemStatus.pending || s == DeletionItemStatus.inProgress;
+    DeletionQueueCounts.waitingStatuses.contains(s);
 
 bool _isFailed(DeletionItemStatus s) =>
-    s == DeletionItemStatus.failed || s == DeletionItemStatus.quotaExceeded;
+    DeletionQueueCounts.failedStatuses.contains(s);
 
 Set<String> _filterQueueIds(
   List<DeletionQueueItem> items,
