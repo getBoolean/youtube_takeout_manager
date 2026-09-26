@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
@@ -149,7 +148,7 @@ class _Takeout extends TakeoutNotifier {
 
 class _SignedIn extends AuthNotifier {
   @override
-  AuthState? build() => AuthState.fromProfile(_longProfile);
+  SignInProfile? build() => _longProfile;
 }
 
 class _SignIns extends SavedSignIns {

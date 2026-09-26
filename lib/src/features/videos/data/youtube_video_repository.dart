@@ -28,52 +28,6 @@ class YoutubeVideoRepository {
   static const _batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
-  /// Fetches video metadata for the given [videoIds].
-  ///
-  /// Returns a map of videoId → [Video] for videos that were found.
-  /// Videos that are deleted, private, or otherwise unavailable will be
-  /// absent from the returned map.
-  Future<Map<String, Video>> fetchVideoMetadata(
-    http.Client authClient,
-    Set<String> videoIds,
-  ) async {
-    final youtube = yt.YouTubeApi(authClient);
-    final results = <String, Video>{};
-    final idList = videoIds.toList();
-
-    for (var i = 0; i < idList.length; i += _batchSize) {
-      final batch = idList.sublist(i, (i + _batchSize).clamp(0, idList.length));
-
-      try {
-        final response = await youtube.videos.list(['snippet'], id: batch);
-
-        for (final item in response.items ?? <yt.Video>[]) {
-          if (item.id == null || item.snippet == null) continue;
-          final snippet = item.snippet!;
-          results[item.id!] = Video(
-            videoId: item.id!,
-            channelId: snippet.channelId ?? '',
-            channelTitle: snippet.channelTitle,
-            title: snippet.title,
-            description: snippet.description,
-            thumbnailUrl: thumbnailUrlOf(snippet.thumbnails),
-            publishedAt: snippet.publishedAt,
-          );
-        }
-      } catch (e) {
-        // A sign-in that stopped working fails every batch; let it through.
-        if (isSignInFailure(e)) rethrow;
-        // Continue with remaining batches on error
-      }
-
-      if (i + _batchSize < idList.length) {
-        await Future.delayed(_delayBetweenRequests);
-      }
-    }
-
-    return results;
-  }
-
   /// Streams individual [Video] objects as they are fetched from the API.
   ///
   /// Batches requests in groups of [_batchSize] for efficiency, but yields

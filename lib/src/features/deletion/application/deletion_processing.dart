@@ -65,10 +65,6 @@ class DeletionProcessing extends _$DeletionProcessing {
     _setProcessing(processing: true, paused: true);
   }
 
-  void cancelProcessing() {
-    _setProcessing(processing: false, paused: true);
-  }
-
   /// Deletes [channelId]'s pending items one by one until done, paused or
   /// out of quota.
   Future<void> _processQueueViaYoutubeApi(String channelId) async {

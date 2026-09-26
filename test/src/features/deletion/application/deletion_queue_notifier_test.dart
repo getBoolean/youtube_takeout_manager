@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queue_repository.dart';
@@ -355,7 +355,7 @@ void main() {
 
 class _SignedIn extends AuthNotifier {
   @override
-  AuthState? build() => const AuthState(channelId: 'UCa');
+  SignInProfile? build() => const SignInProfile(channelId: 'UCa');
 }
 
 class _SignIns extends SignInService {

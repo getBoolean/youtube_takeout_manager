@@ -29,10 +29,6 @@ const _plan = TakeoutImportPlan(
   newlyDeletedLiveChatCount: 0,
   newCommentCount: 0,
   newLiveChatCount: 0,
-  differentAccount: ChannelMismatch(
-    expectedChannelIds: {'UCme'},
-    foundChannelIds: {'UCnew'},
-  ),
 );
 
 Future<void> _pump(WidgetTester tester, Widget child) => tester.pumpWidget(

@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -71,12 +71,12 @@ class _Processing extends DeletionProcessing {
 }
 
 class _FakeAuth extends AuthNotifier {
-  final AuthState? initial;
+  final SignInProfile? initial;
 
   _FakeAuth(this.initial);
 
   @override
-  AuthState? build() => initial;
+  SignInProfile? build() => initial;
 }
 
 class _FakeQuota extends QuotaNotifier {
@@ -128,8 +128,9 @@ void main() {
             ),
           ]),
           authProvider.overrideWith(
-            () =>
-                _FakeAuth(signedIn ? const AuthState(channelId: 'UCme') : null),
+            () => _FakeAuth(
+              signedIn ? const SignInProfile(channelId: 'UCme') : null,
+            ),
           ),
           quotaProvider.overrideWith(_FakeQuota.new),
         ],

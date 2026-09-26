@@ -15,9 +15,6 @@ import '../domain/takeout_import_plan.dart';
 class CsvParseResult<T> {
   final List<T> items;
 
-  /// Number of non-empty lines in the raw file (including header).
-  final int rawLineCount;
-
   /// Number of rows the CSV parser produced (excluding header).
   final int parsedRowCount;
 
@@ -27,7 +24,6 @@ class CsvParseResult<T> {
 
   const CsvParseResult({
     required this.items,
-    required this.rawLineCount,
     required this.parsedRowCount,
     required this.skippedRowCount,
   });
@@ -79,15 +75,10 @@ class CsvParserService {
   /// Supports both 8-column (no Post ID) and 9-column (with Post ID) formats.
   CsvParseResult<Comment> parseCommentsCsv(Uint8List bytes) {
     final content = utf8.decode(bytes);
-    final rawLineCount = content
-        .split('\n')
-        .where((l) => l.trim().isNotEmpty)
-        .length;
     final rows = _csv.decode(content);
     if (rows.isEmpty) {
       return const CsvParseResult(
         items: [],
-        rawLineCount: 0,
         parsedRowCount: 0,
         skippedRowCount: 0,
       );
@@ -132,7 +123,6 @@ class CsvParserService {
 
     return CsvParseResult(
       items: items,
-      rawLineCount: rawLineCount,
       parsedRowCount: dataRows.length,
       skippedRowCount: dataRows.length - items.length,
     );
@@ -144,15 +134,10 @@ class CsvParserService {
   /// Currency Code and Parent Live Chat ID columns.
   CsvParseResult<LiveChat> parseLiveChatsCsv(Uint8List bytes) {
     final content = utf8.decode(bytes);
-    final rawLineCount = content
-        .split('\n')
-        .where((l) => l.trim().isNotEmpty)
-        .length;
     final rows = _csv.decode(content);
     if (rows.isEmpty) {
       return const CsvParseResult(
         items: [],
-        rawLineCount: 0,
         parsedRowCount: 0,
         skippedRowCount: 0,
       );
@@ -191,7 +176,6 @@ class CsvParserService {
 
     return CsvParseResult(
       items: items,
-      rawLineCount: rawLineCount,
       parsedRowCount: dataRows.length,
       skippedRowCount: dataRows.length - items.length,
     );

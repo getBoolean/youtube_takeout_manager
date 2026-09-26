@@ -2,7 +2,7 @@
 // takeout data. Opens the largest channels, switches to the live chat tab,
 // then reopens them and logs build/raster times and widget counts.
 //
-// flutter run -d windows -t lib/perf_probe.dart --dart-define-from-file=.env
+// flutter run -d windows -t tool/perf_probe.dart --dart-define-from-file=.env
 // Add --profile for representative numbers; debug mode is 5-10x slower.
 import 'dart:async';
 

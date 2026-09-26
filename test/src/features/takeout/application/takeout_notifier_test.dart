@@ -240,7 +240,7 @@ void main() {
     );
     await notifier.commitImport(plan);
 
-    expect(plan.differentAccount?.foundChannelIds, {'UCother'});
+    expect(plan.accountId, 'UCother');
     expect(await commentIds(c), ['D', 'C', 'A']);
     expect(repository.accounts['UCme'], same(savedFiles));
     expect(repository.accounts.keys, unorderedEquals(['UCme', 'UCother']));

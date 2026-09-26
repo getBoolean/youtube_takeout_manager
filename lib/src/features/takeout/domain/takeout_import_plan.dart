@@ -17,17 +17,6 @@ enum DeletionCheckSkipReason {
   savedDataUnverified,
 }
 
-/// Author channels of two takeouts that don't belong to the same account.
-class ChannelMismatch {
-  final Set<String> expectedChannelIds;
-  final Set<String> foundChannelIds;
-
-  const ChannelMismatch({
-    required this.expectedChannelIds,
-    required this.foundChannelIds,
-  });
-}
-
 /// The result of reading picked takeout zips, ready to be confirmed and saved.
 class TakeoutImportPlan {
   /// The author channel of the imported takeouts, whose folder the data is
@@ -57,9 +46,6 @@ class TakeoutImportPlan {
   final DeletionCheckSkipReason? commentCheckSkipped;
   final DeletionCheckSkipReason? liveChatCheckSkipped;
 
-  /// Set when replacing saved data with a takeout from another channel.
-  final ChannelMismatch? differentAccount;
-
   /// The takeout selected when this was worked out. Committing is refused
   /// if another one is selected by then, since this was worked out against
   /// it.
@@ -78,7 +64,6 @@ class TakeoutImportPlan {
     required this.newLiveChatCount,
     this.commentCheckSkipped,
     this.liveChatCheckSkipped,
-    this.differentAccount,
     this.baseTakeoutId,
   });
 

@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../data/google_auth_repository.dart';
-import '../domain/auth_state.dart';
+import '../domain/sign_in_profile.dart';
 import 'saved_sign_ins.dart';
 
 part 'auth_notifier.g.dart';
@@ -15,7 +15,7 @@ part 'auth_notifier.g.dart';
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
   @override
-  AuthState? build() {
+  SignInProfile? build() {
     final channelId = ref.watch(viewedChannelIdProvider);
     if (channelId == null) return null;
     final profile = ref.watch(
@@ -25,7 +25,7 @@ class AuthNotifier extends _$AuthNotifier {
     if (!ref.watch(googleAuthRepositoryProvider).hasSession(channelId)) {
       return null;
     }
-    return AuthState.fromProfile(profile);
+    return profile;
   }
 }
 

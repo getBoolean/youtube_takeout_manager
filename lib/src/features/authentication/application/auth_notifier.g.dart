@@ -19,7 +19,7 @@ final authProvider = AuthNotifierProvider._();
 /// as signed in only with the sign-in chosen for it. Signing in and out is
 /// `SignInService`'s.
 final class AuthNotifierProvider
-    extends $NotifierProvider<AuthNotifier, AuthState?> {
+    extends $NotifierProvider<AuthNotifier, SignInProfile?> {
   /// The viewed channel's sign-in, or null when it has none: a channel counts
   /// as signed in only with the sign-in chosen for it. Signing in and out is
   /// `SignInService`'s.
@@ -42,31 +42,31 @@ final class AuthNotifierProvider
   AuthNotifier create() => AuthNotifier();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AuthState? value) {
+  Override overrideWithValue(SignInProfile? value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<AuthState?>(value),
+      providerOverride: $SyncValueProvider<SignInProfile?>(value),
     );
   }
 }
 
-String _$authNotifierHash() => r'b453b03c33793eb4aaf70df70787fc6180864325';
+String _$authNotifierHash() => r'8bb9b13b0bdba9bdc2facaae02084842dc14ce93';
 
 /// The viewed channel's sign-in, or null when it has none: a channel counts
 /// as signed in only with the sign-in chosen for it. Signing in and out is
 /// `SignInService`'s.
 
-abstract class _$AuthNotifier extends $Notifier<AuthState?> {
-  AuthState? build();
+abstract class _$AuthNotifier extends $Notifier<SignInProfile?> {
+  SignInProfile? build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AuthState?, AuthState?>;
+    final ref = this.ref as $Ref<SignInProfile?, SignInProfile?>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AuthState?, AuthState?>,
-              AuthState?,
+              AnyNotifier<SignInProfile?, SignInProfile?>,
+              SignInProfile?,
               Object?,
               Object?
             >;

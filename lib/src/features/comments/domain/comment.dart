@@ -14,7 +14,6 @@ class Comment with CommentMappable {
   final String rawCommentText;
   final String displayText;
   final String? topLevelCommentId;
-  final bool markedForDeletion;
 
   const Comment({
     required this.commentId,
@@ -27,6 +26,5 @@ class Comment with CommentMappable {
     required this.rawCommentText,
     required this.displayText,
     this.topLevelCommentId,
-    this.markedForDeletion = false,
   });
 }

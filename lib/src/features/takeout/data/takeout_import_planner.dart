@@ -49,7 +49,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
   final saved = request.saved;
   final base = request.merge ? saved : null;
   final exports = _readExports(request.zips);
-  final (:accountId, :differentAccount) = _resolveTakeout(exports, request);
+  final accountId = _resolveTakeout(exports, request);
 
   final sources = [if (base != null) _Source.saved(base), ...exports]
     ..sort((a, b) => _compareSnapshots(a.snapshot, a, b.snapshot, b));
@@ -123,7 +123,6 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
         .length,
     commentCheckSkipped: goneComments.skipped,
     liveChatCheckSkipped: goneLiveChats.skipped,
-    differentAccount: differentAccount,
     baseTakeoutId: request.activeTakeoutId,
   );
 }
@@ -320,12 +319,9 @@ List<_Source> _readExports(List<PickedZip> zips) {
 /// sharing a channel. They go into the saved takeout they share a channel
 /// with, else a new one saved under their main channel (or the channel that
 /// wrote most). Throws when they share channels with two saved takeouts, or
-/// when adding them to a takeout other than the one selected. When
-/// replacing, another takeout is allowed and returned as [ChannelMismatch].
-({String accountId, ChannelMismatch? differentAccount}) _resolveTakeout(
-  List<_Source> exports,
-  TakeoutImportRequest request,
-) {
+/// when merging them into a takeout other than the one selected. Replacing
+/// with another takeout is allowed.
+String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
   final titles = {
     for (final export in [
       ...exports,
@@ -407,25 +403,15 @@ List<_Source> _readExports(List<PickedZip> zips) {
       _mostCommonAuthor(exports) ??
       channels.first;
 
-  if (activeId == null || takeoutId == activeId) {
-    return (accountId: takeoutId, differentAccount: null);
+  if (!request.merge || activeId == null || takeoutId == activeId) {
+    return takeoutId;
   }
-  final expected = savedSets[activeId] ?? {activeId};
-  if (request.merge) {
-    throw TakeoutAccountMismatchException(
-      'This takeout is from a different YouTube account than your current '
-      'data.',
-      expectedChannelIds: expected,
-      foundChannelIds: channels,
-      titlesById: titles,
-    );
-  }
-  return (
-    accountId: takeoutId,
-    differentAccount: ChannelMismatch(
-      expectedChannelIds: expected,
-      foundChannelIds: channels,
-    ),
+  throw TakeoutAccountMismatchException(
+    'This takeout is from a different YouTube account than your current '
+    'data.',
+    expectedChannelIds: savedSets[activeId] ?? {activeId},
+    foundChannelIds: channels,
+    titlesById: titles,
   );
 }
 

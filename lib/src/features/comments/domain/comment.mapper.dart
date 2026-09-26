@@ -73,13 +73,6 @@ class CommentMapper extends ClassMapperBase<Comment> {
     _$topLevelCommentId,
     opt: true,
   );
-  static bool _$markedForDeletion(Comment v) => v.markedForDeletion;
-  static const Field<Comment, bool> _f$markedForDeletion = Field(
-    'markedForDeletion',
-    _$markedForDeletion,
-    opt: true,
-    def: false,
-  );
 
   @override
   final MappableFields<Comment> fields = const {
@@ -93,7 +86,6 @@ class CommentMapper extends ClassMapperBase<Comment> {
     #rawCommentText: _f$rawCommentText,
     #displayText: _f$displayText,
     #topLevelCommentId: _f$topLevelCommentId,
-    #markedForDeletion: _f$markedForDeletion,
   };
 
   static Comment _instantiate(DecodingData data) {
@@ -108,7 +100,6 @@ class CommentMapper extends ClassMapperBase<Comment> {
       rawCommentText: data.dec(_f$rawCommentText),
       displayText: data.dec(_f$displayText),
       topLevelCommentId: data.dec(_f$topLevelCommentId),
-      markedForDeletion: data.dec(_f$markedForDeletion),
     );
   }
 
@@ -180,7 +171,6 @@ abstract class CommentCopyWith<$R, $In extends Comment, $Out>
     String? rawCommentText,
     String? displayText,
     String? topLevelCommentId,
-    bool? markedForDeletion,
   });
   CommentCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -205,7 +195,6 @@ class _CommentCopyWithImpl<$R, $Out>
     String? rawCommentText,
     String? displayText,
     Object? topLevelCommentId = $none,
-    bool? markedForDeletion,
   }) => $apply(
     FieldCopyWithData({
       if (commentId != null) #commentId: commentId,
@@ -218,7 +207,6 @@ class _CommentCopyWithImpl<$R, $Out>
       if (rawCommentText != null) #rawCommentText: rawCommentText,
       if (displayText != null) #displayText: displayText,
       if (topLevelCommentId != $none) #topLevelCommentId: topLevelCommentId,
-      if (markedForDeletion != null) #markedForDeletion: markedForDeletion,
     }),
   );
   @override
@@ -235,10 +223,6 @@ class _CommentCopyWithImpl<$R, $Out>
     topLevelCommentId: data.get(
       #topLevelCommentId,
       or: $value.topLevelCommentId,
-    ),
-    markedForDeletion: data.get(
-      #markedForDeletion,
-      or: $value.markedForDeletion,
     ),
   );
 

@@ -12,7 +12,6 @@ class LiveChat with LiveChatMappable {
   final String? videoId;
   final String rawText;
   final String displayText;
-  final bool markedForDeletion;
 
   const LiveChat({
     required this.liveChatId,
@@ -23,6 +22,5 @@ class LiveChat with LiveChatMappable {
     this.videoId,
     required this.rawText,
     required this.displayText,
-    this.markedForDeletion = false,
   });
 }

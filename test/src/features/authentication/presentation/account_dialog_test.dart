@@ -9,7 +9,6 @@ import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
@@ -105,7 +104,7 @@ TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
 
 class _NotSignedIn extends AuthNotifier {
   @override
-  AuthState? build() => null;
+  SignInProfile? build() => null;
 }
 
 class _FakeAuth extends SignInService {

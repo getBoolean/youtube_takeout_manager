@@ -58,13 +58,6 @@ class LiveChatMapper extends ClassMapperBase<LiveChat> {
     'displayText',
     _$displayText,
   );
-  static bool _$markedForDeletion(LiveChat v) => v.markedForDeletion;
-  static const Field<LiveChat, bool> _f$markedForDeletion = Field(
-    'markedForDeletion',
-    _$markedForDeletion,
-    opt: true,
-    def: false,
-  );
 
   @override
   final MappableFields<LiveChat> fields = const {
@@ -76,7 +69,6 @@ class LiveChatMapper extends ClassMapperBase<LiveChat> {
     #videoId: _f$videoId,
     #rawText: _f$rawText,
     #displayText: _f$displayText,
-    #markedForDeletion: _f$markedForDeletion,
   };
 
   static LiveChat _instantiate(DecodingData data) {
@@ -89,7 +81,6 @@ class LiveChatMapper extends ClassMapperBase<LiveChat> {
       videoId: data.dec(_f$videoId),
       rawText: data.dec(_f$rawText),
       displayText: data.dec(_f$displayText),
-      markedForDeletion: data.dec(_f$markedForDeletion),
     );
   }
 
@@ -159,7 +150,6 @@ abstract class LiveChatCopyWith<$R, $In extends LiveChat, $Out>
     String? videoId,
     String? rawText,
     String? displayText,
-    bool? markedForDeletion,
   });
   LiveChatCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -182,7 +172,6 @@ class _LiveChatCopyWithImpl<$R, $Out>
     Object? videoId = $none,
     String? rawText,
     String? displayText,
-    bool? markedForDeletion,
   }) => $apply(
     FieldCopyWithData({
       if (liveChatId != null) #liveChatId: liveChatId,
@@ -193,7 +182,6 @@ class _LiveChatCopyWithImpl<$R, $Out>
       if (videoId != $none) #videoId: videoId,
       if (rawText != null) #rawText: rawText,
       if (displayText != null) #displayText: displayText,
-      if (markedForDeletion != null) #markedForDeletion: markedForDeletion,
     }),
   );
   @override
@@ -206,10 +194,6 @@ class _LiveChatCopyWithImpl<$R, $Out>
     videoId: data.get(#videoId, or: $value.videoId),
     rawText: data.get(#rawText, or: $value.rawText),
     displayText: data.get(#displayText, or: $value.displayText),
-    markedForDeletion: data.get(
-      #markedForDeletion,
-      or: $value.markedForDeletion,
-    ),
   );
 
   @override

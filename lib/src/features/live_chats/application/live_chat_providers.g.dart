@@ -163,7 +163,7 @@ final class ChannelLiveChatsProvider
   }
 }
 
-String _$channelLiveChatsHash() => r'056b1edef236ffb40b36c1d20bffbe35a3276446';
+String _$channelLiveChatsHash() => r'aa6e2accbb1853f53973e34e14dcd4170e60c04e';
 
 final class ChannelLiveChatsFamily extends $Family
     with $FunctionalFamilyOverride<List<LiveChat>, String> {

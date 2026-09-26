@@ -33,10 +33,6 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
   final vanityNames = <String, String>{};
   final CsvPages commentPages = {};
   final CsvPages liveChatPages = {};
-  var rawCommentLines = 0;
-  var rawLiveChatLines = 0;
-  var parsedCommentRows = 0;
-  var parsedLiveChatRows = 0;
   var skippedCommentRows = 0;
   var skippedLiveChatRows = 0;
   DateTime? latestExportAt;
@@ -61,16 +57,12 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
       final result = csvParser.parseCommentsCsv(bytes);
       comments.addAll(result.items);
       commentPages.add((page: page(path), rows: result.parsedRowCount));
-      rawCommentLines += result.rawLineCount;
-      parsedCommentRows += result.parsedRowCount;
       skippedCommentRows += result.skippedRowCount;
     } else if (path.contains('live chats/live chats') &&
         path.endsWith('.csv')) {
       final result = csvParser.parseLiveChatsCsv(bytes);
       liveChats.addAll(result.items);
       liveChatPages.add((page: page(path), rows: result.parsedRowCount));
-      rawLiveChatLines += result.rawLineCount;
-      parsedLiveChatRows += result.parsedRowCount;
       skippedLiveChatRows += result.skippedRowCount;
     } else if (path.contains('subscriptions/subscriptions') &&
         path.endsWith('.csv')) {
@@ -98,10 +90,6 @@ parseTakeoutFiles(Map<String, Uint8List> extractedFiles) {
       comments: comments,
       liveChats: liveChats,
       subscriptionsByChannelId: subscriptionsByChannelId,
-      rawCommentLines: rawCommentLines,
-      rawLiveChatLines: rawLiveChatLines,
-      parsedCommentRows: parsedCommentRows,
-      parsedLiveChatRows: parsedLiveChatRows,
       skippedCommentRows: skippedCommentRows,
       skippedLiveChatRows: skippedLiveChatRows,
       latestExportAt: latestExportAt,

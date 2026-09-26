@@ -652,7 +652,6 @@ void main() {
       ], saved: mixed);
 
       expect(plan.accountId, 'UCaaa');
-      expect(plan.differentAccount, isNull);
       // UCaaa isn't in the newer takeout, so its items can't be found gone.
       expect(plan.goneCommentIds, isEmpty);
     });
@@ -694,27 +693,23 @@ void main() {
       );
     });
 
-    test(
-      'replacing with another channel\'s takeout is allowed but flagged',
-      () {
-        final plan = _plan(
-          [
-            _zip('takeout-20260301T000000Z-001.zip', {
-              _comments: _commentsCsv([
-                _c('Z', '2026-01-01T00:00:00Z', channel: 'UCother'),
-              ]),
-            }),
-          ],
-          saved: _savedAbc,
-          merge: false,
-        );
+    test("replacing with another channel's takeout is allowed", () {
+      final plan = _plan(
+        [
+          _zip('takeout-20260301T000000Z-001.zip', {
+            _comments: _commentsCsv([
+              _c('Z', '2026-01-01T00:00:00Z', channel: 'UCother'),
+            ]),
+          }),
+        ],
+        saved: _savedAbc,
+        merge: false,
+      );
 
-        expect(plan.differentAccount?.expectedChannelIds, {'UCme'});
-        expect(plan.differentAccount?.foundChannelIds, {'UCother'});
-        expect(_commentIds(plan), {'Z'});
-        expect(plan.goneCommentIds, isEmpty);
-      },
-    );
+      expect(plan.accountId, 'UCother');
+      expect(_commentIds(plan), {'Z'});
+      expect(plan.goneCommentIds, isEmpty);
+    });
   });
 
   group('replacing', () {
@@ -731,7 +726,6 @@ void main() {
 
       expect(_commentIds(plan), {'D'});
       expect(plan.goneCommentIds, isEmpty);
-      expect(plan.differentAccount, isNull);
     });
 
     test('with two takeouts marks items missing from the newer one', () {
@@ -831,7 +825,6 @@ void main() {
       );
 
       expect(plan.accountId, 'UCmain');
-      expect(plan.differentAccount, isNotNull);
     });
 
     test('sharing channels with two saved takeouts is refused', () {

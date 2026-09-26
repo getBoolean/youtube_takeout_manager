@@ -162,7 +162,7 @@ final class ChannelCommentsProvider
   }
 }
 
-String _$channelCommentsHash() => r'2d5cd13f2b7e95bc27e7f96cbcd462578a48c8f4';
+String _$channelCommentsHash() => r'97996d4532e9a2292cd7e3c256d170f4a37d7f27';
 
 final class ChannelCommentsFamily extends $Family
     with $FunctionalFamilyOverride<List<Comment>, String> {
