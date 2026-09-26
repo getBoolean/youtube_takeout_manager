@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -13,6 +14,10 @@ class App extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Background work, such as fetching video titles, runs while the app
+    // does.
+    ref.listen(appEffectsProvider, (_, _) {});
+
     // A sign-in can stop working on any screen, e.g. while loading video
     // titles, so this reports it wherever the user is.
     ref.listen(lostSignInProvider, (_, lost) {

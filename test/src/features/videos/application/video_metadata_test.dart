@@ -5,13 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
@@ -66,11 +66,11 @@ class _Videos extends YoutubeVideoRepository {
   }
 }
 
-class _SignIns extends SavedSignIns {
+class _SignIns extends SignInService {
   final failed = <String>[];
 
   @override
-  Future<Map<String, SignInProfile>> build() async => const {};
+  void build() {}
 
   @override
   Future<void> signInFailed(String channelId) async => failed.add(channelId);
@@ -92,11 +92,13 @@ void main() {
         youtubeVideoRepositoryProvider.overrideWithValue(
           _Videos(signInFails: signInFails),
         ),
-        savedSignInsProvider.overrideWith(() => signIns),
+        signInServiceProvider.overrideWith(() => signIns),
       ],
     );
     addTearDown(c.dispose);
-    c.listen(videoMetadataProvider, (_, _) {});
+    c
+      ..listen(videoMetadataProvider, (_, _) {})
+      ..listen(videoTitleFetcherProvider, (_, _) {});
     // Lets the fetch after the cached videos finish.
     for (var i = 0; i < 20; i++) {
       await pumpEventQueue();

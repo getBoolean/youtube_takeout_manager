@@ -80,11 +80,18 @@ abstract class _$VideoFetchProgress
   }
 }
 
+/// Details of the videos commented or chatted on, by video ID, kept on this
+/// device. Fetching more is `videoTitleFetcher`'s.
+
 @ProviderFor(VideoMetadata)
 final videoMetadataProvider = VideoMetadataProvider._();
 
+/// Details of the videos commented or chatted on, by video ID, kept on this
+/// device. Fetching more is `videoTitleFetcher`'s.
 final class VideoMetadataProvider
     extends $StreamNotifierProvider<VideoMetadata, Map<String, Video>> {
+  /// Details of the videos commented or chatted on, by video ID, kept on this
+  /// device. Fetching more is `videoTitleFetcher`'s.
   VideoMetadataProvider._()
     : super(
         from: null,
@@ -104,7 +111,10 @@ final class VideoMetadataProvider
   VideoMetadata create() => VideoMetadata();
 }
 
-String _$videoMetadataHash() => r'bbbe9931882e46846f404d34680c93c254e61375';
+String _$videoMetadataHash() => r'5c76d066d6328a55a45164efc4231df1b08d8640';
+
+/// Details of the videos commented or chatted on, by video ID, kept on this
+/// device. Fetching more is `videoTitleFetcher`'s.
 
 abstract class _$VideoMetadata extends $StreamNotifier<Map<String, Video>> {
   Stream<Map<String, Video>> build();

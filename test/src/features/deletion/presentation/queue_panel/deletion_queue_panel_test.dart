@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_items_by_channel.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
@@ -53,19 +54,20 @@ class _FakeQueue extends DeletionQueue {
       calls.add('clearCompleted $channelId');
 
   @override
-  void pauseProcessing() => calls.add('pause');
-
-  @override
   Future<void> removeUnassigned() async => calls.add('removeUnassigned');
 }
 
 class _Processing extends DeletionProcessing {
   final DeletionProcessingState initial;
+  final List<String> calls;
 
-  _Processing(this.initial);
+  _Processing(this.initial, this.calls);
 
   @override
   DeletionProcessingState build() => initial;
+
+  @override
+  void pauseProcessing() => calls.add('pause');
 }
 
 class _FakeAuth extends AuthNotifier {
@@ -103,7 +105,7 @@ void main() {
           deletionQueueProvider.overrideWith(() => queue),
           viewedChannelIdProvider.overrideWithValue('UCme'),
           deletionProcessingProvider.overrideWith(
-            () => _Processing(processing),
+            () => _Processing(processing, queue.calls),
           ),
           queuedItemChannelIdsProvider.overrideWithValue(const {
             'a1': 'UCa',

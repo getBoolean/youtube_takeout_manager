@@ -1,17 +1,11 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
-import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/channel_cache_repository.dart';
-import '../data/youtube_channel_repository.dart';
 import '../domain/channel.dart';
 
 part 'channel_providers.g.dart';
@@ -48,15 +42,12 @@ Map<String, String> channelTitlesFromVideos(Ref ref) {
   return titles;
 }
 
+/// Channel pictures by channel ID, kept on this device. Fetching more is
+/// `ChannelThumbnailFetcher`'s.
 @Riverpod(keepAlive: true)
 class ChannelThumbnails extends _$ChannelThumbnails {
   ChannelCacheRepository get _cacheRepository =>
       ref.read(channelCacheRepositoryProvider);
-  YoutubeChannelRepository get _channelRepository =>
-      ref.read(youtubeChannelRepositoryProvider);
-
-  final _pendingIds = <String>{};
-  bool _fetchInProgress = false;
 
   @override
   Map<String, String> build() {
@@ -73,96 +64,11 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     }
   }
 
-  /// Queue channel IDs for thumbnail fetching.
-  /// Buffers them and fetches in batches of 10.
-  void queueChannelIds(Set<String> channelIds) {
-    final uncached = channelIds.difference(state.keys.toSet()).difference(
-      const {unknownChannelId},
-    );
-    if (uncached.isEmpty) return;
-    _pendingIds.addAll(uncached);
-    if (_pendingIds.length >= 10 && !_fetchInProgress) {
-      _fetchPending();
-    }
-  }
+  /// Adds fetched pictures by channel ID.
+  void add(Map<String, String> thumbnails) => state = {...state, ...thumbnails};
 
-  /// Flush any remaining queued IDs (called when video stream completes).
-  Future<void> flushQueue() async {
-    if (_pendingIds.isNotEmpty && !_fetchInProgress) {
-      await _fetchPending();
-    }
-  }
-
-  Future<void> _fetchPending() async {
-    if (_fetchInProgress || _pendingIds.isEmpty) return;
-    final sessionChannelId = ref.read(readSessionChannelIdProvider);
-    if (sessionChannelId == null) return;
-    _fetchInProgress = true;
-
-    final client = ref
-        .read(googleAuthRepositoryProvider)
-        .getAuthenticatedClient(sessionChannelId);
-    try {
-      while (_pendingIds.isNotEmpty) {
-        final batch = _pendingIds.take(10).toSet();
-        _pendingIds.removeAll(batch);
-        final fetched = await _channelRepository.fetchChannelThumbnails(
-          client,
-          batch,
-        );
-        await ref
-            .read(quotaProvider.notifier)
-            .recordUsage(QuotaOperation.channelsList);
-        state = {...state, ...fetched};
-      }
-      await _cacheRepository.saveThumbnails(state);
-    } catch (e) {
-      if (!isSignInFailure(e)) rethrow;
-      await ref
-          .read(savedSignInsProvider.notifier)
-          .signInFailed(sessionChannelId);
-    } finally {
-      client.close();
-      _fetchInProgress = false;
-    }
-  }
-
-  /// Fetches thumbnails for channels not already cached (manual refresh),
-  /// with whichever sign-in is available.
-  Future<void> fetchThumbnails(Set<String> channelIds) async {
-    final sessionChannelId = ref.read(readSessionChannelIdProvider);
-    if (sessionChannelId == null) return;
-
-    final uncachedIds = channelIds.difference(state.keys.toSet()).difference(
-      const {unknownChannelId},
-    );
-    if (uncachedIds.isEmpty) return;
-
-    final client = ref
-        .read(googleAuthRepositoryProvider)
-        .getAuthenticatedClient(sessionChannelId);
-    try {
-      final fetched = await _channelRepository.fetchChannelThumbnails(
-        client,
-        uncachedIds,
-      );
-      final batchCount = (uncachedIds.length + 49) ~/ 50;
-      if (batchCount > 0) {
-        await ref
-            .read(quotaProvider.notifier)
-            .recordUsage(QuotaOperation.channelsList, count: batchCount);
-      }
-      state = {...state, ...fetched};
-      await _cacheRepository.saveThumbnails(state);
-    } catch (e) {
-      if (!isSignInFailure(e)) rethrow;
-      await ref
-          .read(savedSignInsProvider.notifier)
-          .signInFailed(sessionChannelId);
-    } finally {
-      client.close();
-    }
-  }
+  /// Keeps the pictures on this device.
+  Future<void> persist() => _cacheRepository.saveThumbnails(state);
 }
 
 @riverpod

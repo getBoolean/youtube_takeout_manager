@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
@@ -38,6 +39,7 @@ void main() {
 }
 
 Future<void> _probe(ProviderContainer container) async {
+  container.listen(appEffectsProvider, (_, _) {});
   // Keep data providers alive and wait for them.
   container.listen(takeoutProvider, (_, _) {});
   container.listen(videoMetadataProvider, (_, _) {});

@@ -47,7 +47,7 @@ final class SignInNoticesProvider
   }
 }
 
-String _$signInNoticesHash() => r'a92217636f8a63083a3bdd0235fcf18672febe5d';
+String _$signInNoticesHash() => r'9ed9bca45015465d3c2e906df23750e7deeab9d1';
 
 /// Signs channels in from the account dialog, keeping why one didn't end up
 /// signed in, by channel ID, to show on its row until dismissed.

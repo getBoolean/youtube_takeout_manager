@@ -18,6 +18,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_qu
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_remover.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
@@ -162,7 +164,7 @@ void main() {
         _pending('B'),
         _pending('C'),
       ]);
-      final notifier = c.read(takeoutProvider.notifier);
+      final notifier = c.read(takeoutImporterProvider.notifier);
 
       final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
       await notifier.commitImport(plan);
@@ -186,7 +188,7 @@ void main() {
     await c.read(deletedCommentIdsProvider.notifier).markDeleted({'B'});
 
     final plan = await c
-        .read(takeoutProvider.notifier)
+        .read(takeoutImporterProvider.notifier)
         .prepareImport(_newerTakeout(), merge: true);
 
     expect(plan.goneCommentIds, {'B'});
@@ -200,7 +202,7 @@ void main() {
 
     await expectLater(
       c
-          .read(takeoutProvider.notifier)
+          .read(takeoutImporterProvider.notifier)
           .prepareImport(_newerTakeout(channel: 'UCother'), merge: true),
       throwsA(isA<TakeoutAccountMismatchException>()),
     );
@@ -216,7 +218,7 @@ void main() {
 
     await expectLater(
       c
-          .read(takeoutProvider.notifier)
+          .read(takeoutImporterProvider.notifier)
           .prepareImport(
             FilePickerResult([
               PlatformFile(name: 'takeout-20260301T000000Z-001.zip', size: 1),
@@ -230,7 +232,7 @@ void main() {
       'switches to it', () async {
     final c = container();
     final savedFiles = repository.accounts['UCme'];
-    final notifier = c.read(takeoutProvider.notifier);
+    final notifier = c.read(takeoutImporterProvider.notifier);
 
     final plan = await notifier.prepareImport(
       _newerTakeout(channel: 'UCother'),
@@ -264,7 +266,7 @@ void main() {
     final c = container();
     await c.read(deletionQueueRepositoryProvider).saveQueue([_pending('B')]);
     final savedFiles = repository.accounts['UCme'];
-    final notifier = c.read(takeoutProvider.notifier);
+    final notifier = c.read(takeoutImporterProvider.notifier);
     final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
 
     repository.failSaves = true;
@@ -319,7 +321,7 @@ void main() {
       );
       final c = container();
       c.listen(takeoutProvider, (_, _) {});
-      final notifier = c.read(takeoutProvider.notifier);
+      final notifier = c.read(takeoutImporterProvider.notifier);
 
       final plan = await notifier.prepareImport(_newerTakeout(), merge: false);
       await notifier.commitImport(plan);
@@ -333,7 +335,7 @@ void main() {
   );
 
   test('tells which accounts have saved data', () async {
-    final notifier = container().read(takeoutProvider.notifier);
+    final notifier = container().read(takeoutImporterProvider.notifier);
 
     expect(await notifier.hasSavedData('UCme'), isTrue);
     expect(await notifier.hasSavedData('UCother'), isFalse);
@@ -347,7 +349,9 @@ void main() {
       _pending('not-in-takeout'),
     ]);
 
+    c.listen(queueChannelAssignmentProvider, (_, _) {});
     await c.read(takeoutProvider.future);
+    await pumpEventQueue();
 
     final channels = {
       for (final i in await container().read(deletionQueueProvider.future))
@@ -402,7 +406,7 @@ void main() {
         _pending('A').copyWith(authorChannelId: 'UCme'),
       ]);
       await c.read(takeoutProvider.future);
-      final saved = c.read(savedTakeoutsProvider.notifier);
+      final saved = c.read(takeoutRemoverProvider.notifier);
 
       final removal = await saved.planRemoval('UCother');
       expect(removal.orphanedChannelIds, {'UCother'});
@@ -421,7 +425,7 @@ void main() {
     test('removing the viewed one switches to another', () async {
       final c = withSignIns();
       await c.read(takeoutProvider.future);
-      final saved = c.read(savedTakeoutsProvider.notifier);
+      final saved = c.read(takeoutRemoverProvider.notifier);
 
       await saved.removeTakeout(await saved.planRemoval('UCme'));
 
@@ -436,7 +440,7 @@ void main() {
       repository.accounts.remove('UCother');
       final c = withSignIns();
       await c.read(takeoutProvider.future);
-      final saved = c.read(savedTakeoutsProvider.notifier);
+      final saved = c.read(takeoutRemoverProvider.notifier);
 
       await saved.removeTakeout(await saved.planRemoval('UCme'));
 
@@ -461,7 +465,7 @@ void main() {
       await c.read(takeoutProvider.future);
 
       final plan = await c
-          .read(takeoutProvider.notifier)
+          .read(takeoutImporterProvider.notifier)
           .prepareImport(_newerTakeout(channel: 'UCalt'), merge: false);
 
       expect(plan.accountId, 'UCmulti');
@@ -470,7 +474,7 @@ void main() {
     test('an import prepared before switching takeouts is refused', () async {
       final c = withSignIns();
       await c.read(takeoutProvider.future);
-      final notifier = c.read(takeoutProvider.notifier);
+      final notifier = c.read(takeoutImporterProvider.notifier);
       final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
       final savedFiles = repository.accounts['UCme'];
 
@@ -545,7 +549,7 @@ void main() {
       () async {
         final c = container();
         await c.read(takeoutProvider.future);
-        final notifier = c.read(takeoutProvider.notifier);
+        final notifier = c.read(takeoutImporterProvider.notifier);
         final plan = await notifier.prepareImport(
           _newerTakeout(channel: 'UCnew'),
           merge: false,

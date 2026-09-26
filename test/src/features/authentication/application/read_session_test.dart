@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
@@ -66,11 +67,14 @@ void main() {
         takeoutSelectionProvider.overrideWith(_Selection.new),
         savedSignInsProvider.overrideWith(_SignIns.new),
         channelCacheRepositoryProvider.overrideWithValue(_NoCache()),
+        channelsProvider.overrideWithValue(const []),
       ],
     );
     addTearDown(container.dispose);
     container.listen(readSessionChannelIdProvider, (_, _) {});
-    container.listen(channelThumbnailsProvider, (_, _) {});
+    container
+      ..listen(channelThumbnailsProvider, (_, _) {})
+      ..listen(channelThumbnailFetcherProvider, (_, _) {});
     await container.read(takeoutProvider.future);
     await container.read(takeoutSelectionProvider.future);
     await container.read(savedSignInsProvider.future);
@@ -78,9 +82,9 @@ void main() {
 
     // Enough channels to fetch a batch, which reads the sign-in to use.
     expect(
-      () => container.read(channelThumbnailsProvider.notifier).queueChannelIds(
-        {for (var i = 0; i < 10; i++) 'UC$i'},
-      ),
+      () => container
+          .read(channelThumbnailFetcherProvider.notifier)
+          .queueChannelIds({for (var i = 0; i < 10; i++) 'UC$i'}),
       returnsNormally,
     );
   });

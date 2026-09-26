@@ -7,11 +7,12 @@ import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_remover.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
@@ -20,10 +21,11 @@ import 'package:youtube_takeout_manager/src/features/takeout/presentation/leave_
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/skipped_rows_banner.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
-import '../application/auth_notifier.dart';
 import '../application/saved_sign_ins.dart';
 import '../application/sign_in_notices.dart';
+import '../application/sign_in_service.dart';
 import '../domain/account_profile.dart';
 import '../domain/sign_in_notice.dart';
 import '../domain/sign_in_profile.dart';
@@ -236,7 +238,8 @@ class _Channels extends ConsumerWidget {
       savedChannelIds: {for (final t in saved) ...t.channelIds},
       onView: (id) => _view(context, ref, id),
       onSignIn: ref.read(signInNoticesProvider.notifier).signIn,
-      onSignOut: (id) => ref.read(authProvider.notifier).signOut(channelId: id),
+      onSignOut: (id) =>
+          ref.read(signInServiceProvider.notifier).signOut(channelId: id),
       onDismissNotice: (id) => switch (notices[id]) {
         SignInStoppedWorking() =>
           ref.read(lostSignInProvider.notifier).dismiss(),
@@ -299,7 +302,7 @@ class _OtherAccounts extends ConsumerWidget {
     final profiles = ref.watch(savedSignInsProvider).value ?? const {};
     final inTakeouts = {for (final t in saved) ...t.channelIds};
     final viewed = saved.where((t) => t.id == viewingId).firstOrNull;
-    final savedTakeouts = ref.read(savedTakeoutsProvider.notifier);
+    final remover = ref.read(takeoutRemoverProvider.notifier);
 
     return OtherAccountsSection(
       viewedAccount: viewed,
@@ -314,10 +317,10 @@ class _OtherAccounts extends ConsumerWidget {
       deletionRunning: deletionRunning,
       onView: (takeoutId, channelId) =>
           _show(context, ref, takeoutId, channelId: channelId),
-      planRemoval: savedTakeouts.planRemoval,
+      planRemoval: remover.planRemoval,
       onRemove: (removal) async {
         final router = StackRouterScope.of(context)?.controller;
-        await savedTakeouts.removeTakeout(removal);
+        await remover.removeTakeout(removal);
         if (removal.summary.id == viewingId && context.mounted) {
           leaveChannelScreens(router);
         }
@@ -366,8 +369,9 @@ class _DeletionRunningBanner extends ConsumerWidget {
         TextButton(
           onPressed: pausing
               ? null
-              : () =>
-                    ref.read(deletionQueueProvider.notifier).pauseProcessing(),
+              : () => ref
+                    .read(deletionProcessingProvider.notifier)
+                    .pauseProcessing(),
           child: Text(
             pausing ? 'Pausing…' : 'Pause deletion',
             textAlign: TextAlign.center,
@@ -486,6 +490,8 @@ class _CacheSection extends ConsumerWidget {
 
     ref.invalidate(videoMetadataProvider);
     ref.invalidate(channelThumbnailsProvider);
+    // Fetches what was cleared again.
+    ref.invalidate(videoTitleFetcherProvider);
 
     if (context.mounted) {
       ScaffoldMessenger.of(context)

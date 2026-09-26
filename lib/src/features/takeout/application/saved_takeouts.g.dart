@@ -10,19 +10,19 @@ part of 'saved_takeouts.dart';
 // ignore_for_file: type=lint, type=warning
 /// Every saved takeout, newest export first, read from each one's small
 /// summary files rather than all its data. The loaded takeout's comes from
-/// its data.
+/// its data. Removing one is `TakeoutRemover`'s.
 
 @ProviderFor(SavedTakeouts)
 final savedTakeoutsProvider = SavedTakeoutsProvider._();
 
 /// Every saved takeout, newest export first, read from each one's small
 /// summary files rather than all its data. The loaded takeout's comes from
-/// its data.
+/// its data. Removing one is `TakeoutRemover`'s.
 final class SavedTakeoutsProvider
     extends $AsyncNotifierProvider<SavedTakeouts, List<TakeoutSummary>> {
   /// Every saved takeout, newest export first, read from each one's small
   /// summary files rather than all its data. The loaded takeout's comes from
-  /// its data.
+  /// its data. Removing one is `TakeoutRemover`'s.
   SavedTakeoutsProvider._()
     : super(
         from: null,
@@ -42,11 +42,11 @@ final class SavedTakeoutsProvider
   SavedTakeouts create() => SavedTakeouts();
 }
 
-String _$savedTakeoutsHash() => r'3256f7e44484456edd395e92324172618f635b30';
+String _$savedTakeoutsHash() => r'71f75e87e7616c37378dc15cb89f3b269b92527c';
 
 /// Every saved takeout, newest export first, read from each one's small
 /// summary files rather than all its data. The loaded takeout's comes from
-/// its data.
+/// its data. Removing one is `TakeoutRemover`'s.
 
 abstract class _$SavedTakeouts extends $AsyncNotifier<List<TakeoutSummary>> {
   FutureOr<List<TakeoutSummary>> build();

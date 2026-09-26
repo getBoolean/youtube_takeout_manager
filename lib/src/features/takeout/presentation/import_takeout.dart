@@ -2,7 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import '../application/add_account_import.dart';
 import '../application/saved_takeouts.dart';
 import '../application/takeout_selection_notifier.dart';

@@ -9,17 +9,20 @@ part of 'emoji_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
+/// `emojiKey`, kept on this device. Looking up the rest is
+/// `EmojiNameResolver`'s.
 
 @ProviderFor(EmojiNames)
 final emojiNamesProvider = EmojiNamesProvider._();
 
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
+/// `emojiKey`, kept on this device. Looking up the rest is
+/// `EmojiNameResolver`'s.
 final class EmojiNamesProvider
     extends $NotifierProvider<EmojiNames, EmojiNamesState> {
   /// Custom emoji names resolved from YouTube live chat replays, keyed by
-  /// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
+  /// `emojiKey`, kept on this device. Looking up the rest is
+  /// `EmojiNameResolver`'s.
   EmojiNamesProvider._()
     : super(
         from: null,
@@ -47,10 +50,11 @@ final class EmojiNamesProvider
   }
 }
 
-String _$emojiNamesHash() => r'a72cf7c199f42c26ec46402d5135b0b565e7fcc2';
+String _$emojiNamesHash() => r'4fd36edef5ee380004bde61ce576b352accda714';
 
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
+/// `emojiKey`, kept on this device. Looking up the rest is
+/// `EmojiNameResolver`'s.
 
 abstract class _$EmojiNames extends $Notifier<EmojiNamesState> {
   EmojiNamesState build();

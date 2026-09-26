@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/deletion_queue_counts.dart';
-import '../../application/deletion_queue_notifier.dart';
+import '../../application/deletion_processing.dart';
 import 'deletion_queue_layout.dart';
 
 /// Phones' bottom bar summarizing the deletion queue. Tapping it opens the

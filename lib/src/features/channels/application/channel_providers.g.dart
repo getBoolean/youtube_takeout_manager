@@ -151,11 +151,18 @@ final class ChannelTitlesFromVideosProvider
 String _$channelTitlesFromVideosHash() =>
     r'ed393773d249f269882c15519e293baf03011288';
 
+/// Channel pictures by channel ID, kept on this device. Fetching more is
+/// `ChannelThumbnailFetcher`'s.
+
 @ProviderFor(ChannelThumbnails)
 final channelThumbnailsProvider = ChannelThumbnailsProvider._();
 
+/// Channel pictures by channel ID, kept on this device. Fetching more is
+/// `ChannelThumbnailFetcher`'s.
 final class ChannelThumbnailsProvider
     extends $NotifierProvider<ChannelThumbnails, Map<String, String>> {
+  /// Channel pictures by channel ID, kept on this device. Fetching more is
+  /// `ChannelThumbnailFetcher`'s.
   ChannelThumbnailsProvider._()
     : super(
         from: null,
@@ -183,7 +190,10 @@ final class ChannelThumbnailsProvider
   }
 }
 
-String _$channelThumbnailsHash() => r'5bf232b96dfbebe3bed71653a83567682b2d0f17';
+String _$channelThumbnailsHash() => r'fc21e1dccf7611e6c526f593fbf16bededfd52c0';
+
+/// Channel pictures by channel ID, kept on this device. Fetching more is
+/// `ChannelThumbnailFetcher`'s.
 
 abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
   Map<String, String> build();

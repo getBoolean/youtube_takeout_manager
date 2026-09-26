@@ -5,11 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 
 class _Clients extends GoogleAuthRepository {
   final used = <String>[];
@@ -45,11 +47,25 @@ class _Channels extends YoutubeChannelRepository {
   }
 }
 
-class _SignIns extends SavedSignIns {
+/// The channels the viewed channel interacted with, as the channel list
+/// shows them.
+class _Shown extends Notifier<List<Channel>> {
+  @override
+  List<Channel> build() => const [];
+
+  void set(Iterable<String> ids) => state = [
+    for (final id in ids)
+      Channel(channelId: id, commentCount: 1, liveChatCount: 0),
+  ];
+}
+
+final _shown = NotifierProvider<_Shown, List<Channel>>(_Shown.new);
+
+class _SignIns extends SignInService {
   final failed = <String>[];
 
   @override
-  Future<Map<String, SignInProfile>> build() async => const {};
+  void build() {}
 
   @override
   Future<void> signInFailed(String channelId) async => failed.add(channelId);
@@ -71,19 +87,29 @@ void main() {
         youtubeChannelRepositoryProvider.overrideWithValue(
           _Channels(signInFails: signInFails),
         ),
-        savedSignInsProvider.overrideWith(() => signIns),
+        signInServiceProvider.overrideWith(() => signIns),
+        channelsProvider.overrideWith((ref) => ref.watch(_shown)),
       ],
     );
     addTearDown(c.dispose);
-    c.listen(channelThumbnailsProvider, (_, _) {});
+    c
+      ..listen(channelThumbnailsProvider, (_, _) {})
+      ..listen(channelThumbnailFetcherProvider, (_, _) {});
     return c;
+  }
+
+  /// Queues [channelIds] and fetches them without waiting for a batch.
+  Future<void> fetch(ProviderContainer c, Set<String> channelIds) {
+    final fetcher = c.read(channelThumbnailFetcherProvider.notifier)
+      ..queueChannelIds(channelIds);
+    return fetcher.flushQueue();
   }
 
   test('loads avatars with whichever sign-in is available', () async {
     final clients = _Clients();
     final c = container(clients: clients, signIns: _SignIns());
 
-    await c.read(channelThumbnailsProvider.notifier).fetchThumbnails({'UCa'});
+    await fetch(c, {'UCa'});
 
     expect(clients.used, ['UCother']);
     expect(c.read(channelThumbnailsProvider), {
@@ -95,7 +121,7 @@ void main() {
     final clients = _Clients();
     final c = container(clients: clients, signIns: _SignIns(), session: null);
 
-    await c.read(channelThumbnailsProvider.notifier).fetchThumbnails({'UCa'});
+    await fetch(c, {'UCa'});
 
     expect(clients.used, isEmpty);
   });
@@ -108,9 +134,39 @@ void main() {
       signInFails: true,
     );
 
-    await c.read(channelThumbnailsProvider.notifier).fetchThumbnails({'UCa'});
+    await fetch(c, {'UCa'});
 
     expect(signIns.failed, ['UCother']);
     expect(c.read(channelThumbnailsProvider), isEmpty);
+  });
+
+  test('fetches pictures once 10 new channels show', () async {
+    final clients = _Clients();
+    final c = container(clients: clients, signIns: _SignIns());
+
+    c.read(_shown.notifier).set([for (var i = 0; i < 9; i++) 'UC$i']);
+    await pumpEventQueue();
+    expect(clients.used, isEmpty);
+
+    c.read(_shown.notifier).set([for (var i = 0; i < 10; i++) 'UC$i']);
+    await pumpEventQueue();
+    expect(clients.used, ['UCother']);
+    expect(c.read(channelThumbnailsProvider), hasLength(10));
+  });
+
+  test('fetches the rest once video titles are done', () async {
+    final clients = _Clients();
+    final c = container(clients: clients, signIns: _SignIns());
+    final progress = c.read(videoFetchProgressProvider.notifier)..start(1);
+
+    c.read(_shown.notifier).set(['UCa']);
+    await pumpEventQueue();
+    expect(clients.used, isEmpty);
+
+    progress.complete();
+    await pumpEventQueue();
+    expect(c.read(channelThumbnailsProvider), {
+      'UCa': 'https://yt3.example/UCa',
+    });
   });
 }

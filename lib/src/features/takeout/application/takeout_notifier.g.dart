@@ -9,17 +9,17 @@ part of 'takeout_notifier.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// The selected saved takeout, with every channel's items. Reloads when
-/// another takeout is selected.
+/// another takeout is selected. Importing is `TakeoutImporter`'s.
 
 @ProviderFor(TakeoutNotifier)
 final takeoutProvider = TakeoutNotifierProvider._();
 
 /// The selected saved takeout, with every channel's items. Reloads when
-/// another takeout is selected.
+/// another takeout is selected. Importing is `TakeoutImporter`'s.
 final class TakeoutNotifierProvider
     extends $AsyncNotifierProvider<TakeoutNotifier, LoadedTakeout?> {
   /// The selected saved takeout, with every channel's items. Reloads when
-  /// another takeout is selected.
+  /// another takeout is selected. Importing is `TakeoutImporter`'s.
   TakeoutNotifierProvider._()
     : super(
         from: null,
@@ -39,10 +39,10 @@ final class TakeoutNotifierProvider
   TakeoutNotifier create() => TakeoutNotifier();
 }
 
-String _$takeoutNotifierHash() => r'517f95061b3f28671939ebb636112e14fb60b794';
+String _$takeoutNotifierHash() => r'360c9a5387d05b45f0816ec83284010862e0a188';
 
 /// The selected saved takeout, with every channel's items. Reloads when
-/// another takeout is selected.
+/// another takeout is selected. Importing is `TakeoutImporter`'s.
 
 abstract class _$TakeoutNotifier extends $AsyncNotifier<LoadedTakeout?> {
   FutureOr<LoadedTakeout?> build();

@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -46,14 +45,9 @@ class EmojiNamesState {
   );
 }
 
-const _retryFailedAfter = Duration(days: 7);
-const _pauseAfterFormatChange = Duration(days: 3);
-
-/// Consecutive failures of one kind before the current run is abandoned.
-const _maxConsecutiveFailures = 2;
-
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`. Loaded from cache on start; [resolveMissing] looks up the rest.
+/// `emojiKey`, kept on this device. Looking up the rest is
+/// `EmojiNameResolver`'s.
 @Riverpod(keepAlive: true)
 class EmojiNames extends _$EmojiNames {
   EmojiNameCacheRepository get _cacheRepository =>
@@ -67,6 +61,9 @@ class EmojiNames extends _$EmojiNames {
     return const EmojiNamesState();
   }
 
+  /// Completes once the names kept on this device are in.
+  Future<void> get cacheLoaded => _cacheLoaded;
+
   Future<void> _loadCache() async {
     final cached = await _cacheRepository.loadNames();
     if (cached.isNotEmpty) {
@@ -74,96 +71,20 @@ class EmojiNames extends _$EmojiNames {
     }
   }
 
-  /// Scans the user's live chats for emojis without a known name and reads
-  /// the replay of each video they were sent in. Native platforms only.
-  ///
-  /// Never throws. Backs off when YouTube is unreachable, and pauses lookups
-  /// for [_pauseAfterFormatChange] when its responses stop parsing.
-  Future<void> resolveMissing() async {
-    if (kIsWeb || state.isResolving) return;
-    try {
-      await _resolveMissing();
-    } catch (e) {
-      debugPrint('Emoji name resolution failed: $e');
-    } finally {
-      if (ref.mounted) state = state.copyWith(isResolving: false);
-    }
-  }
-
-  Future<void> _resolveMissing() async {
-    await _cacheLoaded;
-    final pausedUntil = await _cacheRepository.loadPausedUntil();
-    if (pausedUntil != null && DateTime.now().isBefore(pausedUntil)) {
-      state = state.copyWith(lookupUnavailable: true);
-      return;
-    }
-
-    final keysByVideo = <String, Set<String>>{};
-    final timesByVideo = <String, List<DateTime>>{};
-    for (final chat in ref.read(allLiveChatsProvider)) {
-      final videoId = chat.videoId;
-      if (videoId == null) continue;
-      for (final segment in parseCommentSegments(chat.rawText)) {
-        if (segment is! EmojiSegment) continue;
-        final key = emojiKey(segment.url);
-        if (state.names.containsKey(key)) continue;
-        keysByVideo.putIfAbsent(videoId, () => {}).add(key);
-        timesByVideo.putIfAbsent(videoId, () => []).add(chat.createdAt);
-      }
-    }
-    if (keysByVideo.isEmpty) return;
-
-    final attempts = await _cacheRepository.loadAttempts();
-    final now = DateTime.now();
-    keysByVideo.removeWhere((videoId, _) {
-      final last = attempts[videoId];
-      return last != null && now.difference(last) < _retryFailedAfter;
-    });
-    if (keysByVideo.isEmpty) return;
-
-    state = state.copyWith(isResolving: true, lookupUnavailable: false);
-    final lookupRepository = ref.read(youtubeEmojiNameRepositoryProvider);
-    var first = true;
-    var networkFailures = 0;
-    var formatFailures = 0;
-    for (final MapEntry(key: videoId, value: keys) in keysByVideo.entries) {
-      final wanted = keys.difference(state.names.keys.toSet());
-      if (wanted.isEmpty) continue;
-      if (!first) await Future<void>.delayed(const Duration(seconds: 1));
-      first = false;
-
-      final result = await lookupRepository.resolveFromVideo(
-        videoId,
-        timesByVideo[videoId]!,
-        wantedKeys: wanted,
+  /// Notes that names are being looked up, and whether lookups are paused.
+  void setResolving({required bool resolving, bool? lookupUnavailable}) =>
+      state = state.copyWith(
+        isResolving: resolving,
+        lookupUnavailable: lookupUnavailable,
       );
-      if (!ref.mounted) return;
-      if (result.found.isNotEmpty) {
-        state = state.copyWith(names: {...state.names, ...result.found});
-        await _cacheRepository.saveNames(state.names);
-      }
 
-      switch (result.status) {
-        case EmojiLookupStatus.ok || EmojiLookupStatus.noReplay:
-          networkFailures = 0;
-          formatFailures = 0;
-          attempts[videoId] = DateTime.now();
-          await _cacheRepository.saveAttempts(attempts);
-        case EmojiLookupStatus.networkError:
-          // Probably offline or rate limited; try again next launch.
-          if (++networkFailures >= _maxConsecutiveFailures) return;
-        case EmojiLookupStatus.unexpectedFormat:
-          // Not recorded as attempted so the video is retried once the
-          // pause ends (e.g. after an app update adapts to the change).
-          if (++formatFailures >= _maxConsecutiveFailures) {
-            await _cacheRepository.savePausedUntil(
-              DateTime.now().add(_pauseAfterFormatChange),
-            );
-            state = state.copyWith(lookupUnavailable: true);
-            return;
-          }
-      }
-    }
+  /// Notes that lookups are paused, YouTube's responses having changed.
+  void pauseLookups() => state = state.copyWith(lookupUnavailable: true);
+
+  /// Adds looked-up names and keeps them on this device.
+  Future<void> addNames(Map<String, ResolvedEmoji> found) async {
+    state = state.copyWith(names: {...state.names, ...found});
+    await _cacheRepository.saveNames(state.names);
   }
 }
 

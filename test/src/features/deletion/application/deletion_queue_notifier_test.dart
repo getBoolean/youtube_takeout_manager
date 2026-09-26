@@ -4,11 +4,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queue_repository.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/youtube_deletion_repository.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
@@ -238,7 +238,7 @@ void main() {
       await c.read(deletionQueueProvider.future);
 
       await c
-          .read(deletionQueueProvider.notifier)
+          .read(deletionProcessingProvider.notifier)
           .processPendingViaYoutubeApi(channelId: 'UCa');
 
       expect(deleted, ['a1', 'a2']);
@@ -272,7 +272,7 @@ void main() {
         await c.read(deletionQueueProvider.future);
 
         await c
-            .read(deletionQueueProvider.notifier)
+            .read(deletionProcessingProvider.notifier)
             .processPendingViaYoutubeApi(channelId: 'UCb');
 
         expect(deleted, isEmpty);
@@ -287,7 +287,7 @@ void main() {
         final c = ProviderContainer(
           overrides: [
             authProvider.overrideWith(_SignedIn.new),
-            savedSignInsProvider.overrideWith(() => signIns),
+            signInServiceProvider.overrideWith(() => signIns),
             googleAuthRepositoryProvider.overrideWithValue(
               _FakeAuthRepository(),
             ),
@@ -304,7 +304,7 @@ void main() {
         await c.read(deletionQueueProvider.future);
 
         await c
-            .read(deletionQueueProvider.notifier)
+            .read(deletionProcessingProvider.notifier)
             .processPendingViaYoutubeApi(channelId: 'UCa');
 
         expect(deleted, ['a1']);
@@ -326,11 +326,11 @@ class _SignedIn extends AuthNotifier {
   AuthState? build() => const AuthState(channelId: 'UCa');
 }
 
-class _SignIns extends SavedSignIns {
+class _SignIns extends SignInService {
   final failed = <String>[];
 
   @override
-  Future<Map<String, SignInProfile>> build() async => const {};
+  void build() {}
 
   @override
   Future<void> signInFailed(String channelId) async => failed.add(channelId);

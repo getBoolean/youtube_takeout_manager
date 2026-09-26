@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import '../../application/deletion_queue_counts.dart';
-import '../../application/deletion_queue_notifier.dart';
+import '../../application/deletion_processing.dart';
 import 'deletion_queue_layout.dart';
 import 'deletion_queue_panel.dart';
 

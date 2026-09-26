@@ -1,23 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 
 const _other = SignInProfile(channelId: 'UCx', channelTitle: 'Someone Else');
 
-class _Auth extends AuthNotifier {
+class _Auth extends SignInService {
   final Future<SignInOutcome> Function() next;
   final targets = <String?>[];
 
   _Auth(this.next);
 
   @override
-  AuthState? build() => null;
+  void build() {}
 
   @override
   Future<SignInOutcome> signIn({String? targetChannelId}) {
@@ -32,7 +31,7 @@ void main() {
   ProviderContainer container(Future<SignInOutcome> Function() next) {
     auth = _Auth(next);
     final c = ProviderContainer(
-      overrides: [authProvider.overrideWith(() => auth)],
+      overrides: [signInServiceProvider.overrideWith(() => auth)],
     );
     addTearDown(c.dispose);
     c.listen(signInNoticesProvider, (_, _) {});

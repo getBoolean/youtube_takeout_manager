@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_st
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../../application/deletion_queue_counts.dart';
 import '../../application/deletion_queue_notifier.dart';
+import '../../application/deletion_processing.dart';
 import '../../application/queue_items_by_channel.dart';
 import '../../application/viewed_queue_items.dart';
 import '../../domain/deletion_item_status.dart';
@@ -440,7 +441,7 @@ class _Footer extends ConsumerWidget {
       if (running)
         FilledButton.tonalIcon(
           onPressed: processing == DeletionProcessingState.running
-              ? notifier.pauseProcessing
+              ? ref.read(deletionProcessingProvider.notifier).pauseProcessing
               : null,
           icon: const Icon(Icons.pause),
           label: Text(

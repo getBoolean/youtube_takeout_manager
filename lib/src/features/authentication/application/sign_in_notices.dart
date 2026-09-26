@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../domain/sign_in_notice.dart';
 import '../domain/sign_in_outcome.dart';
-import 'auth_notifier.dart';
+import 'sign_in_service.dart';
 
 part 'sign_in_notices.g.dart';
 
@@ -20,7 +20,7 @@ class SignInNotices extends _$SignInNotices {
     SignInNotice? notice;
     try {
       final outcome = await ref
-          .read(authProvider.notifier)
+          .read(signInServiceProvider.notifier)
           .signIn(targetChannelId: channelId);
       notice = switch (outcome) {
         SignedInOtherChannel(:final profile) => OtherChannelChosen(profile),

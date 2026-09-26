@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../application/deletion_queue_notifier.dart';
+import '../application/deletion_processing.dart';
 import '../domain/deletion_method.dart';
 import '../domain/deletion_targets.dart';
 import 'deletion_actions.dart';
@@ -39,7 +40,11 @@ Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
       openMyActivityScript(context, ref, waiting.allIds);
     case DeletionMethod.youtubeApi:
       // Runs until the queue is done, paused or out of quota.
-      unawaited(notifier.processPendingViaYoutubeApi(channelId: channelId));
+      unawaited(
+        ref
+            .read(deletionProcessingProvider.notifier)
+            .processPendingViaYoutubeApi(channelId: channelId),
+      );
     case null:
       return;
   }

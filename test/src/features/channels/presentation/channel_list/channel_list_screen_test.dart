@@ -14,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
@@ -56,15 +57,21 @@ class _Picker implements ZipPickerRepository {
   ]);
 }
 
-/// Nothing saved until a takeout is imported, which then shows.
-class _Takeout extends TakeoutNotifier {
+/// Nothing saved until a takeout is imported.
+class _NoTakeout extends TakeoutNotifier {
+  @override
+  Future<LoadedTakeout?> build() async => null;
+}
+
+/// Imports [plan], selecting and showing its takeout.
+class _Takeout extends TakeoutImporter {
   final TakeoutImportPlan plan;
   final committed = <TakeoutImportPlan>[];
 
   _Takeout(this.plan);
 
   @override
-  Future<LoadedTakeout?> build() async => null;
+  void build() {}
 
   @override
   Future<TakeoutImportPlan> prepareImport(
@@ -79,7 +86,9 @@ class _Takeout extends TakeoutNotifier {
   Future<void> commitImport(TakeoutImportPlan plan) async {
     committed.add(plan);
     await ref.read(takeoutSelectionProvider.notifier).select(plan.accountId);
-    state = const AsyncData(LoadedTakeout(id: 'UCme', data: _data));
+    ref
+        .read(takeoutProvider.notifier)
+        .show(const LoadedTakeout(id: 'UCme', data: _data));
   }
 }
 
@@ -126,7 +135,8 @@ void main() {
       ProviderScope(
         overrides: [
           ...fixture.fixtureOverrides(),
-          takeoutProvider.overrideWith(notifier ?? () => takeout),
+          takeoutProvider.overrideWith(notifier ?? _NoTakeout.new),
+          takeoutImporterProvider.overrideWith(() => takeout),
           savedTakeoutsProvider.overrideWith(_Saved.new),
           takeoutSelectionProvider.overrideWith(_Selection.new),
           zipPickerRepositoryProvider.overrideWithValue(_Picker()),

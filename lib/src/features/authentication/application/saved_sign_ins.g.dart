@@ -229,17 +229,20 @@ abstract class _$LostSignInNotifier extends $Notifier<LostSignIn?> {
 }
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each
-/// with a session ready to use.
+/// with a session ready to use. Looking sign-ins up and dropping ones that
+/// stop working is `SignInService`'s.
 
 @ProviderFor(SavedSignIns)
 final savedSignInsProvider = SavedSignInsProvider._();
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each
-/// with a session ready to use.
+/// with a session ready to use. Looking sign-ins up and dropping ones that
+/// stop working is `SignInService`'s.
 final class SavedSignInsProvider
     extends $AsyncNotifierProvider<SavedSignIns, Map<String, SignInProfile>> {
   /// Every saved sign-in, by the YouTube channel chosen when signing in, each
-  /// with a session ready to use.
+  /// with a session ready to use. Looking sign-ins up and dropping ones that
+  /// stop working is `SignInService`'s.
   SavedSignInsProvider._()
     : super(
         from: null,
@@ -259,10 +262,11 @@ final class SavedSignInsProvider
   SavedSignIns create() => SavedSignIns();
 }
 
-String _$savedSignInsHash() => r'5ac0cac2b0e9c1c3e02a30d2f9e3a5e46246988f';
+String _$savedSignInsHash() => r'64f63c8184ab4cda726c60d0f3f65948e8d3673d';
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each
-/// with a session ready to use.
+/// with a session ready to use. Looking sign-ins up and dropping ones that
+/// stop working is `SignInService`'s.
 
 abstract class _$SavedSignIns
     extends $AsyncNotifier<Map<String, SignInProfile>> {

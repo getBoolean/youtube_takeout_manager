@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
@@ -85,7 +86,7 @@ class _Picker implements ZipPickerRepository {
   Future<FilePickerResult?> pickZips() async => result;
 }
 
-class _Takeout extends TakeoutNotifier {
+class _Takeout extends TakeoutImporter {
   final Object? importError;
   final Set<String> saved;
   final Completer<void>? commitGate;
@@ -102,7 +103,7 @@ class _Takeout extends TakeoutNotifier {
   });
 
   @override
-  Future<LoadedTakeout?> build() async => null;
+  void build() {}
 
   @override
   Future<TakeoutImportPlan> prepareImport(
@@ -124,6 +125,11 @@ class _Takeout extends TakeoutNotifier {
   @override
   Future<bool> hasSavedData(String accountId) async =>
       saved.contains(accountId);
+}
+
+class _NoTakeout extends TakeoutNotifier {
+  @override
+  Future<LoadedTakeout?> build() async => null;
 }
 
 class _Selection extends TakeoutSelectionNotifier {
@@ -166,7 +172,8 @@ void main() {
     final c = ProviderContainer(
       overrides: [
         zipPickerRepositoryProvider.overrideWithValue(_Picker(picked)),
-        takeoutProvider.overrideWith(() => takeout),
+        takeoutImporterProvider.overrideWith(() => takeout),
+        takeoutProvider.overrideWith(_NoTakeout.new),
         takeoutSelectionProvider.overrideWith(() => selection),
         savedTakeoutsProvider.overrideWith(() => _SavedTakeouts(savedTakeouts)),
       ],

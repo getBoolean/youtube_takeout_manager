@@ -8,18 +8,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
@@ -101,7 +103,12 @@ TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
   newLiveChatCount: 0,
 );
 
-class _FakeAuth extends AuthNotifier {
+class _NotSignedIn extends AuthNotifier {
+  @override
+  AuthState? build() => null;
+}
+
+class _FakeAuth extends SignInService {
   final Future<SignInOutcome> Function() outcome;
   final signIns = <String?>[];
   final signOuts = <String?>[];
@@ -109,7 +116,7 @@ class _FakeAuth extends AuthNotifier {
   _FakeAuth({required this.outcome});
 
   @override
-  AuthState? build() => null;
+  void build() {}
 
   @override
   Future<SignInOutcome> signIn({String? targetChannelId}) {
@@ -155,15 +162,23 @@ class _Saved extends SavedTakeouts {
   Future<List<TakeoutSummary>> build() async => summaries;
 }
 
-class _Takeout extends TakeoutNotifier {
-  final Set<String> saved;
+class _Loaded extends TakeoutNotifier {
   final LoadedTakeout? loaded;
-  final committed = <TakeoutImportPlan>[];
 
-  _Takeout({this.saved = const {}, this.loaded});
+  _Loaded(this.loaded);
 
   @override
   Future<LoadedTakeout?> build() async => loaded;
+}
+
+class _Takeout extends TakeoutImporter {
+  final Set<String> saved;
+  final committed = <TakeoutImportPlan>[];
+
+  _Takeout({this.saved = const {}});
+
+  @override
+  void build() {}
 
   @override
   Future<TakeoutImportPlan> prepareImport(
@@ -228,16 +243,18 @@ void main() {
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
     selection = _Selection();
-    takeout = _Takeout(saved: alreadySaved, loaded: loaded);
+    takeout = _Takeout(saved: alreadySaved);
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          authProvider.overrideWith(() => auth),
+          authProvider.overrideWith(_NotSignedIn.new),
+          signInServiceProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
-          takeoutProvider.overrideWith(() => takeout),
+          takeoutProvider.overrideWith(() => _Loaded(loaded)),
+          takeoutImporterProvider.overrideWith(() => takeout),
           takeoutChannelsProvider.overrideWithValue(channels),
           viewedChannelProvider.overrideWithValue(channels.firstOrNull),
           viewedChannelIdProvider.overrideWithValue(
@@ -571,7 +588,8 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            authProvider.overrideWith(() => auth),
+            authProvider.overrideWith(_NotSignedIn.new),
+            signInServiceProvider.overrideWith(() => auth),
             quotaProvider.overrideWith(_FakeQuota.new),
             takeoutChannelsProvider.overrideWithValue([?viewed]),
             viewedChannelProvider.overrideWithValue(viewed),

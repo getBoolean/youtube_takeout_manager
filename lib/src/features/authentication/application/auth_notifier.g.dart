@@ -9,17 +9,20 @@ part of 'auth_notifier.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// The viewed channel's sign-in, or null when it has none: a channel counts
-/// as signed in only with the sign-in chosen for it.
+/// as signed in only with the sign-in chosen for it. Signing in and out is
+/// `SignInService`'s.
 
 @ProviderFor(AuthNotifier)
 final authProvider = AuthNotifierProvider._();
 
 /// The viewed channel's sign-in, or null when it has none: a channel counts
-/// as signed in only with the sign-in chosen for it.
+/// as signed in only with the sign-in chosen for it. Signing in and out is
+/// `SignInService`'s.
 final class AuthNotifierProvider
     extends $NotifierProvider<AuthNotifier, AuthState?> {
   /// The viewed channel's sign-in, or null when it has none: a channel counts
-  /// as signed in only with the sign-in chosen for it.
+  /// as signed in only with the sign-in chosen for it. Signing in and out is
+  /// `SignInService`'s.
   AuthNotifierProvider._()
     : super(
         from: null,
@@ -47,10 +50,11 @@ final class AuthNotifierProvider
   }
 }
 
-String _$authNotifierHash() => r'10127db674b7cc4caf53f11438a0b5b038c5a3e2';
+String _$authNotifierHash() => r'b453b03c33793eb4aaf70df70787fc6180864325';
 
 /// The viewed channel's sign-in, or null when it has none: a channel counts
-/// as signed in only with the sign-in chosen for it.
+/// as signed in only with the sign-in chosen for it. Signing in and out is
+/// `SignInService`'s.
 
 abstract class _$AuthNotifier extends $Notifier<AuthState?> {
   AuthState? build();

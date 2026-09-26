@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
@@ -190,7 +191,7 @@ void main() {
     await c.read(savedSignInsProvider.future);
     repository.next = _credentials('UCa');
 
-    final outcome = await c.read(authProvider.notifier).signIn();
+    final outcome = await c.read(signInServiceProvider.notifier).signIn();
 
     expect(outcome, isA<SignedIn>());
     expect(c.read(authProvider)?.channelId, 'UCa');
@@ -206,7 +207,7 @@ void main() {
     await c.read(savedSignInsProvider.future);
     repository.next = _credentials('UCb');
 
-    final outcome = await c.read(authProvider.notifier).signIn();
+    final outcome = await c.read(signInServiceProvider.notifier).signIn();
 
     expect(
       outcome,
@@ -229,7 +230,7 @@ void main() {
     repository.next = _credentials('UCb');
 
     final outcome = await c
-        .read(authProvider.notifier)
+        .read(signInServiceProvider.notifier)
         .signIn(targetChannelId: 'UCb');
 
     expect(outcome, isA<SignedIn>());
@@ -243,7 +244,7 @@ void main() {
     repository.next = _credentials('UCc');
 
     final outcome = await c
-        .read(authProvider.notifier)
+        .read(signInServiceProvider.notifier)
         .signIn(targetChannelId: 'UCb');
 
     expect(
@@ -264,7 +265,7 @@ void main() {
     final c = container();
     await c.read(savedSignInsProvider.future);
 
-    await c.read(authProvider.notifier).signOut(channelId: 'UCb');
+    await c.read(signInServiceProvider.notifier).signOut(channelId: 'UCb');
 
     expect(c.read(authProvider)?.channelId, 'UCa');
     expect(await storedChannels(), {'UCa'});
@@ -276,7 +277,7 @@ void main() {
     repository.next = _credentials('none');
 
     expect(
-      await c.read(authProvider.notifier).signIn(),
+      await c.read(signInServiceProvider.notifier).signIn(),
       isA<SignInNoChannel>(),
     );
     expect(await storedChannels(), isEmpty);
@@ -288,7 +289,7 @@ void main() {
     await c.read(savedSignInsProvider.future);
 
     expect(
-      await c.read(authProvider.notifier).signIn(),
+      await c.read(signInServiceProvider.notifier).signIn(),
       isA<SignInCancelled>(),
     );
     expect(await storedChannels(), isEmpty);
@@ -302,7 +303,7 @@ void main() {
     final c = container();
     await c.read(savedSignInsProvider.future);
 
-    await c.read(authProvider.notifier).signOut();
+    await c.read(signInServiceProvider.notifier).signOut();
 
     expect(c.read(authProvider), isNull);
     expect(c.read(savedSignInsProvider).value?.keys, ['UCb']);
@@ -318,7 +319,7 @@ void main() {
     c.listen(lostSignInProvider, (_, _) {});
     await c.read(savedSignInsProvider.future);
 
-    await c.read(savedSignInsProvider.notifier).signInFailed('UCa');
+    await c.read(signInServiceProvider.notifier).signInFailed('UCa');
 
     expect(c.read(authProvider), isNull);
     expect(await storedChannels(), isEmpty);
@@ -356,6 +357,7 @@ void main() {
         'google_auth_credentials': _legacy('UCa'),
       });
       final c = container();
+      await c.read(legacySignInMigrationProvider.future);
 
       expect((await c.read(savedSignInsProvider.future)).keys, ['UCa']);
       expect(c.read(authProvider)?.channelId, 'UCa');
@@ -369,6 +371,7 @@ void main() {
         'google_auth_credentials': _legacy('offline'),
       });
       final c = container();
+      await c.read(legacySignInMigrationProvider.future);
 
       expect(await c.read(savedSignInsProvider.future), isEmpty);
       expect(await store().loadLegacy(), isNotNull);
@@ -379,6 +382,7 @@ void main() {
         'google_auth_credentials': _legacy('refused'),
       });
       final c = container();
+      await c.read(legacySignInMigrationProvider.future);
 
       expect(await c.read(savedSignInsProvider.future), isEmpty);
       expect(await store().loadLegacy(), isNull);
@@ -389,6 +393,7 @@ void main() {
         'google_auth_credentials': _legacy('none'),
       });
       final c = container();
+      await c.read(legacySignInMigrationProvider.future);
 
       expect(await c.read(savedSignInsProvider.future), isEmpty);
       expect(await store().loadLegacy(), isNull);
@@ -401,6 +406,7 @@ void main() {
       'google_auth_credentials': _legacy('UCa'),
     });
     final c = container(configured: false);
+    await c.read(legacySignInMigrationProvider.future);
 
     expect(await c.read(savedSignInsProvider.future), isEmpty);
     expect(repository.sessions, isEmpty);

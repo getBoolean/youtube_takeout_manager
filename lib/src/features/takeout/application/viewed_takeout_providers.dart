@@ -87,12 +87,14 @@ AsyncValue<TakeoutData?> viewedTakeout(Ref ref) {
   if (loaded == null) return const AsyncData(null);
   if (loaded.id != selection.value?.takeoutId) return const AsyncLoading();
 
-  final channel = ref.watch(viewedChannelProvider);
+  // Channel IDs only, so channel titles and pictures arriving don't reach
+  // everything built from this.
+  final channelId = ref.watch(viewedChannelIdProvider);
   final main = ref.watch(
-    takeoutChannelsProvider.select((cs) => cs.firstOrNull?.channelId),
+    _takeoutChannelsAsImportedProvider.select(
+      (cs) => cs.firstOrNull?.channelId,
+    ),
   );
-  if (channel == null || main == null) return AsyncData(loaded.data);
-  return AsyncData(
-    onlyChannel(loaded.data, channel.channelId, mainChannelId: main),
-  );
+  if (channelId == null || main == null) return AsyncData(loaded.data);
+  return AsyncData(onlyChannel(loaded.data, channelId, mainChannelId: main));
 }

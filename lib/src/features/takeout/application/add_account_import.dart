@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_import_plan.dart';
 import 'saved_takeouts.dart';
+import 'takeout_importer.dart';
 import 'takeout_notifier.dart';
 import 'takeout_selection_notifier.dart';
 
@@ -73,7 +74,7 @@ class AddAccountImport extends _$AddAccountImport {
     _picked = picked;
     state = const AddAccountWorking();
     try {
-      final takeouts = ref.read(takeoutProvider.notifier);
+      final takeouts = ref.read(takeoutImporterProvider.notifier);
       final plan = await takeouts.prepareImport(picked, merge: false);
       if (await takeouts.hasSavedData(plan.accountId)) {
         if (ref.mounted) state = AddAccountAlreadySaved(plan.accountId);
@@ -105,7 +106,7 @@ class AddAccountImport extends _$AddAccountImport {
         if (shown != takeoutId) await selection.select(takeoutId);
         await ref.read(takeoutProvider.future);
         final plan = await ref
-            .read(takeoutProvider.notifier)
+            .read(takeoutImporterProvider.notifier)
             .prepareImport(picked, merge: true);
         if (ref.mounted) state = AddAccountMergeReview(plan);
       } catch (e) {
@@ -129,7 +130,7 @@ class AddAccountImport extends _$AddAccountImport {
   Future<bool> _save(TakeoutImportPlan plan) async {
     state = const AddAccountWorking();
     try {
-      await ref.read(takeoutProvider.notifier).commitImport(plan);
+      await ref.read(takeoutImporterProvider.notifier).commitImport(plan);
       if (ref.mounted) dismiss();
       return true;
     } catch (e) {

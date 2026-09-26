@@ -11,7 +11,6 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/delet
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
@@ -39,42 +38,7 @@ class ChannelListScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
-  void Function()? _cancelChannelsSub;
-  void Function()? _cancelProgressSub;
-  void Function()? _cancelLiveChatsSub;
   final ValueNotifier<bool> _selectionMode = ValueNotifier(false);
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Listen for new channels and queue their thumbnails
-      final channelsSub = ref.listenManual(channelsProvider, (prev, next) {
-        final ids = next.map((c) => c.channelId).toSet();
-        ref.read(channelThumbnailsProvider.notifier).queueChannelIds(ids);
-      });
-      _cancelChannelsSub = channelsSub.close;
-
-      // Flush remaining thumbnail queue when video fetch completes
-      final progressSub = ref.listenManual(videoFetchProgressProvider, (
-        prev,
-        next,
-      ) {
-        if (prev != null && prev.isFetching && !next.isFetching) {
-          ref.read(channelThumbnailsProvider.notifier).flushQueue();
-        }
-      });
-      _cancelProgressSub = progressSub.close;
-
-      // Look up names for custom emojis once live chats are loaded
-      final liveChatsSub = ref.listenManual(allLiveChatsProvider, (_, next) {
-        if (next.isNotEmpty) {
-          ref.read(emojiNamesProvider.notifier).resolveMissing();
-        }
-      }, fireImmediately: true);
-      _cancelLiveChatsSub = liveChatsSub.close;
-    });
-  }
 
   void _exitSelectionMode() {
     _selectionMode.value = false;
@@ -83,9 +47,6 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
   @override
   void dispose() {
-    _cancelChannelsSub?.call();
-    _cancelProgressSub?.call();
-    _cancelLiveChatsSub?.call();
     _selectionMode.dispose();
     super.dispose();
   }
