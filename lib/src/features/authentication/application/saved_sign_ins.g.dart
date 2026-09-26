@@ -206,7 +206,7 @@ final class LostSignInNotifierProvider
 }
 
 String _$lostSignInNotifierHash() =>
-    r'7ee13c00f373e21daa57f60d0bc2e09d48af9a67';
+    r'b0984f1fa8a993489055958eb0fce3b69270c68b';
 
 /// The last sign-in that stopped working, for the UI to report.
 

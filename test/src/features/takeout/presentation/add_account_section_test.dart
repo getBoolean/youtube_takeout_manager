@@ -31,9 +31,25 @@ const _plan = TakeoutImportPlan(
   newLiveChatCount: 0,
 );
 
+const _mergePlan = TakeoutImportPlan(
+  accountId: 'UCme',
+  mergedData: TakeoutData(
+    comments: [],
+    liveChats: [],
+    subscriptionsByChannelId: {},
+  ),
+  csvFiles: {},
+  goneCommentIds: {},
+  goneLiveChatIds: {},
+  newlyDeletedCommentCount: 0,
+  newlyDeletedLiveChatCount: 0,
+  newCommentCount: 3,
+  newLiveChatCount: 0,
+);
+
 void main() {
   late int starts, confirms, dismisses;
-  late List<String> viewedSaved;
+  late int merges;
 
   Future<void> pump(
     WidgetTester tester,
@@ -42,7 +58,7 @@ void main() {
     String? viewedTakeoutId,
   }) {
     starts = confirms = dismisses = 0;
-    viewedSaved = [];
+    merges = 0;
     return tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -55,7 +71,7 @@ void main() {
               onStart: () => starts++,
               onConfirm: () => confirms++,
               onDismiss: () => dismisses++,
-              onViewSaved: viewedSaved.add,
+              onMerge: () => merges++,
             ),
           ),
         ),
@@ -96,32 +112,49 @@ void main() {
     expect(dismisses, 1);
   });
 
-  testWidgets('refuses an account already saved, offering to view it', (
+  testWidgets('warns an account is already imported, asking to merge', (
     tester,
   ) async {
     await pump(tester, const AddAccountAlreadySaved('UCme'));
 
     expect(find.text('Takeout already imported'), findsOneWidget);
-    expect(find.textContaining('from Boolean'), findsOneWidget);
-    expect(find.textContaining('Nothing was imported'), findsOneWidget);
+    expect(find.textContaining("from Boolean's account"), findsOneWidget);
+    expect(find.textContaining('Merging shows Boolean'), findsOneWidget);
 
-    await tester.tap(find.text('View Boolean'));
-    await tester.tap(find.byTooltip('Dismiss'));
-    expect(viewedSaved, ['UCme']);
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+    await tester.tap(find.text('Cancel'));
+    expect(merges, 1);
     expect(dismisses, 1);
   });
 
-  testWidgets('the account already viewed needs no view button', (
-    tester,
-  ) async {
+  testWidgets('merging into the account shown needs no switch', (tester) async {
     await pump(
       tester,
       const AddAccountAlreadySaved('UCme'),
       viewedTakeoutId: 'UCme',
     );
 
-    expect(find.text('View Boolean'), findsNothing);
     expect(find.textContaining('(the one shown)'), findsOneWidget);
+    expect(find.textContaining('Merging shows'), findsNothing);
+  });
+
+  testWidgets("can't merge while deleting", (tester) async {
+    await pump(tester, const AddAccountAlreadySaved('UCme'), enabled: false);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+    expect(merges, 0);
+  });
+
+  testWidgets('reviews the merge before saving it', (tester) async {
+    await pump(tester, const AddAccountMergeReview(_mergePlan));
+
+    expect(find.text('Merge this takeout?'), findsOneWidget);
+    expect(find.text('3 new comments'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+    await tester.tap(find.text('Cancel'));
+    expect(confirms, 1);
+    expect(dismisses, 1);
   });
 
   testWidgets('says why it failed, in place', (tester) async {

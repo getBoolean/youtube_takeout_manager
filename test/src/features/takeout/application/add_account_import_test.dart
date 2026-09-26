@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -45,6 +47,7 @@ class _Takeout extends TakeoutNotifier {
   final Object? importError;
   final Set<String> saved;
   final Completer<void>? commitGate;
+  Object? failNext;
   final prepared = <bool>[];
   final committed = <TakeoutImportPlan>[];
 
@@ -60,6 +63,7 @@ class _Takeout extends TakeoutNotifier {
   }) async {
     prepared.add(merge);
     if (importError case final error?) throw error;
+    if (failNext case final error?) throw error;
     return _plan;
   }
 
@@ -74,24 +78,45 @@ class _Takeout extends TakeoutNotifier {
       saved.contains(accountId);
 }
 
+class _Selection extends TakeoutSelectionNotifier {
+  final String viewing;
+  final selected = <String>[];
+
+  _Selection(this.viewing);
+
+  @override
+  Future<TakeoutSelection?> build() async =>
+      TakeoutSelection(takeoutId: viewing);
+
+  @override
+  Future<void> select(String takeoutId, {String? channelId}) async {
+    selected.add(takeoutId);
+    state = AsyncData(TakeoutSelection(takeoutId: takeoutId));
+  }
+}
+
 void main() {
   late _Takeout takeout;
+  late _Selection selection;
 
   ProviderContainer container({
     FilePickerResult? picked,
     Object? importError,
     Set<String> saved = const {},
     Completer<void>? commitGate,
+    String viewing = 'UCme',
   }) {
     takeout = _Takeout(
       importError: importError,
       saved: saved,
       commitGate: commitGate,
     );
+    selection = _Selection(viewing);
     final c = ProviderContainer(
       overrides: [
         zipPickerRepositoryProvider.overrideWithValue(_Picker(picked)),
         takeoutProvider.overrideWith(() => takeout),
+        takeoutSelectionProvider.overrideWith(() => selection),
       ],
     );
     addTearDown(c.dispose);
@@ -123,15 +148,58 @@ void main() {
     expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
   });
 
-  test('a takeout from an account already saved is refused', () async {
+  test(
+    'a takeout from an account already saved asks whether to merge',
+    () async {
+      final c = container(picked: _picked, saved: {'UCnew'});
+
+      await c.read(addAccountImportProvider.notifier).start();
+
+      final state = c.read(addAccountImportProvider);
+      expect(state, isA<AddAccountAlreadySaved>());
+      expect((state as AddAccountAlreadySaved).takeoutId, 'UCnew');
+      expect(takeout.committed, isEmpty);
+    },
+  );
+
+  test('merging shows that account, then reviews the merge', () async {
     final c = container(picked: _picked, saved: {'UCnew'});
+    final add = c.read(addAccountImportProvider.notifier);
+    await add.start();
 
-    await c.read(addAccountImportProvider.notifier).start();
+    await add.merge();
 
+    expect(selection.selected, ['UCnew']);
+    expect(takeout.prepared, [false, true]);
     final state = c.read(addAccountImportProvider);
-    expect(state, isA<AddAccountAlreadySaved>());
-    expect((state as AddAccountAlreadySaved).takeoutId, 'UCnew');
+    expect(state, isA<AddAccountMergeReview>());
     expect(takeout.committed, isEmpty);
+
+    await add.confirm();
+    expect(takeout.committed, [same(_plan)]);
+    expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+  });
+
+  test('merging into the account shown stays on it', () async {
+    final c = container(picked: _picked, saved: {'UCnew'}, viewing: 'UCnew');
+    final add = c.read(addAccountImportProvider.notifier);
+    await add.start();
+
+    await add.merge();
+
+    expect(selection.selected, isEmpty);
+    expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
+  });
+
+  test('a merge that fails to read says why', () async {
+    final c = container(picked: _picked, saved: {'UCnew'});
+    final add = c.read(addAccountImportProvider.notifier);
+    await add.start();
+    takeout.failNext = const TakeoutImportException('Not a takeout.');
+
+    await add.merge();
+
+    expect(c.read(addAccountImportProvider), isA<AddAccountFailed>());
   });
 
   test('a takeout that fails to read says why', () async {

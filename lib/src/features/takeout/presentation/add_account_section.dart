@@ -6,12 +6,13 @@ import '../application/add_account_import.dart';
 import 'import_error_dialog.dart';
 import 'import_review.dart';
 
-/// Adds another Google account's takeout in place: a button, then progress,
-/// a review to confirm, or why nothing was imported.
+/// Imports another Google account's takeout in place: a button, then
+/// progress, a review to confirm, whether to merge one from an account
+/// already imported, or why nothing was imported.
 class AddAccountSection extends StatelessWidget {
   final AddAccountState state;
 
-  /// Whether one can be added now, i.e. nothing is being deleted through
+  /// Whether one can be imported now, i.e. nothing is being deleted through
   /// the YouTube API.
   final bool enabled;
 
@@ -23,8 +24,8 @@ class AddAccountSection extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onDismiss;
 
-  /// Views the saved account a takeout turned out to be from.
-  final ValueChanged<String> onViewSaved;
+  /// Merges the takeout into the saved account it's from.
+  final VoidCallback onMerge;
 
   const AddAccountSection({
     super.key,
@@ -35,7 +36,7 @@ class AddAccountSection extends StatelessWidget {
     required this.onStart,
     required this.onConfirm,
     required this.onDismiss,
-    required this.onViewSaved,
+    required this.onMerge,
   });
 
   @override
@@ -87,6 +88,21 @@ class AddAccountSection extends StatelessWidget {
         children: [ImportReview(plan: plan, merge: false, newAccount: true)],
       ),
       AddAccountAlreadySaved(:final takeoutId) => _alreadySaved(takeoutId),
+      AddAccountMergeReview(:final plan) => NoticeBanner(
+        title: 'Merge this takeout?',
+        error: false,
+        actions: [
+          TextButton(
+            onPressed: onDismiss,
+            child: const Text('Cancel', textAlign: TextAlign.center),
+          ),
+          FilledButton(
+            onPressed: enabled ? onConfirm : null,
+            child: const Text('Merge', textAlign: TextAlign.center),
+          ),
+        ],
+        children: [ImportReview(plan: plan, merge: true, hasSavedData: true)],
+      ),
       AddAccountFailed(:final error) => NoticeBanner(
         title: importErrorTitle(error),
         onDismiss: onDismiss,
@@ -100,20 +116,23 @@ class AddAccountSection extends StatelessWidget {
     final viewing = takeoutId == viewedTakeoutId;
     return NoticeBanner(
       title: 'Takeout already imported',
-      onDismiss: onDismiss,
+      error: false,
       actions: [
-        if (!viewing)
-          TextButton(
-            onPressed: enabled ? () => onViewSaved(takeoutId) : null,
-            child: Text('View $name', textAlign: TextAlign.center),
-          ),
+        TextButton(
+          onPressed: onDismiss,
+          child: const Text('Cancel', textAlign: TextAlign.center),
+        ),
+        FilledButton(
+          onPressed: enabled ? onMerge : null,
+          child: const Text('Merge', textAlign: TextAlign.center),
+        ),
       ],
       children: [
         Text(
           "This takeout is from $name's account, which already has a saved "
-          'takeout'
-          "${viewing ? ' (the one shown)' : ''}. Nothing was imported. "
-          'To update it, use Add Newer Takeout on Home while viewing it.',
+          "takeout${viewing ? ' (the one shown)' : ''}. Merge it into that "
+          "one to add what's new? You'll see what changes before it's saved."
+          '${viewing ? '' : ' Merging shows $name.'}',
         ),
       ],
     );

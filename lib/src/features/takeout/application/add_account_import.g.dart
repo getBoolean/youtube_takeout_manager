@@ -8,18 +8,21 @@ part of 'add_account_import.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Adds another Google account's takeout from the account dialog. Never
-/// replaces or merges into an account already saved.
+/// Imports another Google account's takeout from the account dialog. One
+/// from an account already saved is merged into it only if the user says
+/// so; nothing is ever replaced.
 
 @ProviderFor(AddAccountImport)
 final addAccountImportProvider = AddAccountImportProvider._();
 
-/// Adds another Google account's takeout from the account dialog. Never
-/// replaces or merges into an account already saved.
+/// Imports another Google account's takeout from the account dialog. One
+/// from an account already saved is merged into it only if the user says
+/// so; nothing is ever replaced.
 final class AddAccountImportProvider
     extends $NotifierProvider<AddAccountImport, AddAccountState> {
-  /// Adds another Google account's takeout from the account dialog. Never
-  /// replaces or merges into an account already saved.
+  /// Imports another Google account's takeout from the account dialog. One
+  /// from an account already saved is merged into it only if the user says
+  /// so; nothing is ever replaced.
   AddAccountImportProvider._()
     : super(
         from: null,
@@ -47,10 +50,11 @@ final class AddAccountImportProvider
   }
 }
 
-String _$addAccountImportHash() => r'3611615f2a0e8242cdb8f4c8720ef779b1623e5e';
+String _$addAccountImportHash() => r'31d4358378b9e5ff49259b22283c1fc35338f378';
 
-/// Adds another Google account's takeout from the account dialog. Never
-/// replaces or merges into an account already saved.
+/// Imports another Google account's takeout from the account dialog. One
+/// from an account already saved is merged into it only if the user says
+/// so; nothing is ever replaced.
 
 abstract class _$AddAccountImport extends $Notifier<AddAccountState> {
   AddAccountState build();

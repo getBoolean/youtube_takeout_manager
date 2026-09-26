@@ -324,9 +324,13 @@ class _OtherAccounts extends ConsumerWidget {
           }
         },
         onDismiss: addAccount.dismiss,
-        onViewSaved: (takeoutId) async {
-          addAccount.dismiss();
-          await _show(context, ref, takeoutId);
+        onMerge: () async {
+          // Merging shows the account it's for; the review stays open here.
+          final router = StackRouterScope.of(context)?.controller;
+          await addAccount.merge();
+          if (context.mounted) {
+            leaveChannelScreens(context, router, closeDialogs: false);
+          }
         },
       ),
     );

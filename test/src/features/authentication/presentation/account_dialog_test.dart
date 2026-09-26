@@ -454,9 +454,8 @@ void main() {
     expect(find.text('Import this takeout?'), findsNothing);
   });
 
-  testWidgets('refuses a takeout from an account already saved, in place', (
-    tester,
-  ) async {
+  testWidgets('a takeout from an account already saved is merged only if '
+      'asked, in place', (tester) async {
     await pumpDialog(
       tester,
       saved: [_viewedSummary, _workSummary],
@@ -472,9 +471,17 @@ void main() {
     expect(find.text('Takeout already imported'), findsOneWidget);
     expect(takeout.committed, isEmpty);
 
-    await tester.tap(find.text('View Work Channel'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.pumpAndSettle();
+    expectNoPopups();
     expect(selection.selected, [('UCwork', null)]);
+    expect(find.text('Merge this takeout?'), findsOneWidget);
+    expect(takeout.committed, isEmpty);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+    await tester.pumpAndSettle();
+    expect(takeout.committed.single.accountId, 'UCwork');
+    expect(find.text('Merge this takeout?'), findsNothing);
   });
 
   testWidgets('shows quota usage, which is API-only', (tester) async {

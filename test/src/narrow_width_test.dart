@@ -231,7 +231,7 @@ Widget _addAccount(AddAccountState state) => AddAccountSection(
   onStart: () {},
   onConfirm: () {},
   onDismiss: () {},
-  onViewSaved: (_) {},
+  onMerge: () {},
 );
 
 const _notices = <String, SignInNotice>{
@@ -593,6 +593,7 @@ void main() {
           _addAccount(const AddAccountWorking()),
           _addAccount(AddAccountReview(_longPlan)),
           _addAccount(const AddAccountAlreadySaved('UCme')),
+          _addAccount(AddAccountMergeReview(_longPlan)),
           _addAccount(
             const AddAccountFailed(
               TakeoutAccountMismatchException(
