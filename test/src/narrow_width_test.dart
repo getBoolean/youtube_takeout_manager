@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
@@ -143,13 +144,20 @@ class _Takeout extends TakeoutNotifier {
 
 class _SignedIn extends AuthNotifier {
   @override
-  AuthState? build() => const AuthState(
-    channelId: 'UCme',
-    channelTitle: 'A channel with a fairly long name',
-    displayName: 'Somebody With A Long Name',
-    email: 'somebody.with.a.long.address@example.com',
-  );
+  AuthState? build() => AuthState.fromProfile(_longProfile);
 }
+
+class _SignIns extends SavedSignIns {
+  @override
+  Future<Map<String, SignInProfile>> build() async => {'UCme': _longProfile};
+}
+
+const _longProfile = SignInProfile(
+  channelId: 'UCme',
+  channelTitle: 'A channel with a fairly long name',
+  displayName: 'Somebody With A Long Name',
+  email: 'somebody.with.a.long.address@example.com',
+);
 
 final _longTakeout = TakeoutSummary(
   id: 'UCme',
@@ -407,7 +415,10 @@ void main() {
   fitsAtEveryWidth(
     'the account dialog signed in',
     () => ProviderScope(
-      overrides: [authProvider.overrideWith(_SignedIn.new)],
+      overrides: [
+        authProvider.overrideWith(_SignedIn.new),
+        savedSignInsProvider.overrideWith(_SignIns.new),
+      ],
       child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
     ),
   );
@@ -418,8 +429,8 @@ void main() {
         channelId: 'UCaVeryLongChannelIdentifier12',
         channelTitle: 'A channel with a fairly long name',
       ),
-      viewedChannelId: 'UCanotherLongChannelIdentifier',
-      viewedTitle: 'Another channel with a long name',
+      targetChannelId: 'UCanotherLongChannelIdentifier',
+      targetTitle: 'Another channel with a long name',
     ),
   );
   fitsAtEveryWidth(

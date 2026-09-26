@@ -32,9 +32,9 @@ class AuthNotifier extends _$AuthNotifier {
   }
 
   /// Asks the user to sign in, and saves the sign-in for the channel they
-  /// chose, whichever that is. Compares it with the channel viewed when
-  /// sign-in finishes.
-  Future<SignInOutcome> signIn() async {
+  /// chose, whichever that is. Compares it with [targetChannelId], or else
+  /// the channel viewed when sign-in finishes.
+  Future<SignInOutcome> signIn({String? targetChannelId}) async {
     final generation = ++_generation;
     final credentials = await ref
         .read(googleAuthRepositoryProvider)
@@ -48,16 +48,17 @@ class AuthNotifier extends _$AuthNotifier {
     if (generation != _generation) return const SignInCancelled();
     if (profile == null) return const SignInNoChannel();
 
-    final viewed = ref.read(viewedChannelIdProvider);
-    if (viewed == null || viewed == profile.channelId) {
+    final target = targetChannelId ?? ref.read(viewedChannelIdProvider);
+    if (target == null || target == profile.channelId) {
       return SignedIn(profile);
     }
-    return SignedInOtherChannel(profile, viewedChannelId: viewed);
+    return SignedInOtherChannel(profile, targetChannelId: target);
   }
 
-  /// Signs the viewed channel out. Other channels stay signed in.
-  Future<void> signOut() async {
-    final channelId = ref.read(viewedChannelIdProvider);
+  /// Signs [channelId] out, or else the viewed channel. Other channels stay
+  /// signed in.
+  Future<void> signOut({String? channelId}) async {
+    channelId ??= ref.read(viewedChannelIdProvider);
     if (channelId == null) return;
     await ref
         .read(savedSignInsProvider.notifier)

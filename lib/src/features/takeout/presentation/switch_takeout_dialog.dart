@@ -54,7 +54,7 @@ class SwitchTakeoutDialog extends ConsumerWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Saved takeouts',
+                      'Google accounts',
                       style: theme.textTheme.titleLarge,
                     ),
                   ),

@@ -212,7 +212,7 @@ void main() {
       outcome,
       isA<SignedInOtherChannel>()
           .having((o) => o.profile.channelId, 'chosen', 'UCb')
-          .having((o) => o.viewedChannelId, 'viewed', 'UCa'),
+          .having((o) => o.targetChannelId, 'target', 'UCa'),
     );
     expect(c.read(authProvider), isNull);
     expect(await storedChannels(), {'UCb'});
@@ -220,6 +220,54 @@ void main() {
     // Used when its own channel is viewed.
     c.read(_viewed.notifier).set('UCb');
     expect(c.read(authProvider)?.channelId, 'UCb');
+  });
+
+  test('signing in for a channel not viewed compares with that channel, and '
+      'leaves the view alone', () async {
+    final c = container();
+    await c.read(savedSignInsProvider.future);
+    repository.next = _credentials('UCb');
+
+    final outcome = await c
+        .read(authProvider.notifier)
+        .signIn(targetChannelId: 'UCb');
+
+    expect(outcome, isA<SignedIn>());
+    expect(c.read(authProvider), isNull);
+    expect(await storedChannels(), {'UCb'});
+  });
+
+  test('signing in with the wrong channel for a given one names it', () async {
+    final c = container();
+    await c.read(savedSignInsProvider.future);
+    repository.next = _credentials('UCc');
+
+    final outcome = await c
+        .read(authProvider.notifier)
+        .signIn(targetChannelId: 'UCb');
+
+    expect(
+      outcome,
+      isA<SignedInOtherChannel>().having(
+        (o) => o.targetChannelId,
+        'target',
+        'UCb',
+      ),
+    );
+  });
+
+  test('signs out a given channel', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'google_auth_credentials:UCa': _saved('UCa'),
+      'google_auth_credentials:UCb': _saved('UCb'),
+    });
+    final c = container();
+    await c.read(savedSignInsProvider.future);
+
+    await c.read(authProvider.notifier).signOut(channelId: 'UCb');
+
+    expect(c.read(authProvider)?.channelId, 'UCa');
+    expect(await storedChannels(), {'UCa'});
   });
 
   test('an account without a YouTube channel saves nothing', () async {

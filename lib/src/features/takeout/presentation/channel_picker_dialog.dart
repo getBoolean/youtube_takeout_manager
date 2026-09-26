@@ -82,7 +82,15 @@ class ChannelPickerDialog extends StatelessWidget {
 /// A channel's item counts, whether it's signed in, and its ID when its
 /// title stands in for it, e.g. "1,234 comments · 5 live chats · Signed in
 /// · UC…".
-String describeChannel(TakeoutChannel channel, {required bool signedIn}) {
+String describeChannel(TakeoutChannel channel, {required bool signedIn}) => [
+  describeChannelCounts(channel),
+  if (signedIn) 'Signed in',
+  if (channel.title != null) channel.channelId,
+].join(' · ');
+
+/// A channel's comment and live chat counts, e.g. "1,234 comments · 5 live
+/// chats".
+String describeChannelCounts(TakeoutChannel channel) {
   final number = NumberFormat.decimalPattern();
   return [
     Intl.plural(
@@ -95,7 +103,5 @@ String describeChannel(TakeoutChannel channel, {required bool signedIn}) {
       one: '1 live chat',
       other: '${number.format(channel.liveChatCount)} live chats',
     ),
-    if (signedIn) 'Signed in',
-    if (channel.title != null) channel.channelId,
   ].join(' · ');
 }

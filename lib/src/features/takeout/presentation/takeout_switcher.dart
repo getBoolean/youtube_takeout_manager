@@ -94,12 +94,19 @@ Future<String?> _pickChannel(
   ),
 );
 
-/// Closes open dialogs, and leaves screens tied to the previous channel.
-void leaveChannelScreens(BuildContext context, StackRouter? router) {
-  Navigator.of(
-    context,
-    rootNavigator: true,
-  ).popUntil((route) => route is! PopupRoute);
+/// Closes open dialogs (unless [closeDialogs] is false), and leaves screens
+/// tied to the previous channel.
+void leaveChannelScreens(
+  BuildContext context,
+  StackRouter? router, {
+  bool closeDialogs = true,
+}) {
+  if (closeDialogs) {
+    Navigator.of(
+      context,
+      rootNavigator: true,
+    ).popUntil((route) => route is! PopupRoute);
+  }
   if (router == null) return;
   if (router.isRouteActive(ChannelDetailRoute.name) ||
       router.isRouteActive(ScriptDeletionRoute.name)) {

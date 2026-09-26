@@ -47,7 +47,7 @@ final class AuthNotifierProvider
   }
 }
 
-String _$authNotifierHash() => r'16320a3afa1bf051ab0310006116f203ede57cdb';
+String _$authNotifierHash() => r'10127db674b7cc4caf53f11438a0b5b038c5a3e2';
 
 /// The viewed channel's sign-in, or null when it has none: a channel counts
 /// as signed in only with the sign-in chosen for it.

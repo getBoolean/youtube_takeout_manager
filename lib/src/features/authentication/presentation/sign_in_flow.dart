@@ -10,13 +10,23 @@ import '../application/auth_notifier.dart';
 import '../domain/sign_in_outcome.dart';
 import '../domain/sign_in_profile.dart';
 
-/// Signs in, then says so loudly if the channel chosen isn't the viewed one:
-/// the sign-in is saved for its own channel, and the viewed one stays signed
-/// out.
-Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
+/// Signs the viewed channel in. See [signInToChannel].
+Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) =>
+    signInToChannel(context, ref);
+
+/// Signs [channelId] in (else the viewed channel), then says so loudly if the
+/// channel chosen isn't it: the sign-in is saved for its own channel, and
+/// [channelId] stays signed out.
+Future<void> signInToChannel(
+  BuildContext context,
+  WidgetRef ref, {
+  String? channelId,
+}) async {
   final SignInOutcome outcome;
   try {
-    outcome = await ref.read(authProvider.notifier).signIn();
+    outcome = await ref
+        .read(authProvider.notifier)
+        .signIn(targetChannelId: channelId);
   } catch (e) {
     if (context.mounted) {
       ScaffoldMessenger.of(context)
@@ -28,8 +38,11 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
   if (!context.mounted) return;
 
   switch (outcome) {
-    case SignedInOtherChannel(:final profile, :final viewedChannelId):
-      final viewed = ref.read(viewedChannelProvider);
+    case SignedInOtherChannel(:final profile, :final targetChannelId):
+      final target = ref
+          .read(takeoutChannelsProvider)
+          .where((c) => c.channelId == targetChannelId)
+          .firstOrNull;
       final takeouts = await ref.read(savedTakeoutsProvider.future);
       final chosenTakeout = takeouts
           .where((t) => t.channelIds.contains(profile.channelId))
@@ -39,13 +52,9 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
         context: context,
         builder: (_) => SignedInOtherChannelDialog(
           chosen: profile,
-          viewedChannelId: viewedChannelId,
-          viewedTitle: viewed?.channelId == viewedChannelId
-              ? viewed?.title
-              : null,
-          viewedThumbnailUrl: viewed?.channelId == viewedChannelId
-              ? viewed?.thumbnailUrl
-              : null,
+          targetChannelId: targetChannelId,
+          targetTitle: target?.title,
+          targetThumbnailUrl: target?.thumbnailUrl,
           canViewChosen: chosenTakeout != null,
         ),
       );
@@ -67,12 +76,12 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
   }
 }
 
-/// The channel chosen when signing in isn't the viewed one.
+/// The channel chosen when signing in isn't the one being signed in.
 class SignedInOtherChannelDialog extends StatelessWidget {
   final SignInProfile chosen;
-  final String viewedChannelId;
-  final String? viewedTitle;
-  final String? viewedThumbnailUrl;
+  final String targetChannelId;
+  final String? targetTitle;
+  final String? targetThumbnailUrl;
 
   /// Whether a saved takeout has the chosen channel, so it can be viewed.
   /// The dialog then returns true if the user chooses to.
@@ -81,16 +90,16 @@ class SignedInOtherChannelDialog extends StatelessWidget {
   const SignedInOtherChannelDialog({
     super.key,
     required this.chosen,
-    required this.viewedChannelId,
-    this.viewedTitle,
-    this.viewedThumbnailUrl,
+    required this.targetChannelId,
+    this.targetTitle,
+    this.targetThumbnailUrl,
     this.canViewChosen = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final chosenName = chosen.channelTitle ?? chosen.channelId;
-    final viewedName = viewedTitle ?? viewedChannelId;
+    final targetName = targetTitle ?? targetChannelId;
     return AlertDialog(
       scrollable: true,
       insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
@@ -110,17 +119,17 @@ class SignedInOtherChannelDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             ChannelIdentity(
-              label: "You're viewing",
-              channelId: viewedChannelId,
-              title: viewedTitle,
-              thumbnailUrl: viewedThumbnailUrl,
+              label: 'Signing in for',
+              channelId: targetChannelId,
+              title: targetTitle,
+              thumbnailUrl: targetThumbnailUrl,
             ),
             const SizedBox(height: 16),
             Text(
               'The sign-in is saved for $chosenName and used whenever you '
-              "view it. $viewedName isn't signed in, so it can't delete "
+              "view it. $targetName isn't signed in, so it can't delete "
               'through the YouTube API. To sign it in, sign in again and '
-              'choose $viewedName when Google asks.',
+              'choose $targetName when Google asks.',
             ),
           ],
         ),

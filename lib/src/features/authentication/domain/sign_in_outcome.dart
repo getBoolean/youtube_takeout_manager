@@ -16,9 +16,9 @@ class SignedIn extends SignInOutcome {
 /// saved for its own channel; the viewed channel stays signed out.
 class SignedInOtherChannel extends SignInOutcome {
   final SignInProfile profile;
-  final String viewedChannelId;
+  final String targetChannelId;
 
-  const SignedInOtherChannel(this.profile, {required this.viewedChannelId});
+  const SignedInOtherChannel(this.profile, {required this.targetChannelId});
 }
 
 /// The chosen Google account has no YouTube channel. Nothing was saved.

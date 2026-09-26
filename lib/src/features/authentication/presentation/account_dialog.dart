@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,21 +8,25 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import '../application/auth_notifier.dart';
-import '../domain/auth_state.dart';
-import 'account_avatar.dart';
+import '../application/saved_sign_ins.dart';
+import '../domain/account_profile.dart';
+import 'account_channels_section.dart';
+import 'google_account_header.dart';
 import 'sign_in_flow.dart';
 
 Future<void> showAccountDialog(BuildContext context) =>
     showDialog<void>(context: context, builder: (_) => const AccountDialog());
 
-/// The signed-in account, the YouTube API quota it has used today, and the
-/// on-device cache.
+/// The Google account the viewed takeout is from, with its channels to view
+/// and sign in, then the app's YouTube API quota and on-device cache.
 class AccountDialog extends ConsumerWidget {
   /// Whether Google sign-in has a client configured. Overridable in tests.
   final bool oauthConfigured;
@@ -33,8 +38,6 @@ class AccountDialog extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authProvider);
-
     return Dialog(
       insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
       child: ConstrainedBox(
@@ -54,13 +57,10 @@ class AccountDialog extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const TakeoutAccountSection(),
-                    const SizedBox(height: 24),
-                    _AccountHeader(
-                      auth: auth,
-                      oauthConfigured: oauthConfigured,
-                    ),
-                    const SizedBox(height: 24),
+                    _AccountSection(oauthConfigured: oauthConfigured),
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
                     const _QuotaSection(),
                     const SizedBox(height: 24),
                     const _CacheSection(),
@@ -75,109 +75,81 @@ class AccountDialog extends ConsumerWidget {
   }
 }
 
-/// The viewed channel's sign-in: the Google account and channel when signed
-/// in, otherwise which channel to choose when signing in.
-class _AccountHeader extends ConsumerWidget {
-  final AuthState? auth;
+/// The viewed takeout's Google account and its channels.
+class _AccountSection extends ConsumerWidget {
   final bool oauthConfigured;
 
-  const _AccountHeader({required this.auth, required this.oauthConfigured});
+  const _AccountSection({required this.oauthConfigured});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final auth = this.auth;
-    final viewed = ref.watch(viewedChannelProvider);
-    final channelName =
-        viewed?.title ?? auth?.channelTitle ?? viewed?.channelId;
-    final name = auth == null
-        ? 'Not signed in'
-        : auth.displayName ?? auth.email ?? 'Signed in';
-    final email = auth?.displayName != null ? auth?.email : null;
-    // A narrow window gets a smaller avatar, and the tiniest none, so the
-    // name has room.
-    final windowWidth = MediaQuery.sizeOf(context).width;
-    final tiny = isTinyWidth(context);
-    final secondary = theme.textTheme.bodyMedium?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
+    final channels = ref.watch(takeoutChannelsProvider);
+    final profiles = ref.watch(savedSignInsProvider).value ?? const {};
+    final exportedAt = ref.watch(
+      takeoutProvider.select((t) => t.value?.data.latestExportAt),
     );
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            if (!tiny) ...[
-              AccountAvatar(auth: auth, radius: windowWidth < 320 ? 20 : 32),
-              const SizedBox(width: 16),
-            ],
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: theme.textTheme.titleMedium),
-                  if (email != null) Text(email, style: secondary),
-                ],
-              ),
-            ),
-          ],
+        GoogleAccountHeader(
+          profile: accountProfileFor(channels, profiles),
+          mainChannel: channels.firstOrNull,
+          exportedAt: channels.isEmpty ? null : exportedAt,
         ),
-        const SizedBox(height: 16),
-        if (auth != null) ...[
-          Text(
-            'Signed in as ${channelName ?? auth.channelId}',
-            style: theme.textTheme.bodyMedium,
+        if (channels.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          AccountChannelsSection(
+            channels: channels,
+            viewedChannelId: ref.watch(viewedChannelIdProvider),
+            signedInChannelIds: profiles.keys.toSet(),
+            signInEnabled: oauthConfigured,
+            onView: (id) => _view(context, ref, id),
+            onSignIn: (id) => signInToChannel(context, ref, channelId: id),
+            onSignOut: (id) => _signOut(context, ref, id),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () async {
-              // Signing out mid-deletion would close the session under it.
-              if (!await ensureNotDeleting(context, ref)) return;
-              await ref.read(authProvider.notifier).signOut();
-            },
-            icon: tiny ? null : const Icon(Icons.logout),
-            label: const Text('Sign out', textAlign: TextAlign.center),
-          ),
-        ] else ...[
-          if (channelName != null) ...[
-            Text(
-              "$channelName isn't signed in",
-              style: theme.textTheme.titleSmall,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Sign in to load video titles and delete through the YouTube '
-              'API. When Google asks, choose $channelName.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          ] else
-            Text(
-              'Import a takeout to sign in.',
-              style: theme.textTheme.bodyMedium,
-            ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: oauthConfigured && viewed != null
-                ? () => signInToViewedChannel(context, ref)
-                : null,
-            icon: tiny ? null : const Icon(Icons.login),
-            label: const Text(
-              'Sign in with Google',
-              textAlign: TextAlign.center,
-            ),
-          ),
-          if (!oauthConfigured) ...[
-            const SizedBox(height: 4),
+          if (!oauthConfigured)
             Text(
               "Sign-in isn't configured",
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
-          ],
         ],
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: OutlinedButton.icon(
+            onPressed: () => showSwitchTakeoutDialog(context),
+            icon: isTinyWidth(context) ? null : const Icon(Icons.swap_horiz),
+            label: const Text(
+              'Switch Google account',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
       ],
     );
+  }
+
+  /// Views [channelId], leaving screens tied to the previous one. This
+  /// dialog stays open unless it was over one of those screens.
+  Future<void> _view(BuildContext context, WidgetRef ref, String id) async {
+    if (id == ref.read(viewedChannelIdProvider)) return;
+    if (!await ensureNotDeleting(context, ref)) return;
+    if (!context.mounted) return;
+    final router = StackRouterScope.of(context)?.controller;
+    await ref.read(takeoutSelectionProvider.notifier).selectChannel(id);
+    if (context.mounted) {
+      leaveChannelScreens(context, router, closeDialogs: false);
+    }
+  }
+
+  Future<void> _signOut(BuildContext context, WidgetRef ref, String id) async {
+    // Signing out mid-deletion would close the session under it.
+    if (!await ensureNotDeleting(context, ref)) return;
+    await ref.read(authProvider.notifier).signOut(channelId: id);
   }
 }
 

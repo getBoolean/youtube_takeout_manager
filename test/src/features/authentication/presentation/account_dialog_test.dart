@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
@@ -14,19 +15,26 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
 
-const _viewed = TakeoutChannel(
+const _main = TakeoutChannel(
   channelId: 'UCme',
   title: 'Boolean',
   isMain: true,
   listed: true,
 );
+const _alt = TakeoutChannel(
+  channelId: 'UCalt',
+  title: 'Gaming Alt',
+  isMain: false,
+  listed: true,
+);
 
-const _signedIn = AuthState(
+const _mainProfile = SignInProfile(
   channelId: 'UCme',
   channelTitle: 'Boolean',
   displayName: 'Ada',
@@ -34,24 +42,57 @@ const _signedIn = AuthState(
 );
 
 class _FakeAuth extends AuthNotifier {
-  final AuthState? initial;
   final SignInOutcome outcome;
-  var signInCalls = 0;
+  final signIns = <String?>[];
+  final signOuts = <String?>[];
 
-  _FakeAuth(this.initial, {required this.outcome});
-
-  @override
-  AuthState? build() => initial;
+  _FakeAuth({required this.outcome});
 
   @override
-  Future<SignInOutcome> signIn() async {
-    signInCalls++;
-    if (outcome is SignedIn) state = _signedIn;
+  AuthState? build() => null;
+
+  @override
+  Future<SignInOutcome> signIn({String? targetChannelId}) async {
+    signIns.add(targetChannelId);
     return outcome;
   }
 
   @override
-  Future<void> signOut() async => state = null;
+  Future<void> signOut({String? channelId}) async => signOuts.add(channelId);
+}
+
+class _SignIns extends SavedSignIns {
+  final Map<String, SignInProfile> profiles;
+
+  _SignIns(this.profiles);
+
+  @override
+  Future<Map<String, SignInProfile>> build() async => profiles;
+}
+
+class _Selection extends TakeoutSelectionNotifier {
+  final channels = <String>[];
+
+  @override
+  Future<TakeoutSelection?> build() async =>
+      const TakeoutSelection(takeoutId: 'UCme');
+
+  @override
+  Future<void> selectChannel(String channelId) async => channels.add(channelId);
+}
+
+class _NoSavedTakeouts extends SavedTakeouts {
+  @override
+  Future<List<TakeoutSummary>> build() async => const [];
+}
+
+class _Processing extends DeletionProcessing {
+  final DeletionProcessingState initial;
+
+  _Processing(this.initial);
+
+  @override
+  DeletionProcessingState build() => initial;
 }
 
 class _FakeQuota extends QuotaNotifier {
@@ -67,42 +108,34 @@ class _FakeQuota extends QuotaNotifier {
   Future<void> resetUsage() async => resets++;
 }
 
-class _Processing extends DeletionProcessing {
-  final DeletionProcessingState initial;
-
-  _Processing(this.initial);
-
-  @override
-  DeletionProcessingState build() => initial;
-}
-
-class _NoSavedTakeouts extends SavedTakeouts {
-  @override
-  Future<List<TakeoutSummary>> build() async => const [];
-}
-
 void main() {
   late _FakeAuth auth;
   late _FakeQuota quota;
+  late _Selection selection;
 
   Future<void> pumpDialog(
     WidgetTester tester, {
-    AuthState? signedIn,
+    List<TakeoutChannel> channels = const [_main, _alt],
+    Map<String, SignInProfile> signIns = const {'UCme': _mainProfile},
     bool oauthConfigured = true,
-    TakeoutChannel? viewed = _viewed,
-    List<TakeoutChannel> channels = const [_viewed],
-    SignInOutcome outcome = const SignedIn(SignInProfile(channelId: 'UCme')),
+    SignInOutcome outcome = const SignInCancelled(),
     DeletionProcessingState processing = DeletionProcessingState.idle,
   }) async {
-    auth = _FakeAuth(signedIn, outcome: outcome);
+    auth = _FakeAuth(outcome: outcome);
     quota = _FakeQuota();
+    selection = _Selection();
+    tester.view.physicalSize = const Size(600, 1400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
-          viewedChannelProvider.overrideWithValue(viewed),
           takeoutChannelsProvider.overrideWithValue(channels),
+          viewedChannelProvider.overrideWithValue(channels.firstOrNull),
+          savedSignInsProvider.overrideWith(() => _SignIns(signIns)),
+          takeoutSelectionProvider.overrideWith(() => selection),
           savedTakeoutsProvider.overrideWith(_NoSavedTakeouts.new),
           deletionProcessingProvider.overrideWith(
             () => _Processing(processing),
@@ -116,66 +149,99 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('signed out, names the viewed channel and which to choose', (
+  testWidgets("heads with the takeout's Google account", (tester) async {
+    await pumpDialog(tester);
+
+    expect(find.text('Ada'), findsOneWidget);
+    expect(find.text('ada@example.com'), findsOneWidget);
+  });
+
+  testWidgets('before any sign-in, heads with the main channel', (
+    tester,
+  ) async {
+    await pumpDialog(tester, signIns: const {});
+
+    expect(find.text('Not signed in with Google'), findsOneWidget);
+  });
+
+  testWidgets('without a takeout, lists no channels', (tester) async {
+    await pumpDialog(tester, channels: const [], signIns: const {});
+
+    expect(find.text('No takeout imported'), findsOneWidget);
+    expect(find.text('Channels'), findsNothing);
+    expect(find.text('Switch Google account'), findsOneWidget);
+  });
+
+  testWidgets("lists the account's channels with their sign-ins", (
     tester,
   ) async {
     await pumpDialog(tester);
 
-    expect(find.text("Boolean isn't signed in"), findsOneWidget);
-    expect(find.textContaining('When Google asks, choose Boolean'), findsOne);
+    expect(find.text('Channels'), findsOneWidget);
+    expect(find.text('Viewing'), findsOneWidget);
+    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 
-  testWidgets('signing in with the viewed channel signs it in', (tester) async {
+  testWidgets('tapping a channel views it', (tester) async {
     await pumpDialog(tester);
 
-    await tester.tap(find.text('Sign in with Google'));
+    await tester.tap(find.text('Gaming Alt'));
     await tester.pumpAndSettle();
 
-    expect(auth.signInCalls, 1);
-    expect(find.text('Ada'), findsOneWidget);
-    expect(find.text('Signed in as Boolean'), findsOneWidget);
-    expect(find.text('Sign out'), findsOneWidget);
+    expect(selection.channels, ['UCalt']);
   });
 
-  testWidgets('signing in with another channel warns, naming both', (
-    tester,
-  ) async {
+  testWidgets('signs a channel in from its own row, warning naming it when '
+      'another is chosen', (tester) async {
     await pumpDialog(
       tester,
       outcome: const SignedInOtherChannel(
-        SignInProfile(channelId: 'UCalt', channelTitle: 'Gaming Alt'),
-        viewedChannelId: 'UCme',
+        SignInProfile(channelId: 'UCx', channelTitle: 'Someone Else'),
+        targetChannelId: 'UCalt',
       ),
     );
 
-    await tester.tap(find.text('Sign in with Google'));
+    await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
+    expect(auth.signIns, ['UCalt']);
     expect(find.text('Signed in with another channel'), findsOneWidget);
     Finder inWarning(Finder finder) => find.descendant(
       of: find.byType(SignedInOtherChannelDialog),
       matching: finder,
     );
+    expect(inWarning(find.text('Someone Else')), findsOneWidget);
     expect(inWarning(find.text('Gaming Alt')), findsOneWidget);
-    expect(inWarning(find.text('youtube.com/channel/UCalt')), findsOneWidget);
-    expect(inWarning(find.text('Boolean')), findsOneWidget);
-    expect(inWarning(find.text('youtube.com/channel/UCme')), findsOneWidget);
-    expect(inWarning(find.textContaining('saved for Gaming Alt')), findsOne);
-
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-    expect(find.text('Signed in with another channel'), findsNothing);
-    // Still signed out.
-    expect(find.text("Boolean isn't signed in"), findsOneWidget);
+    expect(inWarning(find.text('Signing in for')), findsOneWidget);
   });
 
   testWidgets('explains an account without a YouTube channel', (tester) async {
     await pumpDialog(tester, outcome: const SignInNoChannel());
 
-    await tester.tap(find.text('Sign in with Google'));
+    await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
     expect(find.text('No YouTube channel'), findsOneWidget);
+  });
+
+  testWidgets('signs out only that channel', (tester) async {
+    await pumpDialog(tester);
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(auth.signOuts, ['UCme']);
+  });
+
+  testWidgets("won't sign out while deleting through the API", (tester) async {
+    await pumpDialog(tester, processing: DeletionProcessingState.running);
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Deleting in progress'), findsOneWidget);
+    expect(auth.signOuts, isEmpty);
   });
 
   testWidgets("sign-in is disabled when it isn't configured", (tester) async {
@@ -183,7 +249,7 @@ void main() {
 
     final button = tester.widget<ButtonStyleButton>(
       find.ancestor(
-        of: find.text('Sign in with Google'),
+        of: find.text('Sign in'),
         matching: find.bySubtype<ButtonStyleButton>(),
       ),
     );
@@ -191,85 +257,14 @@ void main() {
     expect(find.text("Sign-in isn't configured"), findsOneWidget);
   });
 
-  testWidgets('sign-in waits for a takeout to sign its channel in', (
-    tester,
-  ) async {
-    await pumpDialog(tester, viewed: null);
-
-    final button = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('Sign in with Google'),
-        matching: find.bySubtype<ButtonStyleButton>(),
-      ),
-    );
-    expect(button.onPressed, isNull);
-    expect(find.text('Import a takeout to sign in.'), findsOneWidget);
-  });
-
-  testWidgets('signed in shows the account and channel, and signs out', (
-    tester,
-  ) async {
-    await pumpDialog(tester, signedIn: _signedIn);
-
-    expect(find.text('Ada'), findsOneWidget);
-    expect(find.text('ada@example.com'), findsOneWidget);
-    expect(find.text('Signed in as Boolean'), findsOneWidget);
-
-    await tester.tap(find.text('Sign out'));
-    await tester.pumpAndSettle();
-
-    expect(find.text("Boolean isn't signed in"), findsOneWidget);
-  });
-
-  testWidgets('shows the viewed takeout channel, and opens the switcher', (
-    tester,
-  ) async {
+  testWidgets('opens the Google account switcher', (tester) async {
     await pumpDialog(tester);
 
-    expect(find.text('Takeout'), findsOneWidget);
-    expect(find.text('youtube.com/channel/UCme'), findsOneWidget);
-    expect(find.textContaining('of 2 channels'), findsNothing);
-    expect(find.text('Change channel'), findsNothing);
-
-    await tester.tap(find.text('Switch takeout'));
+    await tester.tap(find.text('Switch Google account'));
     await tester.pumpAndSettle();
+
     expect(find.byType(SwitchTakeoutDialog), findsOneWidget);
-  });
-
-  testWidgets('says which of several channels is viewed', (tester) async {
-    await pumpDialog(
-      tester,
-      channels: const [
-        _viewed,
-        TakeoutChannel(channelId: 'UCalt', isMain: false, listed: true),
-      ],
-    );
-
-    expect(find.text('1 of 2 channels in this takeout'), findsOneWidget);
-
-    await tester.tap(find.text('Change channel'));
-    await tester.pumpAndSettle();
-    expect(find.byType(ChannelPickerDialog), findsOneWidget);
-  });
-
-  testWidgets('says when no takeout is imported', (tester) async {
-    await pumpDialog(tester, viewed: null, channels: const []);
-
-    expect(find.text('No takeout imported'), findsOneWidget);
-  });
-
-  testWidgets("won't sign out while deleting through the API", (tester) async {
-    await pumpDialog(
-      tester,
-      signedIn: _signedIn,
-      processing: DeletionProcessingState.running,
-    );
-
-    await tester.tap(find.text('Sign out'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Deleting in progress'), findsOneWidget);
-    expect(auth.state, isNotNull);
+    expect(find.text('Google accounts'), findsOneWidget);
   });
 
   testWidgets('shows quota usage, which is API-only', (tester) async {
@@ -311,13 +306,15 @@ void main() {
   });
 
   testWidgets('the account button opens the dialog', (tester) async {
-    auth = _FakeAuth(null, outcome: const SignInCancelled());
+    auth = _FakeAuth(outcome: const SignInCancelled());
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(_FakeQuota.new),
-          viewedChannelProvider.overrideWithValue(_viewed),
+          takeoutChannelsProvider.overrideWithValue(const [_main]),
+          viewedChannelProvider.overrideWithValue(_main),
+          savedSignInsProvider.overrideWith(() => _SignIns(const {})),
         ],
         child: MaterialApp(
           home: Scaffold(appBar: AppBar(actions: const [AccountButton()])),

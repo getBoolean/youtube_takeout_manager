@@ -17,8 +17,8 @@ void main() {
               context: context,
               builder: (_) => SignedInOtherChannelDialog(
                 chosen: _chosen,
-                viewedChannelId: 'UCme',
-                viewedTitle: 'Boolean',
+                targetChannelId: 'UCme',
+                targetTitle: 'Boolean',
                 canViewChosen: canView,
               ),
             ),
@@ -51,7 +51,7 @@ void main() {
               context: context,
               builder: (_) => const SignedInOtherChannelDialog(
                 chosen: _chosen,
-                viewedChannelId: 'UCme',
+                targetChannelId: 'UCme',
                 canViewChosen: true,
               ),
             ),
