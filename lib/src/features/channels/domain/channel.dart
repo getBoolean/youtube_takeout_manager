@@ -2,6 +2,12 @@ import 'package:dart_mappable/dart_mappable.dart';
 
 part 'channel.mapper.dart';
 
+/// Stands in for the channel of comments and live chats whose video's
+/// channel isn't known: its details aren't loaded (e.g. signed out), the
+/// video is gone, or the item is on a post. Never a real channel ID, which
+/// always starts with "UC".
+const unknownChannelId = '_unknown';
+
 @MappableClass()
 class Channel with ChannelMappable {
   final String channelId;
@@ -21,4 +27,8 @@ class Channel with ChannelMappable {
   });
 
   int get totalInteractions => commentCount + liveChatCount;
+
+  /// Whether this groups items whose channel isn't known, rather than being
+  /// a real channel.
+  bool get isUnknown => channelId == unknownChannelId;
 }

@@ -75,7 +75,9 @@ class ChannelThumbnails extends _$ChannelThumbnails {
   /// Queue channel IDs for thumbnail fetching.
   /// Buffers them and fetches in batches of 10.
   void queueChannelIds(Set<String> channelIds) {
-    final uncached = channelIds.difference(state.keys.toSet());
+    final uncached = channelIds.difference(state.keys.toSet()).difference(
+      const {unknownChannelId},
+    );
     if (uncached.isEmpty) return;
     _pendingIds.addAll(uncached);
     if (_pendingIds.length >= 10 && !_fetchInProgress) {
@@ -128,7 +130,9 @@ class ChannelThumbnails extends _$ChannelThumbnails {
     final authState = ref.read(authProvider);
     if (authState == null) return;
 
-    final uncachedIds = channelIds.difference(state.keys.toSet());
+    final uncachedIds = channelIds.difference(state.keys.toSet()).difference(
+      const {unknownChannelId},
+    );
     if (uncachedIds.isEmpty) return;
 
     final client = ref
@@ -172,6 +176,11 @@ List<Channel> channels(Ref ref) {
   final thumbnails = ref.watch(channelThumbnailsProvider);
 
   final channels = channelIds.map((id) {
+    final commentCount = commentsByChannel[id]?.length ?? 0;
+    final liveChatCount = liveChatsByChannel[id]?.length ?? 0;
+    if (id == unknownChannelId) {
+      return _unknownChannel(commentCount, liveChatCount);
+    }
     final sub = subscriptions[id];
     final channelTitle = sub?.channelTitle ?? channelTitlesFromVideos[id];
     return Channel(
@@ -179,15 +188,25 @@ List<Channel> channels(Ref ref) {
       channelTitle: channelTitle,
       channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$id',
       thumbnailUrl: thumbnails[id],
-      commentCount: commentsByChannel[id]?.length ?? 0,
-      liveChatCount: liveChatsByChannel[id]?.length ?? 0,
+      commentCount: commentCount,
+      liveChatCount: liveChatCount,
     );
   }).toList();
 
-  // Sort by total interactions descending
-  channels.sort((a, b) => b.totalInteractions.compareTo(a.totalInteractions));
+  // Most interactions first; items with an unknown channel always last.
+  channels.sort((a, b) {
+    if (a.isUnknown != b.isUnknown) return a.isUnknown ? 1 : -1;
+    return b.totalInteractions.compareTo(a.totalInteractions);
+  });
   return channels;
 }
+
+Channel _unknownChannel(int commentCount, int liveChatCount) => Channel(
+  channelId: unknownChannelId,
+  channelTitle: 'Unknown channel',
+  commentCount: commentCount,
+  liveChatCount: liveChatCount,
+);
 
 @riverpod
 Channel? channelById(Ref ref, String channelId) {
@@ -199,6 +218,12 @@ Channel? channelById(Ref ref, String channelId) {
   if (!commentsByChannel.containsKey(channelId) &&
       !liveChatsByChannel.containsKey(channelId)) {
     return null;
+  }
+  if (channelId == unknownChannelId) {
+    return _unknownChannel(
+      commentsByChannel[channelId]?.length ?? 0,
+      liveChatsByChannel[channelId]?.length ?? 0,
+    );
   }
 
   final sub = takeout.subscriptionsByChannelId[channelId];

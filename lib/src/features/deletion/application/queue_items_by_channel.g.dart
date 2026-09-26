@@ -9,15 +9,15 @@ part of 'queue_items_by_channel.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// The channel each queued comment or live chat was posted on, by item ID,
-/// grouped the same way as the channel lists. Items whose video hasn't been
-/// looked up yet, or that are no longer in the takeout, are missing.
+/// grouped the same way as the channel lists. Items whose channel is
+/// unknown, or that are no longer in the takeout, are missing.
 
 @ProviderFor(queuedItemChannelIds)
 final queuedItemChannelIdsProvider = QueuedItemChannelIdsProvider._();
 
 /// The channel each queued comment or live chat was posted on, by item ID,
-/// grouped the same way as the channel lists. Items whose video hasn't been
-/// looked up yet, or that are no longer in the takeout, are missing.
+/// grouped the same way as the channel lists. Items whose channel is
+/// unknown, or that are no longer in the takeout, are missing.
 
 final class QueuedItemChannelIdsProvider
     extends
@@ -28,8 +28,8 @@ final class QueuedItemChannelIdsProvider
         >
     with $Provider<Map<String, String>> {
   /// The channel each queued comment or live chat was posted on, by item ID,
-  /// grouped the same way as the channel lists. Items whose video hasn't been
-  /// looked up yet, or that are no longer in the takeout, are missing.
+  /// grouped the same way as the channel lists. Items whose channel is
+  /// unknown, or that are no longer in the takeout, are missing.
   QueuedItemChannelIdsProvider._()
     : super(
         from: null,
@@ -65,4 +65,4 @@ final class QueuedItemChannelIdsProvider
 }
 
 String _$queuedItemChannelIdsHash() =>
-    r'8fa6023dce0be4ec5ecf50418d78b33b31e17020';
+    r'64cb98f3e6b1f4949433a8e794b128c4911d7991';

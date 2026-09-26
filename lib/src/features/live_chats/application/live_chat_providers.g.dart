@@ -50,8 +50,14 @@ final class AllLiveChatsProvider
 
 String _$allLiveChatsHash() => r'20d0553bbbff085eb00e89a0f145bbe2668825ad';
 
+/// Live chats by the channel their video is on. Live chats whose video's
+/// channel isn't known are kept under [unknownChannelId].
+
 @ProviderFor(liveChatsByChannel)
 final liveChatsByChannelProvider = LiveChatsByChannelProvider._();
+
+/// Live chats by the channel their video is on. Live chats whose video's
+/// channel isn't known are kept under [unknownChannelId].
 
 final class LiveChatsByChannelProvider
     extends
@@ -61,6 +67,8 @@ final class LiveChatsByChannelProvider
           Map<String, List<LiveChat>>
         >
     with $Provider<Map<String, List<LiveChat>>> {
+  /// Live chats by the channel their video is on. Live chats whose video's
+  /// channel isn't known are kept under [unknownChannelId].
   LiveChatsByChannelProvider._()
     : super(
         from: null,
@@ -96,7 +104,7 @@ final class LiveChatsByChannelProvider
 }
 
 String _$liveChatsByChannelHash() =>
-    r'db09a4ff14973df0496a37e981e0e2dbd6d5b7c5';
+    r'7bf9e46b7fe1cdaa301e56b50b633d3ae312b340';
 
 @ProviderFor(channelLiveChats)
 final channelLiveChatsProvider = ChannelLiveChatsFamily._();

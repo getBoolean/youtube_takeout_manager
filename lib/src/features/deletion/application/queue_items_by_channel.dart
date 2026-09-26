@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import '../domain/deletion_queue_item.dart';
@@ -9,8 +10,8 @@ import 'deletion_queue_notifier.dart';
 part 'queue_items_by_channel.g.dart';
 
 /// The channel each queued comment or live chat was posted on, by item ID,
-/// grouped the same way as the channel lists. Items whose video hasn't been
-/// looked up yet, or that are no longer in the takeout, are missing.
+/// grouped the same way as the channel lists. Items whose channel is
+/// unknown, or that are no longer in the takeout, are missing.
 @riverpod
 Map<String, String> queuedItemChannelIds(Ref ref) {
   final queue = ref.watch(deletionQueueProvider).value ?? const [];
@@ -23,16 +24,20 @@ Map<String, String> queuedItemChannelIds(Ref ref) {
       item.itemId,
     );
   }
-  // Not the items' own channelId: that's the author's channel.
+  // Not the items' own channelId: that's the author's channel. Items whose
+  // channel is unknown are left out, so they group with items no longer in
+  // the takeout.
   return {
     for (final MapEntry(key: channelId, value: comments)
         in ref.watch(commentsByChannelProvider).entries)
-      for (final c in comments)
-        if (commentIds.contains(c.commentId)) c.commentId: channelId,
+      if (channelId != unknownChannelId)
+        for (final c in comments)
+          if (commentIds.contains(c.commentId)) c.commentId: channelId,
     for (final MapEntry(key: channelId, value: liveChats)
         in ref.watch(liveChatsByChannelProvider).entries)
-      for (final c in liveChats)
-        if (liveChatIds.contains(c.liveChatId)) c.liveChatId: channelId,
+      if (channelId != unknownChannelId)
+        for (final c in liveChats)
+          if (liveChatIds.contains(c.liveChatId)) c.liveChatId: channelId,
   };
 }
 

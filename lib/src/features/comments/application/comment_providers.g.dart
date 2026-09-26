@@ -50,8 +50,14 @@ final class AllCommentsProvider
 
 String _$allCommentsHash() => r'b31010c52a56d62b49f287a2c037a714d784c6c9';
 
+/// Comments by the channel their video is on. Comments whose video's channel
+/// isn't known are kept under [unknownChannelId].
+
 @ProviderFor(commentsByChannel)
 final commentsByChannelProvider = CommentsByChannelProvider._();
+
+/// Comments by the channel their video is on. Comments whose video's channel
+/// isn't known are kept under [unknownChannelId].
 
 final class CommentsByChannelProvider
     extends
@@ -61,6 +67,8 @@ final class CommentsByChannelProvider
           Map<String, List<Comment>>
         >
     with $Provider<Map<String, List<Comment>>> {
+  /// Comments by the channel their video is on. Comments whose video's channel
+  /// isn't known are kept under [unknownChannelId].
   CommentsByChannelProvider._()
     : super(
         from: null,
@@ -95,7 +103,7 @@ final class CommentsByChannelProvider
   }
 }
 
-String _$commentsByChannelHash() => r'29cb2e08ad7cd9091e4369f75d93e118783a0a4f';
+String _$commentsByChannelHash() => r'4b5721ff7944d045a6655af7aa04541ca6b86ed0';
 
 @ProviderFor(channelComments)
 final channelCommentsProvider = ChannelCommentsFamily._();

@@ -20,6 +20,7 @@ import 'package:youtube_takeout_manager/src/features/channels/presentation/chann
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_header.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/cross_channel_result_tile.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/unknown_channel_hint.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -213,6 +214,15 @@ Widget _channelListParts() => Scaffold(
         selectionMode: ValueNotifier(false),
       ),
       ChannelTile(channel: _channel, onTap: () {}),
+      ChannelTile(
+        channel: const Channel(
+          channelId: unknownChannelId,
+          channelTitle: 'Unknown channel',
+          commentCount: 1234,
+          liveChatCount: 567,
+        ),
+        onTap: () {},
+      ),
       for (final selecting in [false, true])
         CrossChannelResultTile(
           item: CommentResult(_comment, channelId: fixture.channelId),
@@ -274,6 +284,21 @@ void main() {
     () => _channelPage(liveChats: true, selecting: false),
   );
   fitsAtEveryWidth('the channel list', _channelListParts);
+  fitsAtEveryWidth(
+    'the unknown channel title',
+    () => Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        leading: BackButton(onPressed: () {}),
+        title: const ChannelTitle(
+          channelName: 'Unknown channel',
+          channelUrl: null,
+        ),
+        actions: const [AccountButton()],
+      ),
+      body: const UnknownChannelHint(),
+    ),
+  );
   fitsAtEveryWidth(
     'the deletion queue',
     () => const Scaffold(body: DeletionQueuePanel()),

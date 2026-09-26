@@ -16,6 +16,8 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
+import '../../domain/channel.dart';
+import '../unknown_channel_hint.dart';
 import 'channel_actions_header.dart';
 import 'channel_app_bar.dart';
 import 'channel_deletion_bar.dart';
@@ -94,6 +96,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
     );
     final channel = ref.watch(channelByIdProvider(channelId));
     final channelName = channel?.channelTitle ?? 'Unknown Channel';
+    final isUnknown = channelId == unknownChannelId;
 
     final hasComments = commentCount > 0;
     final hasLiveChats = liveChatCount > 0;
@@ -131,10 +134,26 @@ class ChannelDetailScreen extends HookConsumerWidget {
             initialScrollTarget: liveChatTargetId,
           );
 
-    final header = ChannelActionsHeader(
+    final actions = ChannelActionsHeader(
       channelId: channelId,
       selectionMode: selectionMode,
     );
+    final header = isUnknown
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: UnknownChannelHint(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              actions,
+            ],
+          )
+        : actions;
 
     // One search bar above both tabs, so comments and live chats share the
     // same query text.
@@ -193,9 +212,10 @@ class ChannelDetailScreen extends HookConsumerWidget {
               : ChannelTitle(
                   channelName: channelName,
                   thumbnailUrl: channel?.thumbnailUrl,
-                  channelUrl:
-                      channel?.channelUrl ??
-                      'https://www.youtube.com/channel/$channelId',
+                  channelUrl: isUnknown
+                      ? null
+                      : channel?.channelUrl ??
+                            'https://www.youtube.com/channel/$channelId',
                 ),
           backgroundColor: inSelection ? scheme.secondaryContainer : null,
           foregroundColor: inSelection ? scheme.onSecondaryContainer : null,

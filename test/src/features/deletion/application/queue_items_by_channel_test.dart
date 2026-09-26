@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -76,6 +77,28 @@ void main() {
         'c1': 'UCvideo',
         'l1': 'UCstream',
       });
+    },
+  );
+
+  test(
+    'leaves items whose channel is unknown out, so they group last',
+    () async {
+      final container = ProviderContainer(
+        overrides: [
+          deletionQueueProvider.overrideWith(
+            () => _FakeQueue([_item('c1'), _item('no-details')]),
+          ),
+          commentsByChannelProvider.overrideWithValue({
+            'UCvideo': [_comment('c1')],
+            unknownChannelId: [_comment('no-details')],
+          }),
+          liveChatsByChannelProvider.overrideWithValue(const {}),
+        ],
+      );
+      addTearDown(container.dispose);
+      await container.read(deletionQueueProvider.future);
+
+      expect(container.read(queuedItemChannelIdsProvider), {'c1': 'UCvideo'});
     },
   );
 }

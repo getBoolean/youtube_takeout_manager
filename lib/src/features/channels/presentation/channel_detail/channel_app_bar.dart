@@ -110,13 +110,14 @@ class ChannelTabBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 /// The channel's avatar and name, with a globe when there's room, as one
-/// button that offers to open the channel on YouTube.
+/// button that offers to open the channel on YouTube. Without a channel page
+/// (items whose channel is unknown) it's plain text beside a question mark.
 class ChannelTitle extends StatelessWidget {
   final String channelName;
   final String? thumbnailUrl;
 
-  /// The channel's page on YouTube.
-  final String channelUrl;
+  /// The channel's page on YouTube, or null when there isn't one.
+  final String? channelUrl;
 
   const ChannelTitle({
     super.key,
@@ -129,7 +130,7 @@ class ChannelTitle extends StatelessWidget {
   static const _avatarMinWidth = 100.0;
   static const _globeMinWidth = 180.0;
 
-  Future<void> _confirmOpen(BuildContext context) async {
+  Future<void> _confirmOpen(BuildContext context, String url) async {
     final open = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -148,71 +149,80 @@ class ChannelTitle extends StatelessWidget {
       ),
     );
     if (open == true) {
-      launchUrl(Uri.parse(channelUrl), mode: LaunchMode.externalApplication);
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final url = channelUrl;
     return LayoutBuilder(
-      builder: (context, constraints) => Row(
-        children: [
-          Flexible(
-            child: Tooltip(
-              message: 'Open on YouTube…',
-              child: InkWell(
-                onTap: () => _confirmOpen(context),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(0, 4, 8, 4),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (constraints.maxWidth >= _avatarMinWidth) ...[
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: theme.colorScheme.primaryContainer,
-                          child: thumbnailUrl != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    thumbnailUrl!,
-                                    width: 32,
-                                    height: 32,
-                                    fit: BoxFit.cover,
-                                    webHtmlElementStrategy:
-                                        WebHtmlElementStrategy.prefer,
-                                  ),
-                                )
-                              : Text(
-                                  channelName[0].toUpperCase(),
-                                  style: TextStyle(
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                    fontSize: 14,
-                                  ),
-                                ),
+      builder: (context, constraints) {
+        final content = Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(0, 4, 8, 4),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (constraints.maxWidth >= _avatarMinWidth) ...[
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: url == null
+                      ? Icon(
+                          Icons.help_outline,
+                          size: 18,
+                          color: theme.colorScheme.onPrimaryContainer,
+                        )
+                      : thumbnailUrl != null
+                      ? ClipOval(
+                          child: Image.network(
+                            thumbnailUrl!,
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.cover,
+                            webHtmlElementStrategy:
+                                WebHtmlElementStrategy.prefer,
+                          ),
+                        )
+                      : Text(
+                          channelName[0].toUpperCase(),
+                          style: TextStyle(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontSize: 14,
+                          ),
                         ),
-                        const SizedBox(width: 12),
-                      ],
-                      Flexible(
-                        child: Text(
-                          channelName,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      // Shows the name can be clicked.
-                      if (constraints.maxWidth >= _globeMinWidth) ...[
-                        const SizedBox(width: 8),
-                        const Icon(Icons.language, size: 18),
-                      ],
-                    ],
-                  ),
                 ),
+                const SizedBox(width: 12),
+              ],
+              Flexible(
+                child: Text(channelName, overflow: TextOverflow.ellipsis),
               ),
-            ),
+              // Shows the name can be clicked.
+              if (url != null && constraints.maxWidth >= _globeMinWidth) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.language, size: 18),
+              ],
+            ],
           ),
-        ],
-      ),
+        );
+        return Row(
+          children: [
+            Flexible(
+              child: url == null
+                  ? content
+                  : Tooltip(
+                      message: 'Open on YouTube…',
+                      child: InkWell(
+                        onTap: () => _confirmOpen(context, url),
+                        borderRadius: BorderRadius.circular(8),
+                        child: content,
+                      ),
+                    ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

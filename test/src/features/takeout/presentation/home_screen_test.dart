@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
@@ -15,7 +17,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
+import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 
 final _pickedZip = FilePickerResult([
   PlatformFile(
@@ -123,7 +125,24 @@ class _FakeQueue extends DeletionQueue {
   Future<List<DeletionQueueItem>> build() async => items;
 }
 
+/// Home with a stand-in channel list, so tests can see it opened.
+class _TestRouter extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => [
+    AutoRoute(page: HomeRoute.page, initial: true),
+    AutoRoute(
+      page: PageInfo(
+        ChannelListRoute.name,
+        builder: (_) => const Scaffold(body: Text('Channel list')),
+      ),
+      path: '/channels',
+    ),
+  ];
+}
+
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   Future<void> pumpHome(
     WidgetTester tester,
     _FakeTakeout takeout, {
@@ -142,15 +161,18 @@ void main() {
           channelsProvider.overrideWithValue(const []),
           deletionQueueProvider.overrideWith(() => _FakeQueue(queued)),
         ],
-        child: const MaterialApp(home: HomeScreen()),
+        child: MaterialApp.router(routerConfig: _TestRouter().config()),
       ),
     );
+    // The router builds Home a frame after it starts.
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
   }
 
   /// Taps [button] and lets the import run up to its next dialog or result.
   /// The import spinner never settles, so this pumps a fixed time instead.
   Future<void> tapAndWait(WidgetTester tester, String button) async {
+    await tester.ensureVisible(find.text(button));
     await tester.tap(find.text(button));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
@@ -262,10 +284,22 @@ void main() {
 
     expect(find.byType(AlertDialog), findsNothing);
     expect(takeout.committed, hasLength(1));
+    // Opens the channels even when signed out.
+    expect(find.text('Channel list'), findsOneWidget);
+  });
+
+  testWidgets('offers the channels when signed out', (tester) async {
+    await pumpHome(tester, _FakeTakeout(saved: _savedData));
+
+    expect(find.text('Sign in to View Channels'), findsNothing);
     expect(
-      find.text('Sign in to fetch video metadata and view channels.'),
+      find.text('Signed out: video titles and YouTube API deletion are off.'),
       findsOneWidget,
     );
+
+    await tester.tap(find.text('View Channels'));
+    await tester.pumpAndSettle();
+    expect(find.text('Channel list'), findsOneWidget);
   });
 
   testWidgets('cancelling the file picker does nothing', (tester) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import '../../domain/channel.dart';
+import '../unknown_channel_hint.dart';
 
 class ChannelTile extends StatelessWidget {
   final Channel channel;
@@ -35,7 +36,12 @@ class ChannelTile extends StatelessWidget {
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: theme.colorScheme.primaryContainer,
-        child: channel.thumbnailUrl != null
+        child: channel.isUnknown
+            ? Icon(
+                Icons.help_outline,
+                color: theme.colorScheme.onPrimaryContainer,
+              )
+            : channel.thumbnailUrl != null
             ? ClipOval(
                 child: Image.network(
                   channel.thumbnailUrl!,
@@ -56,7 +62,9 @@ class ChannelTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      subtitle: channel.channelTitle == null
+      subtitle: channel.isUnknown
+          ? UnknownChannelHint(maxLines: 1, style: theme.textTheme.bodySmall)
+          : channel.channelTitle == null
           ? HighlightedText(
               channel.channelId,
               query: highlightQuery,

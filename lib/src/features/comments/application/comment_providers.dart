@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../domain/comment.dart';
@@ -11,6 +12,8 @@ List<Comment> allComments(Ref ref) {
   return ref.watch(takeoutProvider).value?.comments ?? [];
 }
 
+/// Comments by the channel their video is on. Comments whose video's channel
+/// isn't known are kept under [unknownChannelId].
 @Riverpod(keepAlive: true)
 Map<String, List<Comment>> commentsByChannel(Ref ref) {
   final comments = ref.watch(allCommentsProvider);
@@ -20,8 +23,9 @@ Map<String, List<Comment>> commentsByChannel(Ref ref) {
     final video = comment.videoId != null
         ? videoMetadata[comment.videoId]
         : null;
-    if (video == null) continue;
-    grouped.putIfAbsent(video.channelId, () => []).add(comment);
+    grouped
+        .putIfAbsent(video?.channelId ?? unknownChannelId, () => [])
+        .add(comment);
   }
   return grouped;
 }

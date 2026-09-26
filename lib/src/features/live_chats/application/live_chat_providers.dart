@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../domain/live_chat.dart';
@@ -11,6 +12,8 @@ List<LiveChat> allLiveChats(Ref ref) {
   return ref.watch(takeoutProvider).value?.liveChats ?? [];
 }
 
+/// Live chats by the channel their video is on. Live chats whose video's
+/// channel isn't known are kept under [unknownChannelId].
 @Riverpod(keepAlive: true)
 Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
   final liveChats = ref.watch(allLiveChatsProvider);
@@ -18,8 +21,9 @@ Map<String, List<LiveChat>> liveChatsByChannel(Ref ref) {
   final grouped = <String, List<LiveChat>>{};
   for (final chat in liveChats) {
     final video = chat.videoId != null ? videoMetadata[chat.videoId] : null;
-    if (video == null) continue;
-    grouped.putIfAbsent(video.channelId, () => []).add(chat);
+    grouped
+        .putIfAbsent(video?.channelId ?? unknownChannelId, () => [])
+        .add(chat);
   }
   return grouped;
 }

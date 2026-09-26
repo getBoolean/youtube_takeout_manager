@@ -77,20 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ..showSnackBar(SnackBar(content: Text(_addedSummary(plan))));
         return;
       }
-      if (ref.read(authProvider) == null) {
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Sign in to fetch video metadata and view channels.',
-              ),
-            ),
-          );
-        return;
-      }
-      await ref.read(channelThumbnailsProvider.notifier).loadCache();
-      if (mounted) context.router.push(const ChannelListRoute());
+      await _viewChannels();
     } on TakeoutImportException catch (e) {
       if (mounted) {
         await showDialog<void>(
@@ -288,27 +275,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          QueueSummaryCard(
-            onOpenChannels: isAuthenticated ? _viewChannels : null,
-          ),
+          QueueSummaryCard(onOpenChannels: _viewChannels),
           const SizedBox(height: 16),
-          if (isAuthenticated)
-            FilledButton.icon(
-              onPressed: _viewChannels,
-              icon: const Icon(Icons.list),
-              label: const Text('View Channels', textAlign: TextAlign.center),
-            )
-          else
-            FilledButton.icon(
+          FilledButton.icon(
+            onPressed: _viewChannels,
+            icon: const Icon(Icons.list),
+            label: const Text('View Channels', textAlign: TextAlign.center),
+          ),
+          if (!isAuthenticated) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Signed out: video titles and YouTube API deletion are off.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            TextButton.icon(
               onPressed: isOAuthConfigured
                   ? () => ref.read(authProvider.notifier).signIn()
                   : null,
               icon: const Icon(Icons.login),
-              label: const Text(
-                'Sign in to View Channels',
-                textAlign: TextAlign.center,
-              ),
+              label: const Text('Sign in', textAlign: TextAlign.center),
             ),
+          ],
           const SizedBox(height: 12),
           FilledButton.tonalIcon(
             onPressed: () => _import(merge: true),

@@ -183,7 +183,7 @@ final class ChannelThumbnailsProvider
   }
 }
 
-String _$channelThumbnailsHash() => r'7be99a6836afb0eb8c22b195e80a65990e3da324';
+String _$channelThumbnailsHash() => r'6ea1042196360f129f0a5130813b33c85d9fdf54';
 
 abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
   Map<String, String> build();
@@ -242,7 +242,7 @@ final class ChannelsProvider
   }
 }
 
-String _$channelsHash() => r'31beddcd8fae022e129a60f10a41807478d17cb6';
+String _$channelsHash() => r'48a4bdb87e37d707175fad6ea95a07424e3dd9da';
 
 @ProviderFor(channelById)
 final channelByIdProvider = ChannelByIdFamily._();
@@ -301,7 +301,7 @@ final class ChannelByIdProvider
   }
 }
 
-String _$channelByIdHash() => r'14d5a19fc6f6cba71a5df228ceda3f14467e6341';
+String _$channelByIdHash() => r'2caed8b51327cbdf52532a99829ec1df55a0e3b2';
 
 final class ChannelByIdFamily extends $Family
     with $FunctionalFamilyOverride<Channel?, String> {
