@@ -48,7 +48,7 @@ class AddAccountSection extends StatelessWidget {
           onPressed: enabled ? onStart : null,
           icon: isTinyWidth(context) ? null : const Icon(Icons.add),
           label: const Text(
-            'Add another Google account',
+            "Import another account's takeout",
             textAlign: TextAlign.center,
           ),
         ),
@@ -72,7 +72,7 @@ class AddAccountSection extends StatelessWidget {
         ),
       ),
       AddAccountReview(:final plan) => NoticeBanner(
-        title: 'Add this Google account?',
+        title: 'Import this takeout?',
         error: false,
         actions: [
           TextButton(
@@ -81,7 +81,7 @@ class AddAccountSection extends StatelessWidget {
           ),
           FilledButton(
             onPressed: enabled ? onConfirm : null,
-            child: const Text('Add account', textAlign: TextAlign.center),
+            child: const Text('Import', textAlign: TextAlign.center),
           ),
         ],
         children: [ImportReview(plan: plan, merge: false, newAccount: true)],
@@ -99,7 +99,7 @@ class AddAccountSection extends StatelessWidget {
     final name = accountNames[takeoutId] ?? takeoutId;
     final viewing = takeoutId == viewedTakeoutId;
     return NoticeBanner(
-      title: 'Account already saved',
+      title: 'Takeout already imported',
       onDismiss: onDismiss,
       actions: [
         if (!viewing)
@@ -110,8 +110,9 @@ class AddAccountSection extends StatelessWidget {
       ],
       children: [
         Text(
-          'This takeout is from $name, which is already saved'
-          "${viewing ? " (it's the one shown)" : ''}. Nothing was imported. "
+          "This takeout is from $name's account, which already has a saved "
+          'takeout'
+          "${viewing ? ' (the one shown)' : ''}. Nothing was imported. "
           'To update it, use Add Newer Takeout on Home while viewing it.',
         ),
       ],

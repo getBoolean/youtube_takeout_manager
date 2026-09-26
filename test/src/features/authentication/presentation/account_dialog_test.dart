@@ -288,7 +288,7 @@ void main() {
 
     expect(find.text('No takeout imported'), findsOneWidget);
     expect(find.text('Viewing'), findsNothing);
-    expect(find.text('Add another Google account'), findsOneWidget);
+    expect(find.text("Import another account's takeout"), findsOneWidget);
   });
 
   testWidgets("lists the account's channels with their sign-ins", (
@@ -300,7 +300,7 @@ void main() {
     expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
     // Collapsed until asked for.
-    expect(find.text('Add another Google account'), findsNothing);
+    expect(find.text("Import another account's takeout"), findsNothing);
   });
 
   testWidgets('tapping a channel views it', (tester) async {
@@ -440,18 +440,18 @@ void main() {
 
     await tester.tap(find.byTooltip('Show other Google accounts'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add another Google account'));
+    await tester.tap(find.text("Import another account's takeout"));
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('Add this Google account?'), findsOneWidget);
+    expect(find.text('Import this takeout?'), findsOneWidget);
     expect(find.text('Somebody Else'), findsOneWidget);
 
-    await tester.tap(find.text('Add account'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.pumpAndSettle();
 
     expect(takeout.committed.single.accountId, 'UCnew');
-    expect(find.text('Add this Google account?'), findsNothing);
+    expect(find.text('Import this takeout?'), findsNothing);
   });
 
   testWidgets('refuses a takeout from an account already saved, in place', (
@@ -465,11 +465,11 @@ void main() {
 
     await tester.tap(find.byTooltip('Show other Google accounts'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Add another Google account'));
+    await tester.tap(find.text("Import another account's takeout"));
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('Account already saved'), findsOneWidget);
+    expect(find.text('Takeout already imported'), findsOneWidget);
     expect(takeout.committed, isEmpty);
 
     await tester.tap(find.text('View Work Channel'));

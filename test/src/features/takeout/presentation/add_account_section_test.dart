@@ -66,14 +66,14 @@ void main() {
   testWidgets('offers to add another account', (tester) async {
     await pump(tester, const AddAccountIdle());
 
-    await tester.tap(find.text('Add another Google account'));
+    await tester.tap(find.text("Import another account's takeout"));
     expect(starts, 1);
   });
 
   testWidgets("can't add one while deleting", (tester) async {
     await pump(tester, const AddAccountIdle(), enabled: false);
 
-    await tester.tap(find.text('Add another Google account'));
+    await tester.tap(find.text("Import another account's takeout"));
     expect(starts, 0);
   });
 
@@ -87,10 +87,10 @@ void main() {
     await pump(tester, const AddAccountReview(_plan));
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text('Add this Google account?'), findsOneWidget);
+    expect(find.text('Import this takeout?'), findsOneWidget);
     expect(find.text('Somebody Else'), findsOneWidget);
 
-    await tester.tap(find.text('Add account'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.tap(find.text('Cancel'));
     expect(confirms, 1);
     expect(dismisses, 1);
@@ -101,7 +101,7 @@ void main() {
   ) async {
     await pump(tester, const AddAccountAlreadySaved('UCme'));
 
-    expect(find.text('Account already saved'), findsOneWidget);
+    expect(find.text('Takeout already imported'), findsOneWidget);
     expect(find.textContaining('from Boolean'), findsOneWidget);
     expect(find.textContaining('Nothing was imported'), findsOneWidget);
 
@@ -121,7 +121,7 @@ void main() {
     );
 
     expect(find.text('View Boolean'), findsNothing);
-    expect(find.textContaining("it's the one shown"), findsOneWidget);
+    expect(find.textContaining('(the one shown)'), findsOneWidget);
   });
 
   testWidgets('says why it failed, in place', (tester) async {

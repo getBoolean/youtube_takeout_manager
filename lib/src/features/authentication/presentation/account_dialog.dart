@@ -377,8 +377,8 @@ class _DeletionRunningBanner extends ConsumerWidget {
       ],
       children: const [
         Text(
-          'Switching accounts or channels, signing out and adding or removing '
-          'the account shown wait until it stops.',
+          'Switching accounts or channels, signing out, importing another '
+          "account's takeout and removing the one shown wait until it stops.",
         ),
       ],
     );
