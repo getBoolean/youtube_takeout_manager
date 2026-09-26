@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:youtube_takeout_manager/src/features/channels/application/signed_in_channel_provider.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -124,13 +123,9 @@ void main() {
     repository.accounts['UCme'] = encodeTakeoutCsvs(_savedAbc);
   });
 
-  ProviderContainer container({Future<String?> Function()? signedInChannelId}) {
+  ProviderContainer container() {
     final container = ProviderContainer(
-      overrides: [
-        takeoutRepositoryProvider.overrideWithValue(repository),
-        if (signedInChannelId != null)
-          signedInChannelIdProvider.overrideWith((_) => signedInChannelId()),
-      ],
+      overrides: [takeoutRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
     return container;
@@ -251,62 +246,6 @@ void main() {
     },
   );
 
-  test(
-    'a takeout from another channel than the signed-in one is rejected',
-    () async {
-      final c = container(signedInChannelId: () async => 'UCsignedIn');
-
-      await expectLater(
-        c
-            .read(takeoutProvider.notifier)
-            .prepareImport(_newerTakeout(), merge: true),
-        throwsA(
-          isA<TakeoutAccountMismatchException>().having(
-            (e) => e.expectedChannelIds,
-            'expected',
-            {'UCsignedIn'},
-          ),
-        ),
-      );
-    },
-  );
-
-  test(
-    "an import is blocked when the signed-in channel can't be looked up",
-    () async {
-      final c = container(
-        signedInChannelId: () async => throw Exception('offline'),
-      );
-
-      await expectLater(
-        c
-            .read(takeoutProvider.notifier)
-            .prepareImport(_newerTakeout(), merge: true),
-        throwsA(isA<TakeoutImportException>()),
-      );
-    },
-  );
-  test(
-    'a failed signed-in channel lookup is retried on the next import',
-    () async {
-      var lookups = 0;
-      final c = container(
-        signedInChannelId: () async {
-          if (++lookups == 1) throw Exception('offline');
-          return 'UCme';
-        },
-      );
-      final notifier = c.read(takeoutProvider.notifier);
-
-      await expectLater(
-        notifier.prepareImport(_newerTakeout(), merge: true),
-        throwsA(isA<TakeoutImportException>()),
-      );
-      final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
-
-      expect(plan.accountId, 'UCme');
-    },
-  );
   test('items found gone stay marked even if saving fails', () async {
     final c = container();
     await c.read(deletionQueueRepositoryProvider).saveQueue([_pending('B')]);

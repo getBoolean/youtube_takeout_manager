@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 
-/// Why items are under the unknown channel: signed out, video details can't
-/// be loaded; signed in, what's left is on posts or videos that are gone.
+/// Why items are under the unknown channel: with no sign-in, video details
+/// can't be loaded; with one, what's left is on posts or videos that are
+/// gone.
 class UnknownChannelHint extends ConsumerWidget {
   final TextStyle? style;
   final int? maxLines;
@@ -19,7 +20,8 @@ class UnknownChannelHint extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final signedIn = ref.watch(isAuthenticatedProvider);
+    // Any sign-in loads video details, not just the viewed channel's.
+    final signedIn = ref.watch(readSessionChannelIdProvider) != null;
     return Text(
       signedIn
           ? 'On posts, or videos that are private or gone'

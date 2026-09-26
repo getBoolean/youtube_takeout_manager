@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/channels/application/signed_in_channel_provider.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
@@ -97,7 +96,6 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       zips: zips,
       saved: await _savedData(required: merge),
       merge: merge,
-      signedInChannelId: await _signedInChannelId(),
       deletedCommentIds: await ref.read(deletedCommentIdsProvider.future),
       deletedLiveChatIds: await ref.read(deletedLiveChatIdsProvider.future),
     ));
@@ -152,20 +150,6 @@ class TakeoutNotifier extends _$TakeoutNotifier {
     } catch (_) {
       if (required) rethrow;
       return null;
-    }
-  }
-
-  Future<String?> _signedInChannelId() async {
-    try {
-      return await ref.read(signedInChannelIdProvider.future);
-    } catch (e) {
-      // Look it up again on the next attempt.
-      ref.invalidate(signedInChannelIdProvider);
-      throw TakeoutImportException(
-        "Couldn't check which YouTube channel you're signed in with ($e). "
-        'Try signing out and back in, or sign out to import without this '
-        'check.',
-      );
     }
   }
 }

@@ -3,8 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/cross_channel_search_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
@@ -128,6 +132,16 @@ class _Takeout extends TakeoutNotifier {
       subscriptionsByChannelId: const {},
       skippedCommentRows: 12,
     ),
+  );
+}
+
+class _SignedIn extends AuthNotifier {
+  @override
+  AuthState? build() => const AuthState(
+    channelId: 'UCme',
+    channelTitle: 'A channel with a fairly long name',
+    displayName: 'Somebody With A Long Name',
+    email: 'somebody.with.a.long.address@example.com',
   );
 }
 
@@ -330,6 +344,28 @@ void main() {
   fitsAtEveryWidth(
     'the account dialog',
     () => const Scaffold(body: AccountDialog(oauthConfigured: true)),
+  );
+  fitsAtEveryWidth(
+    'the account dialog signed in',
+    () => ProviderScope(
+      overrides: [authProvider.overrideWith(_SignedIn.new)],
+      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the other-channel sign-in warning',
+    () => const SignedInOtherChannelDialog(
+      chosen: SignInProfile(
+        channelId: 'UCaVeryLongChannelIdentifier12',
+        channelTitle: 'A channel with a fairly long name',
+      ),
+      viewedChannelId: 'UCanotherLongChannelIdentifier',
+      viewedTitle: 'Another channel with a long name',
+    ),
+  );
+  fitsAtEveryWidth(
+    'the no-channel dialog',
+    () => const NoYouTubeChannelDialog(),
   );
   fitsAtEveryWidth(
     'the queue dialog',

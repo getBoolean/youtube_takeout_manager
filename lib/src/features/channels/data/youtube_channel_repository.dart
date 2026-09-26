@@ -2,6 +2,8 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+
 part 'youtube_channel_repository.g.dart';
 
 @Riverpod(keepAlive: true)
@@ -15,13 +17,22 @@ class YoutubeChannelRepository {
   static const _batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
-  /// Returns the ID of the signed-in account's channel, or null if the
+  /// Returns the channel [authClient] is signed in with, or null if its
   /// account has none. Request failures are thrown.
-  Future<String?> fetchMyChannelId(http.Client authClient) async {
+  Future<({String id, String? title, String? handle, String? thumbnailUrl})?>
+  fetchMyChannel(http.Client authClient) async {
     final response = await yt.YouTubeApi(
       authClient,
-    ).channels.list(['id'], mine: true);
-    return response.items?.firstOrNull?.id;
+    ).channels.list(['snippet'], mine: true);
+    final channel = response.items?.firstOrNull;
+    final id = channel?.id;
+    if (id == null) return null;
+    return (
+      id: id,
+      title: channel?.snippet?.title,
+      handle: channel?.snippet?.customUrl,
+      thumbnailUrl: channel?.snippet?.thumbnails?.default_?.url,
+    );
   }
 
   /// Fetches channel thumbnails for the given [channelIds].
@@ -48,7 +59,9 @@ class YoutubeChannelRepository {
             results[item.id!] = url;
           }
         }
-      } catch (_) {
+      } catch (e) {
+        // A sign-in that stopped working fails every batch; let it through.
+        if (isSignInFailure(e)) rethrow;
         // Continue with remaining batches on error
       }
 

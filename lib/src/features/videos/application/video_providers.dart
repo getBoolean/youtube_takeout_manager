@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
@@ -38,13 +39,14 @@ class VideoMetadata extends _$VideoMetadata {
     final cached = await cacheRepository.loadCachedVideos();
     yield cached;
 
-    // Re-run when auth or takeout changes, but read current values.
-    ref.listen(authProvider, (_, _) => ref.invalidateSelf());
+    // Re-run when a sign-in to read with appears or the viewed takeout
+    // changes, but read current values.
+    ref.listen(readSessionChannelIdProvider, (_, _) => ref.invalidateSelf());
     ref.listen(viewedTakeoutProvider, (_, _) => ref.invalidateSelf());
 
-    final authState = ref.read(authProvider);
+    final sessionChannelId = ref.read(readSessionChannelIdProvider);
     final takeout = ref.read(viewedTakeoutProvider).value;
-    if (authState == null || takeout == null) return;
+    if (sessionChannelId == null || takeout == null) return;
 
     // Collect all unique videoIds from comments and live chats
     final videoIds = <String>{};
@@ -65,7 +67,7 @@ class VideoMetadata extends _$VideoMetadata {
     final progress = ref.read(videoFetchProgressProvider.notifier);
     progress.start(uncachedIds.length);
 
-    final client = authRepository.getAuthenticatedClient(authState.accessToken);
+    final client = authRepository.getAuthenticatedClient(sessionChannelId);
     final accumulated = Map<String, Video>.from(cached);
     var count = 0;
 
@@ -79,27 +81,36 @@ class VideoMetadata extends _$VideoMetadata {
         progress.update(count);
         yield Map.unmodifiable(accumulated);
       }
-
-      // Record quota usage for videos.list API calls.
-      final batchCount = (uncachedIds.length + 49) ~/ 50;
-      if (batchCount > 0) {
-        await ref
-            .read(quotaProvider.notifier)
-            .recordUsage(QuotaOperation.videosList, count: batchCount);
-      }
-
-      // Persist cache once at the end
+    } catch (e) {
+      if (!isSignInFailure(e)) rethrow;
+      // Keep what was fetched, but don't take the rest to be gone: the
+      // sign-in failed, not the videos.
       await cacheRepository.saveVideos(accumulated);
-
-      // Persist IDs that were not found
-      final newNotFound = uncachedIds.difference(accumulated.keys.toSet());
-      if (newNotFound.isNotEmpty) {
-        final allNotFound = notFoundIds.union(newNotFound);
-        await cacheRepository.saveNotFoundIds(allNotFound);
-      }
+      await ref
+          .read(savedSignInsProvider.notifier)
+          .signInFailed(sessionChannelId);
+      return;
     } finally {
       client.close();
       progress.complete();
+    }
+
+    // Record quota usage for videos.list API calls.
+    final batchCount = (uncachedIds.length + 49) ~/ 50;
+    if (batchCount > 0) {
+      await ref
+          .read(quotaProvider.notifier)
+          .recordUsage(QuotaOperation.videosList, count: batchCount);
+    }
+
+    // Persist cache once at the end
+    await cacheRepository.saveVideos(accumulated);
+
+    // Persist IDs that were not found
+    final newNotFound = uncachedIds.difference(accumulated.keys.toSet());
+    if (newNotFound.isNotEmpty) {
+      final allNotFound = notFoundIds.union(newNotFound);
+      await cacheRepository.saveNotFoundIds(allNotFound);
     }
   }
 }

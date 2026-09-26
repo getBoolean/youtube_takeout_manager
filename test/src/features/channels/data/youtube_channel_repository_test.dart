@@ -13,39 +13,48 @@ http.Response _json(Object body) => http.Response(
 );
 
 void main() {
-  group('fetchMyChannelId', () {
-    test(
-      "asks for the signed-in account's channel and returns its ID",
-      () async {
-        late Uri requested;
-        final client = MockClient((request) async {
-          requested = request.url;
-          return _json({
-            'items': [
-              {'id': 'UCNvbaa8lnkDE7-qc3zcePLA'},
-            ],
-          });
+  group('fetchMyChannel', () {
+    test("asks for the signed-in account's channel and returns it", () async {
+      late Uri requested;
+      final client = MockClient((request) async {
+        requested = request.url;
+        return _json({
+          'items': [
+            {
+              'id': 'UCNvbaa8lnkDE7-qc3zcePLA',
+              'snippet': {
+                'title': 'Boolean',
+                'customUrl': '@booleandev',
+                'thumbnails': {
+                  'default': {'url': 'https://yt3.example/avatar'},
+                },
+              },
+            },
+          ],
         });
+      });
 
-        final id = await YoutubeChannelRepository().fetchMyChannelId(client);
+      final channel = await YoutubeChannelRepository().fetchMyChannel(client);
 
-        expect(id, 'UCNvbaa8lnkDE7-qc3zcePLA');
-        expect(requested.path, endsWith('/youtube/v3/channels'));
-        expect(requested.queryParameters['mine'], 'true');
-      },
-    );
+      expect(channel?.id, 'UCNvbaa8lnkDE7-qc3zcePLA');
+      expect(channel?.title, 'Boolean');
+      expect(channel?.handle, '@booleandev');
+      expect(channel?.thumbnailUrl, 'https://yt3.example/avatar');
+      expect(requested.path, endsWith('/youtube/v3/channels'));
+      expect(requested.queryParameters['mine'], 'true');
+    });
 
     test('returns null when the account has no channel', () async {
       final client = MockClient((_) async => _json({'items': <Object>[]}));
 
-      expect(await YoutubeChannelRepository().fetchMyChannelId(client), isNull);
+      expect(await YoutubeChannelRepository().fetchMyChannel(client), isNull);
     });
 
     test('lets request failures through', () async {
       final client = MockClient((_) async => http.Response('', 500));
 
       expect(
-        YoutubeChannelRepository().fetchMyChannelId(client),
+        YoutubeChannelRepository().fetchMyChannel(client),
         throwsA(anything),
       );
     });

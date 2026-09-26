@@ -4,8 +4,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queue_repository.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/youtube_deletion_repository.dart';
@@ -247,17 +249,96 @@ void main() {
       expect(statuses['b1'], DeletionItemStatus.pending);
       expect(statuses['unknown'], DeletionItemStatus.pending);
     });
+
+    test(
+      'deletes nothing unless signed in with the channel asked for',
+      () async {
+        final deleted = <String>[];
+        final c = ProviderContainer(
+          overrides: [
+            authProvider.overrideWith(_SignedIn.new),
+            googleAuthRepositoryProvider.overrideWithValue(
+              _FakeAuthRepository(),
+            ),
+            youtubeDeletionRepositoryProvider.overrideWithValue(
+              _RecordingDeletions(deleted),
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+        await c.read(deletionQueueRepositoryProvider).saveQueue([
+          owned('b1', 'UCb'),
+        ]);
+        await c.read(deletionQueueProvider.future);
+
+        await c
+            .read(deletionQueueProvider.notifier)
+            .processPendingViaYoutubeApi(channelId: 'UCb');
+
+        expect(deleted, isEmpty);
+      },
+    );
+
+    test(
+      'stops, keeping items to delete, when the sign-in stops working',
+      () async {
+        final deleted = <String>[];
+        final signIns = _SignIns();
+        final c = ProviderContainer(
+          overrides: [
+            authProvider.overrideWith(_SignedIn.new),
+            savedSignInsProvider.overrideWith(() => signIns),
+            googleAuthRepositoryProvider.overrideWithValue(
+              _FakeAuthRepository(),
+            ),
+            youtubeDeletionRepositoryProvider.overrideWithValue(
+              _RecordingDeletions(deleted, signInFailsAt: 'a1'),
+            ),
+          ],
+        );
+        addTearDown(c.dispose);
+        await c.read(deletionQueueRepositoryProvider).saveQueue([
+          owned('a1', 'UCa'),
+          owned('a2', 'UCa'),
+        ]);
+        await c.read(deletionQueueProvider.future);
+
+        await c
+            .read(deletionQueueProvider.notifier)
+            .processPendingViaYoutubeApi(channelId: 'UCa');
+
+        expect(deleted, ['a1']);
+        expect(signIns.failed, ['UCa']);
+        expect(
+          [
+            for (final i in await c.read(deletionQueueProvider.future))
+              i.status,
+          ],
+          [DeletionItemStatus.pending, DeletionItemStatus.pending],
+        );
+      },
+    );
   });
 }
 
 class _SignedIn extends AuthNotifier {
   @override
-  AuthState? build() => const AuthState(accessToken: 'token');
+  AuthState? build() => const AuthState(channelId: 'UCa');
+}
+
+class _SignIns extends SavedSignIns {
+  final failed = <String>[];
+
+  @override
+  Future<Map<String, SignInProfile>> build() async => const {};
+
+  @override
+  Future<void> signInFailed(String channelId) async => failed.add(channelId);
 }
 
 class _FakeAuthRepository extends GoogleAuthRepository {
   @override
-  http.Client getAuthenticatedClient(String accessToken) => http.Client();
+  http.Client getAuthenticatedClient(String channelId) => http.Client();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -265,15 +346,26 @@ class _FakeAuthRepository extends GoogleAuthRepository {
 
 class _RecordingDeletions extends YoutubeDeletionRepository {
   final List<String> deleted;
+  final String? signInFailsAt;
 
-  _RecordingDeletions(this.deleted);
+  _RecordingDeletions(this.deleted, {this.signInFailsAt});
 
   @override
-  Future<({bool succeeded, bool quotaExceeded, String? error})> deleteItem(
-    http.Client client,
-    String itemId,
-  ) async {
+  Future<DeletionResult> deleteItem(http.Client client, String itemId) async {
     deleted.add(itemId);
-    return (succeeded: true, quotaExceeded: false, error: null);
+    if (itemId == signInFailsAt) {
+      return (
+        succeeded: false,
+        quotaExceeded: false,
+        signInFailed: true,
+        error: 'invalid_grant',
+      );
+    }
+    return (
+      succeeded: true,
+      quotaExceeded: false,
+      signInFailed: false,
+      error: null,
+    );
   }
 }

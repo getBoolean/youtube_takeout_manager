@@ -20,8 +20,6 @@ typedef TakeoutImportRequest = ({
   /// Whether to add the zips to [saved] instead of replacing it.
   bool merge,
 
-  /// The signed-in account's channel, which the zips must belong to.
-  String? signedInChannelId,
   Set<String> deletedCommentIds,
   Set<String> deletedLiveChatIds,
 });
@@ -47,7 +45,6 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
     exports,
     saved: saved,
     merge: request.merge,
-    signedInChannelId: request.signedInChannelId,
   );
 
   final sources = [if (base != null) _Source.saved(base), ...exports]
@@ -303,15 +300,14 @@ List<_Source> _readExports(List<PickedZip> zips) {
 }
 
 /// Works out the account the exports belong to: the one author channel they
-/// all share. Throws when there isn't exactly one, or when it isn't the
-/// signed-in channel or, when adding, the saved data's channel. When
+/// all share. Throws when there isn't exactly one, or when adding, when it
+/// isn't the saved data's channel. When
 /// replacing, a different channel than the saved data's is allowed and
 /// returned as [ChannelMismatch] instead.
 ({String accountId, ChannelMismatch? differentAccount}) _checkAccount(
   List<_Source> exports, {
   required TakeoutData? saved,
   required bool merge,
-  required String? signedInChannelId,
 }) {
   String? accountId;
   for (final export in exports) {
@@ -346,15 +342,6 @@ List<_Source> _readExports(List<PickedZip> zips) {
   }
   // _readExports never returns an empty list.
   final id = accountId!;
-
-  if (signedInChannelId != null && id != signedInChannelId) {
-    throw TakeoutAccountMismatchException(
-      'This takeout is from a different YouTube account than the one '
-      "you're signed in with.",
-      expectedChannelIds: {signedInChannelId},
-      foundChannelIds: {id},
-    );
-  }
 
   // Data saved before takeouts were kept per account can mix channels; it
   // belongs to the one that wrote most of it.

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
@@ -294,7 +295,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
             TextButton.icon(
               onPressed: isOAuthConfigured
-                  ? () => ref.read(authProvider.notifier).signIn()
+                  ? () => signInToViewedChannel(context, ref)
                   : null,
               icon: const Icon(Icons.login),
               label: const Text('Sign in', textAlign: TextAlign.center),

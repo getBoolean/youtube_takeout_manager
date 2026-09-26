@@ -96,7 +96,7 @@ final class DeletionQueueProvider
   DeletionQueue create() => DeletionQueue();
 }
 
-String _$deletionQueueHash() => r'2e85fa8645228fbd6a1e242955cd8643f7c59a2c';
+String _$deletionQueueHash() => r'732d23e18e1b71c9780d721bf05ebfe578863474';
 
 abstract class _$DeletionQueue extends $AsyncNotifier<List<DeletionQueueItem>> {
   FutureOr<List<DeletionQueueItem>> build();

@@ -8,12 +8,18 @@ part of 'auth_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// The viewed channel's sign-in, or null when it has none: a channel counts
+/// as signed in only with the sign-in chosen for it.
 
 @ProviderFor(AuthNotifier)
 final authProvider = AuthNotifierProvider._();
 
+/// The viewed channel's sign-in, or null when it has none: a channel counts
+/// as signed in only with the sign-in chosen for it.
 final class AuthNotifierProvider
     extends $NotifierProvider<AuthNotifier, AuthState?> {
+  /// The viewed channel's sign-in, or null when it has none: a channel counts
+  /// as signed in only with the sign-in chosen for it.
   AuthNotifierProvider._()
     : super(
         from: null,
@@ -41,7 +47,10 @@ final class AuthNotifierProvider
   }
 }
 
-String _$authNotifierHash() => r'2583b8f5186087476dda26645a97cf0d6f484c09';
+String _$authNotifierHash() => r'16320a3afa1bf051ab0310006116f203ede57cdb';
+
+/// The viewed channel's sign-in, or null when it has none: a channel counts
+/// as signed in only with the sign-in chosen for it.
 
 abstract class _$AuthNotifier extends $Notifier<AuthState?> {
   AuthState? build();

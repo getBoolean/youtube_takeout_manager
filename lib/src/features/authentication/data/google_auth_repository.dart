@@ -1,12 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show protected;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:googleapis/youtube/v3.dart' show DetailedApiRequestError;
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-
-import '../domain/auth_state.dart';
 
 import 'google_auth_repository_stub.dart'
     if (dart.library.io) 'google_auth_repository_native.dart'
@@ -26,9 +23,14 @@ const scopes = [
   'profile',
 ];
 
-const credentialsKey = 'google_auth_credentials';
+/// Whether [error] means a sign-in stopped working: its refresh was refused
+/// (access revoked, account deleted) or the API rejected its token.
+bool isSignInFailure(Object error) =>
+    error is ServerRequestFailedException ||
+    error is AccessDeniedException ||
+    (error is DetailedApiRequestError && error.status == 401);
 
-/// Google OAuth2 authentication.
+/// Google OAuth2 sign-ins, one session per YouTube channel.
 ///
 /// Platform-specific implementations handle the actual sign-in flow:
 /// - Native (Windows/macOS/Linux): local HTTP server redirect via `auth_io`
@@ -36,28 +38,37 @@ const credentialsKey = 'google_auth_credentials';
 abstract class GoogleAuthRepository {
   GoogleAuthRepository();
 
-  http.Client? get authClient;
+  /// Asks the user to sign in, choosing an account and channel. Null if they
+  /// cancel or refuse.
+  Future<AccessCredentials?> requestCredentials();
 
-  Future<AuthState?> signIn();
-  Future<void> signOut();
-  http.Client getAuthenticatedClient(String accessToken);
-  Future<AuthState?> tryRestoreSession();
+  /// Whether saved [credentials] can still be used: on native, whether they
+  /// can be refreshed; on web, where they can't, whether they're still valid.
+  bool isUsable(AccessCredentials credentials);
 
-  // ---------------------------------------------------------------------------
-  // Shared helpers (for subclass use only)
-  // ---------------------------------------------------------------------------
+  /// A client for [credentials], e.g. to look up their channel. The caller
+  /// closes it.
+  http.Client clientFor(AccessCredentials credentials);
 
-  @protected
-  AuthState buildAuthState(String accessToken, Map<String, dynamic> userInfo) {
-    return AuthState(
-      accessToken: accessToken,
-      displayName: userInfo['name'] as String?,
-      email: userInfo['email'] as String?,
-      photoUrl: userInfo['picture'] as String?,
-    );
-  }
+  /// Keeps a session for [channelId], calling [onRefreshed] with each
+  /// refreshed token. Replaces any session it had.
+  void addSession(
+    String channelId,
+    AccessCredentials credentials, {
+    required void Function(AccessCredentials credentials) onRefreshed,
+  });
 
-  @protected
+  bool hasSession(String channelId);
+
+  /// A client for [channelId]'s session. Closing it does nothing, so callers
+  /// can't close the shared session.
+  http.Client getAuthenticatedClient(String channelId);
+
+  /// Ends [channelId]'s session. [revoke] also revokes its token where the
+  /// platform can (web).
+  Future<void> closeSession(String channelId, {bool revoke = false});
+
+  /// The Google account's name, email and photo.
   Future<Map<String, dynamic>> fetchUserInfo(http.Client client) async {
     final response = await client.get(
       Uri.parse('https://www.googleapis.com/oauth2/v3/userinfo'),
@@ -66,50 +77,6 @@ abstract class GoogleAuthRepository {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     return {};
-  }
-
-  @protected
-  static const storage = FlutterSecureStorage();
-
-  @protected
-  Future<void> persistCredentials(AccessCredentials credentials) async {
-    final json = jsonEncode({
-      'accessToken': {
-        'type': credentials.accessToken.type,
-        'data': credentials.accessToken.data,
-        'expiry': credentials.accessToken.expiry.toIso8601String(),
-      },
-      'refreshToken': credentials.refreshToken,
-      'scopes': credentials.scopes,
-    });
-    await storage.write(key: credentialsKey, value: json);
-  }
-
-  @protected
-  Future<AccessCredentials?> loadPersistedCredentials() async {
-    final raw = await storage.read(key: credentialsKey);
-    if (raw == null) return null;
-
-    try {
-      final map = jsonDecode(raw) as Map<String, dynamic>;
-      final tokenMap = map['accessToken'] as Map<String, dynamic>;
-      return AccessCredentials(
-        AccessToken(
-          tokenMap['type'] as String,
-          tokenMap['data'] as String,
-          DateTime.parse(tokenMap['expiry'] as String),
-        ),
-        map['refreshToken'] as String?,
-        (map['scopes'] as List).cast<String>(),
-      );
-    } on Exception {
-      return null;
-    }
-  }
-
-  @protected
-  Future<void> clearPersistedCredentials() async {
-    await storage.delete(key: credentialsKey);
   }
 }
 

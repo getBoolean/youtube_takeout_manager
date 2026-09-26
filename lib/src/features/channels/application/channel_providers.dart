@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
@@ -94,17 +95,13 @@ class ChannelThumbnails extends _$ChannelThumbnails {
 
   Future<void> _fetchPending() async {
     if (_fetchInProgress || _pendingIds.isEmpty) return;
+    final sessionChannelId = ref.read(readSessionChannelIdProvider);
+    if (sessionChannelId == null) return;
     _fetchInProgress = true;
-
-    final authState = ref.read(authProvider);
-    if (authState == null) {
-      _fetchInProgress = false;
-      return;
-    }
 
     final client = ref
         .read(googleAuthRepositoryProvider)
-        .getAuthenticatedClient(authState.accessToken);
+        .getAuthenticatedClient(sessionChannelId);
     try {
       while (_pendingIds.isNotEmpty) {
         final batch = _pendingIds.take(10).toSet();
@@ -119,16 +116,22 @@ class ChannelThumbnails extends _$ChannelThumbnails {
         state = {...state, ...fetched};
       }
       await _cacheRepository.saveThumbnails(state);
+    } catch (e) {
+      if (!isSignInFailure(e)) rethrow;
+      await ref
+          .read(savedSignInsProvider.notifier)
+          .signInFailed(sessionChannelId);
     } finally {
       client.close();
       _fetchInProgress = false;
     }
   }
 
-  /// Fetches thumbnails for channels not already cached (manual refresh).
+  /// Fetches thumbnails for channels not already cached (manual refresh),
+  /// with whichever sign-in is available.
   Future<void> fetchThumbnails(Set<String> channelIds) async {
-    final authState = ref.read(authProvider);
-    if (authState == null) return;
+    final sessionChannelId = ref.read(readSessionChannelIdProvider);
+    if (sessionChannelId == null) return;
 
     final uncachedIds = channelIds.difference(state.keys.toSet()).difference(
       const {unknownChannelId},
@@ -137,7 +140,7 @@ class ChannelThumbnails extends _$ChannelThumbnails {
 
     final client = ref
         .read(googleAuthRepositoryProvider)
-        .getAuthenticatedClient(authState.accessToken);
+        .getAuthenticatedClient(sessionChannelId);
     try {
       final fetched = await _channelRepository.fetchChannelThumbnails(
         client,
@@ -151,6 +154,11 @@ class ChannelThumbnails extends _$ChannelThumbnails {
       }
       state = {...state, ...fetched};
       await _cacheRepository.saveThumbnails(state);
+    } catch (e) {
+      if (!isSignInFailure(e)) rethrow;
+      await ref
+          .read(savedSignInsProvider.notifier)
+          .signInFailed(sessionChannelId);
     } finally {
       client.close();
     }

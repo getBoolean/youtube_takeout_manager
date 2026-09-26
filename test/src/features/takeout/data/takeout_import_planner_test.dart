@@ -95,12 +95,10 @@ TakeoutImportPlan _plan(
   TakeoutData? saved,
   bool merge = true,
   Set<String> deletedCommentIds = const {},
-  String? signedInChannelId,
 }) => planTakeoutImport((
   zips: zips,
   saved: saved,
   merge: merge,
-  signedInChannelId: signedInChannelId,
   deletedCommentIds: deletedCommentIds,
   deletedLiveChatIds: const {},
 ));
@@ -614,41 +612,6 @@ void main() {
 
     for (final merge in [true, false]) {
       final action = merge ? 'adding' : 'replacing with';
-      PickedZip export(String channel) =>
-          _zip('takeout-20260301T000000Z-001.zip', {
-            _comments: _commentsCsv([
-              _c('A', '2026-01-01T00:00:00Z', channel: channel),
-            ]),
-          });
-
-      test('$action a takeout from another channel than the signed-in one '
-          'is rejected', () {
-        expect(
-          () => _plan(
-            [export('UCme')],
-            saved: _savedAbc,
-            merge: merge,
-            signedInChannelId: 'UCsignedIn',
-          ),
-          throwsA(
-            isA<TakeoutAccountMismatchException>()
-                .having((e) => e.expectedChannelIds, 'expected', {'UCsignedIn'})
-                .having((e) => e.foundChannelIds, 'found', {'UCme'}),
-          ),
-        );
-      });
-
-      test('$action a takeout from the signed-in channel is accepted', () {
-        final plan = _plan(
-          [export('UCme')],
-          saved: _savedAbc,
-          merge: merge,
-          signedInChannelId: 'UCme',
-        );
-
-        expect(plan.accountId, 'UCme');
-      });
-
       test('$action a takeout without comments or live chats is rejected', () {
         expect(
           () => _plan(

@@ -1,90 +1,104 @@
+import 'dart:async';
+
 import 'package:googleapis_auth/auth_io.dart' as auth_io;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
-import '../domain/auth_state.dart';
 import 'google_auth_repository.dart';
 
 GoogleAuthRepository createGoogleAuthRepository() =>
     NativeGoogleAuthRepository();
 
 class NativeGoogleAuthRepository extends GoogleAuthRepository {
-  auth_io.AutoRefreshingAuthClient? _client;
+  final _sessions =
+      <
+        String,
+        ({
+          auth_io.AutoRefreshingAuthClient client,
+          StreamSubscription<auth_io.AccessCredentials> updates,
+        })
+      >{};
+
+  static auth_io.ClientId get _clientId =>
+      auth_io.ClientId(googleClientId, googleClientSecret);
 
   @override
-  http.Client? get authClient => _client;
-
-  @override
-  Future<AuthState?> signIn() async {
+  Future<auth_io.AccessCredentials?> requestCredentials() async {
+    final client = http.Client();
     try {
-      final clientId = auth_io.ClientId(googleClientId, googleClientSecret);
-
-      final client = await auth_io.clientViaUserConsent(
-        clientId,
+      return await auth_io.obtainAccessCredentialsViaUserConsent(
+        _clientId,
         scopes,
+        client,
         _openBrowser,
       );
-
-      _client = client;
-      client.credentialUpdates.listen(persistCredentials);
-      await persistCredentials(client.credentials);
-
-      final userInfo = await fetchUserInfo(client);
-      return buildAuthState(client.credentials.accessToken.data, userInfo);
-    } on Exception {
+    } on auth_io.UserConsentException {
       return null;
+    } finally {
+      client.close();
     }
   }
 
   @override
-  Future<void> signOut() async {
-    _client?.close();
-    _client = null;
-    await clearPersistedCredentials();
-  }
+  bool isUsable(auth_io.AccessCredentials credentials) =>
+      credentials.refreshToken != null;
 
   @override
-  http.Client getAuthenticatedClient(String accessToken) {
-    if (_client != null) return NonClosingClient(_client!);
+  http.Client clientFor(auth_io.AccessCredentials credentials) =>
+      auth_io.autoRefreshingClient(_clientId, credentials, http.Client());
 
-    final credentials = auth_io.AccessCredentials(
-      auth_io.AccessToken(
-        'Bearer',
-        accessToken,
-        DateTime.now().toUtc().add(const Duration(hours: 1)),
-      ),
-      null,
-      scopes,
+  @override
+  void addSession(
+    String channelId,
+    auth_io.AccessCredentials credentials, {
+    required void Function(auth_io.AccessCredentials credentials) onRefreshed,
+  }) {
+    unawaited(closeSession(channelId));
+    final client = auth_io.autoRefreshingClient(
+      _clientId,
+      credentials,
+      http.Client(),
     );
-    return auth_io.authenticatedClient(http.Client(), credentials);
+    _sessions[channelId] = (
+      client: client,
+      updates: client.credentialUpdates.listen(onRefreshed),
+    );
   }
 
   @override
-  Future<AuthState?> tryRestoreSession() async {
-    final credentials = await loadPersistedCredentials();
-    if (credentials == null || credentials.refreshToken == null) return null;
+  bool hasSession(String channelId) => _sessions.containsKey(channelId);
 
-    try {
-      final clientId = auth_io.ClientId(googleClientId, googleClientSecret);
-      final client = auth_io.autoRefreshingClient(
-        clientId,
-        credentials,
-        http.Client(),
-      );
-
-      _client = client;
-      client.credentialUpdates.listen(persistCredentials);
-
-      final userInfo = await fetchUserInfo(client);
-      return buildAuthState(client.credentials.accessToken.data, userInfo);
-    } on Exception {
-      await clearPersistedCredentials();
-      return null;
+  @override
+  http.Client getAuthenticatedClient(String channelId) {
+    final session = _sessions[channelId];
+    if (session == null) {
+      throw StateError('No sign-in for channel $channelId');
     }
+    return NonClosingClient(session.client);
   }
 
+  @override
+  Future<void> closeSession(String channelId, {bool revoke = false}) async {
+    final session = _sessions.remove(channelId);
+    if (session == null) return;
+    // Stop saving refreshed tokens first, so a refresh in flight can't save
+    // one for a removed sign-in.
+    await session.updates.cancel();
+    session.client.close();
+  }
+
+  /// Opens Google's consent page, always asking which account and channel
+  /// to use, and to consent again so a refresh token is always issued.
   void _openBrowser(String url) {
-    launchUrl(Uri.parse(url));
+    final uri = Uri.parse(url);
+    launchUrl(
+      uri.replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          'prompt': 'select_account consent',
+        },
+      ),
+    );
   }
 }

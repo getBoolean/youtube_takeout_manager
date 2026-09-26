@@ -1,36 +1,67 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../data/google_auth_repository.dart';
 import '../domain/auth_state.dart';
+import '../domain/sign_in_outcome.dart';
+import 'saved_sign_ins.dart';
 
 part 'auth_notifier.g.dart';
 
+/// The viewed channel's sign-in, or null when it has none: a channel counts
+/// as signed in only with the sign-in chosen for it.
 @Riverpod(keepAlive: true)
 class AuthNotifier extends _$AuthNotifier {
-  GoogleAuthRepository get _authRepository =>
-      ref.read(googleAuthRepositoryProvider);
+  /// Counts [signIn] calls, so only the latest reports how it went.
+  var _generation = 0;
 
   @override
-  AuthState? build() => null;
-
-  Future<void> signIn() async {
-    final authState = await _authRepository.signIn();
-    if (authState != null) {
-      state = authState;
+  AuthState? build() {
+    final channelId = ref.watch(viewedChannelIdProvider);
+    if (channelId == null) return null;
+    final profile = ref.watch(
+      savedSignInsProvider.select((s) => s.value?[channelId]),
+    );
+    if (profile == null) return null;
+    if (!ref.watch(googleAuthRepositoryProvider).hasSession(channelId)) {
+      return null;
     }
+    return AuthState.fromProfile(profile);
   }
 
+  /// Asks the user to sign in, and saves the sign-in for the channel they
+  /// chose, whichever that is. Compares it with the channel viewed when
+  /// sign-in finishes.
+  Future<SignInOutcome> signIn() async {
+    final generation = ++_generation;
+    final credentials = await ref
+        .read(googleAuthRepositoryProvider)
+        .requestCredentials();
+    if (credentials == null) return const SignInCancelled();
+
+    // Saved even if a newer sign-in started: it's for its own channel.
+    final profile = await ref
+        .read(savedSignInsProvider.notifier)
+        .add(credentials);
+    if (generation != _generation) return const SignInCancelled();
+    if (profile == null) return const SignInNoChannel();
+
+    final viewed = ref.read(viewedChannelIdProvider);
+    if (viewed == null || viewed == profile.channelId) {
+      return SignedIn(profile);
+    }
+    return SignedInOtherChannel(profile, viewedChannelId: viewed);
+  }
+
+  /// Signs the viewed channel out. Other channels stay signed in.
   Future<void> signOut() async {
-    await _authRepository.signOut();
-    state = null;
-  }
-
-  /// Attempt to restore a previous session from persisted credentials.
-  Future<void> tryRestoreSession() async {
-    final authState = await _authRepository.tryRestoreSession();
-    if (authState != null) {
-      state = authState;
-    }
+    final channelId = ref.read(viewedChannelIdProvider);
+    if (channelId == null) return;
+    await ref
+        .read(savedSignInsProvider.notifier)
+        .remove(channelId, revoke: true);
   }
 }
 

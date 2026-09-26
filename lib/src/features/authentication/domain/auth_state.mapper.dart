@@ -22,10 +22,22 @@ class AuthStateMapper extends ClassMapperBase<AuthState> {
   @override
   final String id = 'AuthState';
 
-  static String _$accessToken(AuthState v) => v.accessToken;
-  static const Field<AuthState, String> _f$accessToken = Field(
-    'accessToken',
-    _$accessToken,
+  static String _$channelId(AuthState v) => v.channelId;
+  static const Field<AuthState, String> _f$channelId = Field(
+    'channelId',
+    _$channelId,
+  );
+  static String? _$channelTitle(AuthState v) => v.channelTitle;
+  static const Field<AuthState, String> _f$channelTitle = Field(
+    'channelTitle',
+    _$channelTitle,
+    opt: true,
+  );
+  static String? _$channelThumbnailUrl(AuthState v) => v.channelThumbnailUrl;
+  static const Field<AuthState, String> _f$channelThumbnailUrl = Field(
+    'channelThumbnailUrl',
+    _$channelThumbnailUrl,
+    opt: true,
   );
   static String? _$displayName(AuthState v) => v.displayName;
   static const Field<AuthState, String> _f$displayName = Field(
@@ -48,7 +60,9 @@ class AuthStateMapper extends ClassMapperBase<AuthState> {
 
   @override
   final MappableFields<AuthState> fields = const {
-    #accessToken: _f$accessToken,
+    #channelId: _f$channelId,
+    #channelTitle: _f$channelTitle,
+    #channelThumbnailUrl: _f$channelThumbnailUrl,
     #displayName: _f$displayName,
     #email: _f$email,
     #photoUrl: _f$photoUrl,
@@ -56,7 +70,9 @@ class AuthStateMapper extends ClassMapperBase<AuthState> {
 
   static AuthState _instantiate(DecodingData data) {
     return AuthState(
-      accessToken: data.dec(_f$accessToken),
+      channelId: data.dec(_f$channelId),
+      channelTitle: data.dec(_f$channelTitle),
+      channelThumbnailUrl: data.dec(_f$channelThumbnailUrl),
       displayName: data.dec(_f$displayName),
       email: data.dec(_f$email),
       photoUrl: data.dec(_f$photoUrl),
@@ -123,7 +139,9 @@ extension AuthStateValueCopy<$R, $Out> on ObjectCopyWith<$R, AuthState, $Out> {
 abstract class AuthStateCopyWith<$R, $In extends AuthState, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
   $R call({
-    String? accessToken,
+    String? channelId,
+    String? channelTitle,
+    String? channelThumbnailUrl,
     String? displayName,
     String? email,
     String? photoUrl,
@@ -141,13 +159,18 @@ class _AuthStateCopyWithImpl<$R, $Out>
       AuthStateMapper.ensureInitialized();
   @override
   $R call({
-    String? accessToken,
+    String? channelId,
+    Object? channelTitle = $none,
+    Object? channelThumbnailUrl = $none,
     Object? displayName = $none,
     Object? email = $none,
     Object? photoUrl = $none,
   }) => $apply(
     FieldCopyWithData({
-      if (accessToken != null) #accessToken: accessToken,
+      if (channelId != null) #channelId: channelId,
+      if (channelTitle != $none) #channelTitle: channelTitle,
+      if (channelThumbnailUrl != $none)
+        #channelThumbnailUrl: channelThumbnailUrl,
       if (displayName != $none) #displayName: displayName,
       if (email != $none) #email: email,
       if (photoUrl != $none) #photoUrl: photoUrl,
@@ -155,7 +178,12 @@ class _AuthStateCopyWithImpl<$R, $Out>
   );
   @override
   AuthState $make(CopyWithData data) => AuthState(
-    accessToken: data.get(#accessToken, or: $value.accessToken),
+    channelId: data.get(#channelId, or: $value.channelId),
+    channelTitle: data.get(#channelTitle, or: $value.channelTitle),
+    channelThumbnailUrl: data.get(
+      #channelThumbnailUrl,
+      or: $value.channelThumbnailUrl,
+    ),
     displayName: data.get(#displayName, or: $value.displayName),
     email: data.get(#email, or: $value.email),
     photoUrl: data.get(#photoUrl, or: $value.photoUrl),

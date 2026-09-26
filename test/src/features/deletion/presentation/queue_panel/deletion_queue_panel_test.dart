@@ -126,9 +126,8 @@ void main() {
             ),
           ]),
           authProvider.overrideWith(
-            () => _FakeAuth(
-              signedIn ? const AuthState(accessToken: 'token') : null,
-            ),
+            () =>
+                _FakeAuth(signedIn ? const AuthState(channelId: 'UCme') : null),
           ),
           quotaProvider.overrideWith(_FakeQuota.new),
         ],

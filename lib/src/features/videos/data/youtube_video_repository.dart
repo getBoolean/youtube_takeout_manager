@@ -4,6 +4,8 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+
 import '../domain/video.dart';
 
 part 'youtube_video_repository.g.dart';
@@ -58,7 +60,9 @@ class YoutubeVideoRepository {
             publishedAt: snippet.publishedAt,
           );
         }
-      } catch (_) {
+      } catch (e) {
+        // A sign-in that stopped working fails every batch; let it through.
+        if (isSignInFailure(e)) rethrow;
         // Continue with remaining batches on error
       }
 
@@ -100,7 +104,9 @@ class YoutubeVideoRepository {
             publishedAt: snippet.publishedAt,
           );
         }
-      } catch (_) {
+      } catch (e) {
+        // A sign-in that stopped working fails every batch; let it through.
+        if (isSignInFailure(e)) rethrow;
         // Continue with remaining batches on error
       }
 

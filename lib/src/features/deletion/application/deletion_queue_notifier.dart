@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
@@ -327,13 +328,14 @@ class DeletionQueue extends _$DeletionQueue {
   Future<void> _processQueueViaYoutubeApi(String channelId) async {
     if (_isProcessing) return;
 
+    // Only the channel's own sign-in may delete its items.
     final authState = ref.read(authProvider);
-    if (authState == null) return;
+    if (authState == null || authState.channelId != channelId) return;
     _setProcessing(processing: true, paused: false);
 
     final client = ref
         .read(googleAuthRepositoryProvider)
-        .getAuthenticatedClient(authState.accessToken);
+        .getAuthenticatedClient(channelId);
 
     try {
       await ref.read(quotaProvider.notifier).resetIfNewDay();
@@ -397,6 +399,12 @@ class DeletionQueue extends _$DeletionQueue {
                 .read(deletedLiveChatIdsProvider.notifier)
                 .markDeleted(idSet);
           }
+        } else if (result.signInFailed) {
+          // Not the item's fault: keep it to delete once signed in again,
+          // and stop instead of failing every other item the same way.
+          await _updateItem(nextItem.id, nextItem);
+          await ref.read(savedSignInsProvider.notifier).signInFailed(channelId);
+          break;
         } else if (result.quotaExceeded) {
           await _updateItem(
             nextItem.id,

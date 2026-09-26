@@ -4,31 +4,45 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
+
+const _viewed = TakeoutChannel(
+  channelId: 'UCme',
+  title: 'Boolean',
+  isMain: true,
+  listed: true,
+);
 
 const _signedIn = AuthState(
-  accessToken: 'token',
+  channelId: 'UCme',
+  channelTitle: 'Boolean',
   displayName: 'Ada',
   email: 'ada@example.com',
 );
 
 class _FakeAuth extends AuthNotifier {
   final AuthState? initial;
+  final SignInOutcome outcome;
   var signInCalls = 0;
 
-  _FakeAuth(this.initial);
+  _FakeAuth(this.initial, {required this.outcome});
 
   @override
   AuthState? build() => initial;
 
   @override
-  Future<void> signIn() async {
+  Future<SignInOutcome> signIn() async {
     signInCalls++;
-    state = _signedIn;
+    if (outcome is SignedIn) state = _signedIn;
+    return outcome;
   }
 
   @override
@@ -56,14 +70,17 @@ void main() {
     WidgetTester tester, {
     AuthState? signedIn,
     bool oauthConfigured = true,
+    TakeoutChannel? viewed = _viewed,
+    SignInOutcome outcome = const SignedIn(SignInProfile(channelId: 'UCme')),
   }) async {
-    auth = _FakeAuth(signedIn);
+    auth = _FakeAuth(signedIn, outcome: outcome);
     quota = _FakeQuota();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
+          viewedChannelProvider.overrideWithValue(viewed),
         ],
         child: MaterialApp(
           home: Scaffold(body: AccountDialog(oauthConfigured: oauthConfigured)),
@@ -73,16 +90,62 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('signed out offers Google sign-in', (tester) async {
+  testWidgets('signed out, names the viewed channel and which to choose', (
+    tester,
+  ) async {
     await pumpDialog(tester);
 
-    expect(find.text('Not signed in'), findsOneWidget);
+    expect(find.text("Boolean isn't signed in"), findsOneWidget);
+    expect(find.textContaining('When Google asks, choose Boolean'), findsOne);
+  });
+
+  testWidgets('signing in with the viewed channel signs it in', (tester) async {
+    await pumpDialog(tester);
+
     await tester.tap(find.text('Sign in with Google'));
     await tester.pumpAndSettle();
 
     expect(auth.signInCalls, 1);
     expect(find.text('Ada'), findsOneWidget);
+    expect(find.text('Signed in as Boolean'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('signing in with another channel warns, naming both', (
+    tester,
+  ) async {
+    await pumpDialog(
+      tester,
+      outcome: const SignedInOtherChannel(
+        SignInProfile(channelId: 'UCalt', channelTitle: 'Gaming Alt'),
+        viewedChannelId: 'UCme',
+      ),
+    );
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Signed in with another channel'), findsOneWidget);
+    expect(find.text('Gaming Alt'), findsOneWidget);
+    expect(find.text('youtube.com/channel/UCalt'), findsOneWidget);
+    expect(find.text('Boolean'), findsOneWidget);
+    expect(find.text('youtube.com/channel/UCme'), findsOneWidget);
+    expect(find.textContaining('saved for Gaming Alt'), findsOneWidget);
+
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Signed in with another channel'), findsNothing);
+    // Still signed out.
+    expect(find.text("Boolean isn't signed in"), findsOneWidget);
+  });
+
+  testWidgets('explains an account without a YouTube channel', (tester) async {
+    await pumpDialog(tester, outcome: const SignInNoChannel());
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No YouTube channel'), findsOneWidget);
   });
 
   testWidgets("sign-in is disabled when it isn't configured", (tester) async {
@@ -98,16 +161,34 @@ void main() {
     expect(find.text("Sign-in isn't configured"), findsOneWidget);
   });
 
-  testWidgets('signed in shows the account and signs out', (tester) async {
+  testWidgets('sign-in waits for a takeout to sign its channel in', (
+    tester,
+  ) async {
+    await pumpDialog(tester, viewed: null);
+
+    final button = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Sign in with Google'),
+        matching: find.bySubtype<ButtonStyleButton>(),
+      ),
+    );
+    expect(button.onPressed, isNull);
+    expect(find.text('Import a takeout to sign in.'), findsOneWidget);
+  });
+
+  testWidgets('signed in shows the account and channel, and signs out', (
+    tester,
+  ) async {
     await pumpDialog(tester, signedIn: _signedIn);
 
     expect(find.text('Ada'), findsOneWidget);
     expect(find.text('ada@example.com'), findsOneWidget);
+    expect(find.text('Signed in as Boolean'), findsOneWidget);
 
     await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Not signed in'), findsOneWidget);
+    expect(find.text("Boolean isn't signed in"), findsOneWidget);
   });
 
   testWidgets('shows quota usage, which is API-only', (tester) async {
@@ -121,6 +202,7 @@ void main() {
   testWidgets('resets quota usage after confirming', (tester) async {
     await pumpDialog(tester);
 
+    await tester.ensureVisible(find.text('Reset usage'));
     await tester.tap(find.text('Reset usage'));
     await tester.pumpAndSettle();
     expect(find.text('Reset Quota Usage'), findsOneWidget);
@@ -148,12 +230,13 @@ void main() {
   });
 
   testWidgets('the account button opens the dialog', (tester) async {
-    auth = _FakeAuth(null);
+    auth = _FakeAuth(null, outcome: const SignInCancelled());
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           authProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(_FakeQuota.new),
+          viewedChannelProvider.overrideWithValue(_viewed),
         ],
         child: MaterialApp(
           home: Scaffold(appBar: AppBar(actions: const [AccountButton()])),

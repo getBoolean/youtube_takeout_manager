@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/app.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,17 +29,13 @@ class _AppWrapperState extends ConsumerState<_AppWrapper> {
   @override
   void initState() {
     super.initState();
-    if (isOAuthConfigured) {
-      _initSession();
-    }
-  }
-
-  Future<void> _initSession() async {
-    await ref.read(authProvider.notifier).tryRestoreSession();
+    // Restores saved sign-ins now, so the viewed channel is signed in by the
+    // time it shows.
+    if (isOAuthConfigured) ref.read(savedSignInsProvider);
   }
 
   @override
   Widget build(BuildContext context) {
-    return App();
+    return const App();
   }
 }
