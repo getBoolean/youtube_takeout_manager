@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/features/comments/application/comment_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
@@ -155,7 +156,6 @@ class ChannelTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final url = channelUrl;
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -165,33 +165,11 @@ class ChannelTitle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               if (constraints.maxWidth >= _avatarMinWidth) ...[
-                CircleAvatar(
+                ChannelAvatar(
+                  name: channelName,
+                  thumbnailUrl: thumbnailUrl,
                   radius: 16,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  child: url == null
-                      ? Icon(
-                          Icons.help_outline,
-                          size: 18,
-                          color: theme.colorScheme.onPrimaryContainer,
-                        )
-                      : thumbnailUrl != null
-                      ? ClipOval(
-                          child: Image.network(
-                            thumbnailUrl!,
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.cover,
-                            webHtmlElementStrategy:
-                                WebHtmlElementStrategy.prefer,
-                          ),
-                        )
-                      : Text(
-                          channelName[0].toUpperCase(),
-                          style: TextStyle(
-                            color: theme.colorScheme.onPrimaryContainer,
-                            fontSize: 14,
-                          ),
-                        ),
+                  icon: url == null ? Icons.help_outline : null,
                 ),
                 const SizedBox(width: 12),
               ],

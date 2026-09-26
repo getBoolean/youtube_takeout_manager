@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import '../application/emoji_providers.dart';
 import '../domain/channel_emoji.dart';
 import '../domain/emoji_use.dart';
@@ -283,40 +284,6 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   }
 }
 
-class _ChannelAvatar extends StatelessWidget {
-  final ChannelEmojiGroup group;
-  final double radius;
-
-  const _ChannelAvatar({required this.group, required this.radius});
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final url = group.thumbnailUrl;
-    return CircleAvatar(
-      radius: radius,
-      backgroundColor: colorScheme.primaryContainer,
-      child: url != null
-          ? ClipOval(
-              child: Image.network(
-                url,
-                width: radius * 2,
-                height: radius * 2,
-                fit: BoxFit.cover,
-                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-              ),
-            )
-          : Text(
-              group.displayTitle[0].toUpperCase(),
-              style: TextStyle(
-                color: colorScheme.onPrimaryContainer,
-                fontSize: radius,
-              ),
-            ),
-    );
-  }
-}
-
 /// A section's channel avatar or category icon.
 class _SectionIcon extends StatelessWidget {
   final _Section section;
@@ -327,7 +294,11 @@ class _SectionIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (section.channel case final channel?) {
-      return _ChannelAvatar(group: channel, radius: size / 2);
+      return ChannelAvatar(
+        name: channel.displayTitle,
+        thumbnailUrl: channel.thumbnailUrl,
+        radius: size / 2,
+      );
     }
     return SizedBox.square(
       dimension: size,

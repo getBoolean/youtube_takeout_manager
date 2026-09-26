@@ -32,6 +32,18 @@ void main() {
     expect(find.text('B'), findsOneWidget);
   });
 
+  testWidgets('an icon stands in for a channel that isn\'t known', (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const ChannelAvatar(name: '', icon: Icons.help_outline, radius: 20),
+    );
+
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
+    expect(find.text('?'), findsNothing);
+  });
+
   testWidgets('a channel identity shows its picture beside its name', (
     tester,
   ) async {

@@ -6,16 +6,22 @@ class ChannelAvatar extends StatelessWidget {
   final String? thumbnailUrl;
   final double radius;
 
+  /// Shown instead of the picture or initial, e.g. for items whose channel
+  /// isn't known.
+  final IconData? icon;
+
   const ChannelAvatar({
     super.key,
     required this.name,
     this.thumbnailUrl,
     required this.radius,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final icon = this.icon;
     final initial = Text(
       name.isEmpty ? '?' : name[0].toUpperCase(),
       style: TextStyle(
@@ -27,7 +33,9 @@ class ChannelAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: radius,
       backgroundColor: scheme.primaryContainer,
-      child: url == null
+      child: icon != null
+          ? Icon(icon, size: radius * 1.1, color: scheme.onPrimaryContainer)
+          : url == null
           ? initial
           : ClipOval(
               child: Image.network(

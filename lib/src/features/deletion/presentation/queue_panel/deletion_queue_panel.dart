@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
@@ -383,27 +384,7 @@ class _ChannelGroupHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 12,
-            backgroundColor: theme.colorScheme.primaryContainer,
-            child: thumbnailUrl != null
-                ? ClipOval(
-                    child: Image.network(
-                      thumbnailUrl,
-                      width: 24,
-                      height: 24,
-                      fit: BoxFit.cover,
-                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    ),
-                  )
-                : Text(
-                    name[0].toUpperCase(),
-                    style: TextStyle(
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontSize: 11,
-                    ),
-                  ),
-          ),
+          ChannelAvatar(name: name, thumbnailUrl: thumbnailUrl, radius: 12),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
