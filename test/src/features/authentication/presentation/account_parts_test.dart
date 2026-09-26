@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/domain/account_profile.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_channels_section.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_account_header.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 
 const _main = TakeoutChannel(
@@ -93,15 +95,46 @@ void main() {
 
       expect(find.text('No takeout imported'), findsOneWidget);
     });
+
+    testWidgets('expands to show the other accounts', (tester) async {
+      var toggles = 0;
+      await pump(
+        tester,
+        GoogleAccountHeader(mainChannel: _main, onToggle: () => toggles++),
+      );
+
+      await tester.tap(find.byTooltip('Show other Google accounts'));
+      expect(toggles, 1);
+
+      await pump(
+        tester,
+        GoogleAccountHeader(
+          mainChannel: _main,
+          expanded: true,
+          onToggle: () => toggles++,
+        ),
+      );
+      await tester.tap(find.text('Boolean'));
+      expect(toggles, 2);
+      expect(find.byTooltip('Hide other Google accounts'), findsOneWidget);
+    });
   });
 
   group('AccountChannelsSection', () {
-    late List<String> viewed, signedIn, signedOut;
+    late List<String> viewed, signedIn, signedOut, dismissed, viewedChosen;
 
-    Future<void> pumpSection(WidgetTester tester, {bool signInEnabled = true}) {
+    Future<void> pumpSection(
+      WidgetTester tester, {
+      bool signInEnabled = true,
+      bool deletionRunning = false,
+      Map<String, SignInNotice> notices = const {},
+      Set<String> savedChannelIds = const {},
+    }) {
       viewed = [];
       signedIn = [];
       signedOut = [];
+      dismissed = [];
+      viewedChosen = [];
       return pump(
         tester,
         AccountChannelsSection(
@@ -109,9 +142,14 @@ void main() {
           viewedChannelId: 'UCme',
           signedInChannelIds: const {'UCme'},
           signInEnabled: signInEnabled,
+          deletionRunning: deletionRunning,
+          notices: notices,
+          savedChannelIds: savedChannelIds,
           onView: viewed.add,
           onSignIn: signedIn.add,
           onSignOut: signedOut.add,
+          onDismissNotice: dismissed.add,
+          onViewChosen: viewedChosen.add,
         ),
       );
     }
@@ -121,7 +159,8 @@ void main() {
     ) async {
       await pumpSection(tester);
 
-      expect(find.text('Channels'), findsOneWidget);
+      // They sit inside the account's tile, so need no heading.
+      expect(find.text('Channels'), findsNothing);
       expect(find.text('Viewing'), findsOneWidget);
       expect(find.text('1,234 comments · 5 live chats'), findsOneWidget);
       // Sign out already says the channel is signed in.
@@ -157,5 +196,62 @@ void main() {
       );
       expect(button.onPressed, isNull);
     });
+
+    testWidgets("shows a sign-in notice on its channel's row", (tester) async {
+      await pumpSection(
+        tester,
+        notices: const {
+          'UCalt': OtherChannelChosen(
+            SignInProfile(channelId: 'UCx', channelTitle: 'Someone Else'),
+          ),
+        },
+        savedChannelIds: const {'UCx'},
+      );
+
+      final banner = find.byType(SignInNoticeBanner);
+      expect(banner, findsOneWidget);
+      // Below Gaming Alt's name, so it's clearly about that row.
+      expect(
+        tester.getTopLeft(banner).dy,
+        greaterThan(tester.getTopLeft(find.text('Gaming Alt').first).dy),
+      );
+
+      await tester.tap(find.text('View Someone Else'));
+      await tester.tap(find.byTooltip('Dismiss'));
+      expect(viewedChosen, ['UCx']);
+      expect(dismissed, ['UCalt']);
+    });
+
+    testWidgets("can't view the chosen channel when no takeout has it", (
+      tester,
+    ) async {
+      await pumpSection(
+        tester,
+        notices: const {
+          'UCalt': OtherChannelChosen(
+            SignInProfile(channelId: 'UCx', channelTitle: 'Someone Else'),
+          ),
+        },
+      );
+
+      expect(find.text('View Someone Else'), findsNothing);
+    });
+
+    testWidgets(
+      'while deleting, channels can be neither viewed nor signed out',
+      (tester) async {
+        await pumpSection(tester, deletionRunning: true);
+
+        await tester.tap(find.text('Gaming Alt'));
+        final signOut = tester.widget<ButtonStyleButton>(
+          find.ancestor(
+            of: find.text('Sign out'),
+            matching: find.bySubtype<ButtonStyleButton>(),
+          ),
+        );
+        expect(viewed, isEmpty);
+        expect(signOut.onPressed, isNull);
+      },
+    );
   });
 }

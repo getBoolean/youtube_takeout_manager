@@ -52,6 +52,8 @@ class LostSignInNotifier extends _$LostSignInNotifier {
   LostSignIn? build() => null;
 
   void report(SignInProfile profile) => state = LostSignIn(profile);
+
+  void dismiss() => state = null;
 }
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each

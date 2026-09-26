@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 
 TakeoutChannel _channel(String id, {int comments = 0, int liveChats = 0}) =>
     TakeoutChannel(

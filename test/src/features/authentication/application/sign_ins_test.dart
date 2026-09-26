@@ -323,6 +323,9 @@ void main() {
     expect(c.read(authProvider), isNull);
     expect(await storedChannels(), isEmpty);
     expect(c.read(lostSignInProvider)?.profile.channelId, 'UCa');
+
+    c.read(lostSignInProvider.notifier).dismiss();
+    expect(c.read(lostSignInProvider), isNull);
   });
 
   group('reads', () {

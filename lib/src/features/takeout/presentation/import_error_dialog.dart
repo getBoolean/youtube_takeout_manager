@@ -14,53 +14,64 @@ class ImportErrorDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final error = this.error;
-
     return AlertDialog(
       icon: Icon(Icons.error_outline, color: theme.colorScheme.error),
-      title: Text(
-        error is TakeoutAccountMismatchException
-            ? 'Different YouTube account'
-            : "Couldn't import takeout",
-      ),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(error.message),
-            if (error case TakeoutAccountMismatchException(
-              :final expectedChannelIds,
-              :final foundChannelIds,
-              :final titlesById,
-            )) ...[
-              const SizedBox(height: 16),
-              _ChannelIds(
-                label: 'Expected',
-                channelIds: expectedChannelIds,
-                titlesById: titlesById,
-              ),
-              const SizedBox(height: 12),
-              _ChannelIds(
-                label: 'In this takeout',
-                channelIds: foundChannelIds,
-                titlesById: titlesById,
-              ),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              'Nothing was imported.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
+      title: Text(importErrorTitle(error)),
+      content: SingleChildScrollView(child: ImportErrorDetails(error: error)),
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('OK'),
+        ),
+      ],
+    );
+  }
+}
+
+String importErrorTitle(Object error) =>
+    error is TakeoutAccountMismatchException
+    ? 'Different YouTube account'
+    : "Couldn't import takeout";
+
+/// Why an import failed, naming the channels of an account mismatch.
+class ImportErrorDetails extends StatelessWidget {
+  final Object error;
+
+  const ImportErrorDetails({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final error = this.error;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(error is TakeoutImportException ? error.message : 'Error: $error'),
+        if (error case TakeoutAccountMismatchException(
+          :final expectedChannelIds,
+          :final foundChannelIds,
+          :final titlesById,
+        )) ...[
+          const SizedBox(height: 16),
+          _ChannelIds(
+            label: 'Expected',
+            channelIds: expectedChannelIds,
+            titlesById: titlesById,
+          ),
+          const SizedBox(height: 12),
+          _ChannelIds(
+            label: 'In this takeout',
+            channelIds: foundChannelIds,
+            titlesById: titlesById,
+          ),
+        ],
+        const SizedBox(height: 16),
+        Text(
+          'Nothing was imported.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );

@@ -10,6 +10,9 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/cross_channel_search_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
@@ -46,17 +49,21 @@ import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounce
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
@@ -188,6 +195,65 @@ class _SavedTakeouts extends SavedTakeouts {
     _longTakeout,
     _longTakeout.copyWith(id: 'UCother'),
   ];
+}
+
+final _removal = TakeoutRemoval(
+  summary: _longTakeout,
+  orphanedChannelIds: const {'UCme'},
+  queuedCount: 1234,
+  signInIds: const {'UCme'},
+);
+
+final _longPlan = TakeoutImportPlan(
+  accountId: 'UCother',
+  channels: _longTakeout.channels,
+  mergedData: const TakeoutData(
+    comments: [],
+    liveChats: [],
+    subscriptionsByChannelId: {},
+    skippedCommentRows: 12,
+  ),
+  csvFiles: const {},
+  goneCommentIds: const {},
+  goneLiveChatIds: const {},
+  newlyDeletedCommentCount: 0,
+  newlyDeletedLiveChatCount: 0,
+  newCommentCount: 0,
+  newLiveChatCount: 0,
+  commentCheckSkipped: DeletionCheckSkipReason.unparsedRows,
+);
+
+Widget _addAccount(AddAccountState state) => AddAccountSection(
+  state: state,
+  enabled: true,
+  accountNames: const {'UCme': 'A channel with a fairly long name'},
+  viewedTakeoutId: 'UCother',
+  onStart: () {},
+  onConfirm: () {},
+  onDismiss: () {},
+  onViewSaved: (_) {},
+);
+
+const _notices = <String, SignInNotice>{
+  'UCme': OtherChannelChosen(
+    SignInProfile(
+      channelId: 'UCaVeryLongChannelIdentifier12',
+      channelTitle: 'A channel with a fairly long name',
+    ),
+  ),
+  'UCa': NoYouTubeChannel(),
+  'UCb': SignInFailed('Exception: the connection was closed unexpectedly'),
+  'UCc': SignInStoppedWorking(),
+};
+
+class _Notices extends SignInNotices {
+  @override
+  Map<String, SignInNotice> build() => {'UCme': _notices['UCme']!};
+}
+
+class _Deleting extends DeletionProcessing {
+  @override
+  DeletionProcessingState build() => DeletionProcessingState.running;
 }
 
 class _TwoChannelTakeout extends TakeoutNotifier {
@@ -342,7 +408,11 @@ Widget _channelListParts() => Scaffold(
 );
 
 void main() {
-  void fitsAtEveryWidth(String subject, Widget Function() build) {
+  void fitsAtEveryWidth(
+    String subject,
+    Widget Function() build, {
+    Future<void> Function(WidgetTester tester)? then,
+  }) {
     for (final scale in _textScales) {
       for (final width in _widths) {
         testWidgets('$subject fits ${width.toInt()}px at ${scale}x text', (
@@ -370,6 +440,7 @@ void main() {
           );
           await tester.pump();
           await tester.pump(const Duration(seconds: 1));
+          await then?.call(tester);
         });
       }
     }
@@ -438,20 +509,100 @@ void main() {
     () => const NoYouTubeChannelDialog(),
   );
   fitsAtEveryWidth(
-    'the switch takeout dialog',
+    'the account dialog with every account shown',
     () => ProviderScope(
-      overrides: [savedTakeoutsProvider.overrideWith(_SavedTakeouts.new)],
-      child: const Scaffold(body: SwitchTakeoutDialog()),
+      overrides: [
+        takeoutChannelsProvider.overrideWithValue(const []),
+        savedTakeoutsProvider.overrideWith(_SavedTakeouts.new),
+      ],
+      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
     ),
   );
   fitsAtEveryWidth(
-    'the remove takeout dialog',
-    () => RemoveTakeoutDialog(
-      removal: TakeoutRemoval(
-        summary: _longTakeout,
-        orphanedChannelIds: const {'UCme'},
-        queuedCount: 1234,
-        signInIds: const {'UCme'},
+    'the account dialog while deleting, with notices',
+    () => ProviderScope(
+      overrides: [
+        savedSignInsProvider.overrideWith(_SignIns.new),
+        deletionProcessingProvider.overrideWith(_Deleting.new),
+        signInNoticesProvider.overrideWith(_Notices.new),
+      ],
+      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the sign-in notices',
+    () => Scaffold(
+      body: ListView(
+        children: [
+          for (final notice in _notices.values)
+            SignInNoticeBanner(
+              notice: notice,
+              targetChannelId: 'UCanotherLongChannelIdentifier',
+              targetTitle: 'Another channel with a long name',
+              onViewChosen: () {},
+              onDismiss: () {},
+            ),
+        ],
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'another account opened',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: OtherAccountsSection(
+          viewedAccount: _longTakeout,
+          accounts: [
+            OtherAccount(
+              summary: _longTakeout.copyWith(id: 'UCother'),
+              profile: _longProfile,
+            ),
+          ],
+          deletionRunning: false,
+          onView: (_, _) {},
+          planRemoval: (_) async => _removal,
+          onRemove: (_) {},
+          otherSignIns: const [_longProfile],
+          onRemoveSignIn: (_) {},
+          addAccount: _addAccount(const AddAccountIdle()),
+        ),
+      ),
+    ),
+    then: (tester) async {
+      await tester.tap(find.text(_longProfile.displayName!));
+      await tester.pumpAndSettle();
+    },
+  );
+  fitsAtEveryWidth(
+    'the remove confirmation',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: RemoveTakeoutConfirmation(
+          removal: _removal,
+          onCancel: () {},
+          onConfirm: () {},
+        ),
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'adding an account',
+    () => Scaffold(
+      body: ListView(
+        children: [
+          _addAccount(const AddAccountWorking()),
+          _addAccount(AddAccountReview(_longPlan)),
+          _addAccount(const AddAccountAlreadySaved('UCme')),
+          _addAccount(
+            const AddAccountFailed(
+              TakeoutAccountMismatchException(
+                'This takeout has channels from more than one saved takeout.',
+                expectedChannelIds: {'UCaVeryLongChannelIdentifier12'},
+                foundChannelIds: {'UCanotherLongChannelIdentifier'},
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );
