@@ -12,6 +12,8 @@ import '../data/credential_store.dart';
 import '../data/google_auth_repository.dart';
 import '../domain/sign_in_outcome.dart';
 import '../domain/sign_in_profile.dart';
+import 'lost_sign_in.dart';
+import 'oauth_configured.dart';
 import 'saved_sign_ins.dart';
 
 part 'sign_in_service.g.dart';

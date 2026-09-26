@@ -114,7 +114,7 @@ class QuotaStatusBar extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Wraps onto two lines when narrow, e.g. in the account dialog.
+              // Wraps onto two lines when narrow, e.g. in the Takeouts dialog.
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 spacing: 8,

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
@@ -8,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 
 const _other = SignInProfile(channelId: 'UCx', channelTitle: 'Someone Else');
+const _lost = SignInProfile(channelId: 'UCa');
 
 class _Auth extends SignInService {
   final Future<SignInOutcome> Function() next;
@@ -25,13 +28,28 @@ class _Auth extends SignInService {
   }
 }
 
+class _SignIns extends SavedSignIns {
+  final Map<String, SignInProfile> profiles;
+
+  _SignIns(this.profiles);
+
+  @override
+  Future<Map<String, SignInProfile>> build() async => profiles;
+}
+
 void main() {
   late _Auth auth;
 
-  ProviderContainer container(Future<SignInOutcome> Function() next) {
+  ProviderContainer container(
+    Future<SignInOutcome> Function() next, {
+    Map<String, SignInProfile> signIns = const {},
+  }) {
     auth = _Auth(next);
     final c = ProviderContainer(
-      overrides: [signInServiceProvider.overrideWith(() => auth)],
+      overrides: [
+        signInServiceProvider.overrideWith(() => auth),
+        savedSignInsProvider.overrideWith(() => _SignIns(signIns)),
+      ],
     );
     addTearDown(c.dispose);
     c.listen(signInNoticesProvider, (_, _) {});
@@ -104,5 +122,33 @@ void main() {
     notices.dismiss('UCa');
 
     expect(c.read(signInNoticesProvider).keys, ['UCb']);
+  });
+
+  test('a sign-in that stopped working shows on its channel until '
+      'dismissed', () async {
+    final c = container(() async => const SignInNoChannel());
+    await c.read(signInNoticesProvider.notifier).signIn('UCb');
+
+    c.read(lostSignInProvider.notifier).report(_lost);
+
+    expect(c.read(signInNoticesProvider)['UCa'], isA<SignInStoppedWorking>());
+
+    c.read(signInNoticesProvider.notifier).dismiss('UCa');
+
+    expect(c.read(lostSignInProvider), isNull);
+    expect(c.read(signInNoticesProvider).keys, ['UCb']);
+  });
+
+  test('a lost sign-in shows nothing once the channel is signed in '
+      'again', () async {
+    final c = container(
+      () async => const SignInCancelled(),
+      signIns: const {'UCa': _lost},
+    );
+    await c.read(savedSignInsProvider.future);
+
+    c.read(lostSignInProvider.notifier).report(_lost);
+
+    expect(c.read(signInNoticesProvider), isEmpty);
   });
 }

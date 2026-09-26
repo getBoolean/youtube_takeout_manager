@@ -3,54 +3,12 @@ import 'dart:async';
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import '../data/credential_store.dart';
 import '../data/google_auth_repository.dart';
 import '../domain/sign_in_profile.dart';
+import 'oauth_configured.dart';
 
 part 'saved_sign_ins.g.dart';
-
-/// Whether Google sign-in has a client configured. Overridable in tests.
-@Riverpod(keepAlive: true)
-bool oauthConfigured(Ref ref) => isOAuthConfigured;
-
-/// Titles of the channels with a saved sign-in, by channel ID, from the
-/// YouTube API at sign-in. Names takeout channels their saved data gives no
-/// title, e.g. data saved before channel lists were kept.
-@Riverpod(keepAlive: true)
-Map<String, String> signedInChannelTitles(Ref ref) => {
-  for (final profile
-      in (ref.watch(savedSignInsProvider).value ?? const {}).values)
-    profile.channelId: ?profile.channelTitle,
-};
-
-/// Pictures of the channels with a saved sign-in, by channel ID, from the
-/// YouTube API at sign-in.
-@Riverpod(keepAlive: true)
-Map<String, String> signedInChannelThumbnails(Ref ref) => {
-  for (final profile
-      in (ref.watch(savedSignInsProvider).value ?? const {}).values)
-    profile.channelId: ?profile.channelThumbnailUrl,
-};
-
-/// A sign-in that stopped working and was removed. Compared by identity, so
-/// each loss is reported even if the same channel's is lost twice.
-class LostSignIn {
-  final SignInProfile profile;
-
-  LostSignIn(this.profile);
-}
-
-/// The last sign-in that stopped working, for the UI to report.
-@Riverpod(keepAlive: true)
-class LostSignInNotifier extends _$LostSignInNotifier {
-  @override
-  LostSignIn? build() => null;
-
-  void report(SignInProfile profile) => state = LostSignIn(profile);
-
-  void dismiss() => state = null;
-}
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each
 /// with a session ready to use. Looking sign-ins up and dropping ones that

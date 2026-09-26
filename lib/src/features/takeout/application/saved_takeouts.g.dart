@@ -70,3 +70,92 @@ abstract class _$SavedTakeouts extends $AsyncNotifier<List<TakeoutSummary>> {
     element.handleCreate(ref, build);
   }
 }
+
+/// The saved takeout that has [channelId], or null if none does.
+
+@ProviderFor(savedTakeoutWithChannel)
+final savedTakeoutWithChannelProvider = SavedTakeoutWithChannelFamily._();
+
+/// The saved takeout that has [channelId], or null if none does.
+
+final class SavedTakeoutWithChannelProvider
+    extends
+        $FunctionalProvider<TakeoutSummary?, TakeoutSummary?, TakeoutSummary?>
+    with $Provider<TakeoutSummary?> {
+  /// The saved takeout that has [channelId], or null if none does.
+  SavedTakeoutWithChannelProvider._({
+    required SavedTakeoutWithChannelFamily super.from,
+    required String super.argument,
+  }) : super(
+         retry: null,
+         name: r'savedTakeoutWithChannelProvider',
+         isAutoDispose: true,
+         dependencies: null,
+         $allTransitiveDependencies: null,
+       );
+
+  @override
+  String debugGetCreateSourceHash() => _$savedTakeoutWithChannelHash();
+
+  @override
+  String toString() {
+    return r'savedTakeoutWithChannelProvider'
+        ''
+        '($argument)';
+  }
+
+  @$internal
+  @override
+  $ProviderElement<TakeoutSummary?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  TakeoutSummary? create(Ref ref) {
+    final argument = this.argument as String;
+    return savedTakeoutWithChannel(ref, argument);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(TakeoutSummary? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<TakeoutSummary?>(value),
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is SavedTakeoutWithChannelProvider &&
+        other.argument == argument;
+  }
+
+  @override
+  int get hashCode {
+    return argument.hashCode;
+  }
+}
+
+String _$savedTakeoutWithChannelHash() =>
+    r'713c4bf40c0a3c2c1e31968e1c8b82ac7ee236bb';
+
+/// The saved takeout that has [channelId], or null if none does.
+
+final class SavedTakeoutWithChannelFamily extends $Family
+    with $FunctionalFamilyOverride<TakeoutSummary?, String> {
+  SavedTakeoutWithChannelFamily._()
+    : super(
+        retry: null,
+        name: r'savedTakeoutWithChannelProvider',
+        dependencies: null,
+        $allTransitiveDependencies: null,
+        isAutoDispose: true,
+      );
+
+  /// The saved takeout that has [channelId], or null if none does.
+
+  SavedTakeoutWithChannelProvider call(String channelId) =>
+      SavedTakeoutWithChannelProvider._(argument: channelId, from: this);
+
+  @override
+  String toString() => r'savedTakeoutWithChannelProvider';
+}

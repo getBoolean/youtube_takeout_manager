@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/signed_in_channels.dart';
 import '../data/takeout_repository.dart';
 import '../data/takeout_summary_parser.dart';
 import '../domain/takeout_channel.dart';
@@ -30,6 +30,13 @@ class SavedTakeouts extends _$SavedTakeouts {
     ]..sort(_newestFirst);
   }
 }
+
+/// The saved takeout that has [channelId], or null if none does.
+@riverpod
+TakeoutSummary? savedTakeoutWithChannel(Ref ref, String channelId) =>
+    (ref.watch(savedTakeoutsProvider).value ?? const [])
+        .where((t) => t.channelIds.contains(channelId))
+        .firstOrNull;
 
 int _newestFirst(TakeoutSummary a, TakeoutSummary b) {
   final aTime = a.latestExportAt, bTime = b.latestExportAt;

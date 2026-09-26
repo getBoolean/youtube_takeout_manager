@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/signed_in_channels.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 
 import '../domain/takeout_channel.dart';

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
 /// Shown until a takeout is imported: picks its zips, reviewing it in place
 /// if there's anything to look over.
@@ -37,7 +37,7 @@ class TakeoutImportPrompt extends StatelessWidget {
   }
 }
 
-/// The saved takeout couldn't be read. The account dialog can remove it or
+/// The saved takeout couldn't be read. The Takeouts dialog can remove it or
 /// import another.
 class TakeoutLoadFailed extends StatelessWidget {
   final Object error;
@@ -65,7 +65,7 @@ class TakeoutLoadFailed extends StatelessWidget {
         ),
         const SizedBox(height: 32),
         FilledButton(
-          onPressed: () => showAccountDialog(context),
+          onPressed: () => showTakeoutsDialog(context),
           child: const Text('Account', textAlign: TextAlign.center),
         ),
       ],

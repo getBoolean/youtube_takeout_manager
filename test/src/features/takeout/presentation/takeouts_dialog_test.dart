@@ -7,14 +7,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
+import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
@@ -29,6 +31,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_chan
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
 const _main = TakeoutChannel(
   channelId: 'UCme',
@@ -210,6 +213,7 @@ class _Processing extends DeletionProcessing {
 
 class _FakeQuota extends QuotaNotifier {
   var resets = 0;
+  var fail = false;
 
   @override
   Future<QuotaState> build() async => QuotaState(
@@ -218,7 +222,24 @@ class _FakeQuota extends QuotaNotifier {
   );
 
   @override
-  Future<void> resetUsage() async => resets++;
+  Future<void> resetUsage() async {
+    if (fail) throw Exception('storage is full');
+    resets++;
+  }
+}
+
+class _Cache extends DeviceCacheClearer {
+  var clears = 0;
+  var fail = false;
+
+  @override
+  void build() {}
+
+  @override
+  Future<void> clear() async {
+    if (fail) throw Exception('storage is locked');
+    clears++;
+  }
 }
 
 void main() {
@@ -226,6 +247,7 @@ void main() {
   late _FakeQuota quota;
   late _Selection selection;
   late _Takeout takeout;
+  late _Cache cache;
   late ProviderContainer container;
 
   Future<void> pumpDialog(
@@ -243,6 +265,7 @@ void main() {
     quota = _FakeQuota();
     selection = _Selection();
     takeout = _Takeout(saved: alreadySaved);
+    cache = _Cache();
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -250,8 +273,10 @@ void main() {
       ProviderScope(
         overrides: [
           authProvider.overrideWith(_NotSignedIn.new),
+          oauthConfiguredProvider.overrideWithValue(oauthConfigured),
           signInServiceProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
+          deviceCacheClearerProvider.overrideWith(() => cache),
           takeoutProvider.overrideWith(() => _Loaded(loaded)),
           takeoutImporterProvider.overrideWith(() => takeout),
           takeoutChannelsProvider.overrideWithValue(channels),
@@ -271,14 +296,12 @@ void main() {
             () => _Processing(processing),
           ),
         ],
-        child: MaterialApp(
-          home: Scaffold(body: AccountDialog(oauthConfigured: oauthConfigured)),
-        ),
+        child: MaterialApp(home: const Scaffold(body: TakeoutsDialog())),
       ),
     );
     await tester.pumpAndSettle();
     container = ProviderScope.containerOf(
-      tester.element(find.byType(AccountDialog)),
+      tester.element(find.byType(TakeoutsDialog)),
     );
   }
 
@@ -397,6 +420,27 @@ void main() {
     await tester.tap(find.byTooltip('Dismiss'));
     await tester.pumpAndSettle();
     expect(find.byType(SignInNoticeBanner), findsNothing);
+  });
+
+  testWidgets('views the channel chosen instead in its own takeout', (
+    tester,
+  ) async {
+    await pumpDialog(
+      tester,
+      saved: [_viewedSummary, _workSummary],
+      outcome: () async => const SignedInOtherChannel(
+        SignInProfile(channelId: 'UCwork2', channelTitle: 'Work Podcast'),
+        targetChannelId: 'UCalt',
+      ),
+    );
+
+    await tester.tap(find.text('Sign in'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('View Work Podcast'));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(selection.selected, [('UCwork', 'UCwork2')]);
   });
 
   testWidgets('an account without a YouTube channel shows on the row', (
@@ -549,33 +593,109 @@ void main() {
     expect(find.text('30 / 10000 units used today'), findsOneWidget);
   });
 
-  testWidgets('resets quota usage after confirming', (tester) async {
+  testWidgets('reset usage asks in place, not in a popup, and can be '
+      'cancelled', (tester) async {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Reset usage'));
     await tester.tap(find.text('Reset usage'));
     await tester.pumpAndSettle();
-    expect(find.text('Reset Quota Usage'), findsOneWidget);
 
-    await tester.tap(find.text('Reset'));
+    expectNoPopups();
+    expect(
+      find.textContaining('Reset the tracked quota usage'),
+      findsOneWidget,
+    );
+    expect(find.text('Reset usage'), findsNothing);
+
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(quota.resets, 1);
-    expect(find.text('Quota usage reset.'), findsOneWidget);
+    expect(find.textContaining('Reset the tracked quota usage'), findsNothing);
+    expect(find.text('Reset usage'), findsOneWidget);
+    expect(quota.resets, 0);
   });
 
-  testWidgets('clear cache asks first and can be cancelled', (tester) async {
+  testWidgets('resets quota usage after confirming in place, saying so '
+      'there', (tester) async {
+    await pumpDialog(tester);
+
+    await tester.ensureVisible(find.text('Reset usage'));
+    await tester.tap(find.text('Reset usage'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(quota.resets, 1);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('Quota usage reset.'), findsOneWidget);
+    expect(find.text('Reset usage'), findsOneWidget);
+  });
+
+  testWidgets('a reset that fails says so in place', (tester) async {
+    await pumpDialog(tester);
+    quota.fail = true;
+
+    await tester.ensureVisible(find.text('Reset usage'));
+    await tester.tap(find.text('Reset usage'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(find.textContaining("Couldn't reset quota usage"), findsOneWidget);
+    expect(find.text('Quota usage reset.'), findsNothing);
+  });
+
+  testWidgets('clear cache asks in place, not in a popup, and can be '
+      'cancelled', (tester) async {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Clear cache'));
     await tester.tap(find.text('Clear cache'));
     await tester.pumpAndSettle();
-    expect(find.text('Clear Cache'), findsOneWidget);
+
+    expectNoPopups();
+    expect(find.textContaining('Clear cached video metadata'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Clear Cache'), findsNothing);
+    expect(find.textContaining('Clear cached video metadata'), findsNothing);
+    expect(find.text('Clear cache'), findsOneWidget);
+    expect(cache.clears, 0);
+  });
+
+  testWidgets('clears the cache after confirming in place, saying so there', (
+    tester,
+  ) async {
+    await pumpDialog(tester);
+
+    await tester.ensureVisible(find.text('Clear cache'));
+    await tester.tap(find.text('Clear cache'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(cache.clears, 1);
+    expect(find.byType(SnackBar), findsNothing);
+    expect(find.text('Cache cleared.'), findsOneWidget);
+  });
+
+  testWidgets('a cache clear that fails says so in place', (tester) async {
+    await pumpDialog(tester);
+    cache.fail = true;
+
+    await tester.ensureVisible(find.text('Clear cache'));
+    await tester.tap(find.text('Clear cache'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(find.textContaining("Couldn't clear the cache"), findsOneWidget);
     expect(find.text('Cache cleared.'), findsNothing);
   });
 
@@ -609,7 +729,7 @@ void main() {
       await tester.tap(find.byTooltip('Account: Boolean'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(AccountDialog), findsOneWidget);
+      expect(find.byType(TakeoutsDialog), findsOneWidget);
     });
 
     testWidgets("shows and names the viewed channel's picture", (tester) async {

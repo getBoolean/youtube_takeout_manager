@@ -4,10 +4,10 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
@@ -61,6 +61,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
@@ -354,6 +355,12 @@ Widget _channelPage({required bool liveChats, required bool selecting}) {
   );
 }
 
+/// The Takeouts dialog with sign-in configured, and [overrides].
+Widget _takeoutsDialog([List<Override> overrides = const []]) => ProviderScope(
+  overrides: [oauthConfiguredProvider.overrideWithValue(true), ...overrides],
+  child: const Scaffold(body: TakeoutsDialog()),
+);
+
 Widget _channelListParts() => Scaffold(
   body: ListView(
     children: [
@@ -479,40 +486,40 @@ void main() {
     then: (tester) async =>
         expect(find.byType(TakeoutLoadFailed), findsOneWidget),
   );
+  fitsAtEveryWidth('the Takeouts dialog', _takeoutsDialog);
   fitsAtEveryWidth(
-    'the account dialog',
-    () => const Scaffold(body: AccountDialog(oauthConfigured: true)),
+    'the Takeouts dialog signed in',
+    () => _takeoutsDialog([
+      authProvider.overrideWith(_SignedIn.new),
+      savedSignInsProvider.overrideWith(_SignIns.new),
+    ]),
   );
   fitsAtEveryWidth(
-    'the account dialog signed in',
-    () => ProviderScope(
-      overrides: [
-        authProvider.overrideWith(_SignedIn.new),
-        savedSignInsProvider.overrideWith(_SignIns.new),
-      ],
-      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
-    ),
+    'the Takeouts dialog with every account shown',
+    () => _takeoutsDialog([
+      takeoutChannelsProvider.overrideWithValue(const []),
+      savedTakeoutsProvider.overrideWith(_SavedTakeouts.new),
+    ]),
   );
   fitsAtEveryWidth(
-    'the account dialog with every account shown',
-    () => ProviderScope(
-      overrides: [
-        takeoutChannelsProvider.overrideWithValue(const []),
-        savedTakeoutsProvider.overrideWith(_SavedTakeouts.new),
-      ],
-      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
-    ),
+    'the Takeouts dialog while deleting, with notices',
+    () => _takeoutsDialog([
+      savedSignInsProvider.overrideWith(_SignIns.new),
+      deletionProcessingProvider.overrideWith(_Deleting.new),
+      signInNoticesProvider.overrideWith(_Notices.new),
+    ]),
   );
   fitsAtEveryWidth(
-    'the account dialog while deleting, with notices',
-    () => ProviderScope(
-      overrides: [
-        savedSignInsProvider.overrideWith(_SignIns.new),
-        deletionProcessingProvider.overrideWith(_Deleting.new),
-        signInNoticesProvider.overrideWith(_Notices.new),
-      ],
-      child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
-    ),
+    'the Takeouts dialog asking to reset quota usage and clear the cache',
+    _takeoutsDialog,
+    then: (tester) async {
+      for (final action in ['Reset usage', 'Clear cache']) {
+        await tester.ensureVisible(find.text(action));
+        await tester.tap(find.text(action));
+        await tester.pump();
+      }
+      expect(find.text('Cancel'), findsNWidgets(2));
+    },
   );
   fitsAtEveryWidth(
     'the sign-in notices',

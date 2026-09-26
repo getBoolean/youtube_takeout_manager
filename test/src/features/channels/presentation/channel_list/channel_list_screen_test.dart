@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
@@ -22,6 +21,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_chan
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
 import '../channel_detail/channel_list_fixture.dart' as fixture;
 
@@ -190,7 +190,7 @@ void main() {
     expect(find.text('A channel I commented on'), findsOneWidget);
   });
 
-  testWidgets("saved data that can't be read offers the account dialog", (
+  testWidgets("saved data that can't be read offers the Takeouts dialog", (
     tester,
   ) async {
     await pumpScreen(tester, notifier: _Unreadable.new);
@@ -205,6 +205,6 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Account'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AccountDialog), findsOneWidget);
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
   });
 }

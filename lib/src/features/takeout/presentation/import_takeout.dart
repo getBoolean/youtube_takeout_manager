@@ -49,12 +49,8 @@ class ImportTakeout extends ConsumerWidget {
       onStart: () => _whenImported(context, import.start),
       onConfirm: () => _whenImported(context, import.confirm),
       onDismiss: import.dismiss,
-      onMerge: () async {
-        // Merging shows the account it's for; the review stays open here.
-        final router = StackRouterScope.of(context)?.controller;
-        await import.merge();
-        if (context.mounted) leaveChannelScreens(router);
-      },
+      // Merging shows the account it's for; the review stays open here.
+      onMerge: () => leaveChannelScreensAfter(context, import.merge),
     );
   }
 
