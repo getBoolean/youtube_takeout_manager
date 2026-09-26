@@ -144,7 +144,7 @@ final class SavedSignInsProvider
   SavedSignIns create() => SavedSignIns();
 }
 
-String _$savedSignInsHash() => r'011c08e8c40d7e6816ab96582301e240f06e8031';
+String _$savedSignInsHash() => r'5ac0cac2b0e9c1c3e02a30d2f9e3a5e46246988f';
 
 /// Every saved sign-in, by the YouTube channel chosen when signing in, each
 /// with a session ready to use.

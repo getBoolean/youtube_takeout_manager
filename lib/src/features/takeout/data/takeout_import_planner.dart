@@ -22,6 +22,9 @@ typedef TakeoutImportRequest = ({
 
   Set<String> deletedCommentIds,
   Set<String> deletedLiveChatIds,
+
+  /// The takeout selected when the import started.
+  String? activeTakeoutId,
 });
 
 /// The export time Google puts in takeout zip names, e.g.
@@ -115,6 +118,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
     commentCheckSkipped: goneComments.skipped,
     liveChatCheckSkipped: goneLiveChats.skipped,
     differentAccount: differentAccount,
+    baseTakeoutId: request.activeTakeoutId,
   );
 }
 

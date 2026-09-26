@@ -111,4 +111,50 @@ void main() {
 
     expect(await repository.loadLegacyCsvs(), isNull);
   });
+
+  group('listAccountIds', () {
+    test('lists each saved takeout', () async {
+      await repository.saveCsvs('UCme', {'a.csv': _bytes('a')});
+      await repository.saveCsvs('UCother', {'a.csv': _bytes('a')});
+
+      expect(
+        await repository.listAccountIds(),
+        unorderedEquals(['UCme', 'UCother']),
+      );
+    });
+
+    test('lists a takeout whose save stopped after moving the old files '
+        'aside', () async {
+      writeFile('takeouts/UCme.tmp', 'a.csv', 'new');
+      writeFile('takeouts/UCme.old', 'a.csv', 'old');
+
+      expect(await repository.listAccountIds(), ['UCme']);
+    });
+
+    test('skips leftovers of a save and folders that are no channel', () async {
+      writeFile('takeouts/UConlytmp.tmp', 'a.csv', 'new');
+      writeFile('takeouts/UConlyold.old', 'a.csv', 'old');
+      writeFile('takeouts/not a channel', 'a.csv', 'x');
+
+      expect(await repository.listAccountIds(), isEmpty);
+    });
+
+    test('lists nothing before anything is saved', () async {
+      expect(await repository.listAccountIds(), isEmpty);
+    });
+  });
+
+  test('loads only the files asked for', () async {
+    await repository.saveCsvs('UCme', {
+      'small.csv': _bytes('small'),
+      'big.csv': _bytes('big'),
+    });
+
+    final files = await repository.loadCsvs(
+      'UCme',
+      only: (path) => path.startsWith('small'),
+    );
+
+    expect(_decoded(files), {'small.csv': 'small'});
+  });
 }

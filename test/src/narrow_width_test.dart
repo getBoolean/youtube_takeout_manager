@@ -45,12 +45,16 @@ import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounce
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
@@ -143,6 +147,36 @@ class _SignedIn extends AuthNotifier {
     displayName: 'Somebody With A Long Name',
     email: 'somebody.with.a.long.address@example.com',
   );
+}
+
+final _longTakeout = TakeoutSummary(
+  id: 'UCme',
+  channels: const [
+    TakeoutChannel(
+      channelId: 'UCme',
+      title: 'A channel with a fairly long name',
+      isMain: true,
+      listed: true,
+      commentCount: 123456,
+      liveChatCount: 7890,
+    ),
+    TakeoutChannel(
+      channelId: 'UCanotherLongChannelIdentifier',
+      title: 'Another channel with a long name',
+      isMain: false,
+      listed: true,
+    ),
+  ],
+  latestExportAt: DateTime(2026, 4, 12),
+  countsKnown: true,
+);
+
+class _SavedTakeouts extends SavedTakeouts {
+  @override
+  Future<List<TakeoutSummary>> build() async => [
+    _longTakeout,
+    _longTakeout.copyWith(id: 'UCother'),
+  ];
 }
 
 /// Keeps the fake takeout's ID selected.
@@ -366,6 +400,28 @@ void main() {
   fitsAtEveryWidth(
     'the no-channel dialog',
     () => const NoYouTubeChannelDialog(),
+  );
+  fitsAtEveryWidth(
+    'the switch takeout dialog',
+    () => ProviderScope(
+      overrides: [savedTakeoutsProvider.overrideWith(_SavedTakeouts.new)],
+      child: const Scaffold(body: SwitchTakeoutDialog()),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the remove takeout dialog',
+    () => RemoveTakeoutDialog(
+      removal: TakeoutRemoval(
+        summary: _longTakeout,
+        orphanedChannelIds: const {'UCme'},
+        queuedCount: 1234,
+        signInIds: const {'UCme'},
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the deletion running dialog',
+    () => const DeletionRunningDialog(),
   );
   fitsAtEveryWidth(
     'the queue dialog',

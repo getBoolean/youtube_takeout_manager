@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
+import '../domain/channel_id.dart';
 import 'takeout_repository.dart';
 
 /// Web implementation: persists CSV data in IndexedDB, keyed by
@@ -71,12 +72,38 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
   }
 
   @override
-  Future<Map<String, Uint8List>?> loadCsvs(String accountId) async {
+  Future<Map<String, Uint8List>?> loadCsvs(
+    String accountId, {
+    bool Function(String path)? only,
+  }) async {
     final range = _accountRange(accountId);
-    final files = await _load(_dbName, range);
+    final prefix = accountId.length + 1;
+    final files = await _load(
+      _dbName,
+      range: range,
+      only: only == null ? null : (key) => only(key.substring(prefix)),
+    );
     return files?.map(
       (key, bytes) => MapEntry(key.substring(accountId.length + 1), bytes),
     );
+  }
+
+  @override
+  Future<List<String>> listAccountIds() async {
+    final db = await _openDb(_dbName);
+    try {
+      final store = db
+          .transaction(_storeName.toJS, 'readonly')
+          .objectStore(_storeName);
+      final keys = await _keys(store);
+      return {
+        for (final key in keys)
+          if (key.indexOf('/') case final slash when slash > 0)
+            key.substring(0, slash),
+      }.where(isChannelId).toList();
+    } finally {
+      db.close();
+    }
   }
 
   @override
@@ -107,35 +134,21 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     }
   }
 
-  /// Loads every file in [dbName] whose key is in [range], or all files if
-  /// [range] is null. Returns null if there are none.
+  /// Loads every file in [dbName] whose key is in [range] (or all files if
+  /// it's null) and that [only] accepts. Returns null if there are none.
   Future<Map<String, Uint8List>?> _load(
-    String dbName, [
+    String dbName, {
     web.IDBKeyRange? range,
-  ]) async {
+    bool Function(String key)? only,
+  }) async {
     final db = await _openDb(dbName);
     try {
       final txn = db.transaction(_storeName.toJS, 'readonly');
       final store = txn.objectStore(_storeName);
-
-      // Get all keys
-      final keysCompleter = Completer<List<String>>();
-      final keysRequest = store.getAllKeys(range);
-      keysRequest.onsuccess = (web.Event _) {
-        final jsArray = keysRequest.result as JSArray;
-        final keys = <String>[];
-        for (var i = 0; i < jsArray.length; i++) {
-          keys.add((jsArray[i] as JSString).toDart);
-        }
-        keysCompleter.complete(keys);
-      }.toJS;
-      keysRequest.onerror = (web.Event _) {
-        keysCompleter.completeError(
-          Exception('Failed to get keys: ${keysRequest.error?.message}'),
-        );
-      }.toJS;
-      final keys = await keysCompleter.future;
-
+      final keys = [
+        for (final key in await _keys(store, range))
+          if (only == null || only(key)) key,
+      ];
       if (keys.isEmpty) return null;
 
       // Get all values
@@ -159,6 +172,28 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     } finally {
       db.close();
     }
+  }
+
+  /// Every key in [store] within [range], or all of them if it's null.
+  Future<List<String>> _keys(
+    web.IDBObjectStore store, [
+    web.IDBKeyRange? range,
+  ]) {
+    final completer = Completer<List<String>>();
+    final request = store.getAllKeys(range);
+    request.onsuccess = (web.Event _) {
+      final jsArray = request.result as JSArray;
+      completer.complete([
+        for (var i = 0; i < jsArray.length; i++)
+          (jsArray[i] as JSString).toDart,
+      ]);
+    }.toJS;
+    request.onerror = (web.Event _) {
+      completer.completeError(
+        Exception('Failed to get keys: ${request.error?.message}'),
+      );
+    }.toJS;
+    return completer.future;
   }
 
   Future<void> _complete(web.IDBTransaction txn, String action) {

@@ -56,6 +56,11 @@ class TakeoutImportPlan {
   /// Set when replacing saved data with a takeout from another channel.
   final ChannelMismatch? differentAccount;
 
+  /// The takeout selected when this was worked out. Committing is refused
+  /// if another one is selected by then, since this was worked out against
+  /// it.
+  final String? baseTakeoutId;
+
   const TakeoutImportPlan({
     required this.accountId,
     required this.mergedData,
@@ -69,6 +74,7 @@ class TakeoutImportPlan {
     this.commentCheckSkipped,
     this.liveChatCheckSkipped,
     this.differentAccount,
+    this.baseTakeoutId,
   });
 }
 

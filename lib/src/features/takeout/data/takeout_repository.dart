@@ -27,8 +27,15 @@ abstract class TakeoutRepository {
   /// paths. If saving fails, the previously saved files are kept.
   Future<void> saveCsvs(String accountId, Map<String, Uint8List> csvFiles);
 
-  /// Loads the CSV files saved for [accountId]. Returns null if none exist.
-  Future<Map<String, Uint8List>?> loadCsvs(String accountId);
+  /// Loads the CSV files saved for [accountId], or only those whose path
+  /// [only] accepts. Returns null if none exist.
+  Future<Map<String, Uint8List>?> loadCsvs(
+    String accountId, {
+    bool Function(String path)? only,
+  });
+
+  /// The IDs of every account with saved files.
+  Future<List<String>> listAccountIds();
 
   /// Deletes the CSV files saved for [accountId].
   Future<void> clearCsvs(String accountId);

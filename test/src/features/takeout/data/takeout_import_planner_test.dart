@@ -101,6 +101,7 @@ TakeoutImportPlan _plan(
   merge: merge,
   deletedCommentIds: deletedCommentIds,
   deletedLiveChatIds: const {},
+  activeTakeoutId: null,
 ));
 
 Set<String> _commentIds(TakeoutImportPlan plan) =>

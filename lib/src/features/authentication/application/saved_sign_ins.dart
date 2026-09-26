@@ -96,6 +96,14 @@ class SavedSignIns extends _$SavedSignIns {
     state = AsyncData({...current}..remove(channelId));
   }
 
+  /// Removes the sign-ins of [channelIds], revoking them where the platform
+  /// can.
+  Future<void> removeAll(Set<String> channelIds) async {
+    for (final channelId in channelIds) {
+      await remove(channelId, revoke: true);
+    }
+  }
+
   /// Removes [channelId]'s sign-in because it stopped working (access
   /// revoked, account deleted), and reports it.
   Future<void> signInFailed(String channelId) async {

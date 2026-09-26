@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import '../application/auth_notifier.dart';
 import '../domain/sign_in_outcome.dart';
 import '../domain/sign_in_profile.dart';
@@ -28,7 +30,12 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
   switch (outcome) {
     case SignedInOtherChannel(:final profile, :final viewedChannelId):
       final viewed = ref.read(viewedChannelProvider);
-      await showDialog<void>(
+      final takeouts = await ref.read(savedTakeoutsProvider.future);
+      final chosenTakeout = takeouts
+          .where((t) => t.channelIds.contains(profile.channelId))
+          .firstOrNull;
+      if (!context.mounted) return;
+      final view = await showDialog<bool>(
         context: context,
         builder: (_) => SignedInOtherChannelDialog(
           chosen: profile,
@@ -36,8 +43,17 @@ Future<void> signInToViewedChannel(BuildContext context, WidgetRef ref) async {
           viewedTitle: viewed?.channelId == viewedChannelId
               ? viewed?.title
               : null,
+          canViewChosen: chosenTakeout != null,
         ),
       );
+      if (view == true && chosenTakeout != null && context.mounted) {
+        await switchToTakeout(
+          context,
+          ref,
+          chosenTakeout,
+          channelId: profile.channelId,
+        );
+      }
     case SignInNoChannel():
       await showDialog<void>(
         context: context,
@@ -54,11 +70,16 @@ class SignedInOtherChannelDialog extends StatelessWidget {
   final String viewedChannelId;
   final String? viewedTitle;
 
+  /// Whether a saved takeout has the chosen channel, so it can be viewed.
+  /// The dialog then returns true if the user chooses to.
+  final bool canViewChosen;
+
   const SignedInOtherChannelDialog({
     super.key,
     required this.chosen,
     required this.viewedChannelId,
     this.viewedTitle,
+    this.canViewChosen = false,
   });
 
   @override
@@ -98,8 +119,13 @@ class SignedInOtherChannelDialog extends StatelessWidget {
         ),
       ),
       actions: [
+        if (canViewChosen)
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('View $chosenName'),
+          ),
         FilledButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, false),
           child: const Text('OK'),
         ),
       ],

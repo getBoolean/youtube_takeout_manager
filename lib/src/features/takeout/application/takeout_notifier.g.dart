@@ -39,7 +39,7 @@ final class TakeoutNotifierProvider
   TakeoutNotifier create() => TakeoutNotifier();
 }
 
-String _$takeoutNotifierHash() => r'7ed8df9d72b8052bbf89612998958603f4e189c0';
+String _$takeoutNotifierHash() => r'63fe302650123eb17afc26c5132219410955f67b';
 
 /// The selected saved takeout, with every channel's items. Reloads when
 /// another takeout is selected.

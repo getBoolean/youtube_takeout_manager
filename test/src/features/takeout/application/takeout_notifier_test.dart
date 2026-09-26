@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -14,6 +16,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queu
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
@@ -39,10 +42,21 @@ class _MemoryTakeoutRepository implements TakeoutRepository {
   }
 
   @override
-  Future<Map<String, Uint8List>?> loadCsvs(String accountId) async {
+  Future<Map<String, Uint8List>?> loadCsvs(
+    String accountId, {
+    bool Function(String path)? only,
+  }) async {
     loads++;
-    return accounts[accountId];
+    final files = accounts[accountId];
+    if (files == null || only == null) return files;
+    return {
+      for (final MapEntry(:key, :value) in files.entries)
+        if (only(key)) key: value,
+    };
   }
+
+  @override
+  Future<List<String>> listAccountIds() async => accounts.keys.toList();
 
   @override
   Future<void> clearCsvs(String accountId) async => accounts.remove(accountId);
@@ -313,6 +327,111 @@ void main() {
     expect(channels, {'A': 'UCme', 'not-in-takeout': null});
   });
 
+  group('saved takeouts', () {
+    final other = TakeoutData(
+      comments: [
+        _comment('X', '2026-02-01T00:00:00Z').copyWith(channelId: 'UCother'),
+      ],
+      liveChats: const [],
+      subscriptionsByChannelId: const {},
+      latestExportAt: DateTime.utc(2026, 3),
+    );
+    late _SignIns signIns;
+
+    ProviderContainer withSignIns() {
+      signIns = _SignIns({'UCme', 'UCother'});
+      final c = ProviderContainer(
+        overrides: [
+          takeoutRepositoryProvider.overrideWithValue(repository),
+          savedSignInsProvider.overrideWith(() => signIns),
+        ],
+      );
+      addTearDown(c.dispose);
+      c.listen(takeoutProvider, (_, _) {});
+      return c;
+    }
+
+    setUp(() => repository.accounts['UCother'] = encodeTakeoutCsvs(other));
+
+    test('are listed with their channels, newest export first', () async {
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+
+      final saved = await c.read(savedTakeoutsProvider.future);
+
+      expect(saved.map((s) => s.id), ['UCother', 'UCme']);
+      expect(saved.first.channelIds, {'UCother'});
+      expect(saved.first.main.commentCount, 1);
+      expect(saved.last.main.commentCount, 3);
+    });
+
+    test("removing one deletes its data, queued items and its channels' "
+        'sign-ins', () async {
+      final c = withSignIns();
+      await c.read(deletionQueueRepositoryProvider).saveQueue([
+        _pending('X').copyWith(authorChannelId: 'UCother'),
+        _pending('A').copyWith(authorChannelId: 'UCme'),
+      ]);
+      await c.read(takeoutProvider.future);
+      final saved = c.read(savedTakeoutsProvider.notifier);
+
+      final removal = await saved.planRemoval('UCother');
+      expect(removal.orphanedChannelIds, {'UCother'});
+      expect(removal.queuedCount, 1);
+      expect(removal.signInIds, {'UCother'});
+      await saved.removeTakeout(removal);
+
+      expect(repository.accounts.keys, ['UCme']);
+      expect(await queuedItemIds(c), ['A']);
+      expect(signIns.removed, {'UCother'});
+      expect((await c.read(savedTakeoutsProvider.future)).map((s) => s.id), [
+        'UCme',
+      ]);
+    });
+
+    test('removing the viewed one switches to another', () async {
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+      final saved = c.read(savedTakeoutsProvider.notifier);
+
+      await saved.removeTakeout(await saved.planRemoval('UCme'));
+
+      expect(
+        (await c.read(takeoutSelectionProvider.future))?.takeoutId,
+        'UCother',
+      );
+      expect((await c.read(takeoutProvider.future))?.id, 'UCother');
+    });
+
+    test('removing the last one shows none', () async {
+      repository.accounts.remove('UCother');
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+      final saved = c.read(savedTakeoutsProvider.notifier);
+
+      await saved.removeTakeout(await saved.planRemoval('UCme'));
+
+      expect(await c.read(takeoutSelectionProvider.future), isNull);
+      expect(await c.read(takeoutProvider.future), isNull);
+    });
+
+    test('an import prepared before switching takeouts is refused', () async {
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+      final notifier = c.read(takeoutProvider.notifier);
+      final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
+      final savedFiles = repository.accounts['UCme'];
+
+      await c.read(takeoutSelectionProvider.notifier).select('UCother');
+
+      await expectLater(
+        notifier.commitImport(plan),
+        throwsA(isA<TakeoutImportException>()),
+      );
+      expect(repository.accounts['UCme'], same(savedFiles));
+    });
+  });
+
   group('switching takeouts', () {
     final other = TakeoutData(
       comments: [
@@ -424,4 +543,21 @@ void main() {
       expect(await viewedCommentIds(c), ['Alt']);
     });
   });
+}
+
+/// Saved sign-ins for [channelIds], recording which get removed.
+class _SignIns extends SavedSignIns {
+  final Set<String> channelIds;
+  final removed = <String>{};
+
+  _SignIns(this.channelIds);
+
+  @override
+  Future<Map<String, SignInProfile>> build() async => {
+    for (final id in channelIds) id: SignInProfile(channelId: id),
+  };
+
+  @override
+  Future<void> removeAll(Set<String> channelIds) async =>
+      removed.addAll(channelIds);
 }

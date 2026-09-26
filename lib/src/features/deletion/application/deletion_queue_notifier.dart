@@ -186,6 +186,19 @@ class DeletionQueue extends _$DeletionQueue {
     await _repository.saveQueue(updated);
   }
 
+  /// Removes every item written by [channelIds], e.g. when their takeout
+  /// is removed.
+  Future<void> removeForChannels(Set<String> channelIds) async {
+    await future;
+    final current = state.requireValue;
+    final updated = current
+        .where((i) => !channelIds.contains(i.authorChannelId))
+        .toList();
+    if (updated.length == current.length) return;
+    state = AsyncData(updated);
+    await _repository.saveQueue(updated);
+  }
+
   /// Removes items queued before their channel was saved that no takeout
   /// has matched to one, and that aren't done.
   Future<void> removeUnassigned() async {

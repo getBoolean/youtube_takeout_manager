@@ -98,6 +98,9 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       merge: merge,
       deletedCommentIds: await ref.read(deletedCommentIdsProvider.future),
       deletedLiveChatIds: await ref.read(deletedLiveChatIdsProvider.future),
+      activeTakeoutId: (await ref.read(
+        takeoutSelectionProvider.future,
+      ))?.takeoutId,
     ));
   }
 
@@ -105,6 +108,13 @@ class TakeoutNotifier extends _$TakeoutNotifier {
   /// deletions, then saves its data in its takeout's folder and selects that
   /// takeout.
   Future<void> commitImport(TakeoutImportPlan plan) async {
+    final active = (await ref.read(takeoutSelectionProvider.future))?.takeoutId;
+    if (active != plan.baseTakeoutId) {
+      throw const TakeoutImportException(
+        'Another takeout was opened while this one was being read. Import '
+        'it again.',
+      );
+    }
     // Gone items are gone whether or not the save below works, so mark them
     // first; otherwise a failed save would leave them deletable, and each
     // delete of a missing comment still costs quota.
@@ -140,7 +150,9 @@ class TakeoutNotifier extends _$TakeoutNotifier {
 
   /// Whether [accountId] has takeout data saved, active or not.
   Future<bool> hasSavedData(String accountId) async =>
-      await ref.read(takeoutRepositoryProvider).loadCsvs(accountId) != null;
+      (await ref.read(takeoutRepositoryProvider).listAccountIds()).contains(
+        accountId,
+      );
 
   /// The saved data to merge with or compare against. When replacing, data
   /// that failed to load is ignored instead of blocking the import.

@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_account_section.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import '../application/auth_notifier.dart';
@@ -52,6 +53,8 @@ class AccountDialog extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const TakeoutAccountSection(),
+                    const SizedBox(height: 24),
                     _AccountHeader(
                       auth: auth,
                       oauthConfigured: oauthConfigured,

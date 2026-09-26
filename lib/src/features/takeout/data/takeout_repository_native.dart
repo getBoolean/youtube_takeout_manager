@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../domain/channel_id.dart';
 import 'takeout_repository.dart';
 
 /// Stores each account's files in `<app support>/takeouts/<account ID>/`.
@@ -12,6 +13,9 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
 
   /// Where files were saved before they were kept per account.
   static const _legacyDirName = 'takeout_csvs';
+
+  /// What a save's temporary folders end with.
+  static final _saveSuffix = RegExp(r'\.(tmp|old)$');
 
   final Future<Directory> Function() _supportDirectory;
 
@@ -54,10 +58,33 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
   }
 
   @override
-  Future<Map<String, Uint8List>?> loadCsvs(String accountId) async {
+  Future<Map<String, Uint8List>?> loadCsvs(
+    String accountId, {
+    bool Function(String path)? only,
+  }) async {
     final dir = await _accountDir(accountId);
     await _finishInterruptedSave(dir);
-    return _loadDir(dir);
+    return _loadDir(dir, only: only);
+  }
+
+  @override
+  Future<List<String>> listAccountIds() async {
+    final root = Directory('${(await _supportDirectory()).path}/$_dirName');
+    if (!await root.exists()) return [];
+    final names = {
+      await for (final entity in root.list())
+        if (entity is Directory) p.basename(entity.path),
+    };
+    bool saved(String id) =>
+        names.contains(id) ||
+        // A save that stopped after moving the old files aside, which
+        // loading finishes.
+        (names.contains('$id.tmp') && names.contains('$id.old'));
+    final ids = {for (final name in names) name.replaceFirst(_saveSuffix, '')};
+    return [
+      for (final id in ids)
+        if (isChannelId(id) && saved(id)) id,
+    ];
   }
 
   @override
@@ -75,7 +102,10 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
   @override
   Future<void> clearLegacyCsvs() async => _deleteIfExists(await _legacyDir());
 
-  Future<Map<String, Uint8List>?> _loadDir(Directory dir) async {
+  Future<Map<String, Uint8List>?> _loadDir(
+    Directory dir, {
+    bool Function(String path)? only,
+  }) async {
     if (!await dir.exists()) return null;
 
     final files = await dir
@@ -90,6 +120,7 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
       final relativePath = p
           .relative(file.path, from: dir.path)
           .replaceAll('\\', '/');
+      if (only != null && !only(relativePath)) continue;
       result[relativePath] = await file.readAsBytes();
     }
     return result;

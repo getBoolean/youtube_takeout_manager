@@ -173,6 +173,10 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
         _exitSelectionMode();
       }
     });
+    // Nor once another channel is viewed, whose items these aren't.
+    ref.listen(viewedChannelIdProvider, (_, _) {
+      if (_selectionMode.value) _exitSelectionMode();
+    });
 
     final queue = DeletionQueueHost.of(context);
     if (isLoading) {

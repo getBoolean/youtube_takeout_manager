@@ -8,11 +8,14 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
 
 const _viewed = TakeoutChannel(
   channelId: 'UCme',
@@ -62,6 +65,11 @@ class _FakeQuota extends QuotaNotifier {
   Future<void> resetUsage() async => resets++;
 }
 
+class _NoSavedTakeouts extends SavedTakeouts {
+  @override
+  Future<List<TakeoutSummary>> build() async => const [];
+}
+
 void main() {
   late _FakeAuth auth;
   late _FakeQuota quota;
@@ -71,6 +79,7 @@ void main() {
     AuthState? signedIn,
     bool oauthConfigured = true,
     TakeoutChannel? viewed = _viewed,
+    List<TakeoutChannel> channels = const [_viewed],
     SignInOutcome outcome = const SignedIn(SignInProfile(channelId: 'UCme')),
   }) async {
     auth = _FakeAuth(signedIn, outcome: outcome);
@@ -81,6 +90,8 @@ void main() {
           authProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
           viewedChannelProvider.overrideWithValue(viewed),
+          takeoutChannelsProvider.overrideWithValue(channels),
+          savedTakeoutsProvider.overrideWith(_NoSavedTakeouts.new),
         ],
         child: MaterialApp(
           home: Scaffold(body: AccountDialog(oauthConfigured: oauthConfigured)),
@@ -126,11 +137,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Signed in with another channel'), findsOneWidget);
-    expect(find.text('Gaming Alt'), findsOneWidget);
-    expect(find.text('youtube.com/channel/UCalt'), findsOneWidget);
-    expect(find.text('Boolean'), findsOneWidget);
-    expect(find.text('youtube.com/channel/UCme'), findsOneWidget);
-    expect(find.textContaining('saved for Gaming Alt'), findsOneWidget);
+    Finder inWarning(Finder finder) => find.descendant(
+      of: find.byType(SignedInOtherChannelDialog),
+      matching: finder,
+    );
+    expect(inWarning(find.text('Gaming Alt')), findsOneWidget);
+    expect(inWarning(find.text('youtube.com/channel/UCalt')), findsOneWidget);
+    expect(inWarning(find.text('Boolean')), findsOneWidget);
+    expect(inWarning(find.text('youtube.com/channel/UCme')), findsOneWidget);
+    expect(inWarning(find.textContaining('saved for Gaming Alt')), findsOne);
 
     await tester.tap(find.text('OK'));
     await tester.pumpAndSettle();
@@ -189,6 +204,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("Boolean isn't signed in"), findsOneWidget);
+  });
+
+  testWidgets('shows the viewed takeout channel, and opens the switcher', (
+    tester,
+  ) async {
+    await pumpDialog(tester);
+
+    expect(find.text('Takeout'), findsOneWidget);
+    expect(find.text('youtube.com/channel/UCme'), findsOneWidget);
+    expect(find.textContaining('of 2 channels'), findsNothing);
+
+    await tester.tap(find.text('Switch takeout'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SwitchTakeoutDialog), findsOneWidget);
+  });
+
+  testWidgets('says which of several channels is viewed', (tester) async {
+    await pumpDialog(
+      tester,
+      channels: const [
+        _viewed,
+        TakeoutChannel(channelId: 'UCalt', isMain: false, listed: true),
+      ],
+    );
+
+    expect(find.text('1 of 2 channels in this takeout'), findsOneWidget);
+  });
+
+  testWidgets('says when no takeout is imported', (tester) async {
+    await pumpDialog(tester, viewed: null, channels: const []);
+
+    expect(find.text('No takeout imported'), findsOneWidget);
   });
 
   testWidgets('shows quota usage, which is API-only', (tester) async {
