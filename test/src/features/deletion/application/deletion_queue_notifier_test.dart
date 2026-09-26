@@ -93,6 +93,38 @@ void main() {
     expect(await queueIds(container()), ['comment-c']);
   });
 
+  test('changes made at the same time keep every change', () async {
+    SharedPreferences.setMockInitialValues({});
+    final c = container();
+    await c.read(deletionQueueRepositoryProvider).saveQueue([
+      _item('a', DeletionItemStatus.pending),
+      _item('b', DeletionItemStatus.pending),
+    ]);
+    final notifier = c.read(deletionQueueProvider.notifier);
+    await c.read(deletionQueueProvider.future);
+
+    await Future.wait([
+      notifier.updateItem(
+        'comment-a',
+        _item('a', DeletionItemStatus.succeeded),
+      ),
+      notifier.removeItem('comment-b'),
+      notifier.enqueue(
+        const DeletionTargets(commentSnippets: {'c': null}),
+        authorChannelId: 'UC1',
+      ),
+    ]);
+
+    Future<void> check(ProviderContainer c) async {
+      final items = await c.read(deletionQueueProvider.future);
+      expect([for (final i in items) i.itemId], ['a', 'c']);
+      expect(items.first.status, DeletionItemStatus.succeeded);
+    }
+
+    await check(c);
+    await check(container());
+  });
+
   group('channels', () {
     DeletionQueueItem owned(
       String itemId,
