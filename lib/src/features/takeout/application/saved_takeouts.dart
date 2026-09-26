@@ -22,7 +22,11 @@ class SavedTakeouts extends _$SavedTakeouts {
       ref.watch(takeoutRepositoryProvider),
       loaded: ref.watch(takeoutProvider).value,
     );
-    return summaries..sort(_newestFirst);
+    final titles = ref.watch(signedInChannelTitlesProvider);
+    return [
+      for (final s in summaries)
+        s.copyWith(channels: withTitles(s.channels, titles)),
+    ]..sort(_newestFirst);
   }
 
   /// What removing [takeoutId] would remove: its data, and the queued

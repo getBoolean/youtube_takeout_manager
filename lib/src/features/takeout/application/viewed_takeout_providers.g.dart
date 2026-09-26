@@ -58,7 +58,7 @@ final class TakeoutChannelsProvider
   }
 }
 
-String _$takeoutChannelsHash() => r'd9b3c6072329ca4ecf68e277486fb9033d1ad7cc';
+String _$takeoutChannelsHash() => r'e36f376f1d7a57f38be14fe7656c076345ec0c0b';
 
 /// The channel being viewed: the one last chosen in the selected takeout
 /// while it's still there, otherwise the takeout's main channel.

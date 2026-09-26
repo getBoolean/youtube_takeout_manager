@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/deleti
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
@@ -175,6 +176,7 @@ void main() {
     _FakeTakeout takeout, {
     FilePickerResult? picked,
     List<DeletionQueueItem> queued = const [],
+    Map<String, String> titles = const {},
   }) async {
     selection = _Selection();
     await tester.pumpWidget(
@@ -184,6 +186,7 @@ void main() {
         overrides: [
           takeoutProvider.overrideWith(() => takeout),
           takeoutSelectionProvider.overrideWith(() => selection),
+          signedInChannelTitlesProvider.overrideWithValue(titles),
           zipPickerRepositoryProvider.overrideWithValue(
             _FakeZipPicker(picked ?? _pickedZip),
           ),
@@ -411,6 +414,20 @@ void main() {
 
       expect(selection.channels, ['UCalt']);
     });
+
+    testWidgets(
+      'names a channel its saved data gives no title after its sign-in',
+      (tester) async {
+        await pumpHome(
+          tester,
+          _FakeTakeout(saved: _savedData),
+          titles: const {'UCme': 'Boolean'},
+        );
+
+        expect(find.text('Boolean'), findsOneWidget);
+        expect(find.text('UCme'), findsNothing);
+      },
+    );
 
     testWidgets('a takeout with one channel has nothing to change', (
       tester,

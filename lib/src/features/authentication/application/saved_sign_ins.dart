@@ -18,6 +18,16 @@ part 'saved_sign_ins.g.dart';
 @Riverpod(keepAlive: true)
 bool oauthConfigured(Ref ref) => isOAuthConfigured;
 
+/// Titles of the channels with a saved sign-in, by channel ID, from the
+/// YouTube API at sign-in. Names takeout channels their saved data gives no
+/// title, e.g. data saved before channel lists were kept.
+@Riverpod(keepAlive: true)
+Map<String, String> signedInChannelTitles(Ref ref) => {
+  for (final profile
+      in (ref.watch(savedSignInsProvider).value ?? const {}).values)
+    profile.channelId: ?profile.channelTitle,
+};
+
 /// A sign-in that stopped working and was removed. Compared by identity, so
 /// each loss is reported even if the same channel's is lost twice.
 class LostSignIn {

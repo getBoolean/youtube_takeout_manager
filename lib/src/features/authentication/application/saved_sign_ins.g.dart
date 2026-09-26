@@ -54,6 +54,65 @@ final class OauthConfiguredProvider
 
 String _$oauthConfiguredHash() => r'a71521b8cd5f0d0f0c3eb71d05e218d3995bd170';
 
+/// Titles of the channels with a saved sign-in, by channel ID, from the
+/// YouTube API at sign-in. Names takeout channels their saved data gives no
+/// title, e.g. data saved before channel lists were kept.
+
+@ProviderFor(signedInChannelTitles)
+final signedInChannelTitlesProvider = SignedInChannelTitlesProvider._();
+
+/// Titles of the channels with a saved sign-in, by channel ID, from the
+/// YouTube API at sign-in. Names takeout channels their saved data gives no
+/// title, e.g. data saved before channel lists were kept.
+
+final class SignedInChannelTitlesProvider
+    extends
+        $FunctionalProvider<
+          Map<String, String>,
+          Map<String, String>,
+          Map<String, String>
+        >
+    with $Provider<Map<String, String>> {
+  /// Titles of the channels with a saved sign-in, by channel ID, from the
+  /// YouTube API at sign-in. Names takeout channels their saved data gives no
+  /// title, e.g. data saved before channel lists were kept.
+  SignedInChannelTitlesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'signedInChannelTitlesProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$signedInChannelTitlesHash();
+
+  @$internal
+  @override
+  $ProviderElement<Map<String, String>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  Map<String, String> create(Ref ref) {
+    return signedInChannelTitles(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, String>>(value),
+    );
+  }
+}
+
+String _$signedInChannelTitlesHash() =>
+    r'cf935e9224929d9614795f91475d4ea2fc71cbc0';
+
 /// The last sign-in that stopped working, for the UI to report.
 
 @ProviderFor(LostSignInNotifier)

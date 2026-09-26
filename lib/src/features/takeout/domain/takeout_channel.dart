@@ -159,3 +159,15 @@ List<TakeoutChannel> takeoutChannelsFrom(
     return byCount != 0 ? byCount : a.channelId.compareTo(b.channelId);
   });
 }
+
+/// [channels], each without a title taking one from [titles] by channel ID.
+List<TakeoutChannel> withTitles(
+  List<TakeoutChannel> channels,
+  Map<String, String> titles,
+) => [
+  for (final c in channels)
+    if (c.title == null && titles[c.channelId] != null)
+      c.copyWith(title: titles[c.channelId])
+    else
+      c,
+];

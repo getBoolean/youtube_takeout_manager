@@ -32,7 +32,10 @@ void main() {
     expect(isSignInFailure(_refresh(429, {'error': 'rate_limit'})), isFalse);
     // A hotel Wi-Fi login page instead of JSON.
     expect(isSignInFailure(_refresh(null, '<html>Log in</html>')), isFalse);
-    expect(isSignInFailure(_refresh(400, {'error': 'invalid_request'})), isFalse);
+    expect(
+      isSignInFailure(_refresh(400, {'error': 'invalid_request'})),
+      isFalse,
+    );
   });
 
   test("being offline isn't", () {

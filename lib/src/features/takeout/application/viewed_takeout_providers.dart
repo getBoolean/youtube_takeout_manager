@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+
 import '../domain/takeout_channel.dart';
 import '../domain/takeout_data.dart';
 import 'takeout_notifier.dart';
@@ -17,7 +19,10 @@ List<TakeoutChannel> takeoutChannels(Ref ref) {
     takeoutSelectionProvider.select((s) => s.value?.takeoutId),
   );
   if (loaded == null || loaded.id != takeoutId) return const [];
-  return takeoutChannelsOf(loaded.data, takeoutId: loaded.id);
+  return withTitles(
+    takeoutChannelsOf(loaded.data, takeoutId: loaded.id),
+    ref.watch(signedInChannelTitlesProvider),
+  );
 }
 
 /// The channel being viewed: the one last chosen in the selected takeout
