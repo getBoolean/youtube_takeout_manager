@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
+import '../domain/takeout_import_plan.dart';
 
 /// Result of parsing a CSV file, including diagnostic counts.
 class CsvParseResult<T> {
@@ -20,7 +21,8 @@ class CsvParseResult<T> {
   /// Number of rows the CSV parser produced (excluding header).
   final int parsedRowCount;
 
-  /// Number of rows skipped due to insufficient columns.
+  /// Number of rows skipped for having too few columns or an unreadable
+  /// timestamp.
   final int skippedRowCount;
 
   const CsvParseResult({
@@ -58,6 +60,20 @@ class CsvParserService {
     return null;
   }
 
+  /// Finds the index of [column], a column [file] can't be read without,
+  /// also trying [otherNames]. Throws when the header has none of them.
+  static int _requiredCol(
+    Map<String, int> index,
+    String file,
+    String column,
+    List<String> otherNames,
+  ) =>
+      _col(index, [column, ...otherNames]) ??
+      (throw TakeoutImportException(
+        "The takeout's $file file has no \"$column\" column, so it "
+        "couldn't be read. Google may have changed the takeout's format.",
+      ));
+
   /// Parses a comments CSV file into a list of [Comment] objects.
   ///
   /// Supports both 8-column (no Post ID) and 9-column (with Post ID) formats.
@@ -78,42 +94,47 @@ class CsvParserService {
     }
 
     final cols = _buildColumnIndex(rows.first);
-    final iId = _col(cols, ['comment id'])!;
-    final iChannel = _col(cols, ['channel id'])!;
-    final iTimestamp = _col(cols, ['comment create timestamp', 'created at'])!;
-    final iPrice = _col(cols, ['price'])!;
+    int required(String column, [List<String> otherNames = const []]) =>
+        _requiredCol(cols, 'comments', column, otherNames);
+    final iId = required('Comment ID');
+    final iChannel = required('Channel ID');
+    final iTimestamp = required('Comment Create Timestamp', ['created at']);
+    final iPrice = required('Price');
     final iParent = _col(cols, ['parent comment id']);
     final iPost = _col(cols, ['post id']);
     final iVideo = _col(cols, ['video id']);
-    final iText = _col(cols, ['comment text'])!;
+    final iText = required('Comment Text');
     final iTopLevel = _col(cols, ['top-level comment id']);
     final minCols = rows.first.length;
 
     final dataRows = rows.skip(1).toList();
-    final valid = dataRows.where((row) => row.length >= minCols).toList();
-    final skipped = dataRows.length - valid.length;
+    final items = [
+      for (final row in dataRows)
+        if (row.length >= minCols)
+          if (DateTime.tryParse(_str(row[iTimestamp])) case final createdAt?)
+            Comment(
+              commentId: _str(row[iId]),
+              channelId: _str(row[iChannel]),
+              createdAt: createdAt,
+              price: _toDouble(row[iPrice]),
+              parentCommentId: iParent != null
+                  ? _nullableStr(row[iParent])
+                  : null,
+              postId: iPost != null ? _nullableStr(row[iPost]) : null,
+              videoId: iVideo != null ? _nullableStr(row[iVideo]) : null,
+              rawCommentText: _str(row[iText]),
+              displayText: parseCommentText(_str(row[iText])),
+              topLevelCommentId: iTopLevel != null
+                  ? _nullableStr(row[iTopLevel])
+                  : null,
+            ),
+    ];
 
     return CsvParseResult(
-      items: valid.map((row) {
-        final rawText = _str(row[iText]);
-        return Comment(
-          commentId: _str(row[iId]),
-          channelId: _str(row[iChannel]),
-          createdAt: DateTime.parse(_str(row[iTimestamp])),
-          price: _toDouble(row[iPrice]),
-          parentCommentId: iParent != null ? _nullableStr(row[iParent]) : null,
-          postId: iPost != null ? _nullableStr(row[iPost]) : null,
-          videoId: iVideo != null ? _nullableStr(row[iVideo]) : null,
-          rawCommentText: rawText,
-          displayText: parseCommentText(rawText),
-          topLevelCommentId: iTopLevel != null
-              ? _nullableStr(row[iTopLevel])
-              : null,
-        );
-      }).toList(),
+      items: items,
       rawLineCount: rawLineCount,
       parsedRowCount: dataRows.length,
-      skippedRowCount: skipped,
+      skippedRowCount: dataRows.length - items.length,
     );
   }
 
@@ -138,39 +159,41 @@ class CsvParserService {
     }
 
     final cols = _buildColumnIndex(rows.first);
-    final iId = _col(cols, ['live chat id'])!;
-    final iChannel = _col(cols, ['channel id'])!;
-    final iTimestamp = _col(cols, [
-      'live chat create timestamp',
-      'created at',
-    ])!;
-    final iPrice = _col(cols, ['price'])!;
+    int required(String column, [List<String> otherNames = const []]) =>
+        _requiredCol(cols, 'live chats', column, otherNames);
+    final iId = required('Live Chat ID');
+    final iChannel = required('Channel ID');
+    final iTimestamp = required('Live Chat Create Timestamp', ['created at']);
+    final iPrice = required('Price');
     final iCurrency = _col(cols, ['currency code']);
     final iVideo = _col(cols, ['video id']);
-    final iText = _col(cols, ['live chat text', 'text'])!;
+    final iText = required('Live Chat Text', ['text']);
     final minCols = rows.first.length;
 
     final dataRows = rows.skip(1).toList();
-    final valid = dataRows.where((row) => row.length >= minCols).toList();
-    final skipped = dataRows.length - valid.length;
+    final items = [
+      for (final row in dataRows)
+        if (row.length >= minCols)
+          if (DateTime.tryParse(_str(row[iTimestamp])) case final createdAt?)
+            LiveChat(
+              liveChatId: _str(row[iId]),
+              channelId: _str(row[iChannel]),
+              createdAt: createdAt,
+              price: _toDouble(row[iPrice]),
+              currencyCode: iCurrency != null
+                  ? _nullableStr(row[iCurrency])
+                  : null,
+              videoId: iVideo != null ? _nullableStr(row[iVideo]) : null,
+              rawText: _str(row[iText]),
+              displayText: parseCommentText(_str(row[iText])),
+            ),
+    ];
 
     return CsvParseResult(
-      items: valid.map((row) {
-        final rawText = _str(row[iText]);
-        return LiveChat(
-          liveChatId: _str(row[iId]),
-          channelId: _str(row[iChannel]),
-          createdAt: DateTime.parse(_str(row[iTimestamp])),
-          price: _toDouble(row[iPrice]),
-          currencyCode: iCurrency != null ? _nullableStr(row[iCurrency]) : null,
-          videoId: iVideo != null ? _nullableStr(row[iVideo]) : null,
-          rawText: rawText,
-          displayText: parseCommentText(rawText),
-        );
-      }).toList(),
+      items: items,
       rawLineCount: rawLineCount,
       parsedRowCount: dataRows.length,
-      skippedRowCount: skipped,
+      skippedRowCount: dataRows.length - items.length,
     );
   }
 

@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/csv_parser_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 
 Uint8List _toBytes(String s) => Uint8List.fromList(utf8.encode(s));
 
@@ -202,6 +203,70 @@ void main() {
       final result = parser.parseLiveChatsCsv(_toBytes(csv));
       expect(result.items, hasLength(2));
       expect(result.skippedRowCount, 0);
+    });
+
+    test('names a missing column instead of crashing', () {
+      const csv =
+          'Live Chat ID,Channel ID,Price,Video ID,Live Chat Text\r\n'
+          'lc1,ch1,0.0,vid1,"{"text":"hello"}"\r\n';
+
+      expect(
+        () => parser.parseLiveChatsCsv(_toBytes(csv)),
+        throwsA(
+          isA<TakeoutImportException>().having(
+            (e) => e.message,
+            'message',
+            contains('Live Chat Create Timestamp'),
+          ),
+        ),
+      );
+    });
+
+    test('skips a row with an unreadable timestamp and keeps the rest', () {
+      const header =
+          'Live Chat ID,Channel ID,Live Chat Create Timestamp,'
+          'Price,Video ID,Live Chat Text';
+      final csv =
+          '$header\r\n'
+          'lc1,ch1,not a date,0.0,vid1,"{"text":"hello"}"\r\n'
+          'lc2,ch1,2024-01-02T00:00:00.000Z,0.0,vid2,"{"text":"world"}"\r\n';
+
+      final result = parser.parseLiveChatsCsv(_toBytes(csv));
+      expect(result.items.map((c) => c.liveChatId), ['lc2']);
+      expect(result.skippedRowCount, 1);
+    });
+  });
+
+  group('unexpected comments CSVs', () {
+    test('names a missing column instead of crashing', () {
+      const csv =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,Video ID\r\n'
+          'cid1,ch1,2024-01-01T00:00:00.000Z,0.0,vid1\r\n';
+
+      expect(
+        () => parser.parseCommentsCsv(_toBytes(csv)),
+        throwsA(
+          isA<TakeoutImportException>().having(
+            (e) => e.message,
+            'message',
+            contains('Comment Text'),
+          ),
+        ),
+      );
+    });
+
+    test('skips a row with an unreadable timestamp and keeps the rest', () {
+      const header =
+          'Comment ID,Channel ID,Comment Create Timestamp,Price,'
+          'Video ID,Comment Text';
+      final csv =
+          '$header\r\n'
+          'cid1,ch1,,0.0,vid1,"{"text":"hello"}"\r\n'
+          'cid2,ch1,2024-01-02T00:00:00.000Z,0.0,vid2,"{"text":"world"}"\r\n';
+
+      final result = parser.parseCommentsCsv(_toBytes(csv));
+      expect(result.items.map((c) => c.commentId), ['cid2']);
+      expect(result.skippedRowCount, 1);
     });
   });
 }
