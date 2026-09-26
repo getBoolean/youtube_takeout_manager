@@ -42,7 +42,7 @@ final class SavedTakeoutsProvider
   SavedTakeouts create() => SavedTakeouts();
 }
 
-String _$savedTakeoutsHash() => r'51511f03d3ef0ac87e431c9f4f7e427f9de7646c';
+String _$savedTakeoutsHash() => r'b090717f4b06afa70b2e2f0fbe7e63fc69e640ec';
 
 /// Every saved takeout, newest export first, read from each one's small
 /// summary files rather than all its data. The loaded takeout's comes from

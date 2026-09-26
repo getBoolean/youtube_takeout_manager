@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
@@ -66,15 +67,20 @@ class _Saved extends SavedTakeouts {
 }
 
 class _Selection extends TakeoutSelectionNotifier {
+  final String viewing;
   final selected = <String>[];
+  final channels = <String?>[];
+
+  _Selection([this.viewing = 'UCme']);
 
   @override
   Future<TakeoutSelection?> build() async =>
-      const TakeoutSelection(takeoutId: 'UCme');
+      TakeoutSelection(takeoutId: viewing);
 
   @override
   Future<void> select(String takeoutId, {String? channelId}) async {
     selected.add(takeoutId);
+    channels.add(channelId);
     state = AsyncData(TakeoutSelection(takeoutId: takeoutId));
   }
 }
@@ -115,9 +121,11 @@ void main() {
   Future<void> pumpDialog(
     WidgetTester tester, {
     DeletionProcessingState processing = DeletionProcessingState.idle,
+    String viewing = 'UCme',
   }) async {
+    SharedPreferences.setMockInitialValues({});
     saved = _Saved();
-    selection = _Selection();
+    selection = _Selection(viewing);
     signIns = _SignIns();
     tester.view.physicalSize = const Size(600, 1400);
     tester.view.devicePixelRatio = 1;
@@ -210,6 +218,33 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Deleting in progress'), findsOneWidget);
+    expect(selection.selected, isEmpty);
+  });
+
+  testWidgets('switching to a takeout with several channels asks which', (
+    tester,
+  ) async {
+    await pumpDialog(tester, viewing: 'UCwork');
+
+    await tester.tap(find.text('Switch'));
+    await tester.pumpAndSettle();
+    expect(find.text('Choose a channel'), findsOneWidget);
+
+    await tester.tap(find.text('Gaming Alt'));
+    await tester.pumpAndSettle();
+
+    expect(selection.selected, ['UCme']);
+    expect(selection.channels, ['UCalt']);
+  });
+
+  testWidgets('dismissing the channel choice switches nothing', (tester) async {
+    await pumpDialog(tester, viewing: 'UCwork');
+
+    await tester.tap(find.text('Switch'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
     expect(selection.selected, isEmpty);
   });
 }

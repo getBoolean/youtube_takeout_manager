@@ -64,4 +64,22 @@ void main() {
     );
     expect(find.text('Nothing was imported.'), findsOneWidget);
   });
+
+  testWidgets('names the channels by title when the takeouts give them', (
+    tester,
+  ) async {
+    await open(
+      tester,
+      const TakeoutAccountMismatchException(
+        'The selected takeouts are from different YouTube accounts.',
+        expectedChannelIds: {'UCa'},
+        foundChannelIds: {'UCb'},
+        titlesById: {'UCa': 'Boolean', 'UCb': 'Somebody Else'},
+      ),
+    );
+
+    expect(find.text('Boolean'), findsOneWidget);
+    expect(find.text('Somebody Else'), findsOneWidget);
+    expect(find.text('youtube.com/channel/UCb'), findsOneWidget);
+  });
 }

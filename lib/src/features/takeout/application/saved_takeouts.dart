@@ -3,7 +3,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import '../data/takeout_account_repository.dart';
-import '../data/takeout_csv_encoder.dart';
 import '../data/takeout_repository.dart';
 import '../data/takeout_summary_parser.dart';
 import '../domain/takeout_channel.dart';
@@ -19,25 +18,10 @@ part 'saved_takeouts.g.dart';
 class SavedTakeouts extends _$SavedTakeouts {
   @override
   Future<List<TakeoutSummary>> build() async {
-    final repository = ref.watch(takeoutRepositoryProvider);
-    final loaded = ref.watch(takeoutProvider).value;
-
-    final summaries = <TakeoutSummary>[];
-    for (final id in await repository.listAccountIds()) {
-      if (loaded != null && loaded.id == id) {
-        summaries.add(
-          TakeoutSummary(
-            id: id,
-            channels: takeoutChannelsOf(loaded.data, takeoutId: id),
-            latestExportAt: loaded.data.latestExportAt,
-            countsKnown: true,
-          ),
-        );
-      } else {
-        final files = await repository.loadCsvs(id, only: isTakeoutSummaryPath);
-        summaries.add(parseTakeoutSummary(id, files ?? const {}));
-      }
-    }
+    final summaries = await loadTakeoutSummaries(
+      ref.watch(takeoutRepositoryProvider),
+      loaded: ref.watch(takeoutProvider).value,
+    );
     return summaries..sort(_newestFirst);
   }
 

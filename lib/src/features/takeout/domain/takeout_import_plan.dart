@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'takeout_channel.dart';
 import 'takeout_data.dart';
 
 /// Why items missing from the newest takeout weren't marked deleted.
@@ -35,6 +36,9 @@ class TakeoutImportPlan {
 
   final TakeoutData mergedData;
 
+  /// The takeout's channels once imported, main first.
+  final List<TakeoutChannel> channels;
+
   /// [mergedData] encoded for [TakeoutRepository.saveCsvs].
   final Map<String, Uint8List> csvFiles;
 
@@ -64,6 +68,7 @@ class TakeoutImportPlan {
   const TakeoutImportPlan({
     required this.accountId,
     required this.mergedData,
+    this.channels = const [],
     required this.csvFiles,
     required this.goneCommentIds,
     required this.goneLiveChatIds,
@@ -94,9 +99,13 @@ class TakeoutAccountMismatchException extends TakeoutImportException {
   final Set<String> expectedChannelIds;
   final Set<String> foundChannelIds;
 
+  /// Titles of those channels, where the takeouts give them.
+  final Map<String, String> titlesById;
+
   const TakeoutAccountMismatchException(
     super.message, {
     required this.expectedChannelIds,
     required this.foundChannelIds,
+    this.titlesById = const {},
   });
 }

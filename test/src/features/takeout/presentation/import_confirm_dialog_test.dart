@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_confirm_dialog.dart';
@@ -11,8 +12,10 @@ TakeoutImportPlan _plan({
   int newlyDeletedComments = 0,
   DeletionCheckSkipReason? commentCheckSkipped,
   ChannelMismatch? differentAccount,
+  List<TakeoutChannel> channels = const [],
 }) => TakeoutImportPlan(
   accountId: 'UCme',
+  channels: channels,
   mergedData: const TakeoutData(
     comments: [],
     liveChats: [],
@@ -221,5 +224,39 @@ void main() {
     );
 
     expect(find.textContaining('will be removed from the app'), findsOneWidget);
+  });
+
+  testWidgets('lists the channels of a takeout with several', (tester) async {
+    await open(
+      tester,
+      ImportConfirmDialog(
+        plan: _plan(
+          channels: const [
+            TakeoutChannel(
+              channelId: 'UCme',
+              title: 'Boolean',
+              isMain: true,
+              listed: true,
+            ),
+            TakeoutChannel(channelId: 'UCalt', isMain: false, listed: true),
+          ],
+        ),
+        merge: false,
+        hasSavedData: false,
+      ),
+    );
+
+    expect(find.text('Channels in this takeout'), findsOneWidget);
+    expect(find.text('Boolean'), findsOneWidget);
+    expect(find.text('youtube.com/channel/UCalt'), findsOneWidget);
+  });
+
+  testWidgets('a takeout with one channel lists none', (tester) async {
+    await open(
+      tester,
+      ImportConfirmDialog(plan: _plan(), merge: false, hasSavedData: false),
+    );
+
+    expect(find.text('Channels in this takeout'), findsNothing);
   });
 }

@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_
 import '../data/takeout_import_planner.dart';
 import '../data/takeout_import_service.dart';
 import '../data/takeout_repository.dart';
+import '../data/takeout_summary_parser.dart';
 import '../domain/loaded_takeout.dart';
 import '../domain/takeout_channel.dart';
 import '../domain/takeout_data.dart';
@@ -92,9 +93,16 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       zips.add((name: file.name, bytes: bytes));
     }
 
+    final saved = await _savedData(required: merge);
+    final loaded = state.value;
+    final summaries = await loadTakeoutSummaries(
+      ref.read(takeoutRepositoryProvider),
+      loaded: loaded,
+    );
     return compute(planTakeoutImport, (
       zips: zips,
-      saved: await _savedData(required: merge),
+      saved: saved,
+      savedChannelSets: {for (final s in summaries) s.id: s.channelIds},
       merge: merge,
       deletedCommentIds: await ref.read(deletedCommentIdsProvider.future),
       deletedLiveChatIds: await ref.read(deletedLiveChatIdsProvider.future),

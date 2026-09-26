@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../domain/channel_id.dart';
 import '../domain/own_channel.dart';
+import '../domain/takeout_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_import_plan.dart';
@@ -22,6 +23,10 @@ typedef TakeoutImportRequest = ({
 
   Set<String> deletedCommentIds,
   Set<String> deletedLiveChatIds,
+
+  /// Each saved takeout's channels, by the ID it's saved under. An import
+  /// goes into the one it shares a channel with.
+  Map<String, Set<String>> savedChannelSets,
 
   /// The takeout selected when the import started.
   String? activeTakeoutId,
@@ -44,11 +49,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
   final saved = request.saved;
   final base = request.merge ? saved : null;
   final exports = _readExports(request.zips);
-  final (:accountId, :differentAccount) = _checkAccount(
-    exports,
-    saved: saved,
-    merge: request.merge,
-  );
+  final (:accountId, :differentAccount) = _resolveTakeout(exports, request);
 
   final sources = [if (base != null) _Source.saved(base), ...exports]
     ..sort((a, b) => _compareSnapshots(a.snapshot, a, b.snapshot, b));
@@ -70,15 +71,19 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
 
   final newestComments = _newestWith(sources, (s) => s.comments);
   final newestLiveChats = _newestWith(sources, (s) => s.liveChats);
-  // Only the account's own items can be found gone, even if the saved data
-  // also holds another channel's.
+  // Only channels in the newest source can have items found gone: a channel
+  // moved to another account isn't in newer takeouts, but its items aren't
+  // gone. Rows without a Channel ID are the takeout's own.
+  bool inSource(_Newest? newest, String author) =>
+      newest != null &&
+      newest.channels.contains(author.isEmpty ? accountId : author);
   final goneComments = _findGone(newestComments, {
     for (final c in comments.values)
-      if (c.channelId == accountId) c.commentId: c.createdAt,
+      if (inSource(newestComments, c.channelId)) c.commentId: c.createdAt,
   });
   final goneLiveChats = _findGone(newestLiveChats, {
     for (final l in liveChats.values)
-      if (l.channelId == accountId) l.liveChatId: l.createdAt,
+      if (inSource(newestLiveChats, l.channelId)) l.liveChatId: l.createdAt,
   });
 
   final mergedData = TakeoutData(
@@ -100,6 +105,7 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
   return TakeoutImportPlan(
     accountId: accountId,
     mergedData: mergedData,
+    channels: takeoutChannelsOf(mergedData, takeoutId: accountId),
     csvFiles: encodeTakeoutCsvs(mergedData),
     goneCommentIds: goneComments.ids,
     goneLiveChatIds: goneLiveChats.ids,
@@ -151,6 +157,12 @@ class _Source {
   /// When this data was exported from YouTube.
   final DateTime snapshot;
   final bool isSaved;
+
+  /// The channels it has: listed in its channel.csv, or writing its items.
+  Set<String> get channels => {
+    ...data.ownChannels.keys,
+    ..._authorChannelIds(data),
+  };
   final _Kind comments;
   final _Kind liveChats;
 
@@ -245,7 +257,7 @@ class _Kind {
 }
 
 /// The newest source's details for one kind.
-typedef _Newest = ({_Kind kind, KindSnapshot snapshot});
+typedef _Newest = ({_Kind kind, KindSnapshot snapshot, Set<String> channels});
 
 _Newest? _newestWith(List<_Source> sources, _Kind Function(_Source) kindOf) {
   _Source? newest;
@@ -264,7 +276,7 @@ _Newest? _newestWith(List<_Source> sources, _Kind Function(_Source) kindOf) {
   }
   if (newest == null) return null;
   final kind = kindOf(newest);
-  return (kind: kind, snapshot: kind.snapshot);
+  return (kind: kind, snapshot: kind.snapshot, channels: newest.channels);
 }
 
 List<_Source> _readExports(List<PickedZip> zips) {
@@ -303,71 +315,133 @@ List<_Source> _readExports(List<PickedZip> zips) {
   return exports;
 }
 
-/// Works out the account the exports belong to: the one author channel they
-/// all share. Throws when there isn't exactly one, or when adding, when it
-/// isn't the saved data's channel. When
-/// replacing, a different channel than the saved data's is allowed and
-/// returned as [ChannelMismatch] instead.
-({String accountId, ChannelMismatch? differentAccount}) _checkAccount(
-  List<_Source> exports, {
-  required TakeoutData? saved,
-  required bool merge,
-}) {
-  String? accountId;
+/// Works out which saved takeout the exports go into. They must all be from
+/// one Google account: the same main channel when both name one, otherwise
+/// sharing a channel. They go into the saved takeout they share a channel
+/// with, else a new one saved under their main channel (or the channel that
+/// wrote most). Throws when they share channels with two saved takeouts, or
+/// when adding them to a takeout other than the one selected. When
+/// replacing, another takeout is allowed and returned as [ChannelMismatch].
+({String accountId, ChannelMismatch? differentAccount}) _resolveTakeout(
+  List<_Source> exports,
+  TakeoutImportRequest request,
+) {
+  final titles = {
+    for (final export in [
+      ...exports,
+      if (request.saved case final saved?) _Source.saved(saved),
+    ])
+      for (final own in export.data.ownChannels.values)
+        own.channelId: ?own.title,
+  };
+  Set<String>? found;
+  String? main;
   for (final export in exports) {
-    final found = _authorChannelIds(export.data);
-    if (found.isEmpty) {
+    final channels = export.channels;
+    if (channels.isEmpty) {
       throw const TakeoutImportException(
-        'The selected takeout has no comments or live chats, so its YouTube '
-        "account can't be determined.",
+        'The selected takeout has no comments, live chats or channel list, so '
+        "its YouTube account can't be determined.",
       );
     }
-    if (found.length > 1) {
-      throw TakeoutImportException(
-        'The selected takeout has comments from more than one YouTube '
-        "channel (${found.join(', ')}), so its account can't be determined.",
-      );
+    for (final id in channels) {
+      if (!isChannelId(id)) {
+        throw TakeoutImportException(
+          'The selected takeout has an unexpected channel ID ("$id").',
+        );
+      }
     }
-    if (!isChannelId(found.single)) {
-      throw TakeoutImportException(
-        'The selected takeout has an unexpected channel ID '
-        '("${found.single}").',
-      );
+    final own = export.data.ownChannels;
+    final exportMain = own.length == 1 ? own.keys.single : null;
+    if (found == null) {
+      found = {...channels};
+      main = exportMain;
+      continue;
     }
-    if (accountId == null) {
-      accountId = found.single;
-    } else if (found.single != accountId) {
+    final sameAccount = main != null && exportMain != null
+        ? main == exportMain
+        : found.intersection(channels).isNotEmpty;
+    if (!sameAccount) {
       throw TakeoutAccountMismatchException(
         'The selected takeouts are from different YouTube accounts.',
-        expectedChannelIds: {accountId},
-        foundChannelIds: found,
+        expectedChannelIds: found,
+        foundChannelIds: channels,
+        titlesById: titles,
       );
     }
+    found.addAll(channels);
+    main ??= exportMain;
   }
   // _readExports never returns an empty list.
-  final id = accountId!;
+  final channels = found!;
 
   // Data saved before takeouts were kept per account can mix channels; it
   // belongs to the one that wrote most of it.
-  final savedId = saved != null ? mostCommonAuthorChannelId(saved) : null;
-  if (savedId == null || savedId == id) {
-    return (accountId: id, differentAccount: null);
+  final saved = request.saved;
+  final activeId =
+      request.activeTakeoutId ??
+      (saved != null ? mostCommonAuthorChannelId(saved) : null);
+  final savedSets = {
+    ...request.savedChannelSets,
+    if (activeId != null &&
+        saved != null &&
+        !request.savedChannelSets.containsKey(activeId))
+      activeId: {activeId, ..._Source.saved(saved).channels},
+  };
+
+  final matches = [
+    for (final MapEntry(key: id, value: set) in savedSets.entries)
+      if (set.intersection(channels).isNotEmpty) id,
+  ];
+  if (matches.length > 1) {
+    throw TakeoutAccountMismatchException(
+      'This takeout has channels from more than one saved takeout.',
+      expectedChannelIds: {for (final id in matches) ...savedSets[id]!},
+      foundChannelIds: channels,
+      titlesById: titles,
+    );
   }
-  if (merge) {
+  final takeoutId =
+      matches.singleOrNull ??
+      main ??
+      _mostCommonAuthor(exports) ??
+      channels.first;
+
+  if (activeId == null || takeoutId == activeId) {
+    return (accountId: takeoutId, differentAccount: null);
+  }
+  final expected = savedSets[activeId] ?? {activeId};
+  if (request.merge) {
     throw TakeoutAccountMismatchException(
       'This takeout is from a different YouTube account than your current '
       'data.',
-      expectedChannelIds: {savedId},
-      foundChannelIds: {id},
+      expectedChannelIds: expected,
+      foundChannelIds: channels,
+      titlesById: titles,
     );
   }
   return (
-    accountId: id,
+    accountId: takeoutId,
     differentAccount: ChannelMismatch(
-      expectedChannelIds: {savedId},
-      foundChannelIds: {id},
+      expectedChannelIds: expected,
+      foundChannelIds: channels,
     ),
   );
+}
+
+/// The channel that wrote most items across [exports].
+String? _mostCommonAuthor(List<_Source> exports) {
+  final counts = <String, int>{};
+  for (final export in exports) {
+    for (final id in [
+      for (final c in export.data.comments) c.channelId,
+      for (final l in export.data.liveChats) l.channelId,
+    ]) {
+      if (id.isNotEmpty) counts[id] = (counts[id] ?? 0) + 1;
+    }
+  }
+  if (counts.isEmpty) return null;
+  return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
 }
 
 /// IDs in [createdAtById] that the [newest] source of their kind no longer

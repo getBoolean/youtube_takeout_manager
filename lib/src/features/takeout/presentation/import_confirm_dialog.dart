@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import '../domain/takeout_import_plan.dart';
 
 /// Shows what importing [plan] will change and asks before anything is saved.
@@ -55,6 +56,21 @@ class ImportConfirmDialog extends StatelessWidget {
                 color: theme.colorScheme.error,
                 text: _differentAccountNotice(mismatch),
               ),
+              const SizedBox(height: 16),
+            ],
+            if (plan.channels.length > 1) ...[
+              Text(
+                'Channels in this takeout',
+                style: theme.textTheme.titleSmall,
+              ),
+              for (final channel in plan.channels)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: ChannelIdentity(
+                    channelId: channel.channelId,
+                    title: channel.title,
+                  ),
+                ),
               const SizedBox(height: 16),
             ],
             if (merge) ...[

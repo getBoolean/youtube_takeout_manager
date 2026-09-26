@@ -49,9 +49,11 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/saved_t
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
@@ -177,6 +179,28 @@ class _SavedTakeouts extends SavedTakeouts {
     _longTakeout,
     _longTakeout.copyWith(id: 'UCother'),
   ];
+}
+
+class _TwoChannelTakeout extends TakeoutNotifier {
+  @override
+  Future<LoadedTakeout?> build() async => LoadedTakeout(
+    id: 'UCme',
+    data: TakeoutData(
+      comments: [
+        _comment,
+        _comment.copyWith(commentId: 'c2', channelId: 'UCalt'),
+      ],
+      liveChats: const [],
+      subscriptionsByChannelId: const {},
+      ownChannels: const {
+        'UCme': OwnChannel(
+          channelId: 'UCme',
+          title: 'A channel with a fairly long name',
+        ),
+        'UCalt': OwnChannel(channelId: 'UCalt'),
+      },
+    ),
+  );
 }
 
 /// Keeps the fake takeout's ID selected.
@@ -422,6 +446,21 @@ void main() {
   fitsAtEveryWidth(
     'the deletion running dialog',
     () => const DeletionRunningDialog(),
+  );
+  fitsAtEveryWidth(
+    'the channel picker',
+    () => ChannelPickerDialog(
+      channels: _longTakeout.channels,
+      viewedChannelId: 'UCanotherLongChannelIdentifier',
+      signedInChannelIds: const {'UCme'},
+    ),
+  );
+  fitsAtEveryWidth(
+    'Home with several channels',
+    () => ProviderScope(
+      overrides: [takeoutProvider.overrideWith(_TwoChannelTakeout.new)],
+      child: const HomeScreen(),
+    ),
   );
   fitsAtEveryWidth(
     'the queue dialog',

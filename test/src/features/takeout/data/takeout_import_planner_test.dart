@@ -95,13 +95,16 @@ TakeoutImportPlan _plan(
   TakeoutData? saved,
   bool merge = true,
   Set<String> deletedCommentIds = const {},
+  Map<String, Set<String>> savedChannelSets = const {},
+  String? activeTakeoutId,
 }) => planTakeoutImport((
   zips: zips,
   saved: saved,
   merge: merge,
   deletedCommentIds: deletedCommentIds,
   deletedLiveChatIds: const {},
-  activeTakeoutId: null,
+  savedChannelSets: savedChannelSets,
+  activeTakeoutId: activeTakeoutId,
 ));
 
 Set<String> _commentIds(TakeoutImportPlan plan) =>
@@ -601,14 +604,13 @@ void main() {
       );
     });
 
-    test('a takeout with more than one author channel is rejected', () {
-      expect(
-        () => add(
-          [_c('A', '2026-01-01T00:00:00Z')],
-          liveChats: [_l('L1', '2026-01-01T00:00:00Z', channel: 'UCother')],
-        ),
-        throwsA(isA<TakeoutImportException>()),
+    test('adding a takeout with another of its channels too is accepted', () {
+      final plan = add(
+        [_c('A', '2026-01-01T00:00:00Z')],
+        liveChats: [_l('L1', '2026-01-01T00:00:00Z', channel: 'UCother')],
       );
+      expect(plan.accountId, 'UCme');
+      expect(plan.channels.map((c) => c.channelId), ['UCme', 'UCother']);
     });
 
     for (final merge in [true, false]) {
@@ -630,8 +632,8 @@ void main() {
       });
     }
 
-    test('adding a takeout from the lesser channel of mixed saved data is '
-        'rejected', () {
+    test('adding a takeout of another channel in the saved data merges '
+        'into it', () {
       final mixed = _saved(
         comments: [
           _savedComment('A', '2026-01-01T00:00:00Z', channel: 'UCaaa'),
@@ -641,22 +643,18 @@ void main() {
         latestExportAt: DateTime.utc(2026, 2),
       );
 
-      expect(
-        () => _plan([
-          _zip('takeout-20260301T000000Z-001.zip', {
-            _comments: _commentsCsv([
-              _c('X', '2026-01-03T00:00:00Z', channel: 'UCbbb'),
-            ]),
-          }),
-        ], saved: mixed),
-        throwsA(
-          isA<TakeoutAccountMismatchException>().having(
-            (e) => e.expectedChannelIds,
-            'expected',
-            {'UCaaa'},
-          ),
-        ),
-      );
+      final plan = _plan([
+        _zip('takeout-20260301T000000Z-001.zip', {
+          _comments: _commentsCsv([
+            _c('X', '2026-01-03T00:00:00Z', channel: 'UCbbb'),
+          ]),
+        }),
+      ], saved: mixed);
+
+      expect(plan.accountId, 'UCaaa');
+      expect(plan.differentAccount, isNull);
+      // UCaaa isn't in the newer takeout, so its items can't be found gone.
+      expect(plan.goneCommentIds, isEmpty);
     });
 
     test("other channels' items in saved data are never marked deleted", () {
@@ -770,5 +768,182 @@ void main() {
     ], merge: false);
 
     expect(plan.mergedData.ownChannels['UCme']?.title, 'New name');
+  });
+
+  group('takeouts with several channels', () {
+    const channels = '$_dir/channels/channel.csv';
+    String channelList(List<String> ids) => [
+      'Channel ID,Channel Title (Original)',
+      ...ids.map((id) => '$id,T'),
+    ].join('\r\n');
+
+    PickedZip export(
+      List<String> commentRows, {
+      List<String>? listed,
+      String name = 'takeout-20260301T000000Z-001.zip',
+    }) => _zip(name, {
+      _comments: _commentsCsv(commentRows),
+      if (listed != null) channels: channelList(listed),
+    });
+
+    test('is saved under the channel its list names', () {
+      final plan = _plan([
+        export(
+          [
+            _c('A', '2026-01-01T00:00:00Z', channel: 'UCalt'),
+            _c('B', '2026-01-02T00:00:00Z', channel: 'UCalt'),
+            _c('C', '2026-01-03T00:00:00Z', channel: 'UCmain'),
+          ],
+          listed: ['UCmain'],
+        ),
+      ], merge: false);
+
+      expect(plan.accountId, 'UCmain');
+      expect(plan.channels.map((c) => c.channelId), ['UCmain', 'UCalt']);
+    });
+
+    test(
+      'without a channel list, is saved under the channel that wrote most',
+      () {
+        final plan = _plan([
+          export([
+            _c('A', '2026-01-01T00:00:00Z', channel: 'UCa'),
+            _c('B', '2026-01-02T00:00:00Z', channel: 'UCa'),
+            _c('C', '2026-01-03T00:00:00Z', channel: 'UCb'),
+          ]),
+        ], merge: false);
+
+        expect(plan.accountId, 'UCa');
+      },
+    );
+
+    test('goes into the saved takeout it shares a channel with', () {
+      final plan = _plan(
+        [
+          export([_c('A', '2026-01-01T00:00:00Z', channel: 'UCalt')]),
+        ],
+        merge: false,
+        savedChannelSets: {
+          'UCmain': {'UCmain', 'UCalt'},
+          'UCviewed': {'UCviewed'},
+        },
+        activeTakeoutId: 'UCviewed',
+      );
+
+      expect(plan.accountId, 'UCmain');
+      expect(plan.differentAccount, isNotNull);
+    });
+
+    test('sharing channels with two saved takeouts is refused', () {
+      expect(
+        () => _plan(
+          [
+            export([
+              _c('A', '2026-01-01T00:00:00Z', channel: 'UCa'),
+              _c('B', '2026-01-01T00:00:00Z', channel: 'UCb'),
+            ]),
+          ],
+          merge: false,
+          savedChannelSets: {
+            'UCa': {'UCa'},
+            'UCb': {'UCb'},
+          },
+        ),
+        throwsA(isA<TakeoutAccountMismatchException>()),
+      );
+    });
+
+    test('exports naming different main channels are refused together', () {
+      expect(
+        () => _plan([
+          export(
+            [_c('A', '2026-01-01T00:00:00Z', channel: 'UCshared')],
+            listed: ['UCa'],
+            name: 'takeout-20260101T000000Z-001.zip',
+          ),
+          export(
+            [_c('B', '2026-02-01T00:00:00Z', channel: 'UCshared')],
+            listed: ['UCb'],
+          ),
+        ], merge: false),
+        throwsA(isA<TakeoutAccountMismatchException>()),
+      );
+    });
+
+    test("only channels in the newest takeout can have items found gone", () {
+      final saved = _saved(
+        comments: [
+          _savedComment('A', '2026-01-01T00:00:00Z', channel: 'UCmain'),
+          _savedComment('B', '2026-01-02T00:00:00Z', channel: 'UCalt'),
+        ],
+        latestExportAt: DateTime.utc(2026, 2),
+      );
+
+      // UCalt was moved to another account, so this takeout lacks it.
+      final plan = _plan(
+        [
+          export([], listed: ['UCmain']),
+        ],
+        saved: saved,
+        activeTakeoutId: 'UCmain',
+        savedChannelSets: {
+          'UCmain': {'UCmain', 'UCalt'},
+        },
+      );
+
+      expect(plan.goneCommentIds, {'A'});
+    });
+
+    test(
+      "a channel the newest takeout lists has its missing items found gone",
+      () {
+        final saved = _saved(
+          comments: [
+            _savedComment('A', '2026-01-01T00:00:00Z', channel: 'UCmain'),
+            _savedComment('B', '2026-01-02T00:00:00Z', channel: 'UCalt'),
+          ],
+          latestExportAt: DateTime.utc(2026, 2),
+        );
+
+        final plan = _plan(
+          [
+            export(
+              [_c('A', '2026-01-01T00:00:00Z', channel: 'UCmain')],
+              listed: ['UCmain', 'UCalt'],
+            ),
+          ],
+          saved: saved,
+          activeTakeoutId: 'UCmain',
+          savedChannelSets: {
+            'UCmain': {'UCmain', 'UCalt'},
+          },
+        );
+
+        expect(plan.goneCommentIds, {'B'});
+      },
+    );
+
+    test('a refusal names channels by the titles the takeouts give', () {
+      expect(
+        () => _plan([
+          export(
+            [_c('A', '2026-01-01T00:00:00Z', channel: 'UCa')],
+            listed: ['UCa'],
+            name: 'takeout-20260101T000000Z-001.zip',
+          ),
+          export(
+            [_c('B', '2026-02-01T00:00:00Z', channel: 'UCb')],
+            listed: ['UCb'],
+          ),
+        ], merge: false),
+        throwsA(
+          isA<TakeoutAccountMismatchException>().having(
+            (e) => e.titlesById,
+            'titles',
+            {'UCa': 'T', 'UCb': 'T'},
+          ),
+        ),
+      );
+    });
   });
 }

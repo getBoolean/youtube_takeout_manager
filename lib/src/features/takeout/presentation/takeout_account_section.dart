@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import '../application/viewed_takeout_providers.dart';
 import 'switch_takeout_dialog.dart';
+import 'takeout_switcher.dart';
 
 /// The takeout channel being viewed, with a way to switch takeouts.
 class TakeoutAccountSection extends ConsumerWidget {
@@ -47,6 +48,15 @@ class TakeoutAccountSection extends ConsumerWidget {
               icon: tiny ? null : const Icon(Icons.swap_horiz),
               label: const Text('Switch takeout', textAlign: TextAlign.center),
             ),
+            if (channels.length > 1)
+              OutlinedButton.icon(
+                onPressed: () => changeChannel(context, ref),
+                icon: tiny ? null : const Icon(Icons.account_circle_outlined),
+                label: const Text(
+                  'Change channel',
+                  textAlign: TextAlign.center,
+                ),
+              ),
           ],
         ),
       ],

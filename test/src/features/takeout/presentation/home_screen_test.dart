@@ -16,6 +16,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/queue_item_
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -50,9 +52,11 @@ TakeoutImportPlan _plan({
   int newComments = 0,
   int newlyDeletedComments = 0,
   ChannelMismatch? differentAccount,
+  List<TakeoutChannel> channels = const [],
 }) => TakeoutImportPlan(
   accountId: accountId,
   mergedData: _savedData,
+  channels: channels,
   csvFiles: const {},
   goneCommentIds: const {},
   goneLiveChatIds: const {},
@@ -122,9 +126,19 @@ class _FakeTakeout extends TakeoutNotifier {
 
 /// Keeps the fake takeout's ID selected.
 class _Selection extends TakeoutSelectionNotifier {
+  final channels = <String>[];
+
   @override
   Future<TakeoutSelection?> build() async =>
       const TakeoutSelection(takeoutId: 'UCme');
+
+  @override
+  Future<void> selectChannel(String channelId) async {
+    channels.add(channelId);
+    state = AsyncData(
+      TakeoutSelection(takeoutId: 'UCme', channelId: channelId),
+    );
+  }
 }
 
 class _FakeQueue extends DeletionQueue {
@@ -154,19 +168,22 @@ class _TestRouter extends RootStackRouter {
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  late _Selection selection;
+
   Future<void> pumpHome(
     WidgetTester tester,
     _FakeTakeout takeout, {
     FilePickerResult? picked,
     List<DeletionQueueItem> queued = const [],
   }) async {
+    selection = _Selection();
     await tester.pumpWidget(
       ProviderScope(
         // Show a failed load right away instead of retrying it.
         retry: (_, _) => null,
         overrides: [
           takeoutProvider.overrideWith(() => takeout),
-          takeoutSelectionProvider.overrideWith(_Selection.new),
+          takeoutSelectionProvider.overrideWith(() => selection),
           zipPickerRepositoryProvider.overrideWithValue(
             _FakeZipPicker(picked ?? _pickedZip),
           ),
@@ -365,5 +382,69 @@ void main() {
       find.text('2 items waiting to be deleted · 1 failed'),
       findsOneWidget,
     );
+  });
+
+  group('channels', () {
+    final twoChannels = _savedData.copyWith(
+      comments: [
+        ..._savedData.comments,
+        _savedData.comments.first.copyWith(commentId: 'B', channelId: 'UCalt'),
+      ],
+      ownChannels: const {
+        'UCme': OwnChannel(channelId: 'UCme', title: 'Boolean'),
+        'UCalt': OwnChannel(channelId: 'UCalt', title: 'Gaming Alt'),
+      },
+    );
+
+    testWidgets('names the viewed channel, and offers to change it', (
+      tester,
+    ) async {
+      await pumpHome(tester, _FakeTakeout(saved: twoChannels));
+
+      expect(find.text('Boolean'), findsOneWidget);
+      expect(find.text('1 of 2 channels'), findsOneWidget);
+
+      await tester.tap(find.text('Change channel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Gaming Alt'));
+      await tester.pumpAndSettle();
+
+      expect(selection.channels, ['UCalt']);
+    });
+
+    testWidgets('a takeout with one channel has nothing to change', (
+      tester,
+    ) async {
+      await pumpHome(tester, _FakeTakeout(saved: _savedData));
+
+      expect(find.text('Change channel'), findsNothing);
+    });
+
+    testWidgets('after replacing with a takeout of several channels, asks '
+        'which to view', (tester) async {
+      final takeout = _FakeTakeout(
+        plan: _plan(
+          accountId: 'UCnew',
+          channels: const [
+            TakeoutChannel(channelId: 'UCnew', isMain: true, listed: true),
+            TakeoutChannel(
+              channelId: 'UCnew2',
+              title: 'Second',
+              isMain: false,
+              listed: true,
+            ),
+          ],
+        ),
+      );
+      await pumpHome(tester, takeout);
+
+      await tapAndWait(tester, 'Select Zip Files');
+      expect(find.text('Choose a channel'), findsOneWidget);
+      await tester.tap(find.text('Second'));
+      await tester.pumpAndSettle();
+
+      expect(selection.channels, ['UCnew2']);
+      expect(find.text('Channel list'), findsOneWidget);
+    });
   });
 }

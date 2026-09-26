@@ -415,6 +415,29 @@ void main() {
       expect(await c.read(takeoutProvider.future), isNull);
     });
 
+    test('an import sharing a channel with another saved takeout goes into '
+        'it', () async {
+      repository.accounts['UCmulti'] = encodeTakeoutCsvs(
+        other.copyWith(
+          comments: [
+            _comment(
+              'M',
+              '2026-01-01T00:00:00Z',
+            ).copyWith(channelId: 'UCmulti'),
+            _comment('N', '2026-01-02T00:00:00Z').copyWith(channelId: 'UCalt'),
+          ],
+        ),
+      );
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+
+      final plan = await c
+          .read(takeoutProvider.notifier)
+          .prepareImport(_newerTakeout(channel: 'UCalt'), merge: false);
+
+      expect(plan.accountId, 'UCmulti');
+    });
+
     test('an import prepared before switching takeouts is refused', () async {
       final c = withSignIns();
       await c.read(takeoutProvider.future);

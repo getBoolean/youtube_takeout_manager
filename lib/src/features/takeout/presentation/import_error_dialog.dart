@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import '../domain/takeout_import_plan.dart';
 
 /// Explains why picked takeout zips weren't imported. An account mismatch
@@ -31,13 +32,19 @@ class ImportErrorDialog extends StatelessWidget {
             if (error case TakeoutAccountMismatchException(
               :final expectedChannelIds,
               :final foundChannelIds,
+              :final titlesById,
             )) ...[
               const SizedBox(height: 16),
-              _ChannelIds(label: 'Expected', channelIds: expectedChannelIds),
+              _ChannelIds(
+                label: 'Expected',
+                channelIds: expectedChannelIds,
+                titlesById: titlesById,
+              ),
               const SizedBox(height: 12),
               _ChannelIds(
                 label: 'In this takeout',
                 channelIds: foundChannelIds,
+                titlesById: titlesById,
               ),
             ],
             const SizedBox(height: 16),
@@ -63,8 +70,13 @@ class ImportErrorDialog extends StatelessWidget {
 class _ChannelIds extends StatelessWidget {
   final String label;
   final Set<String> channelIds;
+  final Map<String, String> titlesById;
 
-  const _ChannelIds({required this.label, required this.channelIds});
+  const _ChannelIds({
+    required this.label,
+    required this.channelIds,
+    required this.titlesById,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -74,11 +86,9 @@ class _ChannelIds extends StatelessWidget {
       children: [
         Text(label, style: theme.textTheme.labelMedium),
         for (final id in channelIds)
-          SelectableText(
-            'youtube.com/channel/$id',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontFamily: 'monospace',
-            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: ChannelIdentity(channelId: id, title: titlesById[id]),
           ),
       ],
     );

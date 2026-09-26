@@ -1,9 +1,11 @@
 import 'dart:typed_data';
 
+import '../domain/loaded_takeout.dart';
 import '../domain/own_channel.dart';
 import '../domain/takeout_channel.dart';
 import 'csv_parser_service.dart';
 import 'takeout_csv_encoder.dart';
+import 'takeout_repository.dart';
 
 /// Reads a [TakeoutSummary] from a saved takeout's summary files (see
 /// `isTakeoutSummaryPath`).
@@ -40,3 +42,24 @@ TakeoutSummary parseTakeoutSummary(
     countsKnown: counts != null,
   );
 }
+
+/// Every saved takeout's summary, from its summary files. [loaded]'s comes
+/// from its data instead.
+Future<List<TakeoutSummary>> loadTakeoutSummaries(
+  TakeoutRepository repository, {
+  LoadedTakeout? loaded,
+}) async => [
+  for (final id in await repository.listAccountIds())
+    if (loaded != null && loaded.id == id)
+      TakeoutSummary(
+        id: id,
+        channels: takeoutChannelsOf(loaded.data, takeoutId: id),
+        latestExportAt: loaded.data.latestExportAt,
+        countsKnown: true,
+      )
+    else
+      parseTakeoutSummary(
+        id,
+        await repository.loadCsvs(id, only: isTakeoutSummaryPath) ?? const {},
+      ),
+];

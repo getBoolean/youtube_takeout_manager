@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
@@ -11,14 +12,17 @@ import 'package:youtube_takeout_manager/src/features/comments/application/commen
 import 'package:youtube_takeout_manager/src/features/live_chats/application/live_chat_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../application/takeout_notifier.dart';
+import '../application/takeout_selection_notifier.dart';
 import '../application/viewed_takeout_providers.dart';
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_import_plan.dart';
+import 'channel_picker_dialog.dart';
 import 'import_confirm_dialog.dart';
 import 'import_error_dialog.dart';
 import 'import_progress_indicator.dart';
 import 'queue_summary_card.dart';
+import 'takeout_switcher.dart';
 
 @RoutePage()
 class HomeScreen extends ConsumerStatefulWidget {
@@ -71,6 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (confirmed != true || !mounted) return;
       }
 
+      final previousChannel = ref.read(viewedChannelIdProvider);
       await notifier.commitImport(plan);
       if (!mounted) return;
       if (merge) {
@@ -78,6 +83,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ..clearSnackBars()
           ..showSnackBar(SnackBar(content: Text(_addedSummary(plan))));
         return;
+      }
+      // A takeout with several channels, none of them the one viewed
+      // before, asks which to view. Dismissing keeps its main channel.
+      if (plan.channels.length > 1 &&
+          !plan.channels.any((c) => c.channelId == previousChannel)) {
+        final picked = await showDialog<String>(
+          context: context,
+          builder: (_) => ChannelPickerDialog(
+            channels: plan.channels,
+            viewedChannelId: plan.channels.first.channelId,
+            signedInChannelIds: {
+              ...?ref.read(savedSignInsProvider).value?.keys,
+            },
+          ),
+        );
+        if (picked != null) {
+          await ref
+              .read(takeoutSelectionProvider.notifier)
+              .selectChannel(picked);
+        }
+        if (!mounted) return;
       }
       await _viewChannels();
     } on TakeoutImportException catch (e) {
@@ -214,6 +240,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final liveChatCount = ref.watch(allLiveChatsProvider).length;
     final channelCount = ref.watch(channelsProvider).length;
     final isAuthenticated = ref.watch(isAuthenticatedProvider);
+    final viewed = ref.watch(viewedChannelProvider);
+    final channels = ref.watch(takeoutChannelsProvider);
     final droppedComments = takeout.skippedCommentRows;
     final droppedLiveChats = takeout.skippedLiveChatRows;
 
@@ -233,10 +261,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Import Complete',
+            viewed?.title ?? viewed?.channelId ?? 'Import Complete',
             textAlign: TextAlign.center,
             style: theme.textTheme.headlineSmall,
           ),
+          if (viewed != null && channels.length > 1) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${channels.indexOf(viewed) + 1} of ${channels.length} channels',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: () => changeChannel(context, ref),
+              icon: const Icon(Icons.account_circle_outlined),
+              label: const Text('Change channel', textAlign: TextAlign.center),
+            ),
+          ],
           if (droppedComments > 0 || droppedLiveChats > 0) ...[
             const SizedBox(height: 8),
             Text(

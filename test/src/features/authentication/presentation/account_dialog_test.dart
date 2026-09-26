@@ -15,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.da
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/switch_takeout_dialog.dart';
 
 const _viewed = TakeoutChannel(
@@ -214,6 +215,7 @@ void main() {
     expect(find.text('Takeout'), findsOneWidget);
     expect(find.text('youtube.com/channel/UCme'), findsOneWidget);
     expect(find.textContaining('of 2 channels'), findsNothing);
+    expect(find.text('Change channel'), findsNothing);
 
     await tester.tap(find.text('Switch takeout'));
     await tester.pumpAndSettle();
@@ -230,6 +232,10 @@ void main() {
     );
 
     expect(find.text('1 of 2 channels in this takeout'), findsOneWidget);
+
+    await tester.tap(find.text('Change channel'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChannelPickerDialog), findsOneWidget);
   });
 
   testWidgets('says when no takeout is imported', (tester) async {

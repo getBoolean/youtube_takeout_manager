@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/label_badge.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import '../application/saved_takeouts.dart';
@@ -132,7 +133,7 @@ class _TakeoutCard extends ConsumerWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 ChannelIdentity(channelId: main.channelId, title: main.title),
-                if (viewing) const _Badge('Viewing'),
+                if (viewing) const LabelBadge('Viewing'),
               ],
             ),
             const SizedBox(height: 4),
@@ -176,32 +177,6 @@ class _TakeoutCard extends ConsumerWidget {
     final router = StackRouterScope.of(context)?.controller;
     await saved.removeTakeout(removal);
     if (viewing && context.mounted) leaveChannelScreens(context, router);
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-
-  const _Badge(this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        child: Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.labelSmall?.copyWith(color: scheme.onSecondaryContainer),
-        ),
-      ),
-    );
   }
 }
 
