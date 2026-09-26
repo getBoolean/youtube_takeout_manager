@@ -106,9 +106,7 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       merge: merge,
       deletedCommentIds: await ref.read(deletedCommentIdsProvider.future),
       deletedLiveChatIds: await ref.read(deletedLiveChatIdsProvider.future),
-      activeTakeoutId: (await ref.read(
-        takeoutSelectionProvider.future,
-      ))?.takeoutId,
+      activeTakeoutId: await _selectedTakeoutId(),
     ));
   }
 
@@ -116,8 +114,7 @@ class TakeoutNotifier extends _$TakeoutNotifier {
   /// deletions, then saves its data in its takeout's folder and selects that
   /// takeout.
   Future<void> commitImport(TakeoutImportPlan plan) async {
-    final active = (await ref.read(takeoutSelectionProvider.future))?.takeoutId;
-    if (active != plan.baseTakeoutId) {
+    if (await _selectedTakeoutId() != plan.baseTakeoutId) {
       throw const TakeoutImportException(
         'Another takeout was opened while this one was being read. Import '
         'it again.',
@@ -145,8 +142,7 @@ class TakeoutNotifier extends _$TakeoutNotifier {
         .saveCsvs(plan.accountId, plan.csvFiles);
     final loaded = LoadedTakeout(id: plan.accountId, data: plan.mergedData);
     await _assignQueueChannels(loaded);
-    final selection = await ref.read(takeoutSelectionProvider.future);
-    if (selection?.takeoutId == plan.accountId) {
+    if (await _selectedTakeoutId() == plan.accountId) {
       state = AsyncData(loaded);
       return;
     }
@@ -161,6 +157,16 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       (await ref.read(takeoutRepositoryProvider).listAccountIds()).contains(
         accountId,
       );
+
+  /// The selected takeout, or null if there's none or the selection failed
+  /// to load, e.g. saved data no channel wrote. An import then replaces it.
+  Future<String?> _selectedTakeoutId() async {
+    try {
+      return (await ref.read(takeoutSelectionProvider.future))?.takeoutId;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// The saved data to merge with or compare against. When replacing, data
   /// that failed to load is ignored instead of blocking the import.

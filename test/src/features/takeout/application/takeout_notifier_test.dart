@@ -303,6 +303,35 @@ void main() {
     expect(repository.legacy, same(legacy));
   });
 
+  test(
+    'saved data no channel wrote can still be replaced by an import',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      repository.accounts.clear();
+      repository.legacy = encodeTakeoutCsvs(
+        TakeoutData(
+          comments: [
+            _comment('A', '2026-01-01T00:00:00Z').copyWith(channelId: 'NUL'),
+          ],
+          liveChats: const [],
+          subscriptionsByChannelId: const {},
+        ),
+      );
+      final c = container();
+      c.listen(takeoutProvider, (_, _) {});
+      final notifier = c.read(takeoutProvider.notifier);
+
+      final plan = await notifier.prepareImport(_newerTakeout(), merge: false);
+      await notifier.commitImport(plan);
+
+      expect(
+        (await c.read(takeoutSelectionProvider.future))?.takeoutId,
+        'UCme',
+      );
+      expect(await commentIds(c), ['D', 'C', 'A']);
+    },
+  );
+
   test('tells which accounts have saved data', () async {
     final notifier = container().read(takeoutProvider.notifier);
 

@@ -112,7 +112,7 @@ class _FakeChannels extends YoutubeChannelRepository {
       'refused' => throw ServerRequestFailedException(
         'invalid_grant',
         statusCode: 400,
-        responseContent: null,
+        responseContent: {'error': 'invalid_grant'},
       ),
       _ => (id: token, title: 'Title $token', handle: null, thumbnailUrl: null),
     };

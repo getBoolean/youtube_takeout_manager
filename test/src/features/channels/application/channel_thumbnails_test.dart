@@ -38,7 +38,7 @@ class _Channels extends YoutubeChannelRepository {
       throw ServerRequestFailedException(
         'invalid_grant',
         statusCode: 400,
-        responseContent: null,
+        responseContent: {'error': 'invalid_grant'},
       );
     }
     return {for (final id in channelIds) id: 'https://yt3.example/$id'};

@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import '../application/auth_notifier.dart';
@@ -129,7 +130,11 @@ class _AccountHeader extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: () => ref.read(authProvider.notifier).signOut(),
+            onPressed: () async {
+              // Signing out mid-deletion would close the session under it.
+              if (!await ensureNotDeleting(context, ref)) return;
+              await ref.read(authProvider.notifier).signOut();
+            },
             icon: tiny ? null : const Icon(Icons.logout),
             label: const Text('Sign out', textAlign: TextAlign.center),
           ),

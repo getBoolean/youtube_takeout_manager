@@ -23,12 +23,21 @@ const scopes = [
   'profile',
 ];
 
-/// Whether [error] means a sign-in stopped working: its refresh was refused
-/// (access revoked, account deleted) or the API rejected its token.
-bool isSignInFailure(Object error) =>
-    error is ServerRequestFailedException ||
-    error is AccessDeniedException ||
-    (error is DetailedApiRequestError && error.status == 401);
+/// Whether [error] means a sign-in stopped working: Google refused to
+/// refresh it (access revoked, account deleted) or the API rejected its
+/// token. Google being down, a rate limit, or a captive portal's page in
+/// place of the token endpoint's reply don't count, so a sign-in isn't lost
+/// to a bad connection.
+bool isSignInFailure(Object error) => switch (error) {
+  ServerRequestFailedException(
+    statusCode: 400 || 401,
+    responseContent: {'error': 'invalid_grant' || 'unauthorized_client'},
+  ) =>
+    true,
+  AccessDeniedException() => true,
+  DetailedApiRequestError(status: 401) => true,
+  _ => false,
+};
 
 /// Google OAuth2 sign-ins, one session per YouTube channel.
 ///

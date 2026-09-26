@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
@@ -66,6 +67,15 @@ class _FakeQuota extends QuotaNotifier {
   Future<void> resetUsage() async => resets++;
 }
 
+class _Processing extends DeletionProcessing {
+  final DeletionProcessingState initial;
+
+  _Processing(this.initial);
+
+  @override
+  DeletionProcessingState build() => initial;
+}
+
 class _NoSavedTakeouts extends SavedTakeouts {
   @override
   Future<List<TakeoutSummary>> build() async => const [];
@@ -82,6 +92,7 @@ void main() {
     TakeoutChannel? viewed = _viewed,
     List<TakeoutChannel> channels = const [_viewed],
     SignInOutcome outcome = const SignedIn(SignInProfile(channelId: 'UCme')),
+    DeletionProcessingState processing = DeletionProcessingState.idle,
   }) async {
     auth = _FakeAuth(signedIn, outcome: outcome);
     quota = _FakeQuota();
@@ -93,6 +104,9 @@ void main() {
           viewedChannelProvider.overrideWithValue(viewed),
           takeoutChannelsProvider.overrideWithValue(channels),
           savedTakeoutsProvider.overrideWith(_NoSavedTakeouts.new),
+          deletionProcessingProvider.overrideWith(
+            () => _Processing(processing),
+          ),
         ],
         child: MaterialApp(
           home: Scaffold(body: AccountDialog(oauthConfigured: oauthConfigured)),
@@ -242,6 +256,20 @@ void main() {
     await pumpDialog(tester, viewed: null, channels: const []);
 
     expect(find.text('No takeout imported'), findsOneWidget);
+  });
+
+  testWidgets("won't sign out while deleting through the API", (tester) async {
+    await pumpDialog(
+      tester,
+      signedIn: _signedIn,
+      processing: DeletionProcessingState.running,
+    );
+
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Deleting in progress'), findsOneWidget);
+    expect(auth.state, isNotNull);
   });
 
   testWidgets('shows quota usage, which is API-only', (tester) async {

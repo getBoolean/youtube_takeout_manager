@@ -59,7 +59,7 @@ class _Videos extends YoutubeVideoRepository {
       throw ServerRequestFailedException(
         'invalid_grant',
         statusCode: 400,
-        responseContent: null,
+        responseContent: {'error': 'invalid_grant'},
       );
     }
     yield const Video(videoId: 'v1', channelId: 'UCvideo');
