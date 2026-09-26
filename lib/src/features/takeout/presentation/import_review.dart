@@ -7,53 +7,23 @@ import '../domain/takeout_import_plan.dart';
 class ImportReview extends StatelessWidget {
   final TakeoutImportPlan plan;
 
-  /// Whether the takeout is added to the saved data instead of replacing it.
+  /// Whether the takeout is merged into its account's saved data, rather
+  /// than saved as a new account, whose channels are always named.
   final bool merge;
 
-  /// Whether data is shown now.
-  final bool hasSavedData;
-
-  /// Whether the takeout's account already has saved data that replacing
-  /// overwrites, even if it isn't the data shown now.
-  final bool replacesSavedData;
-
-  /// Whether the saved data failed to load, so it may be overwritten unseen.
-  final bool savedDataUnreadable;
-
-  /// Whether it's being added as another Google account, so differing from
-  /// the data shown is expected, and its channels are always named.
-  final bool newAccount;
-
-  const ImportReview({
-    super.key,
-    required this.plan,
-    required this.merge,
-    this.hasSavedData = false,
-    this.replacesSavedData = false,
-    this.savedDataUnreadable = false,
-    this.newAccount = false,
-  });
+  const ImportReview({super.key, required this.plan, required this.merge});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final data = plan.mergedData;
-    final differentAccount = newAccount ? null : plan.differentAccount;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (differentAccount case final mismatch?) ...[
-          _Notice(
-            icon: Icons.warning_amber_outlined,
-            color: theme.colorScheme.error,
-            text: _differentAccountNotice(mismatch),
-          ),
-          const SizedBox(height: 16),
-        ],
         if (plan.channels.length > 1 ||
-            (newAccount && plan.channels.isNotEmpty)) ...[
+            (!merge && plan.channels.isNotEmpty)) ...[
           Text('Channels in this takeout', style: theme.textTheme.titleSmall),
           for (final channel in plan.channels)
             Padding(
@@ -110,41 +80,8 @@ class ImportReview extends StatelessWidget {
             text: warning,
           ),
         ],
-        if (savedDataUnreadable) ...[
-          const SizedBox(height: 16),
-          Text(
-            "Your saved data couldn't be loaded. If it's from the same "
-            'channel as this takeout, it will be replaced.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
-            ),
-          ),
-        ],
-        if (!merge &&
-            (hasSavedData || replacesSavedData) &&
-            plan.differentAccount == null) ...[
-          const SizedBox(height: 16),
-          Text(
-            'Comments and live chats that are only in your current data, '
-            'including deleted ones, will be removed from the app.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.error,
-            ),
-          ),
-        ],
       ],
     );
-  }
-
-  String _differentAccountNotice(ChannelMismatch mismatch) {
-    final found = mismatch.foundChannelIds.join(', ');
-    final current = mismatch.expectedChannelIds.join(', ');
-    final saved = replacesSavedData
-        ? 'It replaces the data already saved for $found, including deleted '
-              'items only saved there, and is shown instead.'
-        : "It'll be saved separately and shown instead.";
-    return 'This takeout is from a different YouTube channel ($found) than '
-        'your current data ($current). $saved Your current data stays saved.';
   }
 
   List<String> _warnings() {

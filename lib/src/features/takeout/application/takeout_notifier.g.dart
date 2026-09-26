@@ -24,7 +24,7 @@ final class TakeoutNotifierProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: _retryLoadBriefly,
         name: r'takeoutProvider',
         isAutoDispose: false,
         dependencies: null,
@@ -39,7 +39,7 @@ final class TakeoutNotifierProvider
   TakeoutNotifier create() => TakeoutNotifier();
 }
 
-String _$takeoutNotifierHash() => r'0d871a4abcec1d534164e0620bfd3a1098ff311f';
+String _$takeoutNotifierHash() => r'517f95061b3f28671939ebb636112e14fb60b794';
 
 /// The selected saved takeout, with every channel's items. Reloads when
 /// another takeout is selected.

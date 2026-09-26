@@ -10,15 +10,15 @@ import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/leave_channel_screens.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/skipped_rows_banner.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import '../application/auth_notifier.dart';
@@ -34,7 +34,8 @@ Future<void> showAccountDialog(BuildContext context) =>
     showDialog<void>(context: context, builder: (_) => const AccountDialog());
 
 /// The Google account the viewed takeout is from, with its channels to view
-/// and sign in and the other saved accounts to switch to, then the app's
+/// and sign in, importing a takeout, and the other saved accounts to switch
+/// to, then the app's
 /// YouTube API quota and on-device cache. Errors show in place, never in
 /// another popup.
 class AccountDialog extends ConsumerWidget {
@@ -95,7 +96,8 @@ class AccountDialog extends ConsumerWidget {
 }
 
 /// The viewed takeout's Google account in an outlined tile: its channels on
-/// a panel inside it, and, expanded, the other saved accounts.
+/// a panel inside it, importing a takeout, and, expanded, the other saved
+/// accounts.
 class _AccountTile extends ConsumerStatefulWidget {
   final bool oauthConfigured;
 
@@ -106,21 +108,31 @@ class _AccountTile extends ConsumerStatefulWidget {
 }
 
 class _AccountTileState extends ConsumerState<_AccountTile> {
-  /// Whether the other accounts show. Without a takeout, they do from the
-  /// start, since switching or adding one is all there is to do.
-  bool? _expanded;
+  /// Whether the other accounts show.
+  var _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final channels = ref.watch(takeoutChannelsProvider);
     final profiles = ref.watch(savedSignInsProvider).value ?? const {};
-    final exportedAt = ref.watch(
-      takeoutProvider.select((t) => t.value?.data.latestExportAt),
+    final data = ref.watch(
+      takeoutProvider.select(
+        (t) => (
+          exportedAt: t.value?.data.latestExportAt,
+          skippedComments: t.value?.data.skippedCommentRows ?? 0,
+          skippedLiveChats: t.value?.data.skippedLiveChatRows ?? 0,
+        ),
+      ),
     );
     final deletionRunning =
         ref.watch(deletionProcessingProvider) != DeletionProcessingState.idle;
-    final expanded = _expanded ??= channels.isEmpty;
+    // Nothing else to show without a takeout or a sign-in.
+    final expandable =
+        channels.isNotEmpty ||
+        profiles.isNotEmpty ||
+        (ref.watch(savedTakeoutsProvider).value?.isNotEmpty ?? false);
+    final expanded = _expanded && expandable;
 
     return Card.outlined(
       margin: EdgeInsets.zero,
@@ -140,10 +152,19 @@ class _AccountTileState extends ConsumerState<_AccountTile> {
             GoogleAccountHeader(
               profile: accountProfileFor(channels, profiles),
               mainChannel: channels.firstOrNull,
-              exportedAt: channels.isEmpty ? null : exportedAt,
+              exportedAt: channels.isEmpty ? null : data.exportedAt,
               expanded: expanded,
-              onToggle: () => setState(() => _expanded = !expanded),
+              onToggle: expandable
+                  ? () => setState(() => _expanded = !expanded)
+                  : null,
             ),
+            if (data.skippedComments > 0 || data.skippedLiveChats > 0) ...[
+              const SizedBox(height: 12),
+              SkippedRowsBanner(
+                comments: data.skippedComments,
+                liveChats: data.skippedLiveChats,
+              ),
+            ],
             if (channels.isNotEmpty) ...[
               const SizedBox(height: 12),
               _Channels(
@@ -163,6 +184,8 @@ class _AccountTileState extends ConsumerState<_AccountTile> {
                   ),
                 ),
             ],
+            const SizedBox(height: 12),
+            ImportTakeout(onImported: () => setState(() => _expanded = false)),
             if (expanded) ...[
               const SizedBox(height: 12),
               const Divider(height: 1),
@@ -229,7 +252,7 @@ class _Channels extends ConsumerWidget {
     final router = StackRouterScope.of(context)?.controller;
     await ref.read(takeoutSelectionProvider.notifier).selectChannel(id);
     if (context.mounted) {
-      leaveChannelScreens(context, router, closeDialogs: false);
+      leaveChannelScreens(router);
     }
   }
 
@@ -249,13 +272,13 @@ class _Channels extends ConsumerWidget {
         .read(takeoutSelectionProvider.notifier)
         .select(takeout.id, channelId: channelId);
     if (context.mounted) {
-      leaveChannelScreens(context, router, closeDialogs: false);
+      leaveChannelScreens(router);
     }
   }
 }
 
-/// Every other saved account to switch to or remove, adding another, and
-/// sign-ins no takeout has.
+/// Every other saved account to switch to or remove, and sign-ins no
+/// takeout has.
 class _OtherAccounts extends ConsumerWidget {
   final bool deletionRunning;
 
@@ -277,7 +300,6 @@ class _OtherAccounts extends ConsumerWidget {
     final inTakeouts = {for (final t in saved) ...t.channelIds};
     final viewed = saved.where((t) => t.id == viewingId).firstOrNull;
     final savedTakeouts = ref.read(savedTakeoutsProvider.notifier);
-    final addAccount = ref.read(addAccountImportProvider.notifier);
 
     return OtherAccountsSection(
       viewedAccount: viewed,
@@ -297,7 +319,7 @@ class _OtherAccounts extends ConsumerWidget {
         final router = StackRouterScope.of(context)?.controller;
         await savedTakeouts.removeTakeout(removal);
         if (removal.summary.id == viewingId && context.mounted) {
-          leaveChannelScreens(context, router, closeDialogs: false);
+          leaveChannelScreens(router);
         }
       },
       otherSignIns: [
@@ -306,33 +328,6 @@ class _OtherAccounts extends ConsumerWidget {
       ],
       onRemoveSignIn: (id) =>
           ref.read(savedSignInsProvider.notifier).remove(id, revoke: true),
-      addAccount: AddAccountSection(
-        state: ref.watch(addAccountImportProvider),
-        enabled: !deletionRunning,
-        accountNames: {
-          for (final t in saved) t.id: t.main.title ?? t.main.channelId,
-        },
-        viewedTakeoutId: viewingId,
-        onStart: addAccount.start,
-        onConfirm: () async {
-          final router = StackRouterScope.of(context)?.controller;
-          await addAccount.confirm();
-          if (!context.mounted) return;
-          if (ref.read(addAccountImportProvider) is AddAccountIdle) {
-            leaveChannelScreens(context, router, closeDialogs: false);
-            onSwitched();
-          }
-        },
-        onDismiss: addAccount.dismiss,
-        onMerge: () async {
-          // Merging shows the account it's for; the review stays open here.
-          final router = StackRouterScope.of(context)?.controller;
-          await addAccount.merge();
-          if (context.mounted) {
-            leaveChannelScreens(context, router, closeDialogs: false);
-          }
-        },
-      ),
     );
   }
 
@@ -349,7 +344,7 @@ class _OtherAccounts extends ConsumerWidget {
         .read(takeoutSelectionProvider.notifier)
         .select(takeoutId, channelId: channelId);
     if (!context.mounted) return;
-    leaveChannelScreens(context, router, closeDialogs: false);
+    leaveChannelScreens(router);
     onSwitched();
   }
 }
@@ -381,8 +376,8 @@ class _DeletionRunningBanner extends ConsumerWidget {
       ],
       children: const [
         Text(
-          'Switching accounts or channels, signing out, importing another '
-          "account's takeout and removing the one shown wait until it stops.",
+          'Switching accounts or channels, signing out, importing a takeout '
+          'and removing the one shown wait until it stops.',
         ),
       ],
     );

@@ -3,12 +3,13 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_import_plan.dart';
+import 'saved_takeouts.dart';
 import 'takeout_notifier.dart';
 import 'takeout_selection_notifier.dart';
 
 part 'add_account_import.g.dart';
 
-/// Where importing another Google account's takeout is at.
+/// Where importing a takeout is at.
 sealed class AddAccountState {
   const AddAccountState();
 }
@@ -52,9 +53,8 @@ class AddAccountFailed extends AddAccountState {
   const AddAccountFailed(this.error);
 }
 
-/// Imports another Google account's takeout from the account dialog. One
-/// from an account already saved is merged into it only if the user says
-/// so; nothing is ever replaced.
+/// Imports a takeout in place: as its own account, or merged into its saved
+/// account only if the user says so. Nothing is ever replaced.
 @riverpod
 class AddAccountImport extends _$AddAccountImport {
   /// The zips picked, kept in case they're merged into a saved account.
@@ -63,24 +63,30 @@ class AddAccountImport extends _$AddAccountImport {
   @override
   AddAccountState build() => const AddAccountIdle();
 
-  /// Picks takeout zips and reads them for review.
-  Future<void> start() async {
+  /// Picks takeout zips and reads them for review. The first takeout saved
+  /// skips the review when there's nothing in it to look over. Returns
+  /// whether it was saved.
+  Future<bool> start() async {
     // Straight from the click handler: see ZipPickerRepository.pickZips.
     final picked = await ref.read(zipPickerRepositoryProvider).pickZips();
-    if (!ref.mounted || picked == null || picked.files.isEmpty) return;
+    if (!ref.mounted || picked == null || picked.files.isEmpty) return false;
     _picked = picked;
     state = const AddAccountWorking();
     try {
       final takeouts = ref.read(takeoutProvider.notifier);
       final plan = await takeouts.prepareImport(picked, merge: false);
-      final saved = await takeouts.hasSavedData(plan.accountId);
-      if (!ref.mounted) return;
-      state = saved
-          ? AddAccountAlreadySaved(plan.accountId)
-          : AddAccountReview(plan);
+      if (await takeouts.hasSavedData(plan.accountId)) {
+        if (ref.mounted) state = AddAccountAlreadySaved(plan.accountId);
+        return false;
+      }
+      final first = (await ref.read(savedTakeoutsProvider.future)).isEmpty;
+      if (!ref.mounted) return false;
+      if (first && !plan.needsReview) return await _save(plan);
+      state = AddAccountReview(plan);
     } catch (e) {
       if (ref.mounted) state = AddAccountFailed(e);
     }
+    return false;
   }
 
   /// Shows the saved account the picked takeout is from, since merging
@@ -109,20 +115,26 @@ class AddAccountImport extends _$AddAccountImport {
   }
 
   /// Saves the reviewed takeout, as its own account or merged into its
-  /// saved one, and shows it.
-  Future<void> confirm() async {
+  /// saved one, and shows it. Returns whether it was saved.
+  Future<bool> confirm() async {
     final plan = switch (state) {
       AddAccountReview(:final plan) ||
       AddAccountMergeReview(:final plan) => plan,
       _ => null,
     };
-    if (plan == null) return;
+    if (plan == null) return false;
+    return _save(plan);
+  }
+
+  Future<bool> _save(TakeoutImportPlan plan) async {
     state = const AddAccountWorking();
     try {
       await ref.read(takeoutProvider.notifier).commitImport(plan);
       if (ref.mounted) dismiss();
+      return true;
     } catch (e) {
       if (ref.mounted) state = AddAccountFailed(e);
+      return false;
     }
   }
 

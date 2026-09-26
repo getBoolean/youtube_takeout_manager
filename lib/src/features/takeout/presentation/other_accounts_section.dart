@@ -8,7 +8,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import '../application/saved_takeouts.dart';
 import '../domain/takeout_channel.dart';
-import 'channel_picker_dialog.dart';
+import 'takeout_details.dart';
 
 /// A saved takeout other than the one viewed, with the sign-in naming its
 /// Google account, if any.
@@ -20,8 +20,8 @@ class OtherAccount {
 }
 
 /// The other saved Google accounts, shown in the viewed account's tile:
-/// open one to view any of its channels, remove it after confirming in
-/// place, or add another. Then sign-ins for channels no takeout has.
+/// open one to view any of its channels, or remove it after confirming in
+/// place. Then sign-ins for channels no takeout has.
 class OtherAccountsSection extends StatelessWidget {
   /// The viewed account, which can be removed too.
   final TakeoutSummary? viewedAccount;
@@ -41,9 +41,6 @@ class OtherAccountsSection extends StatelessWidget {
   final List<SignInProfile> otherSignIns;
   final ValueChanged<String> onRemoveSignIn;
 
-  /// Adds another account's takeout.
-  final Widget addAccount;
-
   const OtherAccountsSection({
     super.key,
     required this.viewedAccount,
@@ -54,7 +51,6 @@ class OtherAccountsSection extends StatelessWidget {
     required this.onRemove,
     required this.otherSignIns,
     required this.onRemoveSignIn,
-    required this.addAccount,
   });
 
   @override
@@ -76,11 +72,9 @@ class OtherAccountsSection extends StatelessWidget {
               planRemoval: () => planRemoval(account.summary.id),
               onRemove: onRemove,
             ),
-          const SizedBox(height: 8),
         ],
-        addAccount,
         if (otherSignIns.isNotEmpty) ...[
-          const SizedBox(height: 16),
+          if (accounts.isNotEmpty) const SizedBox(height: 16),
           Text('Other saved sign-ins', style: theme.textTheme.titleSmall),
           Text(
             "For channels in none of these takeouts. They're used if you "
@@ -396,31 +390,4 @@ class RemoveTakeoutConfirmation extends StatelessWidget {
       ],
     );
   }
-}
-
-/// A saved takeout's channel count, item counts and export date, as far as
-/// they're known, e.g. "2 channels · 1,234 comments · 56 live chats ·
-/// exported Apr 12, 2026".
-String describeTakeout(TakeoutSummary summary) {
-  final number = NumberFormat.decimalPattern();
-  final channels = summary.channels.length;
-  final comments = summary.channels.fold(0, (n, c) => n + c.commentCount);
-  final liveChats = summary.channels.fold(0, (n, c) => n + c.liveChatCount);
-  return [
-    if (channels > 1) '$channels channels',
-    if (summary.countsKnown) ...[
-      Intl.plural(
-        comments,
-        one: '1 comment',
-        other: '${number.format(comments)} comments',
-      ),
-      Intl.plural(
-        liveChats,
-        one: '1 live chat',
-        other: '${number.format(liveChats)} live chats',
-      ),
-    ],
-    if (summary.latestExportAt case final exported?)
-      'exported ${DateFormat.yMMMd().format(exported.toLocal())}',
-  ].join(' · ');
 }

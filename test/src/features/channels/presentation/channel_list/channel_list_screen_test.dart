@@ -1,0 +1,200 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
+
+import '../channel_detail/channel_list_fixture.dart' as fixture;
+
+const _channel = Channel(
+  channelId: fixture.channelId,
+  channelTitle: 'A channel I commented on',
+  commentCount: 3,
+  liveChatCount: 0,
+);
+
+const _data = TakeoutData(
+  comments: [],
+  liveChats: [],
+  subscriptionsByChannelId: {},
+);
+
+TakeoutImportPlan _plan({int newlyDeletedComments = 0}) => TakeoutImportPlan(
+  accountId: 'UCme',
+  mergedData: _data,
+  csvFiles: const {},
+  goneCommentIds: const {},
+  goneLiveChatIds: const {},
+  newlyDeletedCommentCount: newlyDeletedComments,
+  newlyDeletedLiveChatCount: 0,
+  newCommentCount: 0,
+  newLiveChatCount: 0,
+);
+
+class _Picker implements ZipPickerRepository {
+  @override
+  Future<FilePickerResult?> pickZips() async => FilePickerResult([
+    PlatformFile(name: 'takeout-001.zip', size: 1, bytes: Uint8List(1)),
+  ]);
+}
+
+/// Nothing saved until a takeout is imported, which then shows.
+class _Takeout extends TakeoutNotifier {
+  final TakeoutImportPlan plan;
+  final committed = <TakeoutImportPlan>[];
+
+  _Takeout(this.plan);
+
+  @override
+  Future<LoadedTakeout?> build() async => null;
+
+  @override
+  Future<TakeoutImportPlan> prepareImport(
+    FilePickerResult picked, {
+    required bool merge,
+  }) async => plan;
+
+  @override
+  Future<bool> hasSavedData(String accountId) async => false;
+
+  @override
+  Future<void> commitImport(TakeoutImportPlan plan) async {
+    committed.add(plan);
+    await ref.read(takeoutSelectionProvider.notifier).select(plan.accountId);
+    state = const AsyncData(LoadedTakeout(id: 'UCme', data: _data));
+  }
+}
+
+class _Unreadable extends TakeoutNotifier {
+  @override
+  Future<LoadedTakeout?> build() async =>
+      throw const FormatException('Bad saved comments');
+}
+
+/// Nothing selected until a takeout is imported.
+class _Selection extends TakeoutSelectionNotifier {
+  @override
+  Future<TakeoutSelection?> build() async => null;
+
+  @override
+  Future<void> select(String takeoutId, {String? channelId}) async =>
+      state = AsyncData(TakeoutSelection(takeoutId: takeoutId));
+}
+
+class _Saved extends SavedTakeouts {
+  @override
+  Future<List<TakeoutSummary>> build() async => const [];
+}
+
+class _Quota extends QuotaNotifier {
+  @override
+  Future<QuotaState> build() async =>
+      QuotaState(usageByOperation: const {}, periodStart: DateTime(2026));
+}
+
+void main() {
+  late _Takeout takeout;
+
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    TakeoutImportPlan? plan,
+    TakeoutNotifier Function()? notifier,
+  }) async {
+    tester.view.physicalSize = const Size(800, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    takeout = _Takeout(plan ?? _plan());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...fixture.fixtureOverrides(),
+          takeoutProvider.overrideWith(notifier ?? () => takeout),
+          savedTakeoutsProvider.overrideWith(_Saved.new),
+          takeoutSelectionProvider.overrideWith(_Selection.new),
+          zipPickerRepositoryProvider.overrideWithValue(_Picker()),
+          quotaProvider.overrideWith(_Quota.new),
+          channelsProvider.overrideWithValue(const [_channel]),
+          filteredChannelsProvider.overrideWithValue(const [_channel]),
+        ],
+        child: const MaterialApp(home: ChannelListScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('before any takeout, asks for one under the account button', (
+    tester,
+  ) async {
+    await pumpScreen(tester);
+
+    expect(find.text('Import your Google Takeout data'), findsOneWidget);
+    expect(find.text('Select zip files'), findsOneWidget);
+    expect(find.byType(AccountButton), findsOneWidget);
+  });
+
+  testWidgets('a clean first takeout is saved straight away and its channels '
+      'show', (tester) async {
+    await pumpScreen(tester);
+
+    await tester.tap(find.text('Select zip files'));
+    await tester.pumpAndSettle();
+
+    expect(takeout.committed, hasLength(1));
+    expect(find.text('Import your Google Takeout data'), findsNothing);
+    expect(find.text('A channel I commented on'), findsOneWidget);
+  });
+
+  testWidgets('a first takeout with something to look over is reviewed in '
+      'place', (tester) async {
+    await pumpScreen(tester, plan: _plan(newlyDeletedComments: 2));
+
+    await tester.tap(find.text('Select zip files'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text('Import this takeout?'), findsOneWidget);
+    expect(takeout.committed, isEmpty);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Import'));
+    await tester.pumpAndSettle();
+
+    expect(takeout.committed, hasLength(1));
+    expect(find.text('A channel I commented on'), findsOneWidget);
+  });
+
+  testWidgets("saved data that can't be read offers the account dialog", (
+    tester,
+  ) async {
+    await pumpScreen(tester, notifier: _Unreadable.new);
+    // Loading still, while it retries briefly.
+    expect(find.text('Failed to load saved data'), findsNothing);
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump();
+
+    expect(find.text('Failed to load saved data'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AccountDialog), findsOneWidget);
+  });
+}

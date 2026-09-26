@@ -18,9 +18,16 @@ import 'takeout_selection_notifier.dart';
 
 part 'takeout_notifier.g.dart';
 
+/// Retries a failed load twice (after 200ms, then 400ms) instead of
+/// Riverpod's ten, in case the disk was busy. Saved data that can't be
+/// parsed won't parse on a later try either, so the failure then shows
+/// instead of loading for over half a minute.
+Duration? _retryLoadBriefly(int retryCount, Object error) =>
+    ProviderContainer.defaultRetry(retryCount, error, maxRetries: 2);
+
 /// The selected saved takeout, with every channel's items. Reloads when
 /// another takeout is selected.
-@Riverpod(keepAlive: true)
+@Riverpod(keepAlive: true, retry: _retryLoadBriefly)
 class TakeoutNotifier extends _$TakeoutNotifier {
   /// Data an import just saved, so selecting its takeout needn't read and
   /// parse it again.

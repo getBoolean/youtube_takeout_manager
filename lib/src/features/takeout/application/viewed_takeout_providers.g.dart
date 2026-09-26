@@ -8,6 +8,63 @@ part of 'viewed_takeout_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// The selected takeout's channels as the takeout names them, without
+/// titles or pictures loaded since. Empty until it has loaded.
+
+@ProviderFor(_takeoutChannelsAsImported)
+final _takeoutChannelsAsImportedProvider =
+    _TakeoutChannelsAsImportedProvider._();
+
+/// The selected takeout's channels as the takeout names them, without
+/// titles or pictures loaded since. Empty until it has loaded.
+
+final class _TakeoutChannelsAsImportedProvider
+    extends
+        $FunctionalProvider<
+          List<TakeoutChannel>,
+          List<TakeoutChannel>,
+          List<TakeoutChannel>
+        >
+    with $Provider<List<TakeoutChannel>> {
+  /// The selected takeout's channels as the takeout names them, without
+  /// titles or pictures loaded since. Empty until it has loaded.
+  _TakeoutChannelsAsImportedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'_takeoutChannelsAsImportedProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$_takeoutChannelsAsImportedHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<TakeoutChannel>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<TakeoutChannel> create(Ref ref) {
+    return _takeoutChannelsAsImported(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<TakeoutChannel> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<TakeoutChannel>>(value),
+    );
+  }
+}
+
+String _$_takeoutChannelsAsImportedHash() =>
+    r'5a9117cd8acb2fafdd7d9472228c240f51abfaf3';
+
 /// The selected takeout's channels, main first. Empty until it has loaded.
 
 @ProviderFor(takeoutChannels)
@@ -58,7 +115,7 @@ final class TakeoutChannelsProvider
   }
 }
 
-String _$takeoutChannelsHash() => r'649f08d870c329c01e2c832d29256ed55708071c';
+String _$takeoutChannelsHash() => r'60182cdb8c242cb56e8eb78b00596b2c0770aed3';
 
 /// Pictures for takeout channels: from saved sign-ins, else channel pictures
 /// already loaded, by channel ID.
@@ -116,62 +173,29 @@ final class OwnChannelThumbnailsProvider
 String _$ownChannelThumbnailsHash() =>
     r'c4a2c628dd9fd13079fa790587f922803a3911e6';
 
-/// The channel being viewed: the one last chosen in the selected takeout
-/// while it's still there, otherwise the takeout's main channel.
-
-@ProviderFor(viewedChannel)
-final viewedChannelProvider = ViewedChannelProvider._();
-
-/// The channel being viewed: the one last chosen in the selected takeout
-/// while it's still there, otherwise the takeout's main channel.
-
-final class ViewedChannelProvider
-    extends
-        $FunctionalProvider<TakeoutChannel?, TakeoutChannel?, TakeoutChannel?>
-    with $Provider<TakeoutChannel?> {
-  /// The channel being viewed: the one last chosen in the selected takeout
-  /// while it's still there, otherwise the takeout's main channel.
-  ViewedChannelProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'viewedChannelProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$viewedChannelHash();
-
-  @$internal
-  @override
-  $ProviderElement<TakeoutChannel?> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  TakeoutChannel? create(Ref ref) {
-    return viewedChannel(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(TakeoutChannel? value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<TakeoutChannel?>(value),
-    );
-  }
-}
-
-String _$viewedChannelHash() => r'7b86a6c328d7bd83707b3d72a22f3d3b9510b025';
+/// The ID of the channel being viewed: the one last chosen in the selected
+/// takeout while it's still there, otherwise the takeout's main channel.
+///
+/// Worked out without channel titles or pictures, so what depends on it,
+/// like the sign-in used to fetch pictures, doesn't depend on those too.
 
 @ProviderFor(viewedChannelId)
 final viewedChannelIdProvider = ViewedChannelIdProvider._();
 
+/// The ID of the channel being viewed: the one last chosen in the selected
+/// takeout while it's still there, otherwise the takeout's main channel.
+///
+/// Worked out without channel titles or pictures, so what depends on it,
+/// like the sign-in used to fetch pictures, doesn't depend on those too.
+
 final class ViewedChannelIdProvider
     extends $FunctionalProvider<String?, String?, String?>
     with $Provider<String?> {
+  /// The ID of the channel being viewed: the one last chosen in the selected
+  /// takeout while it's still there, otherwise the takeout's main channel.
+  ///
+  /// Worked out without channel titles or pictures, so what depends on it,
+  /// like the sign-in used to fetch pictures, doesn't depend on those too.
   ViewedChannelIdProvider._()
     : super(
         from: null,
@@ -205,7 +229,54 @@ final class ViewedChannelIdProvider
   }
 }
 
-String _$viewedChannelIdHash() => r'5a11e807466db9b090b7ba5cba770729c1a59849';
+String _$viewedChannelIdHash() => r'2078e614fb03a4f5252e6481f36a9988583d00f3';
+
+/// The channel being viewed, with its title and picture.
+
+@ProviderFor(viewedChannel)
+final viewedChannelProvider = ViewedChannelProvider._();
+
+/// The channel being viewed, with its title and picture.
+
+final class ViewedChannelProvider
+    extends
+        $FunctionalProvider<TakeoutChannel?, TakeoutChannel?, TakeoutChannel?>
+    with $Provider<TakeoutChannel?> {
+  /// The channel being viewed, with its title and picture.
+  ViewedChannelProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'viewedChannelProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$viewedChannelHash();
+
+  @$internal
+  @override
+  $ProviderElement<TakeoutChannel?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  TakeoutChannel? create(Ref ref) {
+    return viewedChannel(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(TakeoutChannel? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<TakeoutChannel?>(value),
+    );
+  }
+}
+
+String _$viewedChannelHash() => r'4792219faddd89a521e9302d6bf7d184686ede04';
 
 /// The viewed channel's comments and live chats from the selected takeout.
 ///

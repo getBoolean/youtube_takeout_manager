@@ -81,6 +81,17 @@ class TakeoutImportPlan {
     this.differentAccount,
     this.baseTakeoutId,
   });
+
+  /// Whether there's something to look over before it's saved even as a
+  /// first import: items found deleted, a deletion check skipped, or rows
+  /// that couldn't be read.
+  bool get needsReview =>
+      newlyDeletedCommentCount > 0 ||
+      newlyDeletedLiveChatCount > 0 ||
+      commentCheckSkipped != null ||
+      liveChatCheckSkipped != null ||
+      mergedData.skippedCommentRows > 0 ||
+      mergedData.skippedLiveChatRows > 0;
 }
 
 /// A problem with the picked zips that stops the import before anything is

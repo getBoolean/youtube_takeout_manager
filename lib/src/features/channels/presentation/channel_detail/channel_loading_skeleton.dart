@@ -17,10 +17,8 @@ class ChannelLoadingSkeleton extends StatelessWidget {
         titleSpacing: 0,
         leading: !context.router.canPop()
             ? BackButton(
-                onPressed: () => context.router.replaceAll([
-                  const HomeRoute(),
-                  const ChannelListRoute(),
-                ]),
+                onPressed: () =>
+                    context.router.replaceAll([const ChannelListRoute()]),
               )
             : null,
         actions: const [AccountButton()],

@@ -2,29 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_error_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_error_details.dart';
 
 void main() {
-  Future<void> open(WidgetTester tester, TakeoutImportException error) async {
+  Future<void> show(WidgetTester tester, TakeoutImportException error) async {
     await tester.pumpWidget(
       MaterialApp(
-        home: Builder(
-          builder: (context) => TextButton(
-            onPressed: () => showDialog<void>(
-              context: context,
-              builder: (_) => ImportErrorDialog(error: error),
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: Column(
+              children: [
+                Text(importErrorTitle(error)),
+                ImportErrorDetails(error: error),
+              ],
             ),
-            child: const Text('open'),
           ),
         ),
       ),
     );
-    await tester.tap(find.text('open'));
-    await tester.pumpAndSettle();
   }
 
   testWidgets('an account mismatch names both channels', (tester) async {
-    await open(
+    await show(
       tester,
       const TakeoutAccountMismatchException(
         'This takeout is from a different YouTube account than your current '
@@ -41,15 +40,10 @@ void main() {
     );
     expect(find.text('youtube.com/channel/UCother'), findsOneWidget);
     expect(find.text('Nothing was imported.'), findsOneWidget);
-
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(ImportErrorDialog), findsNothing);
   });
 
   testWidgets('other problems show their message', (tester) async {
-    await open(
+    await show(
       tester,
       const TakeoutImportException(
         'No comments, live chats or subscriptions were found in the selected '
@@ -68,7 +62,7 @@ void main() {
   testWidgets('names the channels by title when the takeouts give them', (
     tester,
   ) async {
-    await open(
+    await show(
       tester,
       const TakeoutAccountMismatchException(
         'The selected takeouts are from different YouTube accounts.',

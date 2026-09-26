@@ -12,22 +12,27 @@ import 'takeout_selection_notifier.dart';
 
 part 'viewed_takeout_providers.g.dart';
 
-/// The selected takeout's channels, main first. Empty until it has loaded.
+/// The selected takeout's channels as the takeout names them, without
+/// titles or pictures loaded since. Empty until it has loaded.
 @Riverpod(keepAlive: true)
-List<TakeoutChannel> takeoutChannels(Ref ref) {
+List<TakeoutChannel> _takeoutChannelsAsImported(Ref ref) {
   final loaded = ref.watch(takeoutProvider).value;
   final takeoutId = ref.watch(
     takeoutSelectionProvider.select((s) => s.value?.takeoutId),
   );
   if (loaded == null || loaded.id != takeoutId) return const [];
-  return withThumbnails(
-    withTitles(
-      takeoutChannelsOf(loaded.data, takeoutId: loaded.id),
-      ref.watch(signedInChannelTitlesProvider),
-    ),
-    ref.watch(ownChannelThumbnailsProvider),
-  );
+  return takeoutChannelsOf(loaded.data, takeoutId: loaded.id);
 }
+
+/// The selected takeout's channels, main first. Empty until it has loaded.
+@Riverpod(keepAlive: true)
+List<TakeoutChannel> takeoutChannels(Ref ref) => withThumbnails(
+  withTitles(
+    ref.watch(_takeoutChannelsAsImportedProvider),
+    ref.watch(signedInChannelTitlesProvider),
+  ),
+  ref.watch(ownChannelThumbnailsProvider),
+);
 
 /// Pictures for takeout channels: from saved sign-ins, else channel pictures
 /// already loaded, by channel ID.
@@ -37,22 +42,28 @@ Map<String, String> ownChannelThumbnails(Ref ref) => {
   ...ref.watch(signedInChannelThumbnailsProvider),
 };
 
-/// The channel being viewed: the one last chosen in the selected takeout
-/// while it's still there, otherwise the takeout's main channel.
+/// The ID of the channel being viewed: the one last chosen in the selected
+/// takeout while it's still there, otherwise the takeout's main channel.
+///
+/// Worked out without channel titles or pictures, so what depends on it,
+/// like the sign-in used to fetch pictures, doesn't depend on those too.
+@Riverpod(keepAlive: true)
+String? viewedChannelId(Ref ref) => resolveViewedChannelId(
+  ref.watch(_takeoutChannelsAsImportedProvider),
+  remembered: ref.watch(
+    takeoutSelectionProvider.select((s) => s.value?.channelId),
+  ),
+);
+
+/// The channel being viewed, with its title and picture.
 @Riverpod(keepAlive: true)
 TakeoutChannel? viewedChannel(Ref ref) {
-  final channels = ref.watch(takeoutChannelsProvider);
-  final id = resolveViewedChannelId(
-    channels,
-    remembered: ref.watch(
-      takeoutSelectionProvider.select((s) => s.value?.channelId),
-    ),
-  );
-  return channels.where((c) => c.channelId == id).firstOrNull;
+  final id = ref.watch(viewedChannelIdProvider);
+  return ref
+      .watch(takeoutChannelsProvider)
+      .where((c) => c.channelId == id)
+      .firstOrNull;
 }
-
-@Riverpod(keepAlive: true)
-String? viewedChannelId(Ref ref) => ref.watch(viewedChannelProvider)?.channelId;
 
 /// The viewed channel's comments and live chats from the selected takeout.
 ///

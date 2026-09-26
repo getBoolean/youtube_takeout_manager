@@ -8,21 +8,18 @@ part of 'add_account_import.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Imports another Google account's takeout from the account dialog. One
-/// from an account already saved is merged into it only if the user says
-/// so; nothing is ever replaced.
+/// Imports a takeout in place: as its own account, or merged into its saved
+/// account only if the user says so. Nothing is ever replaced.
 
 @ProviderFor(AddAccountImport)
 final addAccountImportProvider = AddAccountImportProvider._();
 
-/// Imports another Google account's takeout from the account dialog. One
-/// from an account already saved is merged into it only if the user says
-/// so; nothing is ever replaced.
+/// Imports a takeout in place: as its own account, or merged into its saved
+/// account only if the user says so. Nothing is ever replaced.
 final class AddAccountImportProvider
     extends $NotifierProvider<AddAccountImport, AddAccountState> {
-  /// Imports another Google account's takeout from the account dialog. One
-  /// from an account already saved is merged into it only if the user says
-  /// so; nothing is ever replaced.
+  /// Imports a takeout in place: as its own account, or merged into its saved
+  /// account only if the user says so. Nothing is ever replaced.
   AddAccountImportProvider._()
     : super(
         from: null,
@@ -50,11 +47,10 @@ final class AddAccountImportProvider
   }
 }
 
-String _$addAccountImportHash() => r'31d4358378b9e5ff49259b22283c1fc35338f378';
+String _$addAccountImportHash() => r'848490068d4c65f989c9aa3d851767f33c6ffc6f';
 
-/// Imports another Google account's takeout from the account dialog. One
-/// from an account already saved is merged into it only if the user says
-/// so; nothing is ever replaced.
+/// Imports a takeout in place: as its own account, or merged into its saved
+/// account only if the user says so. Nothing is ever replaced.
 
 abstract class _$AddAccountImport extends $Notifier<AddAccountState> {
   AddAccountState build();

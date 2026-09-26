@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_error_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_error_details.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_review.dart';
 
 const _plan = TakeoutImportPlan(
@@ -45,10 +45,7 @@ void main() {
   testWidgets('a new account names its channel without warning it differs', (
     tester,
   ) async {
-    await _pump(
-      tester,
-      const ImportReview(plan: _plan, merge: false, newAccount: true),
-    );
+    await _pump(tester, const ImportReview(plan: _plan, merge: false));
 
     expect(find.text('Channels in this takeout'), findsOneWidget);
     expect(find.text('Somebody Else'), findsOneWidget);

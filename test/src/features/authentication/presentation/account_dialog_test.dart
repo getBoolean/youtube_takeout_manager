@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_state.dart';
@@ -156,12 +157,13 @@ class _Saved extends SavedTakeouts {
 
 class _Takeout extends TakeoutNotifier {
   final Set<String> saved;
+  final LoadedTakeout? loaded;
   final committed = <TakeoutImportPlan>[];
 
-  _Takeout({this.saved = const {}});
+  _Takeout({this.saved = const {}, this.loaded});
 
   @override
-  Future<LoadedTakeout?> build() async => null;
+  Future<LoadedTakeout?> build() async => loaded;
 
   @override
   Future<TakeoutImportPlan> prepareImport(
@@ -221,11 +223,12 @@ void main() {
     bool oauthConfigured = true,
     Future<SignInOutcome> Function()? outcome,
     DeletionProcessingState processing = DeletionProcessingState.idle,
+    LoadedTakeout? loaded,
   }) async {
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
     selection = _Selection();
-    takeout = _Takeout(saved: alreadySaved);
+    takeout = _Takeout(saved: alreadySaved, loaded: loaded);
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -237,6 +240,9 @@ void main() {
           takeoutProvider.overrideWith(() => takeout),
           takeoutChannelsProvider.overrideWithValue(channels),
           viewedChannelProvider.overrideWithValue(channels.firstOrNull),
+          viewedChannelIdProvider.overrideWithValue(
+            channels.firstOrNull?.channelId,
+          ),
           savedSignInsProvider.overrideWith(() => _SignIns(signIns)),
           takeoutSelectionProvider.overrideWith(() => selection),
           savedTakeoutsProvider.overrideWith(
@@ -281,14 +287,14 @@ void main() {
     expect(find.text('Not signed in with Google'), findsOneWidget);
   });
 
-  testWidgets('without a takeout, offers to add an account right away', (
-    tester,
-  ) async {
+  testWidgets('without a takeout, offers to import one, with nothing else to '
+      'expand', (tester) async {
     await pumpDialog(tester, channels: const [], signIns: const {});
 
     expect(find.text('No takeout imported'), findsOneWidget);
     expect(find.text('Viewing'), findsNothing);
-    expect(find.text("Import another account's takeout"), findsOneWidget);
+    expect(find.text('Import a takeout'), findsOneWidget);
+    expect(find.byTooltip('Show other Google accounts'), findsNothing);
   });
 
   testWidgets("lists the account's channels with their sign-ins", (
@@ -299,8 +305,46 @@ void main() {
     expect(find.text('Viewing'), findsOneWidget);
     expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    // Collapsed until asked for.
-    expect(find.text("Import another account's takeout"), findsNothing);
+  });
+
+  testWidgets('offers to import a takeout without expanding', (tester) async {
+    await pumpDialog(tester);
+
+    expect(find.text('Import a takeout'), findsOneWidget);
+    // The other accounts stay collapsed until asked for.
+    expect(find.textContaining('from this device'), findsNothing);
+  });
+
+  testWidgets("says how many of the takeout's rows couldn't be read", (
+    tester,
+  ) async {
+    await pumpDialog(
+      tester,
+      loaded: const LoadedTakeout(
+        id: 'UCme',
+        data: TakeoutData(
+          comments: [],
+          liveChats: [],
+          subscriptionsByChannelId: {},
+          skippedCommentRows: 3,
+          skippedLiveChatRows: 1,
+        ),
+      ),
+    );
+
+    expect(find.text("Some rows couldn't be read"), findsOneWidget);
+    expect(
+      find.textContaining('3 comments and 1 live chat were skipped'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('says nothing of unread rows when none were skipped', (
+    tester,
+  ) async {
+    await pumpDialog(tester);
+
+    expect(find.text("Some rows couldn't be read"), findsNothing);
   });
 
   testWidgets('tapping a channel views it', (tester) async {
@@ -438,9 +482,7 @@ void main() {
   ) async {
     await pumpDialog(tester);
 
-    await tester.tap(find.byTooltip('Show other Google accounts'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text("Import another account's takeout"));
+    await tester.tap(find.text('Import a takeout'));
     await tester.pumpAndSettle();
 
     expectNoPopups();
@@ -462,9 +504,7 @@ void main() {
       alreadySaved: {'UCwork'},
     );
 
-    await tester.tap(find.byTooltip('Show other Google accounts'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text("Import another account's takeout"));
+    await tester.tap(find.text('Import a takeout'));
     await tester.pumpAndSettle();
 
     expectNoPopups();
@@ -522,26 +562,70 @@ void main() {
     expect(find.text('Cache cleared.'), findsNothing);
   });
 
-  testWidgets('the account button opens the dialog', (tester) async {
-    auth = _FakeAuth(outcome: () async => const SignInCancelled());
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authProvider.overrideWith(() => auth),
-          quotaProvider.overrideWith(_FakeQuota.new),
-          takeoutChannelsProvider.overrideWithValue(const [_main]),
-          viewedChannelProvider.overrideWithValue(_main),
-          savedSignInsProvider.overrideWith(() => _SignIns(const {})),
-        ],
-        child: MaterialApp(
-          home: Scaffold(appBar: AppBar(actions: const [AccountButton()])),
+  group('account button', () {
+    Future<void> pumpButton(
+      WidgetTester tester, {
+      TakeoutChannel? viewed = _main,
+    }) async {
+      auth = _FakeAuth(outcome: () async => const SignInCancelled());
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => auth),
+            quotaProvider.overrideWith(_FakeQuota.new),
+            takeoutChannelsProvider.overrideWithValue([?viewed]),
+            viewedChannelProvider.overrideWithValue(viewed),
+            viewedChannelIdProvider.overrideWithValue(viewed?.channelId),
+            savedSignInsProvider.overrideWith(() => _SignIns(const {})),
+          ],
+          child: MaterialApp(
+            home: Scaffold(appBar: AppBar(actions: const [AccountButton()])),
+          ),
         ),
-      ),
-    );
+      );
+    }
 
-    await tester.tap(find.byTooltip('Account'));
-    await tester.pumpAndSettle();
+    testWidgets('opens the dialog', (tester) async {
+      await pumpButton(tester);
 
-    expect(find.byType(AccountDialog), findsOneWidget);
+      await tester.tap(find.byTooltip('Account: Boolean'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AccountDialog), findsOneWidget);
+    });
+
+    testWidgets("shows and names the viewed channel's picture", (tester) async {
+      await pumpButton(
+        tester,
+        viewed: const TakeoutChannel(
+          channelId: 'UCalt',
+          title: 'Gaming Alt',
+          isMain: false,
+          listed: true,
+          thumbnailUrl: 'https://example.com/alt.jpg',
+        ),
+      );
+
+      final avatar = tester.widget<ChannelAvatar>(find.byType(ChannelAvatar));
+      expect(avatar.thumbnailUrl, 'https://example.com/alt.jpg');
+      expect(find.byTooltip('Account: Gaming Alt'), findsOneWidget);
+    });
+
+    testWidgets("shows the channel's initial while it's signed out", (
+      tester,
+    ) async {
+      await pumpButton(tester);
+
+      expect(find.byType(ChannelAvatar), findsOneWidget);
+      expect(find.text('B'), findsOneWidget);
+    });
+
+    testWidgets('shows an account icon without a takeout', (tester) async {
+      await pumpButton(tester, viewed: null);
+
+      expect(find.byType(ChannelAvatar), findsNothing);
+      expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
+      expect(find.byTooltip('Account'), findsOneWidget);
+    });
   });
 }

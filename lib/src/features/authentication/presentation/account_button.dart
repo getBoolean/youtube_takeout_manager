@@ -1,24 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../application/auth_notifier.dart';
-import 'account_avatar.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'account_dialog.dart';
 
-/// App bar button that opens the account dialog: the signed-in avatar, or an
-/// outline account icon when signed out.
+/// App bar button that opens the account dialog: the viewed channel's
+/// picture, or an outline account icon when no takeout is shown.
 class AccountButton extends ConsumerWidget {
   const AccountButton({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final auth = ref.watch(authProvider);
+    final channel = ref.watch(viewedChannelProvider);
+    final name = channel?.title ?? channel?.channelId;
     return IconButton(
-      tooltip: 'Account',
+      tooltip: name == null ? 'Account' : 'Account: $name',
       onPressed: () => showAccountDialog(context),
-      icon: auth == null
+      icon: channel == null
           ? const Icon(Icons.account_circle_outlined)
-          : AccountAvatar(auth: auth, radius: 16),
+          : ChannelAvatar(
+              name: name!,
+              thumbnailUrl: channel.thumbnailUrl,
+              radius: 16,
+            ),
     );
   }
 }

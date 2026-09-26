@@ -6,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 
@@ -34,6 +36,46 @@ const _plan = TakeoutImportPlan(
   newLiveChatCount: 0,
 );
 
+/// A plan with something to look over even as a first import.
+const _planWithDeleted = TakeoutImportPlan(
+  accountId: 'UCnew',
+  mergedData: TakeoutData(
+    comments: [],
+    liveChats: [],
+    subscriptionsByChannelId: {},
+  ),
+  csvFiles: {},
+  goneCommentIds: {'gone'},
+  goneLiveChatIds: {},
+  newlyDeletedCommentCount: 1,
+  newlyDeletedLiveChatCount: 0,
+  newCommentCount: 0,
+  newLiveChatCount: 0,
+);
+
+const _savedSummary = TakeoutSummary(
+  id: 'UCme',
+  channels: [
+    TakeoutChannel(
+      channelId: 'UCme',
+      isMain: true,
+      listed: true,
+      commentCount: 1,
+      liveChatCount: 0,
+    ),
+  ],
+  countsKnown: true,
+);
+
+class _SavedTakeouts extends SavedTakeouts {
+  final List<TakeoutSummary> summaries;
+
+  _SavedTakeouts(this.summaries);
+
+  @override
+  Future<List<TakeoutSummary>> build() async => summaries;
+}
+
 class _Picker implements ZipPickerRepository {
   final FilePickerResult? result;
 
@@ -47,11 +89,17 @@ class _Takeout extends TakeoutNotifier {
   final Object? importError;
   final Set<String> saved;
   final Completer<void>? commitGate;
+  final TakeoutImportPlan plan;
   Object? failNext;
   final prepared = <bool>[];
   final committed = <TakeoutImportPlan>[];
 
-  _Takeout({this.importError, this.saved = const {}, this.commitGate});
+  _Takeout({
+    this.importError,
+    this.saved = const {},
+    this.commitGate,
+    this.plan = _plan,
+  });
 
   @override
   Future<LoadedTakeout?> build() async => null;
@@ -64,7 +112,7 @@ class _Takeout extends TakeoutNotifier {
     prepared.add(merge);
     if (importError case final error?) throw error;
     if (failNext case final error?) throw error;
-    return _plan;
+    return plan;
   }
 
   @override
@@ -105,11 +153,14 @@ void main() {
     Set<String> saved = const {},
     Completer<void>? commitGate,
     String viewing = 'UCme',
+    List<TakeoutSummary> savedTakeouts = const [_savedSummary],
+    TakeoutImportPlan plan = _plan,
   }) {
     takeout = _Takeout(
       importError: importError,
       saved: saved,
       commitGate: commitGate,
+      plan: plan,
     );
     selection = _Selection(viewing);
     final c = ProviderContainer(
@@ -117,6 +168,7 @@ void main() {
         zipPickerRepositoryProvider.overrideWithValue(_Picker(picked)),
         takeoutProvider.overrideWith(() => takeout),
         takeoutSelectionProvider.overrideWith(() => selection),
+        savedTakeoutsProvider.overrideWith(() => _SavedTakeouts(savedTakeouts)),
       ],
     );
     addTearDown(c.dispose);
@@ -142,10 +194,33 @@ void main() {
   test('picking nothing changes nothing', () async {
     final c = container();
 
-    await c.read(addAccountImportProvider.notifier).start();
+    expect(await c.read(addAccountImportProvider.notifier).start(), isFalse);
 
     expect(takeout.prepared, isEmpty);
     expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+  });
+
+  test('the first takeout is saved straight away when there is nothing to look '
+      'over', () async {
+    final c = container(picked: _picked, savedTakeouts: const []);
+
+    expect(await c.read(addAccountImportProvider.notifier).start(), isTrue);
+
+    expect(takeout.committed, [same(_plan)]);
+    expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+  });
+
+  test('the first takeout is reviewed when it found items deleted', () async {
+    final c = container(
+      picked: _picked,
+      savedTakeouts: const [],
+      plan: _planWithDeleted,
+    );
+
+    expect(await c.read(addAccountImportProvider.notifier).start(), isFalse);
+
+    expect(c.read(addAccountImportProvider), isA<AddAccountReview>());
+    expect(takeout.committed, isEmpty);
   });
 
   test(
@@ -222,7 +297,7 @@ void main() {
     final saving = add.confirm();
     expect(c.read(addAccountImportProvider), isA<AddAccountWorking>());
     gate.complete();
-    await saving;
+    expect(await saving, isTrue);
 
     expect(takeout.committed, [same(_plan)]);
     expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());

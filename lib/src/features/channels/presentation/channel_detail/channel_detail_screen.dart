@@ -51,7 +51,6 @@ class ChannelDetailScreen extends HookConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!context.router.canPop()) {
           context.router.replaceAll([
-            const HomeRoute(),
             const ChannelListRoute(),
             ChannelDetailRoute(channelId: channelId),
           ]);
@@ -228,10 +227,8 @@ class ChannelDetailScreen extends HookConsumerWidget {
                 )
               : !context.router.canPop()
               ? BackButton(
-                  onPressed: () => context.router.replaceAll([
-                    const HomeRoute(),
-                    const ChannelListRoute(),
-                  ]),
+                  onPressed: () =>
+                      context.router.replaceAll([const ChannelListRoute()]),
                 )
               : null,
           actions: inSelection
@@ -239,7 +236,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
               : [
                   ...queue.appBarActions,
                   // Leaves room for the back button in the narrowest windows;
-                  // it's still on Home.
+                  // it's still on Channels.
                   if (MediaQuery.sizeOf(context).width >= 200)
                     const AccountButton(),
                 ],

@@ -3,14 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import '../application/add_account_import.dart';
-import 'import_error_dialog.dart';
+import 'import_error_details.dart';
 import 'import_review.dart';
 
-/// Imports another Google account's takeout in place: a button, then
-/// progress, a review to confirm, whether to merge one from an account
-/// already imported, or why nothing was imported.
+/// Imports a takeout in place: a button, then progress, a review to confirm,
+/// whether to merge one from an account already imported, or why nothing
+/// was imported.
 class AddAccountSection extends StatelessWidget {
   final AddAccountState state;
+
+  /// The button's label before anything is picked.
+  final String? idleLabel;
+
+  /// Whether that button is the main thing to do, filled and centered.
+  final bool prominent;
 
   /// Whether one can be imported now, i.e. nothing is being deleted through
   /// the YouTube API.
@@ -30,6 +36,8 @@ class AddAccountSection extends StatelessWidget {
   const AddAccountSection({
     super.key,
     required this.state,
+    this.idleLabel,
+    this.prominent = false,
     required this.enabled,
     required this.accountNames,
     required this.viewedTakeoutId,
@@ -42,16 +50,24 @@ class AddAccountSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final label = Text(
+      idleLabel ?? 'Import a takeout',
+      textAlign: TextAlign.center,
+    );
     return switch (state) {
+      AddAccountIdle() when prominent => Center(
+        child: FilledButton.icon(
+          onPressed: enabled ? onStart : null,
+          icon: isTinyWidth(context) ? null : const Icon(Icons.folder_open),
+          label: label,
+        ),
+      ),
       AddAccountIdle() => Align(
         alignment: AlignmentDirectional.centerStart,
         child: OutlinedButton.icon(
           onPressed: enabled ? onStart : null,
           icon: isTinyWidth(context) ? null : const Icon(Icons.add),
-          label: const Text(
-            "Import another account's takeout",
-            textAlign: TextAlign.center,
-          ),
+          label: label,
         ),
       ),
       AddAccountWorking() => Padding(
@@ -85,7 +101,7 @@ class AddAccountSection extends StatelessWidget {
             child: const Text('Import', textAlign: TextAlign.center),
           ),
         ],
-        children: [ImportReview(plan: plan, merge: false, newAccount: true)],
+        children: [ImportReview(plan: plan, merge: false)],
       ),
       AddAccountAlreadySaved(:final takeoutId) => _alreadySaved(takeoutId),
       AddAccountMergeReview(:final plan) => NoticeBanner(
@@ -101,7 +117,7 @@ class AddAccountSection extends StatelessWidget {
             child: const Text('Merge', textAlign: TextAlign.center),
           ),
         ],
-        children: [ImportReview(plan: plan, merge: true, hasSavedData: true)],
+        children: [ImportReview(plan: plan, merge: true)],
       ),
       AddAccountFailed(:final error) => NoticeBanner(
         title: importErrorTitle(error),

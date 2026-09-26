@@ -9,7 +9,6 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/auth_
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_dialog.dart';
-import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_flow.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
@@ -26,6 +25,8 @@ import 'package:youtube_takeout_manager/src/features/channels/presentation/chann
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/live_chat_list_view.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/search_options_menu_button.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_header.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/no_takeout_views.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/cross_channel_result_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/unknown_channel_hint.dart';
@@ -55,16 +56,12 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/home_screen.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_switcher.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
@@ -223,16 +220,19 @@ final _longPlan = TakeoutImportPlan(
   commentCheckSkipped: DeletionCheckSkipReason.unparsedRows,
 );
 
-Widget _addAccount(AddAccountState state) => AddAccountSection(
-  state: state,
-  enabled: true,
-  accountNames: const {'UCme': 'A channel with a fairly long name'},
-  viewedTakeoutId: 'UCother',
-  onStart: () {},
-  onConfirm: () {},
-  onDismiss: () {},
-  onMerge: () {},
-);
+Widget _addAccount(AddAccountState state, {bool prominent = false}) =>
+    AddAccountSection(
+      state: state,
+      idleLabel: prominent ? 'Select zip files' : null,
+      prominent: prominent,
+      enabled: true,
+      accountNames: const {'UCme': 'A channel with a fairly long name'},
+      viewedTakeoutId: 'UCother',
+      onStart: () {},
+      onConfirm: () {},
+      onDismiss: () {},
+      onMerge: () {},
+    );
 
 const _notices = <String, SignInNotice>{
   'UCme': OtherChannelChosen(
@@ -256,25 +256,15 @@ class _Deleting extends DeletionProcessing {
   DeletionProcessingState build() => DeletionProcessingState.running;
 }
 
-class _TwoChannelTakeout extends TakeoutNotifier {
+class _NoTakeout extends TakeoutNotifier {
   @override
-  Future<LoadedTakeout?> build() async => LoadedTakeout(
-    id: 'UCme',
-    data: TakeoutData(
-      comments: [
-        _comment,
-        _comment.copyWith(commentId: 'c2', channelId: 'UCalt'),
-      ],
-      liveChats: const [],
-      subscriptionsByChannelId: const {},
-      ownChannels: const {
-        'UCme': OwnChannel(
-          channelId: 'UCme',
-          title: 'A channel with a fairly long name',
-        ),
-        'UCalt': OwnChannel(channelId: 'UCalt'),
-      },
-    ),
+  Future<LoadedTakeout?> build() async => null;
+}
+
+class _UnreadableTakeout extends TakeoutNotifier {
+  @override
+  Future<LoadedTakeout?> build() async => throw const FormatException(
+    'The saved comments file has a row with far too few columns in it',
   );
 }
 
@@ -290,7 +280,6 @@ final List<Override> _overrides = [
   deletionQueueProvider.overrideWith(_Queue.new),
   quotaProvider.overrideWith(_Quota.new),
   searchOptionsProvider.overrideWith(_SearchOptions.new),
-  takeoutProvider.overrideWith(_Takeout.new),
   takeoutSelectionProvider.overrideWith(_Selection.new),
   channelsProvider.overrideWithValue(const [_channel]),
   channelByIdProvider(fixture.channelId).overrideWithValue(_channel),
@@ -411,6 +400,7 @@ void main() {
   void fitsAtEveryWidth(
     String subject,
     Widget Function() build, {
+    TakeoutNotifier Function() takeout = _Takeout.new,
     Future<void> Function(WidgetTester tester)? then,
   }) {
     for (final scale in _textScales) {
@@ -425,7 +415,7 @@ void main() {
           // Any overflow fails the test.
           await tester.pumpWidget(
             ProviderScope(
-              overrides: _overrides,
+              overrides: [..._overrides, takeoutProvider.overrideWith(takeout)],
               child: MaterialApp(
                 theme: AppTheme.light,
                 builder: (context, child) => MediaQuery(
@@ -478,7 +468,20 @@ void main() {
     'the deletion queue',
     () => const Scaffold(body: DeletionQueuePanel()),
   );
-  fitsAtEveryWidth('Home', () => const HomeScreen());
+  fitsAtEveryWidth(
+    'Channels before any takeout',
+    () => const ChannelListScreen(),
+    takeout: _NoTakeout.new,
+    then: (tester) async =>
+        expect(find.byType(TakeoutImportPrompt), findsOneWidget),
+  );
+  fitsAtEveryWidth(
+    "Channels when the saved takeout can't be read",
+    () => const ChannelListScreen(),
+    takeout: _UnreadableTakeout.new,
+    then: (tester) async =>
+        expect(find.byType(TakeoutLoadFailed), findsOneWidget),
+  );
   fitsAtEveryWidth(
     'the account dialog',
     () => const Scaffold(body: AccountDialog(oauthConfigured: true)),
@@ -492,21 +495,6 @@ void main() {
       ],
       child: const Scaffold(body: AccountDialog(oauthConfigured: true)),
     ),
-  );
-  fitsAtEveryWidth(
-    'the other-channel sign-in warning',
-    () => const SignedInOtherChannelDialog(
-      chosen: SignInProfile(
-        channelId: 'UCaVeryLongChannelIdentifier12',
-        channelTitle: 'A channel with a fairly long name',
-      ),
-      targetChannelId: 'UCanotherLongChannelIdentifier',
-      targetTitle: 'Another channel with a long name',
-    ),
-  );
-  fitsAtEveryWidth(
-    'the no-channel dialog',
-    () => const NoYouTubeChannelDialog(),
   );
   fitsAtEveryWidth(
     'the account dialog with every account shown',
@@ -564,7 +552,6 @@ void main() {
           onRemove: (_) {},
           otherSignIns: const [_longProfile],
           onRemoveSignIn: (_) {},
-          addAccount: _addAccount(const AddAccountIdle()),
         ),
       ),
     ),
@@ -590,6 +577,8 @@ void main() {
     () => Scaffold(
       body: ListView(
         children: [
+          _addAccount(const AddAccountIdle()),
+          _addAccount(const AddAccountIdle(), prominent: true),
           _addAccount(const AddAccountWorking()),
           _addAccount(AddAccountReview(_longPlan)),
           _addAccount(const AddAccountAlreadySaved('UCme')),
@@ -605,25 +594,6 @@ void main() {
           ),
         ],
       ),
-    ),
-  );
-  fitsAtEveryWidth(
-    'the deletion running dialog',
-    () => const DeletionRunningDialog(),
-  );
-  fitsAtEveryWidth(
-    'the channel picker',
-    () => ChannelPickerDialog(
-      channels: _longTakeout.channels,
-      viewedChannelId: 'UCanotherLongChannelIdentifier',
-      signedInChannelIds: const {'UCme'},
-    ),
-  );
-  fitsAtEveryWidth(
-    'Home with several channels',
-    () => ProviderScope(
-      overrides: [takeoutProvider.overrideWith(_TwoChannelTakeout.new)],
-      child: const HomeScreen(),
     ),
   );
   fitsAtEveryWidth(

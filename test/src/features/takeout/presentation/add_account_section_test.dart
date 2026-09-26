@@ -82,14 +82,14 @@ void main() {
   testWidgets('offers to add another account', (tester) async {
     await pump(tester, const AddAccountIdle());
 
-    await tester.tap(find.text("Import another account's takeout"));
+    await tester.tap(find.text('Import a takeout'));
     expect(starts, 1);
   });
 
   testWidgets("can't add one while deleting", (tester) async {
     await pump(tester, const AddAccountIdle(), enabled: false);
 
-    await tester.tap(find.text("Import another account's takeout"));
+    await tester.tap(find.text('Import a takeout'));
     expect(starts, 0);
   });
 

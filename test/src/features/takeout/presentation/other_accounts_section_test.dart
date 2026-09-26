@@ -84,7 +84,6 @@ void main() {
               onRemove: (removal) => removed.add(removal.summary.id),
               otherSignIns: otherSignIns,
               onRemoveSignIn: removedSignIns.add,
-              addAccount: const Text('Add account here'),
             ),
           ),
         ),
@@ -104,7 +103,6 @@ void main() {
       find.textContaining('2 channels · 1,234 comments · 56 live chats'),
       findsOneWidget,
     );
-    expect(find.text('Add account here'), findsOneWidget);
     // Its channels show only once opened.
     expect(find.text('Work Podcast'), findsNothing);
   });

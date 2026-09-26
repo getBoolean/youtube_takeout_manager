@@ -22,6 +22,7 @@ import 'channel_list_header.dart';
 import 'channel_tile.dart';
 import 'cross_channel_deletion_bar.dart';
 import 'cross_channel_result_tile.dart';
+import 'no_takeout_views.dart';
 import 'section_header.dart';
 
 const _searchBarPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
@@ -151,6 +152,31 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     );
   }
 
+  /// Before any takeout is shown: [body] centered and scrollable, under the
+  /// account button.
+  Widget _buildWithoutTakeout(Widget body) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Channels'),
+        actions: const [AccountButton()],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: body,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final takeoutAsync = ref.watch(viewedTakeoutProvider);
@@ -177,6 +203,15 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
     ref.listen(viewedChannelIdProvider, (_, _) {
       if (_selectionMode.value) _exitSelectionMode();
     });
+
+    if (takeoutAsync.hasError) {
+      return _buildWithoutTakeout(
+        TakeoutLoadFailed(error: takeoutAsync.error!),
+      );
+    }
+    if (takeoutAsync.hasValue && takeoutAsync.value == null) {
+      return _buildWithoutTakeout(const TakeoutImportPrompt());
+    }
 
     final queue = DeletionQueueHost.of(context);
     if (isLoading) {
@@ -274,18 +309,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
       title = Text('$selectedCount selected');
       actions = [SelectAllToggleButton(selectableIds: deletableIds)];
     } else {
-      leading = context.router.canPop()
-          ? null
-          : BackButton(
-              onPressed: () => context.router.replaceAll([const HomeRoute()]),
-            );
+      leading = null;
       title = const Text('Channels');
-      actions = [
-        ...queueActions,
-        // Leaves room for the back button in the narrowest windows; it's
-        // still on Home.
-        if (MediaQuery.sizeOf(context).width >= 200) const AccountButton(),
-      ];
+      actions = [...queueActions, const AccountButton()];
     }
 
     final scheme = Theme.of(context).colorScheme;

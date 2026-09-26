@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/label_badge.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/presentation/channel_picker_dialog.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeout_details.dart';
 import '../domain/sign_in_notice.dart';
 import 'sign_in_notice_banner.dart';
 

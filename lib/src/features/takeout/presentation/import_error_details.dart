@@ -3,37 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import '../domain/takeout_import_plan.dart';
 
-/// Explains why picked takeout zips weren't imported. An account mismatch
-/// names the channels involved, so a takeout from the wrong account can't
-/// slip by unnoticed.
-class ImportErrorDialog extends StatelessWidget {
-  final TakeoutImportException error;
-
-  const ImportErrorDialog({super.key, required this.error});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return AlertDialog(
-      icon: Icon(Icons.error_outline, color: theme.colorScheme.error),
-      title: Text(importErrorTitle(error)),
-      content: SingleChildScrollView(child: ImportErrorDetails(error: error)),
-      actions: [
-        FilledButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('OK'),
-        ),
-      ],
-    );
-  }
-}
-
+/// Titles why picked takeout zips weren't imported.
 String importErrorTitle(Object error) =>
     error is TakeoutAccountMismatchException
     ? 'Different YouTube account'
     : "Couldn't import takeout";
 
-/// Why an import failed, naming the channels of an account mismatch.
+/// Why an import failed. An account mismatch names the channels involved,
+/// so a takeout from the wrong account can't slip by unnoticed.
 class ImportErrorDetails extends StatelessWidget {
   final Object error;
 
