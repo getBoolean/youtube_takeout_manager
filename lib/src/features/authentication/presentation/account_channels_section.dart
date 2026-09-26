@@ -123,26 +123,23 @@ class _ChannelRow extends StatelessWidget {
                   ),
                 ],
               ),
-              Wrap(
-                alignment: WrapAlignment.end,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 4,
-                children: [
-                  if (signedIn) ...[
-                    Text('Signed in', style: theme.textTheme.labelMedium),
-                    TextButton(
-                      onPressed: onSignOut,
-                      child: const Text(
-                        'Sign out',
-                        textAlign: TextAlign.center,
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: signedIn
+                    ? TextButton(
+                        onPressed: onSignOut,
+                        child: const Text(
+                          'Sign out',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : TextButton(
+                        onPressed: signInEnabled ? onSignIn : null,
+                        child: const Text(
+                          'Sign in',
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                  ] else
-                    TextButton(
-                      onPressed: signInEnabled ? onSignIn : null,
-                      child: const Text('Sign in', textAlign: TextAlign.center),
-                    ),
-                ],
               ),
             ],
           ),

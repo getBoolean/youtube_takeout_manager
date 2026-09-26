@@ -179,7 +179,7 @@ void main() {
 
     expect(find.text('Channels'), findsOneWidget);
     expect(find.text('Viewing'), findsOneWidget);
-    expect(find.text('Signed in'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
 

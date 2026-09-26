@@ -124,7 +124,8 @@ void main() {
       expect(find.text('Channels'), findsOneWidget);
       expect(find.text('Viewing'), findsOneWidget);
       expect(find.text('1,234 comments · 5 live chats'), findsOneWidget);
-      expect(find.text('Signed in'), findsOneWidget);
+      // Sign out already says the channel is signed in.
+      expect(find.text('Signed in'), findsNothing);
       expect(find.text('Sign out'), findsOneWidget);
       expect(find.text('Sign in'), findsOneWidget);
     });
