@@ -62,10 +62,24 @@ class AccountDialog extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: CloseButton(),
+              Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.only(start: tiny ? 4 : 8),
+                      child: Semantics(
+                        header: true,
+                        child: Text(
+                          'Takeouts',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const CloseButton(),
+                ],
               ),
+              const SizedBox(height: 8),
               Padding(
                 padding: EdgeInsetsDirectional.only(end: tiny ? 0 : 8),
                 child: Column(

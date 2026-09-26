@@ -292,6 +292,7 @@ void main() {
   testWidgets("heads with the takeout's Google account", (tester) async {
     await pumpDialog(tester);
 
+    expect(find.text('Takeouts'), findsOneWidget);
     expect(find.text('Ada'), findsOneWidget);
     expect(find.text('ada@example.com'), findsOneWidget);
   });
@@ -329,7 +330,7 @@ void main() {
 
     expect(find.text('Import a takeout'), findsOneWidget);
     // The other accounts stay collapsed until asked for.
-    expect(find.textContaining('from this device'), findsNothing);
+    expect(find.text('Remove this takeout'), findsNothing);
   });
 
   testWidgets("says how many of the takeout's rows couldn't be read", (

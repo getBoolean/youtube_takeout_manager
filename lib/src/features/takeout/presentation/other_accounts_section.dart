@@ -122,8 +122,8 @@ class OtherAccountsSection extends StatelessWidget {
                 icon: isTinyWidth(context)
                     ? null
                     : const Icon(Icons.delete_outline),
-                label: Text(
-                  'Remove ${_nameOf(viewed)} from this device',
+                label: const Text(
+                  'Remove this takeout',
                   textAlign: TextAlign.start,
                 ),
               ),
@@ -283,7 +283,7 @@ class _OtherAccountRowState extends State<_OtherAccountRow> {
             alignment: AlignmentDirectional.centerEnd,
             child: TextButton(
               onPressed: remove,
-              child: const Text('Remove', textAlign: TextAlign.center),
+              child: const Text('Remove takeout', textAlign: TextAlign.center),
             ),
           ),
         ),
@@ -355,7 +355,7 @@ class RemoveTakeoutConfirmation extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return NoticeBanner(
-      title: 'Remove ${_nameOf(removal.summary)}?',
+      title: "Remove ${_nameOf(removal.summary)}'s takeout?",
       actions: [
         TextButton(
           onPressed: onCancel,
@@ -367,13 +367,14 @@ class RemoveTakeoutConfirmation extends StatelessWidget {
             foregroundColor: scheme.onError,
           ),
           onPressed: onConfirm,
-          child: const Text('Remove', textAlign: TextAlign.center),
+          child: const Text('Remove takeout', textAlign: TextAlign.center),
         ),
       ],
       children: [
         Text(
           [
-            'Its data is removed from this device.',
+            "The takeout's comments and live chats are removed from this "
+                'device.',
             if (removal.queuedCount > 0)
               Intl.plural(
                 removal.queuedCount,
@@ -382,9 +383,11 @@ class RemoveTakeoutConfirmation extends StatelessWidget {
                     'Its ${removal.queuedCount} queued deletions are removed '
                     'too.',
               ),
-            if (removal.signInIds.isNotEmpty) 'Its channels are signed out.',
-            'Nothing is deleted from YouTube, and importing the takeout again '
-                'brings it back.',
+            if (removal.signInIds.isNotEmpty)
+              'Its channels are signed out of this app.',
+            'Your Google account and YouTube stay as they are: nothing is '
+                'deleted there, and importing the takeout again brings it '
+                'back.',
           ].join(' '),
         ),
       ],

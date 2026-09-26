@@ -136,15 +136,18 @@ void main() {
   ) async {
     await pump(tester);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Remove'));
+    await tester.tap(find.widgetWithText(TextButton, 'Remove takeout'));
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text('Remove Work Channel?'), findsOneWidget);
+    expect(find.text("Remove Work Channel's takeout?"), findsOneWidget);
     expect(find.textContaining('3 queued deletions'), findsOneWidget);
-    expect(find.textContaining('Nothing is deleted from YouTube'), findsOne);
+    expect(
+      find.textContaining('Your Google account and YouTube stay as they are'),
+      findsOne,
+    );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Remove takeout'));
     await tester.pumpAndSettle();
     expect(removed, ['UCwork']);
   });
@@ -152,13 +155,13 @@ void main() {
   testWidgets('cancelling the removal keeps the account', (tester) async {
     await pump(tester);
 
-    await tester.tap(find.widgetWithText(TextButton, 'Remove'));
+    await tester.tap(find.widgetWithText(TextButton, 'Remove takeout'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
     expect(removed, isEmpty);
-    expect(find.text('Remove Work Channel?'), findsNothing);
+    expect(find.text("Remove Work Channel's takeout?"), findsNothing);
   });
 
   testWidgets('the viewed account can be removed too, after asking', (
@@ -166,11 +169,11 @@ void main() {
   ) async {
     await pump(tester);
 
-    await tester.tap(find.text('Remove Boolean from this device'));
+    await tester.tap(find.text('Remove this takeout'));
     await tester.pumpAndSettle();
-    expect(find.text('Remove Boolean?'), findsOneWidget);
+    expect(find.text("Remove Boolean's takeout?"), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Remove'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Remove takeout'));
     await tester.pumpAndSettle();
     expect(removed, ['UCme']);
   });
@@ -182,7 +185,7 @@ void main() {
 
     final button = tester.widget<ButtonStyleButton>(
       find.ancestor(
-        of: find.text('Remove Boolean from this device'),
+        of: find.text('Remove this takeout'),
         matching: find.bySubtype<ButtonStyleButton>(),
       ),
     );
