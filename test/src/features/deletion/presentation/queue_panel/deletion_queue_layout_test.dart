@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_pane_expanded.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
@@ -21,8 +22,14 @@ void main() {
       deletionQueueLayoutFor(width: width, platform: platform);
 
   test('phones get the bottom bar', () {
-    expect(layout(400, TargetPlatform.android), DeletionQueueLayout.bottomBar);
-    expect(layout(599, TargetPlatform.iOS), DeletionQueueLayout.bottomBar);
+    expect(
+      layout(compactWidthBreakpoint / 2, TargetPlatform.android),
+      DeletionQueueLayout.bottomBar,
+    );
+    expect(
+      layout(compactWidthBreakpoint - 1, TargetPlatform.iOS),
+      DeletionQueueLayout.bottomBar,
+    );
   });
 
   test('desktop never gets the bottom bar', () {
@@ -31,18 +38,26 @@ void main() {
       TargetPlatform.macOS,
       TargetPlatform.linux,
     ]) {
-      expect(layout(1280, platform), DeletionQueueLayout.docked);
-      expect(layout(960, platform), DeletionQueueLayout.docked);
-      expect(layout(959, platform), DeletionQueueLayout.strip);
-      expect(layout(600, platform), DeletionQueueLayout.strip);
-      expect(layout(599, platform), DeletionQueueLayout.appBarIcon);
-      expect(layout(320, platform), DeletionQueueLayout.appBarIcon);
+      const expanded = expandedWidthBreakpoint;
+      const compact = compactWidthBreakpoint;
+      expect(layout(expanded + 320, platform), DeletionQueueLayout.docked);
+      expect(layout(expanded, platform), DeletionQueueLayout.docked);
+      expect(layout(expanded - 1, platform), DeletionQueueLayout.strip);
+      expect(layout(compact, platform), DeletionQueueLayout.strip);
+      expect(layout(compact - 1, platform), DeletionQueueLayout.appBarIcon);
+      expect(layout(compact / 2, platform), DeletionQueueLayout.appBarIcon);
     }
   });
 
   test('tablets use the desktop layouts', () {
-    expect(layout(800, TargetPlatform.android), DeletionQueueLayout.strip);
-    expect(layout(1024, TargetPlatform.iOS), DeletionQueueLayout.docked);
+    expect(
+      layout(compactWidthBreakpoint, TargetPlatform.android),
+      DeletionQueueLayout.strip,
+    );
+    expect(
+      layout(expandedWidthBreakpoint, TargetPlatform.iOS),
+      DeletionQueueLayout.docked,
+    );
   });
 
   testWidgets('the side sheet hands over to the pane when the window widens', (

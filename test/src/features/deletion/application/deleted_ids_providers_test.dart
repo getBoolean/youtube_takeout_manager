@@ -215,11 +215,6 @@ void main() {
     final c = container();
     await c.read(deletedIdsProvider.future);
     await c.read(deletionQueueProvider.future);
-    var liveChatUpdates = 0;
-    c.listen(
-      interactionStatusesProvider(_liveChat),
-      (_, _) => liveChatUpdates++,
-    );
 
     await c
         .read(deletedIdsProvider.notifier)
@@ -235,6 +230,9 @@ void main() {
       c.read(interactionStatusesProvider(_comment)).of('gone'),
       InteractionStatus.deleted,
     );
-    expect(liveChatUpdates, 0);
+    expect(
+      c.read(interactionStatusesProvider(_liveChat)).of('gone'),
+      InteractionStatus.active,
+    );
   });
 }

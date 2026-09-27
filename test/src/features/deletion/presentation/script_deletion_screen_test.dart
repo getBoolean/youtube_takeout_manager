@@ -15,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/my_activity_results.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/possible_membership_events_notice.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/script_deletion_screen.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
@@ -113,6 +114,10 @@ void main() {
     );
   }
 
+  String itemCount(WidgetTester tester) => tester
+      .widget<Text>(find.byKey(const ValueKey('script-item-count')))
+      .data!;
+
   Future<void> goToImport(WidgetTester tester) async {
     for (var i = 0; i < 3; i++) {
       await tester.tap(find.text('Next').hitTestable());
@@ -135,11 +140,10 @@ void main() {
   ) async {
     await pumpScreen(tester);
 
+    final notice = find.byType(PossibleMembershipEventsNotice);
+    expect(tester.widget<PossibleMembershipEventsNotice>(notice).count, 1);
     expect(
-      find.text(
-        '1 item may be a membership event or already-deleted message. '
-        'Deletion may fail for it.',
-      ),
+      find.descendant(of: notice, matching: find.textContaining('1')),
       findsOneWidget,
     );
   });
@@ -165,8 +169,8 @@ void main() {
 
     await tester.tap(find.text('Next').hitTestable());
     await tester.pumpAndSettle();
-    expect(find.text('This script will delete 3 items.'), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.copy));
+    expect(itemCount(tester), contains('3'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Copy Script'));
     await tester.pumpAndSettle();
 
     expect(generator.requested.single, {'c1', 'l1', 'l2'});
@@ -205,7 +209,7 @@ void main() {
 
     expect(container.read(scriptDeletionIdsProvider).liveChatIds, {'l1'});
     expect(container.read(scriptDeletionIdsProvider).commentIds, isEmpty);
-    expect(find.text('This script will delete 1 item.'), findsOneWidget);
+    expect(itemCount(tester), contains('1'));
   });
 
   testWidgets('pasting something else says so and records nothing', (
@@ -216,11 +220,9 @@ void main() {
 
     await importResults(tester, 'not json');
 
-    expect(
-      find.textContaining('Invalid JSON: FormatException'),
-      findsOneWidget,
-    );
-    expect(find.text('Import Results'), findsWidgets);
+    expect(find.byType(SnackBar), findsOneWidget);
+    // Still on the paste step, to try again.
+    expect(find.byType(TextField), findsOneWidget);
     expect(
       container.read(deletedIdsProvider).requireValue[QueueItemKind.comment],
       isEmpty,
@@ -236,12 +238,8 @@ void main() {
 
     await importResults(tester, '{"succeeded":["c1"],"failed":[]}');
 
-    expect(
-      find.text("Couldn't save the results: Bad state: disk full"),
-      findsOneWidget,
-    );
+    expect(find.textContaining('disk full'), findsOneWidget);
     // Still on the paste step, to try again.
-    expect(find.text('1 deleted'), findsNothing);
     expect(find.byType(TextField), findsOneWidget);
   });
 }

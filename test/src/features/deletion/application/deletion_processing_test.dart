@@ -168,8 +168,14 @@ void main() {
       expect(items['c1']!.processedAt, isNotNull);
       expect(items['c1']!.errorMessage, isNull);
       expect(items['l1']!.status, DeletionItemStatus.succeeded);
-      expect(quota.state.usageFor(QuotaOperation.deleteComment), 50);
-      expect(quota.state.usageFor(QuotaOperation.deleteLiveChat), 50);
+      expect(
+        quota.state.usageFor(QuotaOperation.deleteComment),
+        QuotaOperation.deleteCost,
+      );
+      expect(
+        quota.state.usageFor(QuotaOperation.deleteLiveChat),
+        QuotaOperation.deleteCost,
+      );
       final deleted = await c.read(deletedIdsProvider.future);
       expect(deleted[QueueItemKind.comment], {'c1'});
       expect(deleted[QueueItemKind.liveChat], {'l1'});
@@ -193,7 +199,10 @@ void main() {
       expect((await c.read(deletedIdsProvider.future))[QueueItemKind.comment], {
         'a2',
       });
-      expect(quota.state.usageFor(QuotaOperation.deleteComment), 50);
+      expect(
+        quota.state.usageFor(QuotaOperation.deleteComment),
+        QuotaOperation.deleteCost,
+      );
       expect(c.read(deletionProcessingProvider), DeletionProcessingState.idle);
     });
 
@@ -238,10 +247,10 @@ void main() {
         final items = await queue(c);
         expect(items['a1'], _item('a1'));
         expect(items['a2'], _item('a2'));
-        expect(await c.read(deletedIdsProvider.future), {
-          QueueItemKind.comment: <String>{},
-          QueueItemKind.liveChat: <String>{},
-        });
+        expect(
+          (await c.read(deletedIdsProvider.future)).values,
+          everyElement(isEmpty),
+        );
         expect(
           c.read(deletionProcessingProvider),
           DeletionProcessingState.idle,

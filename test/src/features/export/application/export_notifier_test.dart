@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:csv/csv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -60,8 +63,16 @@ void main() {
       ('Chan_export', ExportFormat.csv),
       ('Chan_export', ExportFormat.json),
     ]);
-    expect(files.saved[0].content, contains('comment,c1,UC1,Chan,v1,'));
-    expect(files.saved[1].content, contains('"channelName": "Chan"'));
+    final [header, ...rows] = Csv(
+      autoDetect: false,
+    ).decode(files.saved[0].content);
+    final csvComment = Map.fromIterables(header, rows.single);
+    expect(csvComment['ID'], 'c1');
+    expect(csvComment['Channel Name'], 'Chan');
+    final json = jsonDecode(files.saved[1].content) as Map<String, dynamic>;
+    final jsonComment = (json['comments'] as List).single as Map;
+    expect(jsonComment['id'], 'c1');
+    expect(jsonComment['channelName'], 'Chan');
   });
 
   test('says when the user cancelled', () async {

@@ -36,6 +36,7 @@ class DeletionQueueFilterChips extends StatelessWidget {
         children: [
           for (final filter in DeletionQueueFilter.values)
             ChoiceChip(
+              key: ValueKey('filter:${filter.name}'),
               // The name gives way before the count when narrow.
               label: Row(
                 mainAxisSize: MainAxisSize.min,

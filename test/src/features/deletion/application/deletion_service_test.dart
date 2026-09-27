@@ -143,10 +143,10 @@ void main() {
         ),
       );
 
-      expect(await c.read(deletedIdsProvider.future), {
-        QueueItemKind.comment: <String>{},
-        QueueItemKind.liveChat: <String>{},
-      });
+      expect(
+        (await c.read(deletedIdsProvider.future)).values,
+        everyElement(isEmpty),
+      );
       expect((await queue(c))['c1']!.status, DeletionItemStatus.failed);
     });
   });

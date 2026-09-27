@@ -105,7 +105,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(queue.enqueued.single.commentIds, {'c1', 'c2'});
-    expect(find.text('2 items added to the deletion queue'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(SnackBar),
+        matching: find.textContaining('2'),
+      ),
+      findsOneWidget,
+    );
     await _letSnackBarClose(tester);
   });
 

@@ -8,78 +8,73 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_pr
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 
+/// Video details kept on the device, in memory.
 class _VideoCache implements VideoCacheRepository {
-  var clears = 0;
+  var videos = <String, Video>{
+    'v1': const Video(videoId: 'v1', channelId: 'UCold', title: 'Old'),
+  };
 
   @override
-  Future<void> clearCache() async => clears++;
+  Future<Map<String, Video>> loadCachedVideos() async => videos;
+
+  @override
+  Future<void> clearCache() async => videos = {};
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Channel pictures kept on the device, in memory.
 class _ChannelCache implements ChannelCacheRepository {
-  var clears = 0;
+  var thumbnails = <String, String>{'UCold': 'https://saved/UCold'};
 
   @override
-  Future<Map<String, String>> loadCachedThumbnails() async =>
-      clears == 0 ? {'UCold': 'https://saved/UCold'} : {};
+  Future<Map<String, String>> loadCachedThumbnails() async => thumbnails;
 
   @override
-  Future<void> clearThumbnails() async => clears++;
+  Future<void> clearThumbnails() async => thumbnails = {};
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-}
-
-class _Videos extends VideoMetadata {
-  var builds = 0;
-
-  @override
-  Stream<Map<String, Video>> build() {
-    builds++;
-    return Stream.value(const {});
-  }
 }
 
 void main() {
-  test('clears the kept video details and channel pictures, and loads '
-      'them again', () async {
-    final videoCache = _VideoCache();
-    final channelCache = _ChannelCache();
-    final videos = _Videos();
+  late _VideoCache videoCache;
+  late _ChannelCache channelCache;
+
+  ProviderContainer container() {
+    videoCache = _VideoCache();
+    channelCache = _ChannelCache();
     final c = ProviderContainer(
       overrides: [
         videoCacheRepositoryProvider.overrideWithValue(videoCache),
         channelCacheRepositoryProvider.overrideWithValue(channelCache),
-        videoMetadataProvider.overrideWith(() => videos),
       ],
     );
     addTearDown(c.dispose);
+    return c;
+  }
+
+  test('clears the kept video details and shows none once they load '
+      'again', () async {
+    final c = container();
     c.listen(videoMetadataProvider, (_, _) {});
+    expect(await c.read(videoMetadataProvider.future), isNotEmpty);
 
     await c.read(deviceCacheClearerProvider.notifier).clear();
-    c.read(videoMetadataProvider);
 
-    expect(videoCache.clears, 1);
-    expect(channelCache.clears, 1);
-    expect(videos.builds, 2);
+    expect(videoCache.videos, isEmpty);
+    expect(await c.read(videoMetadataProvider.future), isEmpty);
   });
 
   test('shows no channel pictures as soon as they are cleared', () async {
-    final c = ProviderContainer(
-      overrides: [
-        videoCacheRepositoryProvider.overrideWithValue(_VideoCache()),
-        channelCacheRepositoryProvider.overrideWithValue(_ChannelCache()),
-        videoMetadataProvider.overrideWith(_Videos.new),
-      ],
-    );
-    addTearDown(c.dispose);
+    final c = container();
     c.listen(channelThumbnailsProvider, (_, _) {});
     expect(await c.read(channelThumbnailsProvider.future), isNotEmpty);
 
     await c.read(deviceCacheClearerProvider.notifier).clear();
 
+    expect(channelCache.thumbnails, isEmpty);
     final pictures = c.read(channelThumbnailsProvider);
     expect(pictures.isLoading, isFalse);
     expect(pictures.value, isEmpty);

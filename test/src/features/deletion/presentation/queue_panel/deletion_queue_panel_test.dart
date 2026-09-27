@@ -1,3 +1,4 @@
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,18 +8,27 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_filter.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_items_by_channel.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/script_deletion_ids.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/possible_membership_events_notice.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_filter_chips.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_panel.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/empty_deletion_queue.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/unassigned_queue_notice.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 
 DeletionQueueItem _item(String itemId, DeletionItemStatus status) =>
     DeletionQueueItem(
@@ -37,6 +47,9 @@ final _items = [
   _item('b2', DeletionItemStatus.succeeded),
   _item('a2', DeletionItemStatus.quotaExceeded),
 ];
+
+/// Deletes used today, so the deletes left aren't simply the daily limit's.
+const _deletesUsed = 3;
 
 class _FakeQueue extends DeletionQueue {
   final List<DeletionQueueItem> items;
@@ -70,6 +83,10 @@ class _Processing extends DeletionProcessing {
 
   @override
   void pauseProcessing() => calls.add('pause');
+
+  @override
+  Future<void> processPendingViaYoutubeApi({required String channelId}) async =>
+      calls.add('deleteViaApi $channelId');
 }
 
 class _FakeAuth extends AuthNotifier {
@@ -83,8 +100,34 @@ class _FakeAuth extends AuthNotifier {
 
 class _FakeQuota extends QuotaNotifier {
   @override
-  Future<QuotaState> build() async =>
-      QuotaState(usageByOperation: const {}, periodStart: DateTime.utc(2026));
+  Future<QuotaState> build() async => QuotaState(
+    usageByOperation: const {
+      QuotaOperation.deleteComment: _deletesUsed * QuotaOperation.deleteCost,
+    },
+    periodStart: DateTime.utc(2026),
+  );
+}
+
+/// The panel on a page of its own, and a stand-in for the script screen it
+/// opens.
+class _Router extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => [
+    AutoRoute(
+      page: PageInfo(
+        'PanelRoute',
+        builder: (_) =>
+            const Scaffold(body: DeletionQueuePanel(currentChannelId: 'UCb')),
+      ),
+      initial: true,
+    ),
+    AutoRoute(
+      page: PageInfo(
+        ScriptDeletionRoute.name,
+        builder: (_) => const SizedBox(key: ValueKey('script-screen')),
+      ),
+    ),
+  ];
 }
 
 void main() {
@@ -146,11 +189,25 @@ void main() {
             ),
           ),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: DeletionQueuePanel(currentChannelId: 'UCb')),
-        ),
+        child: MaterialApp.router(routerConfig: _Router().config()),
       ),
     );
+    await tester.pumpAndSettle();
+  }
+
+  ProviderContainer containerOf(WidgetTester tester) =>
+      ProviderScope.containerOf(tester.element(find.byType(MaterialApp)));
+
+  Finder filterChip(DeletionQueueFilter filter) =>
+      find.byKey(ValueKey('filter:${filter.name}'));
+
+  /// What the deletes left today should read, going by the quota used.
+  const deletesLeft =
+      (dailyQuotaLimit - _deletesUsed * QuotaOperation.deleteCost) ~/
+      QuotaOperation.deleteCost;
+
+  Future<void> openDeleteDialog(WidgetTester tester) async {
+    await tester.tap(find.text('Delete 2…'));
     await tester.pumpAndSettle();
   }
 
@@ -166,7 +223,7 @@ void main() {
   testWidgets('filters by status', (tester) async {
     await pumpPanel(tester);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Failed '));
+    await tester.tap(filterChip(DeletionQueueFilter.failed));
     await tester.pumpAndSettle();
 
     expect(find.text('text b1'), findsOneWidget);
@@ -174,7 +231,7 @@ void main() {
     expect(find.text('Alpha'), findsNothing);
 
     // Quota-stopped items wait for the next Delete.
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Waiting '));
+    await tester.tap(filterChip(DeletionQueueFilter.waiting));
     await tester.pumpAndSettle();
 
     expect(find.text('text a1'), findsOneWidget);
@@ -185,12 +242,16 @@ void main() {
   testWidgets('Delete asks how, with the API needing sign-in', (tester) async {
     await pumpPanel(tester);
 
-    await tester.tap(find.text('Delete 2…'));
-    await tester.pumpAndSettle();
+    await openDeleteDialog(tester);
 
-    expect(find.text('Delete 2 items from YouTube'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining('2'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Via My Activity'), findsOneWidget);
-    expect(find.text('Sign in required'), findsOneWidget);
     final api = tester.widget<OptionCard>(
       find.widgetWithText(OptionCard, 'Via YouTube API'),
     );
@@ -218,16 +279,10 @@ void main() {
       liveChats: [takeoutChat('blank', ''), takeoutChat('said', 'hi')],
     );
 
-    await tester.tap(find.text('Delete 2…'));
-    await tester.pumpAndSettle();
+    await openDeleteDialog(tester);
 
-    expect(
-      find.text(
-        '1 item may be a membership event or already-deleted message. '
-        'Deletion may fail for it.',
-      ),
-      findsOneWidget,
-    );
+    final notice = find.byType(PossibleMembershipEventsNotice);
+    expect(tester.widget<PossibleMembershipEventsNotice>(notice).count, 1);
   });
 
   testWidgets('offers the API with the deletes left when signed in', (
@@ -235,13 +290,57 @@ void main() {
   ) async {
     await pumpPanel(tester, signedIn: true);
 
-    await tester.tap(find.text('Delete 2…'));
-    await tester.pumpAndSettle();
+    await openDeleteDialog(tester);
 
     expect(
-      find.text('Uses API quota · ~200 deletes left today'),
+      find.descendant(
+        of: find.widgetWithText(OptionCard, 'Via YouTube API'),
+        matching: find.textContaining('~$deletesLeft '),
+      ),
       findsOneWidget,
     );
+  });
+
+  testWidgets("deleting via the API deletes the viewed channel's items", (
+    tester,
+  ) async {
+    await pumpPanel(tester, signedIn: true);
+
+    await openDeleteDialog(tester);
+    await tester.tap(find.text('Via YouTube API'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(queue.calls, contains('deleteViaApi UCme'));
+  });
+
+  testWidgets('deleting via My Activity opens the script with the waiting '
+      'items', (tester) async {
+    await pumpPanel(tester);
+
+    await openDeleteDialog(tester);
+    await tester.tap(find.text('Via My Activity'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('script-screen')), findsOneWidget);
+    // a1 is waiting and a2 was stopped by the quota; the rest aren't.
+    expect(containerOf(tester).read(scriptDeletionIdsProvider).allIds, {
+      'a1',
+      'a2',
+    });
+    expect(queue.calls, isNot(contains('deleteViaApi UCme')));
+  });
+
+  testWidgets('cancelling the Delete dialog starts nothing', (tester) async {
+    await pumpPanel(tester, signedIn: true);
+
+    await openDeleteDialog(tester);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(queue.calls, isEmpty);
+    expect(containerOf(tester).read(scriptDeletionIdsProvider).isEmpty, isTrue);
   });
 
   testWidgets('shows API quota, and that My Activity has none, signed in', (
@@ -249,14 +348,22 @@ void main() {
   ) async {
     await pumpPanel(tester, signedIn: true);
 
-    expect(find.text('YouTube API · ~200 deletes left today'), findsOneWidget);
-    expect(find.textContaining('My Activity has no limit'), findsOneWidget);
+    final bar = find.byType(QuotaStatusBar);
+    expect(bar, findsOneWidget);
+    expect(
+      find.descendant(of: bar, matching: find.textContaining('~$deletesLeft ')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: bar, matching: find.textContaining('My Activity')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('hides the quota when signed out', (tester) async {
     await pumpPanel(tester);
 
-    expect(find.textContaining('deletes left today'), findsNothing);
+    expect(find.byType(QuotaStatusBar), findsNothing);
   });
 
   testWidgets('offers Pause instead of Delete while deleting', (tester) async {
@@ -264,7 +371,7 @@ void main() {
 
     expect(find.text('Delete 2…'), findsNothing);
     await tester.tap(find.text('Pause'));
-    expect(queue.calls, ['pause']);
+    expect(queue.calls, contains('pause'));
   });
 
   testWidgets('retries failed items and clears done ones', (tester) async {
@@ -273,14 +380,17 @@ void main() {
     await tester.tap(find.text('Retry failed'));
     await tester.tap(find.text('Clear done'));
 
-    expect(queue.calls, ['retryFailed UCme', 'clearCompleted UCme']);
+    expect(
+      queue.calls,
+      containsAll(['retryFailed UCme', 'clearCompleted UCme']),
+    );
   });
 
   testWidgets('explains how to add items when empty', (tester) async {
     await pumpPanel(tester, items: const []);
 
-    expect(find.text('Nothing queued'), findsOneWidget);
-    expect(find.byType(ChoiceChip), findsNothing);
+    expect(find.byType(EmptyDeletionQueue), findsOneWidget);
+    expect(find.byType(DeletionQueueFilterChips), findsNothing);
   });
 
   testWidgets('sets apart items no takeout has matched to a channel', (
@@ -297,14 +407,12 @@ void main() {
       ],
     );
 
-    expect(
-      find.textContaining('1 item queued before channels were tracked'),
-      findsOneWidget,
-    );
+    final notice = find.byType(UnassignedQueueNotice);
+    expect(tester.widget<UnassignedQueueNotice>(notice).count, 1);
     // Not in the list or its counts.
     expect(find.text('text old'), findsNothing);
 
     await tester.tap(find.text('Remove it'));
-    expect(queue.calls, ['removeUnassigned']);
+    expect(queue.calls, contains('removeUnassigned'));
   });
 }

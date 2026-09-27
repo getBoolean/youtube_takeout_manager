@@ -19,7 +19,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       _key:
           '{"usageByOperation":{"deleteComment":100,"deleteLiveChat":50,'
-          '"videosList":3},"periodStart":"$storedStart","dailyLimit":10000}',
+          '"videosList":3},"periodStart":"$storedStart","dailyLimit":5000}',
     });
     final state = await repository().loadQuotaState();
 
@@ -29,7 +29,7 @@ void main() {
       QuotaOperation.videosList: 3,
     });
     expect(state.periodStart, periodStart);
-    expect(state.dailyLimit, 10000);
+    expect(state.dailyLimit, 5000);
     expect(state.unitsUsed, 153);
   });
 
@@ -52,7 +52,7 @@ void main() {
 
     expect(state.usageByOperation, {QuotaOperation.deleteComment: 150});
     expect(state.periodStart, periodStart);
-    expect(state.dailyLimit, 10000);
+    expect(state.dailyLimit, dailyQuotaLimit);
   });
 
   test('loads a legacy total of zero as no usage', () async {
@@ -77,23 +77,25 @@ void main() {
     expect(state.periodStart.isAfter(DateTime.utc(2020, 1, 2)), isTrue);
   });
 
-  test('saves usage in the current format', () async {
+  test('saved usage loads back', () async {
     SharedPreferences.setMockInitialValues({});
-    await repository().saveQuotaState(
-      QuotaState(
-        usageByOperation: {
-          QuotaOperation.deleteComment: 100,
-          QuotaOperation.channelsList: 2,
-        },
-        periodStart: DateTime.utc(2026, 9, 26, 7),
-      ),
+    final saved = QuotaState(
+      usageByOperation: {
+        QuotaOperation.deleteComment: 100,
+        QuotaOperation.channelsList: 2,
+      },
+      periodStart: periodStart,
+      dailyLimit: 5000,
     );
+    await repository().saveQuotaState(saved);
 
+    final loaded = await repository().loadQuotaState();
+
+    expect(loaded.usageByOperation, saved.usageByOperation);
+    expect(loaded.periodStart, saved.periodStart);
+    expect(loaded.dailyLimit, saved.dailyLimit);
+    // Where older versions saved it, so they and this one share it.
     final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString('quota_state'),
-      '{"usageByOperation":{"deleteComment":100,"channelsList":2},'
-      '"periodStart":"2026-09-26T07:00:00.000Z","dailyLimit":10000}',
-    );
+    expect(prefs.containsKey('quota_state'), isTrue);
   });
 }

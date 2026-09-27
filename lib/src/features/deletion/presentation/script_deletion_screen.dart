@@ -160,6 +160,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
+            key: const ValueKey('script-item-count'),
             Intl.plural(
               targets.count,
               one: 'This script will delete 1 item.',
