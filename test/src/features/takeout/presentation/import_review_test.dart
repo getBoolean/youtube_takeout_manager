@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/history_merge.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -39,6 +43,7 @@ TakeoutImportPlan _plan({
   DeletionCheckSkipReason? commentCheckSkipped,
   DeletionCheckSkipReason? liveChatCheckSkipped,
   int skippedLiveChatRows = 0,
+  HistoryImport history = HistoryImport.none,
 }) {
   Set<String> ids(String prefix, int count) => {
     for (var i = 0; i < count; i++) '$prefix $i',
@@ -75,6 +80,7 @@ TakeoutImportPlan _plan({
     newLiveChatIds: const {},
     commentCheckSkipped: commentCheckSkipped,
     liveChatCheckSkipped: liveChatCheckSkipped,
+    history: history,
   );
 }
 
@@ -85,6 +91,11 @@ const _commentsMarked = ValueKey('import-marks-comments-deleted');
 const _liveChatsMarked = ValueKey('import-marks-live-chats-deleted');
 const _commentWarning = ValueKey('import-warning-comments');
 const _liveChatWarning = ValueKey('import-warning-live-chats');
+const _watches = ValueKey('import-watches');
+const _searches = ValueKey('import-searches');
+const _watchesRemoved = ValueKey('import-watches-removed');
+const _searchesRemoved = ValueKey('import-searches-removed');
+const _historyWarning = ValueKey('import-warning-history');
 
 class _NoVideos extends VideoMetadata {
   @override
@@ -235,5 +246,98 @@ void main() {
 
     expect(find.byKey(_commentWarning), findsOneWidget);
     expect(find.byKey(_liveChatWarning), findsOneWidget);
+  });
+
+  group('history', () {
+    WatchEntry watch(int i) => WatchEntry(
+      time: DateTime.utc(2026, 1, i + 1),
+      kind: WatchKind.video,
+      url: 'https://www.youtube.com/watch?v=$i',
+    );
+
+    final history = TakeoutHistory(
+      watches: [for (var i = 0; i < 12; i++) watch(i)],
+      searches: [SearchEntry(time: DateTime.utc(2026), query: 'cats')],
+    );
+
+    testWidgets('a new account lists how many videos it watched and searches '
+        'it made', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ImportReview(
+                plan: _plan(history: HistoryImport(merged: history)),
+                merge: false,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(_textIn(_watches, '12'), findsOneWidget);
+      expect(_textIn(_searches, '1'), findsOneWidget);
+    });
+
+    testWidgets('a merge lists the new history, and what was removed from it', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _plan(
+          history: HistoryImport(
+            merged: history,
+            newWatchCount: 7,
+            newSearchCount: 0,
+            newlyRemovedWatchCount: 3,
+          ),
+        ),
+      );
+
+      expect(_textIn(_watches, '7'), findsOneWidget);
+      expect(_textIn(_searches, '0'), findsOneWidget);
+      expect(_textIn(_watchesRemoved, '3'), findsOneWidget);
+      expect(find.byKey(_searchesRemoved), findsNothing);
+      expect(find.byKey(_historyWarning), findsNothing);
+    });
+
+    testWidgets('a takeout without history lists none', (tester) async {
+      await _pump(tester, _plan());
+
+      expect(find.byKey(_watches), findsNothing);
+      expect(find.byKey(_searches), findsNothing);
+    });
+
+    testWidgets("warns when history couldn't be read", (tester) async {
+      await _pump(
+        tester,
+        _plan(
+          history: HistoryImport(
+            merged: history,
+            unreadableFiles: 1,
+            removalCheckSkipped: true,
+          ),
+        ),
+      );
+
+      expect(find.byKey(_historyWarning), findsOneWidget);
+    });
+
+    testWidgets('warns how many history entries were unreadable', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _plan(
+          history: HistoryImport(
+            merged: history,
+            skippedRows: 5,
+            removalCheckSkipped: true,
+          ),
+        ),
+      );
+
+      expect(_textIn(_historyWarning, '5'), findsOneWidget);
+    });
   });
 }

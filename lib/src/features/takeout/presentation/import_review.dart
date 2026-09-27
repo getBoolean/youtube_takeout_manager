@@ -91,6 +91,30 @@ class ImportReview extends StatelessWidget {
             formatCount(data.liveChats.length, 'live chat'),
           ),
         ],
+        if (plan.history.merged case final history?) ...[
+          _Line(
+            key: const ValueKey('import-watches'),
+            Icons.history,
+            merge
+                ? formatCount(plan.history.newWatchCount, 'new watched video')
+                : formatCount(history.watches.length, 'watched video'),
+          ),
+          _Line(
+            key: const ValueKey('import-searches'),
+            Icons.search,
+            merge
+                ? formatCount(
+                    plan.history.newSearchCount,
+                    'new search',
+                    plural: 'new searches',
+                  )
+                : formatCount(
+                    history.searches.length,
+                    'search',
+                    plural: 'searches',
+                  ),
+          ),
+        ],
         if (plan.newlyDeletedCommentCount > 0 ||
             plan.newlyDeletedLiveChatCount > 0) ...[
           const SizedBox(height: 16),
@@ -111,6 +135,29 @@ class ImportReview extends StatelessWidget {
               '${formatCount(plan.newlyDeletedLiveChatCount, 'live chat')} '
               'will be marked deleted',
               key: 'import-marks-live-chats-deleted',
+            ),
+        ],
+        if (plan.history.newlyRemovedWatchCount > 0 ||
+            plan.history.newlyRemovedSearchCount > 0) ...[
+          const SizedBox(height: 16),
+          Text(
+            'No longer in your YouTube history',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          if (plan.history.newlyRemovedWatchCount > 0)
+            _Line(
+              key: const ValueKey('import-watches-removed'),
+              Icons.history_toggle_off,
+              '${formatCount(plan.history.newlyRemovedWatchCount, 'watched video')} '
+              'will be kept, marked removed',
+            ),
+          if (plan.history.newlyRemovedSearchCount > 0)
+            _Line(
+              key: const ValueKey('import-searches-removed'),
+              Icons.history_toggle_off,
+              '${formatCount(plan.history.newlyRemovedSearchCount, 'search', plural: 'searches')} '
+              'will be kept, marked removed',
             ),
         ],
         for (final (:key, :warning) in _warnings()) ...[
@@ -165,7 +212,26 @@ class ImportReview extends StatelessWidget {
           )
           case final text?)
         (key: 'import-warning-live-chats', warning: text),
+      if (_historyWarning() case final text?)
+        (key: 'import-warning-history', warning: text),
     ];
+  }
+
+  String? _historyWarning() {
+    final history = plan.history;
+    final notMarked = history.removalCheckSkipped
+        ? ", so history missing from this takeout wasn't marked removed"
+        : '';
+    if (history.unreadableFiles > 0) {
+      return "This takeout's history couldn't be read, perhaps because it's "
+          'in another language$notMarked. Export it again with history as '
+          'JSON to add it.';
+    }
+    if (history.skippedRows > 0) {
+      return '${formatCount(history.skippedRows, 'history entry', plural: 'history entries')} '
+          "couldn't be read$notMarked.";
+    }
+    return null;
   }
 }
 
