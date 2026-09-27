@@ -41,6 +41,7 @@ dev_dependencies:
   riverpod_generator: ^4.0.3
   unicode_emojis: ^0.5.1
   analyzer: 9.0.0
+  test: ^1.31.1
 
 flutter:
   uses-material-design: true

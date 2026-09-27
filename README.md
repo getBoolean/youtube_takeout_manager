@@ -117,6 +117,15 @@ On web, match `--web-port` to the port you registered under **Authorized JavaScr
 
 If you skipped OAuth setup, omit `--dart-define-from-file=.env` — the app launches with sign-in disabled.
 
+### Test
+
+```sh
+flutter test                    # everything that runs on the Dart VM
+dart test -p chrome test_browser  # web storage (IndexedDB), in Chrome
+```
+
+The web storage tests use `dart test`, not `flutter test --platform chrome`: the Flutter browser test host crashes before running any test (its page lacks the `#play` element the `test` runner expects).
+
 ### Build a release
 
 ```sh

@@ -4,7 +4,7 @@ library;
 import 'dart:async';
 import 'dart:js_interop';
 
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 import 'package:web/web.dart' as web;
 
 import 'package:youtube_takeout_manager/src/storage/idb_transaction.dart';
@@ -35,11 +35,10 @@ void main() {
   test('fails, not hangs, when the transaction only aborts', () async {
     final db = await _openDb();
     addTearDown(() => db.close());
+    // With no request pending, aborting fires no error event, only abort:
+    // like a commit that fails over the storage quota.
     final txn = db.transaction('s'.toJS, 'readwrite');
-    txn.objectStore('s').put('v'.toJS, 'k'.toJS);
-
     final done = transactionDone(txn, 'save');
-    // Like a commit over the storage quota: no error event, only abort.
     txn.abort();
 
     await expectLater(
