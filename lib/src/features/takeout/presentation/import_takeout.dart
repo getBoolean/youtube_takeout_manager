@@ -39,9 +39,7 @@ class ImportTakeout extends ConsumerWidget {
           ref.watch(deletionProcessingProvider) == DeletionProcessingState.idle,
       idleLabel: idleLabel,
       prominent: prominent,
-      accountNames: {
-        for (final t in saved) t.id: t.main.title ?? t.main.channelId,
-      },
+      accountNames: {for (final t in saved) t.id: t.main.displayName},
       viewedTakeoutId: ref.watch(
         takeoutSelectionProvider.select((s) => s.value?.takeoutId),
       ),

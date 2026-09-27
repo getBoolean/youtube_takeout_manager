@@ -69,4 +69,4 @@ final class AppEffectsProvider extends $FunctionalProvider<void, void, void>
   }
 }
 
-String _$appEffectsHash() => r'40b1cf0547c9317b415a1697a323af4a932c7455';
+String _$appEffectsHash() => r'0066fb2dfdb0ed483b74dc6c129bff2d8fa68d85';

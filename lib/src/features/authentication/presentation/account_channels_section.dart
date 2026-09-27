@@ -123,7 +123,7 @@ class _ChannelRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final name = channel.title ?? channel.channelId;
+    final name = channel.displayName;
     // The tiniest windows need the room for the name.
     final showAvatar = MediaQuery.sizeOf(context).width >= 200;
     final notice = this.notice;

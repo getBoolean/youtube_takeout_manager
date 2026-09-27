@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/takeout_import_service.dart';
+import '../data/takeout_parser.dart';
 import '../data/takeout_repository.dart';
 import '../domain/loaded_takeout.dart';
 import 'takeout_selection_notifier.dart';

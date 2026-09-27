@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import '../data/takeout_account_repository.dart';
 import '../data/takeout_repository.dart';
+import '../domain/takeout_removal.dart';
 import 'saved_takeouts.dart';
 import 'takeout_selection_notifier.dart';
 

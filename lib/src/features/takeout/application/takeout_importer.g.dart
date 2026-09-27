@@ -50,7 +50,7 @@ final class TakeoutImporterProvider
   }
 }
 
-String _$takeoutImporterHash() => r'83028f89c7cc8aedc0313bd99c79f545b318bde7';
+String _$takeoutImporterHash() => r'd510342130448ef28334eb1e8e8e56bd3450612f';
 
 /// Imports takeouts: works out what picked zips would change, then saves
 /// them, marking what they found gone. A service: nothing depends on it, so
@@ -73,53 +73,3 @@ abstract class _$TakeoutImporter extends $Notifier<void> {
     element.handleCreate(ref, build);
   }
 }
-
-/// Fills in the channel of queued deletions saved before it was, each time
-/// a takeout loads. An effect, started with the app.
-
-@ProviderFor(queueChannelAssignment)
-final queueChannelAssignmentProvider = QueueChannelAssignmentProvider._();
-
-/// Fills in the channel of queued deletions saved before it was, each time
-/// a takeout loads. An effect, started with the app.
-
-final class QueueChannelAssignmentProvider
-    extends $FunctionalProvider<void, void, void>
-    with $Provider<void> {
-  /// Fills in the channel of queued deletions saved before it was, each time
-  /// a takeout loads. An effect, started with the app.
-  QueueChannelAssignmentProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'queueChannelAssignmentProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$queueChannelAssignmentHash();
-
-  @$internal
-  @override
-  $ProviderElement<void> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  void create(Ref ref) {
-    return queueChannelAssignment(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(void value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<void>(value),
-    );
-  }
-}
-
-String _$queueChannelAssignmentHash() =>
-    r'67fa1a961e4cf6e30cafa264af5ee23cced4c23b';

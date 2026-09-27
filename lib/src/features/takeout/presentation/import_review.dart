@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
+import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import '../domain/takeout_import_plan.dart';
 
 /// What importing [plan] will change, for looking over before it's saved.
@@ -38,20 +39,20 @@ class ImportReview extends StatelessWidget {
         if (merge) ...[
           _Line(
             Icons.comment_outlined,
-            _count(plan.newCommentCount, 'new comment'),
+            formatCount(plan.newCommentCount, 'new comment'),
           ),
           _Line(
             Icons.chat_bubble_outline,
-            _count(plan.newLiveChatCount, 'new live chat'),
+            formatCount(plan.newLiveChatCount, 'new live chat'),
           ),
         ] else ...[
           _Line(
             Icons.comment_outlined,
-            _count(data.comments.length, 'comment'),
+            formatCount(data.comments.length, 'comment'),
           ),
           _Line(
             Icons.chat_bubble_outline,
-            _count(data.liveChats.length, 'live chat'),
+            formatCount(data.liveChats.length, 'live chat'),
           ),
         ],
         if (plan.newlyDeletedCommentCount > 0 ||
@@ -62,13 +63,13 @@ class ImportReview extends StatelessWidget {
           if (plan.newlyDeletedCommentCount > 0)
             _Line(
               Icons.delete_outline,
-              '${_count(plan.newlyDeletedCommentCount, 'comment')} will '
+              '${formatCount(plan.newlyDeletedCommentCount, 'comment')} will '
               'be marked deleted',
             ),
           if (plan.newlyDeletedLiveChatCount > 0)
             _Line(
               Icons.delete_outline,
-              '${_count(plan.newlyDeletedLiveChatCount, 'live chat')} '
+              '${formatCount(plan.newlyDeletedLiveChatCount, 'live chat')} '
               'will be marked deleted',
             ),
         ],
@@ -92,7 +93,7 @@ class ImportReview extends StatelessWidget {
     ) {
       final items = '${item}s';
       final unreadRows = skippedRows > 0
-          ? "${_count(skippedRows, '$item row')} couldn't be read"
+          ? "${formatCount(skippedRows, '$item row')} couldn't be read"
           : null;
       return switch (reason) {
         DeletionCheckSkipReason.incompleteFiles =>
@@ -121,8 +122,6 @@ class ImportReview extends StatelessWidget {
     ];
   }
 }
-
-String _count(int n, String noun) => '$n ${n == 1 ? noun : '${noun}s'}';
 
 class _Line extends StatelessWidget {
   final IconData icon;

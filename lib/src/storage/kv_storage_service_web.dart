@@ -11,32 +11,8 @@ import 'kv_storage_service.dart';
 class KvStorageServiceImpl implements KvStorageService {
   static const _dbName = 'app_kv_store';
   static const _storeName = 'entries';
-  static const _version = 1;
 
-  Future<web.IDBDatabase> _openDb() {
-    final completer = Completer<web.IDBDatabase>();
-    final request = web.window.self.indexedDB.open(_dbName, _version);
-
-    request.onupgradeneeded = (web.IDBVersionChangeEvent event) {
-      final db =
-          (event.target as web.IDBOpenDBRequest).result as web.IDBDatabase;
-      if (!db.objectStoreNames.contains(_storeName)) {
-        db.createObjectStore(_storeName);
-      }
-    }.toJS;
-
-    request.onsuccess = (web.Event event) {
-      completer.complete(request.result as web.IDBDatabase);
-    }.toJS;
-
-    request.onerror = (web.Event event) {
-      completer.completeError(
-        Exception('Failed to open IndexedDB: ${request.error?.message}'),
-      );
-    }.toJS;
-
-    return completer.future;
-  }
+  Future<web.IDBDatabase> _openDb() => openIdbDatabase(_dbName, _storeName);
 
   Future<String?> _getRaw(web.IDBDatabase db, String key) {
     final txn = db.transaction(_storeName.toJS, 'readonly');

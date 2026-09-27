@@ -53,7 +53,7 @@ class GoogleAccountHeader extends StatelessWidget {
       details = [if (profile.displayName != null) ?profile.email];
       picture = profile.photoUrl;
     } else {
-      name = main!.title ?? main.channelId;
+      name = main!.displayName;
       details = const ['Not signed in with Google'];
       picture = main.thumbnailUrl;
     }

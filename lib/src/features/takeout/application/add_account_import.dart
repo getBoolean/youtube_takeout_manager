@@ -1,8 +1,8 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_import_plan.dart';
+import '../domain/takeout_import_request.dart';
 import 'saved_takeouts.dart';
 import 'takeout_importer.dart';
 import 'takeout_notifier.dart';
@@ -59,7 +59,7 @@ class AddAccountFailed extends AddAccountState {
 @riverpod
 class AddAccountImport extends _$AddAccountImport {
   /// The zips picked, kept in case they're merged into a saved account.
-  FilePickerResult? _picked;
+  List<PickedZip>? _picked;
 
   @override
   AddAccountState build() => const AddAccountIdle();
@@ -68,12 +68,12 @@ class AddAccountImport extends _$AddAccountImport {
   /// skips the review when there's nothing in it to look over. Returns
   /// whether it was saved.
   Future<bool> start() async {
-    // Straight from the click handler: see ZipPickerRepository.pickZips.
-    final picked = await ref.read(zipPickerRepositoryProvider).pickZips();
-    if (!ref.mounted || picked == null || picked.files.isEmpty) return false;
-    _picked = picked;
-    state = const AddAccountWorking();
     try {
+      // Straight from the click handler: see ZipPickerRepository.pickZips.
+      final picked = await ref.read(zipPickerRepositoryProvider).pickZips();
+      if (!ref.mounted || picked == null || picked.isEmpty) return false;
+      _picked = picked;
+      state = const AddAccountWorking();
       final takeouts = ref.read(takeoutImporterProvider.notifier);
       final plan = await takeouts.prepareImport(picked, merge: false);
       if (await takeouts.hasSavedData(plan.accountId)) {

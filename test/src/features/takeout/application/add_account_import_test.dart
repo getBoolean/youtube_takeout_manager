@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,10 +15,9 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeo
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 
-final _picked = FilePickerResult([
-  PlatformFile(name: 'takeout-001.zip', size: 1, bytes: Uint8List(1)),
-]);
+final _picked = [(name: 'takeout-001.zip', bytes: Uint8List(1))];
 
 const _plan = TakeoutImportPlan(
   accountId: 'UCnew',
@@ -28,7 +26,6 @@ const _plan = TakeoutImportPlan(
     liveChats: [],
     subscriptionsByChannelId: {},
   ),
-  csvFiles: {},
   goneCommentIds: {},
   goneLiveChatIds: {},
   newlyDeletedCommentCount: 0,
@@ -45,7 +42,6 @@ const _planWithDeleted = TakeoutImportPlan(
     liveChats: [],
     subscriptionsByChannelId: {},
   ),
-  csvFiles: {},
   goneCommentIds: {'gone'},
   goneLiveChatIds: {},
   newlyDeletedCommentCount: 1,
@@ -78,12 +74,14 @@ class _SavedTakeouts extends SavedTakeouts {
 }
 
 class _Picker implements ZipPickerRepository {
-  final FilePickerResult? result;
+  final List<PickedZip>? result;
+  final Object? error;
 
-  _Picker(this.result);
+  _Picker(this.result, {this.error});
 
   @override
-  Future<FilePickerResult?> pickZips() async => result;
+  Future<List<PickedZip>?> pickZips() async =>
+      error != null ? throw error! : result;
 }
 
 class _Takeout extends TakeoutImporter {
@@ -107,7 +105,7 @@ class _Takeout extends TakeoutImporter {
 
   @override
   Future<TakeoutImportPlan> prepareImport(
-    FilePickerResult picked, {
+    List<PickedZip> zips, {
     required bool merge,
   }) async {
     prepared.add(merge);
@@ -154,7 +152,8 @@ void main() {
   late _Selection selection;
 
   ProviderContainer container({
-    FilePickerResult? picked,
+    List<PickedZip>? picked,
+    Object? pickError,
     Object? importError,
     Set<String> saved = const {},
     Completer<void>? commitGate,
@@ -171,7 +170,9 @@ void main() {
     selection = _Selection(viewing);
     final c = ProviderContainer(
       overrides: [
-        zipPickerRepositoryProvider.overrideWithValue(_Picker(picked)),
+        zipPickerRepositoryProvider.overrideWithValue(
+          _Picker(picked, error: pickError),
+        ),
         takeoutImporterProvider.overrideWith(() => takeout),
         takeoutProvider.overrideWith(_NoTakeout.new),
         takeoutSelectionProvider.overrideWith(() => selection),
@@ -282,6 +283,18 @@ void main() {
     await add.merge();
 
     expect(c.read(addAccountImportProvider), isA<AddAccountFailed>());
+  });
+
+  test("a picked file that can't be read says why", () async {
+    const error = TakeoutImportException('Couldn\'t read "takeout-001.zip".');
+    final c = container(pickError: error);
+
+    await c.read(addAccountImportProvider.notifier).start();
+
+    final state = c.read(addAccountImportProvider);
+    expect(state, isA<AddAccountFailed>());
+    expect((state as AddAccountFailed).error, same(error));
+    expect(takeout.prepared, isEmpty);
   });
 
   test('a takeout that fails to read says why', () async {

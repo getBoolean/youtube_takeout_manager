@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_import_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_parser.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 
 Uint8List _bytes(String s) => Uint8List.fromList(utf8.encode(s));

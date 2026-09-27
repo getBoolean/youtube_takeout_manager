@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,10 +8,15 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 
-/// No takeouts saved, not even from before they were kept per account.
+/// No takeouts saved, except [legacy] from before they were kept per
+/// account.
 class _NoTakeouts implements TakeoutRepository {
+  final Map<String, Uint8List>? legacy;
+
+  _NoTakeouts([this.legacy]);
+
   @override
-  Future<Null> loadLegacyCsvs() async => null;
+  Future<Map<String, Uint8List>?> loadLegacyCsvs() async => legacy;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
@@ -110,5 +117,19 @@ void main() {
 
     expect(c.read(takeoutSelectionProvider).value, isNull);
     expect(await container().read(takeoutSelectionProvider.future), isNull);
+  });
+
+  test('reading it leaves data saved before per-account storage alone, for '
+      'its migration to move', () async {
+    SharedPreferences.setMockInitialValues({});
+    final legacy = {'comments/comments.csv': Uint8List(1)};
+    final c = ProviderContainer(
+      overrides: [
+        takeoutRepositoryProvider.overrideWithValue(_NoTakeouts(legacy)),
+      ],
+    );
+    addTearDown(c.dispose);
+
+    expect(await c.read(takeoutSelectionProvider.future), isNull);
   });
 }

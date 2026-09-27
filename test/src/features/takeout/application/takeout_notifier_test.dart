@@ -1,22 +1,28 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/data/deletion_queue_repository.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
@@ -28,10 +34,16 @@ import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_en
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 
 class _MemoryTakeoutRepository implements TakeoutRepository {
   final accounts = <String, Map<String, Uint8List>>{};
   Map<String, Uint8List>? legacy;
+
+  /// Holds up loading [legacy] until it completes.
+  Completer<void>? legacyGate;
   bool failSaves = false;
   var loads = 0;
 
@@ -65,7 +77,10 @@ class _MemoryTakeoutRepository implements TakeoutRepository {
   Future<void> clearCsvs(String accountId) async => accounts.remove(accountId);
 
   @override
-  Future<Map<String, Uint8List>?> loadLegacyCsvs() async => legacy;
+  Future<Map<String, Uint8List>?> loadLegacyCsvs() async {
+    await legacyGate?.future;
+    return legacy;
+  }
 
   @override
   Future<void> clearLegacyCsvs() async => legacy = null;
@@ -94,7 +109,7 @@ final _savedAbc = TakeoutData(
 );
 
 /// A takeout exported 2026-03-01 where B is gone and D is new.
-FilePickerResult _newerTakeout({String channel = 'UCme'}) {
+List<PickedZip> _newerTakeout({String channel = 'UCme'}) {
   String row(String id, String createdAt) =>
       '$id,$channel,$createdAt,0,,,vid1,"{""text"":""$id""}",';
   final archive = Archive()
@@ -111,14 +126,12 @@ FilePickerResult _newerTakeout({String channel = 'UCme'}) {
         ].join('\r\n'),
       ),
     );
-  final bytes = ZipEncoder().encodeBytes(archive);
-  return FilePickerResult([
-    PlatformFile(
+  return [
+    (
       name: 'takeout-20260301T000000Z-001.zip',
-      size: bytes.length,
-      bytes: bytes,
+      bytes: ZipEncoder().encodeBytes(archive),
     ),
-  ]);
+  ];
 }
 
 DeletionQueueItem _pending(String itemId) => DeletionQueueItem(
@@ -146,6 +159,23 @@ void main() {
     );
     addTearDown(container.dispose);
     return container;
+  }
+
+  /// A container running the app's start-up effects, the ones that don't
+  /// touch takeouts left out.
+  ProviderContainer startedApp() {
+    final c = ProviderContainer(
+      overrides: [
+        takeoutRepositoryProvider.overrideWithValue(repository),
+        legacySignInMigrationProvider.overrideWith((ref) async {}),
+        channelThumbnailFetcherProvider.overrideWith(_Idle.new),
+        videoTitleFetcherProvider.overrideWith((ref) => const Stream.empty()),
+        emojiNameResolverProvider.overrideWith(_IdleEmoji.new),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(appEffectsProvider, (_, _) {});
+    return c;
   }
 
   Future<List<String>> commentIds(ProviderContainer c) async => [
@@ -223,21 +253,6 @@ void main() {
     expect(await queuedItemIds(c), ['B']);
   });
 
-  test('a picked file that could not be read is rejected', () async {
-    final c = container();
-
-    await expectLater(
-      c
-          .read(takeoutImporterProvider.notifier)
-          .prepareImport(
-            FilePickerResult([
-              PlatformFile(name: 'takeout-20260301T000000Z-001.zip', size: 1),
-            ]),
-            merge: true,
-          ),
-      throwsA(isA<TakeoutImportException>()),
-    );
-  });
   test("replacing with another account's takeout saves it separately and "
       'switches to it', () async {
     final c = container();
@@ -257,20 +272,25 @@ void main() {
     expect(await commentIds(container()), ['D', 'C', 'A']);
   });
 
-  test(
-    'data saved before per-account storage moves into its account',
-    () async {
-      SharedPreferences.setMockInitialValues({});
-      repository.accounts.clear();
-      final legacy = encodeTakeoutCsvs(_savedAbc);
-      repository.legacy = legacy;
+  test('data saved before per-account storage moves into its account and is '
+      'selected once the app starts', () async {
+    SharedPreferences.setMockInitialValues({});
+    repository.accounts.clear();
+    final legacy = encodeTakeoutCsvs(_savedAbc);
+    repository.legacy = legacy;
+    final c = startedApp();
 
-      expect(await commentIds(container()), ['A', 'B', 'C']);
-      expect(repository.accounts, {'UCme': legacy});
-      expect(repository.legacy, isNull);
-      expect(await commentIds(container()), ['A', 'B', 'C']);
-    },
-  );
+    await c.read(legacyTakeoutMigrationProvider.future);
+
+    expect(
+      await c.read(takeoutSelectionProvider.future),
+      const TakeoutSelection(takeoutId: 'UCme'),
+    );
+    expect(await commentIds(c), ['A', 'B', 'C']);
+    expect(repository.accounts, {'UCme': legacy});
+    expect(repository.legacy, isNull);
+    expect(await commentIds(container()), ['A', 'B', 'C']);
+  });
 
   test('items found gone stay marked even if saving fails', () async {
     final c = container();
@@ -290,8 +310,43 @@ void main() {
     expect(repository.accounts['UCme'], same(savedFiles));
   });
 
-  test('data saved before per-account storage with an odd channel ID fails '
-      'to load and stays where it is', () async {
+  test('a takeout selected while data saved before per-account storage is '
+      'read stays selected', () async {
+    SharedPreferences.setMockInitialValues({});
+    repository.accounts.clear();
+    final legacy = encodeTakeoutCsvs(_savedAbc);
+    repository.legacy = legacy;
+    final gate = repository.legacyGate = Completer<void>();
+    final c = startedApp();
+    await pumpEventQueue();
+
+    // As importing another takeout does.
+    await c.read(takeoutSelectionProvider.notifier).select('UCother');
+    gate.complete();
+    await c.read(legacyTakeoutMigrationProvider.future);
+
+    expect(
+      c.read(takeoutSelectionProvider).value,
+      const TakeoutSelection(takeoutId: 'UCother'),
+    );
+    expect(repository.accounts, isEmpty);
+    expect(repository.legacy, same(legacy));
+  });
+
+  test('data saved before per-account storage is left alone while a takeout '
+      'is selected', () async {
+    final legacy = encodeTakeoutCsvs(_savedAbc);
+    repository.legacy = legacy;
+    final saved = repository.accounts['UCme'];
+
+    await startedApp().read(legacyTakeoutMigrationProvider.future);
+
+    expect(repository.accounts, {'UCme': same(saved)});
+    expect(repository.legacy, same(legacy));
+  });
+
+  test('data saved before per-account storage with an odd channel ID stays '
+      'where it is, with nothing selected', () async {
     SharedPreferences.setMockInitialValues({});
     repository.accounts.clear();
     final legacy = encodeTakeoutCsvs(
@@ -305,12 +360,15 @@ void main() {
     );
     repository.legacy = legacy;
 
+    final c = startedApp();
+
+    await expectLater(
+      c.read(legacyTakeoutMigrationProvider.future),
+      throwsA(isA<LegacyTakeoutMigrationException>()),
+    );
     // Home then offers to import, rather than showing data tied to no
     // channel.
-    await expectLater(
-      container().read(takeoutSelectionProvider.future),
-      throwsA(isA<TakeoutImportException>()),
-    );
+    expect(await c.read(takeoutSelectionProvider.future), isNull);
     expect(repository.accounts, isEmpty);
     expect(repository.legacy, same(legacy));
   });
@@ -626,4 +684,14 @@ class _SignIns extends SavedSignIns {
   @override
   Future<void> removeAll(Set<String> channelIds) async =>
       removed.addAll(channelIds);
+}
+
+class _Idle extends ChannelThumbnailFetcher {
+  @override
+  void build() {}
+}
+
+class _IdleEmoji extends EmojiNameResolver {
+  @override
+  void build() {}
 }

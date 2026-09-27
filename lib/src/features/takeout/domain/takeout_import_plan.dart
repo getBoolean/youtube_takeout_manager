@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'takeout_channel.dart';
 import 'takeout_data.dart';
 
@@ -28,9 +26,6 @@ class TakeoutImportPlan {
   /// The takeout's channels once imported, main first.
   final List<TakeoutChannel> channels;
 
-  /// [mergedData] encoded for [TakeoutRepository.saveCsvs].
-  final Map<String, Uint8List> csvFiles;
-
   /// IDs no longer on YouTube, including ones already marked deleted.
   final Set<String> goneCommentIds;
   final Set<String> goneLiveChatIds;
@@ -55,7 +50,6 @@ class TakeoutImportPlan {
     required this.accountId,
     required this.mergedData,
     this.channels = const [],
-    required this.csvFiles,
     required this.goneCommentIds,
     required this.goneLiveChatIds,
     required this.newlyDeletedCommentCount,

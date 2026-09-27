@@ -60,6 +60,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_chan
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_removal.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
@@ -211,7 +212,6 @@ final _longPlan = TakeoutImportPlan(
     subscriptionsByChannelId: {},
     skippedCommentRows: 12,
   ),
-  csvFiles: const {},
   goneCommentIds: const {},
   goneLiveChatIds: const {},
   newlyDeletedCommentCount: 0,
@@ -555,7 +555,7 @@ void main() {
           deletionRunning: false,
           onView: (_, _) {},
           planRemoval: (_) async => _removal,
-          onRemove: (_) {},
+          onRemove: (_) async {},
           otherSignIns: const [_longProfile],
           onRemoveSignIn: (_) {},
         ),

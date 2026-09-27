@@ -13,7 +13,7 @@ class AccountButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final channel = ref.watch(viewedChannelProvider);
-    final name = channel?.title ?? channel?.channelId;
+    final name = channel?.displayName;
     return IconButton(
       tooltip: name == null ? 'Account' : 'Account: $name',
       onPressed: () => showTakeoutsDialog(context),

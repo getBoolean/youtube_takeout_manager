@@ -39,6 +39,9 @@ class TakeoutChannel with TakeoutChannelMappable {
     this.liveChatCount = 0,
     this.thumbnailUrl,
   });
+
+  /// Its title, or its ID when the takeout doesn't give one.
+  String get displayName => title ?? channelId;
 }
 
 /// What the takeout switcher shows about a saved takeout, read without
@@ -73,18 +76,7 @@ class TakeoutSummary with TakeoutSummaryMappable {
 List<TakeoutChannel> takeoutChannelsOf(
   TakeoutData data, {
   required String takeoutId,
-}) {
-  final counts = <String, ({int comments, int liveChats})>{};
-  for (final c in data.comments) {
-    final n = counts[c.channelId] ?? _none;
-    counts[c.channelId] = (comments: n.comments + 1, liveChats: n.liveChats);
-  }
-  for (final l in data.liveChats) {
-    final n = counts[l.channelId] ?? _none;
-    counts[l.channelId] = (comments: n.comments, liveChats: n.liveChats + 1);
-  }
-  return takeoutChannelsFrom(takeoutId, data.ownChannels, counts);
-}
+}) => takeoutChannelsFrom(takeoutId, data.ownChannels, data.countsByAuthor);
 
 /// The channel to show from [channels]: [remembered] while it's still there,
 /// otherwise the main channel. Null when there are none.
@@ -108,7 +100,7 @@ TakeoutData onlyChannel(
   required String mainChannelId,
 }) {
   bool keeps(String author) =>
-      author == channelId || (author.isEmpty && channelId == mainChannelId);
+      authorChannelId(author, mainChannelId: mainChannelId) == channelId;
   final comments = [
     for (final c in data.comments)
       if (keeps(c.channelId)) c,
@@ -132,12 +124,12 @@ const _none = (comments: 0, liveChats: 0);
 List<TakeoutChannel> takeoutChannelsFrom(
   String takeoutId,
   Map<String, OwnChannel> own,
-  Map<String, ({int comments, int liveChats})> counts,
+  Map<String, ItemCounts> counts,
 ) {
-  final mainId = own.length == 1 ? own.keys.single : takeoutId;
-  final byChannel = <String, ({int comments, int liveChats})>{};
+  final mainId = listedMainChannelIdOf(own) ?? takeoutId;
+  final byChannel = <String, ItemCounts>{};
   counts.forEach((author, n) {
-    final id = author.isEmpty ? mainId : author;
+    final id = authorChannelId(author, mainChannelId: mainId);
     final sum = byChannel[id] ?? _none;
     byChannel[id] = (
       comments: sum.comments + n.comments,

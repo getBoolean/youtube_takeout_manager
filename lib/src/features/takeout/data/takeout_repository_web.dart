@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -16,32 +15,6 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
   /// Where files were saved before they were kept per account, keyed by path.
   static const _legacyDbName = 'takeout_csvs';
   static const _storeName = 'files';
-  static const _version = 1;
-
-  Future<web.IDBDatabase> _openDb(String name) {
-    final completer = Completer<web.IDBDatabase>();
-    final request = web.window.self.indexedDB.open(name, _version);
-
-    request.onupgradeneeded = (web.IDBVersionChangeEvent event) {
-      final db =
-          (event.target as web.IDBOpenDBRequest).result as web.IDBDatabase;
-      if (!db.objectStoreNames.contains(_storeName)) {
-        db.createObjectStore(_storeName);
-      }
-    }.toJS;
-
-    request.onsuccess = (web.Event event) {
-      completer.complete(request.result as web.IDBDatabase);
-    }.toJS;
-
-    request.onerror = (web.Event event) {
-      completer.completeError(
-        Exception('Failed to open IndexedDB: ${request.error?.message}'),
-      );
-    }.toJS;
-
-    return completer.future;
-  }
 
   /// Keys from `<account ID>/` up to the last possible key with that prefix.
   web.IDBKeyRange _accountRange(String accountId) {
@@ -55,21 +28,14 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     Map<String, Uint8List> csvFiles,
   ) async {
     final range = _accountRange(accountId);
-    final db = await _openDb(_dbName);
-    try {
-      // Clear and write in one transaction, so a failed save keeps the
-      // previous data.
-      final txn = db.transaction(_storeName.toJS, 'readwrite');
-      final store = txn.objectStore(_storeName);
-
+    // Clear and write in one transaction, so a failed save keeps the
+    // previous data.
+    await _withStore(_dbName, 'readwrite', 'save CSVs', (store) {
       store.delete(range);
       for (final entry in csvFiles.entries) {
         store.put(entry.value.toJS, '$accountId/${entry.key}'.toJS);
       }
-      await transactionDone(txn, 'save CSVs');
-    } finally {
-      db.close();
-    }
+    });
   }
 
   @override
@@ -77,123 +43,107 @@ class TakeoutRepositoryImpl implements TakeoutRepository {
     String accountId, {
     bool Function(String path)? only,
   }) async {
-    final range = _accountRange(accountId);
     final prefix = accountId.length + 1;
     final files = await _load(
       _dbName,
-      range: range,
+      range: _accountRange(accountId),
       only: only == null ? null : (key) => only(key.substring(prefix)),
     );
-    return files?.map(
-      (key, bytes) => MapEntry(key.substring(accountId.length + 1), bytes),
-    );
+    return files?.map((key, bytes) => MapEntry(key.substring(prefix), bytes));
   }
 
   @override
   Future<List<String>> listAccountIds() async {
-    final db = await _openDb(_dbName);
-    try {
-      final store = db
-          .transaction(_storeName.toJS, 'readonly')
-          .objectStore(_storeName);
-      final keys = await _keys(store);
-      return {
-        for (final key in keys)
-          if (key.indexOf('/') case final slash when slash > 0)
-            key.substring(0, slash),
-      }.where(isChannelId).toList();
-    } finally {
-      db.close();
-    }
+    final keys = <String>[];
+    await _withStore(_dbName, 'readonly', 'list takeouts', (store) {
+      _getKeys(store, null, keys.addAll);
+    });
+    return {
+      for (final key in keys)
+        if (key.indexOf('/') case final slash when slash > 0)
+          key.substring(0, slash),
+    }.where(isChannelId).toList();
   }
 
   @override
   Future<void> clearCsvs(String accountId) async {
     final range = _accountRange(accountId);
-    final db = await _openDb(_dbName);
-    try {
-      final txn = db.transaction(_storeName.toJS, 'readwrite');
-      txn.objectStore(_storeName).delete(range);
-      await transactionDone(txn, 'clear CSVs');
-    } finally {
-      db.close();
-    }
+    await _withStore(
+      _dbName,
+      'readwrite',
+      'clear CSVs',
+      (store) => store.delete(range),
+    );
   }
 
   @override
   Future<Map<String, Uint8List>?> loadLegacyCsvs() => _load(_legacyDbName);
 
   @override
-  Future<void> clearLegacyCsvs() async {
-    final db = await _openDb(_legacyDbName);
-    try {
-      final txn = db.transaction(_storeName.toJS, 'readwrite');
-      txn.objectStore(_storeName).clear();
-      await transactionDone(txn, 'clear legacy CSVs');
-    } finally {
-      db.close();
-    }
-  }
+  Future<void> clearLegacyCsvs() => _withStore(
+    _legacyDbName,
+    'readwrite',
+    'clear legacy CSVs',
+    (store) => store.clear(),
+  );
 
   /// Loads every file in [dbName] whose key is in [range] (or all files if
-  /// it's null) and that [only] accepts. Returns null if there are none.
+  /// it's null) and that [only] accepts, in one transaction. Returns null if
+  /// there are none.
   Future<Map<String, Uint8List>?> _load(
     String dbName, {
     web.IDBKeyRange? range,
     bool Function(String key)? only,
   }) async {
-    final db = await _openDb(dbName);
+    final files = <String, Uint8List>{};
+    await _withStore(dbName, 'readonly', 'load CSVs', (store) {
+      _getKeys(store, range, (keys) {
+        for (final key in keys) {
+          if (only != null && !only(key)) continue;
+          final request = store.get(key.toJS);
+          request.onsuccess = (web.Event _) {
+            files[key] = (request.result as JSUint8Array).toDart;
+          }.toJS;
+        }
+      });
+    });
+    return files.isEmpty ? null : files;
+  }
+
+  /// Opens [dbName], makes requests with [start] in one [mode] transaction on
+  /// its store, and completes when that commits. Fails, saying it couldn't
+  /// [action], if any request does.
+  ///
+  /// Requests must all be made in [start] or in their callbacks: a
+  /// transaction commits once it has none left, so one made after an await
+  /// would find it gone.
+  Future<void> _withStore(
+    String dbName,
+    String mode,
+    String action,
+    void Function(web.IDBObjectStore store) start,
+  ) async {
+    final db = await openIdbDatabase(dbName, _storeName);
     try {
-      final txn = db.transaction(_storeName.toJS, 'readonly');
-      final store = txn.objectStore(_storeName);
-      final keys = [
-        for (final key in await _keys(store, range))
-          if (only == null || only(key)) key,
-      ];
-      if (keys.isEmpty) return null;
-
-      // Get all values
-      final result = <String, Uint8List>{};
-      for (final key in keys) {
-        final getCompleter = Completer<Uint8List>();
-        final txn2 = db.transaction(_storeName.toJS, 'readonly');
-        final store2 = txn2.objectStore(_storeName);
-        final getRequest = store2.get(key.toJS);
-        getRequest.onsuccess = (web.Event _) {
-          final jsBuffer = getRequest.result as JSUint8Array;
-          getCompleter.complete(jsBuffer.toDart);
-        }.toJS;
-        getRequest.onerror = (web.Event _) {
-          getCompleter.completeError(Exception('Failed to get value for $key'));
-        }.toJS;
-        result[key] = await getCompleter.future;
-      }
-
-      return result;
+      final txn = db.transaction(_storeName.toJS, mode);
+      start(txn.objectStore(_storeName));
+      await transactionDone(txn, action);
     } finally {
       db.close();
     }
   }
 
-  /// Every key in [store] within [range], or all of them if it's null.
-  Future<List<String>> _keys(
-    web.IDBObjectStore store, [
+  /// Asks [store] for its keys within [range], or all of them if it's null,
+  /// and passes them to [onKeys].
+  void _getKeys(
+    web.IDBObjectStore store,
     web.IDBKeyRange? range,
-  ]) {
-    final completer = Completer<List<String>>();
+    void Function(List<String> keys) onKeys,
+  ) {
     final request = store.getAllKeys(range);
     request.onsuccess = (web.Event _) {
-      final jsArray = request.result as JSArray;
-      completer.complete([
-        for (var i = 0; i < jsArray.length; i++)
-          (jsArray[i] as JSString).toDart,
-      ]);
+      final keys = request.result as JSArray<JSString>;
+      onKeys([for (final key in keys.toDart) key.toDart]);
     }.toJS;
-    request.onerror = (web.Event _) {
-      completer.completeError(
-        Exception('Failed to get keys: ${request.error?.message}'),
-      );
-    }.toJS;
-    return completer.future;
   }
 }

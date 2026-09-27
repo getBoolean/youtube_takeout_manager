@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
@@ -84,11 +85,19 @@ class ChannelListScreen extends ConsumerWidget {
         TakeoutLoadFailed(error: takeoutAsync.error!),
       );
     }
+    final queue = DeletionQueueHost.of(context);
     if (takeoutAsync.hasValue && takeoutAsync.value == null) {
+      // Data saved before takeouts were kept per account may be moving
+      // into one. Only while nothing is selected: its failure stays, and an
+      // import replaces that data.
+      final migration = ref.watch(legacyTakeoutMigrationProvider);
+      if (migration.hasError) {
+        return _buildWithoutTakeout(TakeoutLoadFailed(error: migration.error!));
+      }
+      if (migration.isLoading) return queue.wrap(const _LoadingSkeleton());
       return _buildWithoutTakeout(const TakeoutImportPrompt());
     }
 
-    final queue = DeletionQueueHost.of(context);
     if (isLoading) {
       return queue.wrap(const _LoadingSkeleton());
     }

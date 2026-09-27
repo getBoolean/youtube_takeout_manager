@@ -6,8 +6,8 @@ import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
-import '../application/saved_takeouts.dart';
 import '../domain/takeout_channel.dart';
+import '../domain/takeout_removal.dart';
 import 'takeout_details.dart';
 
 /// A saved takeout other than the one viewed, with the sign-in naming its
@@ -36,7 +36,7 @@ class OtherAccountsSection extends StatelessWidget {
 
   /// Works out what removing a takeout removes, to confirm first.
   final Future<TakeoutRemoval> Function(String takeoutId) planRemoval;
-  final ValueChanged<TakeoutRemoval> onRemove;
+  final Future<void> Function(TakeoutRemoval removal) onRemove;
 
   final List<SignInProfile> otherSignIns;
   final ValueChanged<String> onRemoveSignIn;
@@ -135,14 +135,12 @@ class OtherAccountsSection extends StatelessWidget {
   }
 }
 
-String _nameOf(TakeoutSummary summary) =>
-    summary.main.title ?? summary.main.channelId;
-
 /// Shows [builder]'s button until it's pressed, then asks in place whether
-/// to remove the takeout, saying what goes with it.
+/// to remove the takeout, saying what goes with it. Says in place, too, if
+/// that fails.
 class _Removable extends StatefulWidget {
   final Future<TakeoutRemoval> Function() planRemoval;
-  final ValueChanged<TakeoutRemoval> onRemove;
+  final Future<void> Function(TakeoutRemoval removal) onRemove;
   final Widget Function(VoidCallback? remove) builder;
 
   const _Removable({
@@ -158,32 +156,62 @@ class _Removable extends StatefulWidget {
 
 class _RemovableState extends State<_Removable> {
   TakeoutRemoval? _removal;
-  var _planning = false;
+  Object? _error;
+  var _busy = false;
 
-  Future<void> _plan() async {
-    setState(() => _planning = true);
+  Future<void> _plan() => _run(() async {
+    final removal = await widget.planRemoval();
+    if (mounted) setState(() => _removal = removal);
+  });
+
+  Future<void> _remove(TakeoutRemoval removal) {
+    setState(() => _removal = null);
+    return _run(() => widget.onRemove(removal));
+  }
+
+  Future<void> _run(Future<void> Function() step) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
-      final removal = await widget.planRemoval();
-      if (mounted) setState(() => _removal = removal);
+      await step();
+    } catch (e) {
+      if (mounted) setState(() => _error = e);
     } finally {
-      if (mounted) setState(() => _planning = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final removal = _removal;
-    if (removal == null) return widget.builder(_planning ? null : _plan);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: RemoveTakeoutConfirmation(
-        removal: removal,
-        onCancel: () => setState(() => _removal = null),
-        onConfirm: () {
-          setState(() => _removal = null);
-          widget.onRemove(removal);
-        },
-      ),
+    if (removal != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: RemoveTakeoutConfirmation(
+          removal: removal,
+          onCancel: () => setState(() => _removal = null),
+          onConfirm: () => _remove(removal),
+        ),
+      );
+    }
+    final button = widget.builder(_busy ? null : _plan);
+    final error = _error;
+    if (error == null) return button;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        button,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: NoticeBanner(
+            title: "Couldn't remove the takeout",
+            onDismiss: () => setState(() => _error = null),
+            children: [Text('$error')],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -193,7 +221,7 @@ class _OtherAccountRow extends StatefulWidget {
   final bool deletionRunning;
   final ValueChanged<String> onView;
   final Future<TakeoutRemoval> Function() planRemoval;
-  final ValueChanged<TakeoutRemoval> onRemove;
+  final Future<void> Function(TakeoutRemoval removal) onRemove;
 
   const _OtherAccountRow({
     super.key,
@@ -216,13 +244,14 @@ class _OtherAccountRowState extends State<_OtherAccountRow> {
     final theme = Theme.of(context);
     final summary = widget.account.summary;
     final profile = widget.account.profile;
-    final name = profile?.displayName ?? profile?.email ?? _nameOf(summary);
+    final name =
+        profile?.displayName ?? profile?.email ?? summary.main.displayName;
     final email = profile?.displayName != null ? profile?.email : null;
     final details = describeTakeout(summary);
     final secondary = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
-    final showAvatar = MediaQuery.sizeOf(context).width >= 200;
+    final showAvatar = !isTinyWidth(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -301,14 +330,14 @@ class _ChannelChoice extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final name = channel.title ?? channel.channelId;
+    final name = channel.displayName;
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(8),
         child: Row(
           children: [
-            if (MediaQuery.sizeOf(context).width >= 200) ...[
+            if (!isTinyWidth(context)) ...[
               ChannelAvatar(
                 name: name,
                 thumbnailUrl: channel.thumbnailUrl,
@@ -355,7 +384,7 @@ class RemoveTakeoutConfirmation extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return NoticeBanner(
-      title: "Remove ${_nameOf(removal.summary)}'s takeout?",
+      title: "Remove ${removal.summary.main.displayName}'s takeout?",
       actions: [
         TextButton(
           onPressed: onCancel,

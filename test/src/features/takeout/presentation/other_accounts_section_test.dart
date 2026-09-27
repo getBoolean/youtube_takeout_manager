@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_removal.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 
 TakeoutSummary _summary(
@@ -49,6 +49,8 @@ void main() {
     WidgetTester tester, {
     bool deletionRunning = false,
     List<SignInProfile> otherSignIns = const [],
+    Object? planError,
+    Object? removeError,
   }) {
     viewed = [];
     removed = [];
@@ -75,13 +77,18 @@ void main() {
               deletionRunning: deletionRunning,
               onView: (takeoutId, channelId) =>
                   viewed.add((takeoutId, channelId)),
-              planRemoval: (id) async => TakeoutRemoval(
-                summary: id == 'UCwork' ? _work : _boolean,
-                orphanedChannelIds: {id},
-                queuedCount: 3,
-                signInIds: {id},
-              ),
-              onRemove: (removal) => removed.add(removal.summary.id),
+              planRemoval: (id) async => planError != null
+                  ? throw planError
+                  : TakeoutRemoval(
+                      summary: id == 'UCwork' ? _work : _boolean,
+                      orphanedChannelIds: {id},
+                      queuedCount: 3,
+                      signInIds: {id},
+                    ),
+              onRemove: (removal) async {
+                if (removeError != null) throw removeError;
+                removed.add(removal.summary.id);
+              },
               otherSignIns: otherSignIns,
               onRemoveSignIn: removedSignIns.add,
             ),
@@ -207,5 +214,36 @@ void main() {
 
     await tester.tap(find.widgetWithText(TextButton, 'Remove sign-in'));
     expect(removedSignIns, ['UCelsewhere']);
+  });
+
+  testWidgets("says in place when what removing takes can't be worked out", (
+    tester,
+  ) async {
+    await pump(tester, planError: Exception('Storage unavailable'));
+
+    await tester.tap(find.widgetWithText(TextButton, 'Remove takeout'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text("Couldn't remove the takeout"), findsOneWidget);
+    expect(find.textContaining('Storage unavailable'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pumpAndSettle();
+    expect(find.text("Couldn't remove the takeout"), findsNothing);
+    expect(find.widgetWithText(TextButton, 'Remove takeout'), findsOneWidget);
+  });
+
+  testWidgets('says in place when removing fails', (tester) async {
+    await pump(tester, removeError: Exception('Disk full'));
+
+    await tester.tap(find.text('Remove this takeout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Remove takeout'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsNothing);
+    expect(find.text("Couldn't remove the takeout"), findsOneWidget);
+    expect(find.textContaining('Disk full'), findsOneWidget);
   });
 }

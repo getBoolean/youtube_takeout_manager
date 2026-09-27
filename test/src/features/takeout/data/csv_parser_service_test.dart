@@ -4,6 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/csv_parser_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 
 Uint8List _toBytes(String s) => Uint8List.fromList(utf8.encode(s));
@@ -267,6 +270,84 @@ void main() {
       final result = parser.parseCommentsCsv(_toBytes(csv));
       expect(result.items.map((c) => c.commentId), ['cid2']);
       expect(result.skippedRowCount, 1);
+    });
+  });
+
+  group('parseSubscriptionsCsv', () {
+    test("reads Google's subscriptions.csv", () {
+      const csv =
+          'Channel Id,Channel Url,Channel Title\r\n'
+          'UC1,http://www.youtube.com/channel/UC1,"First, too"\r\n'
+          'UC2,http://www.youtube.com/channel/UC2,Second\r\n';
+
+      final subs = parser.parseSubscriptionsCsv(_toBytes(csv));
+
+      expect(subs.map((s) => (s.channelId, s.channelUrl, s.channelTitle)), [
+        ('UC1', 'http://www.youtube.com/channel/UC1', 'First, too'),
+        ('UC2', 'http://www.youtube.com/channel/UC2', 'Second'),
+      ]);
+    });
+
+    test('reads the copy the app saved', () {
+      const sub = Subscription(
+        channelId: 'UC1',
+        channelUrl: 'http://www.youtube.com/channel/UC1',
+        channelTitle: 'First',
+      );
+      final saved = encodeTakeoutCsvs(
+        const TakeoutData(
+          comments: [],
+          liveChats: [],
+          subscriptionsByChannelId: {'UC1': sub},
+        ),
+      );
+      final bytes = saved.entries
+          .singleWhere((e) => e.key.endsWith('subscriptions.csv'))
+          .value;
+
+      expect(parser.parseSubscriptionsCsv(bytes), [sub]);
+    });
+
+    test('reads columns it can name by name, leaving the rest empty', () {
+      const csv =
+          'Channel Title,Channel Id,Kanal-URL\r\n'
+          'First,UC1,http://www.youtube.com/channel/UC1\r\n';
+
+      expect(parser.parseSubscriptionsCsv(_toBytes(csv)), [
+        const Subscription(
+          channelId: 'UC1',
+          channelUrl: '',
+          channelTitle: 'First',
+        ),
+      ]);
+    });
+
+    test("reads columns in Google's order when it can name none", () {
+      const csv =
+          'Kanal-ID,Kanal-URL,Kanaltitel\r\n'
+          'UC1,http://www.youtube.com/channel/UC1,First\r\n';
+
+      expect(parser.parseSubscriptionsCsv(_toBytes(csv)), [
+        const Subscription(
+          channelId: 'UC1',
+          channelUrl: 'http://www.youtube.com/channel/UC1',
+          channelTitle: 'First',
+        ),
+      ]);
+    });
+
+    test('reads columns by their names', () {
+      const csv =
+          'Channel Title,Channel Id,Channel Url\r\n'
+          'First,UC1,http://www.youtube.com/channel/UC1\r\n';
+
+      expect(parser.parseSubscriptionsCsv(_toBytes(csv)), [
+        const Subscription(
+          channelId: 'UC1',
+          channelUrl: 'http://www.youtube.com/channel/UC1',
+          channelTitle: 'First',
+        ),
+      ]);
     });
   });
 }

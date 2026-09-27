@@ -11,8 +11,8 @@ part of 'takeout_selection_notifier.dart';
 /// The saved takeout being shown and the channel chosen in it. Each change
 /// shows at once and is saved in the order made, so what's saved always
 /// matches the last change.
-// A failure is deterministic (legacy data no channel wrote), and retrying
-// would parse that data again each time.
+// A failure shows at once: storage that can't read the selection won't on a
+// retry either.
 
 @ProviderFor(TakeoutSelectionNotifier)
 final takeoutSelectionProvider = TakeoutSelectionNotifierProvider._();
@@ -20,16 +20,16 @@ final takeoutSelectionProvider = TakeoutSelectionNotifierProvider._();
 /// The saved takeout being shown and the channel chosen in it. Each change
 /// shows at once and is saved in the order made, so what's saved always
 /// matches the last change.
-// A failure is deterministic (legacy data no channel wrote), and retrying
-// would parse that data again each time.
+// A failure shows at once: storage that can't read the selection won't on a
+// retry either.
 final class TakeoutSelectionNotifierProvider
     extends
         $AsyncNotifierProvider<TakeoutSelectionNotifier, TakeoutSelection?> {
   /// The saved takeout being shown and the channel chosen in it. Each change
   /// shows at once and is saved in the order made, so what's saved always
   /// matches the last change.
-  // A failure is deterministic (legacy data no channel wrote), and retrying
-  // would parse that data again each time.
+  // A failure shows at once: storage that can't read the selection won't on a
+  // retry either.
   TakeoutSelectionNotifierProvider._()
     : super(
         from: null,
@@ -50,13 +50,13 @@ final class TakeoutSelectionNotifierProvider
 }
 
 String _$takeoutSelectionNotifierHash() =>
-    r'7b73db6d26b62d658b08051dfff5f69cc86cb125';
+    r'f8d6a8639be9eb1cdd892b5cedade2eb04447351';
 
 /// The saved takeout being shown and the channel chosen in it. Each change
 /// shows at once and is saved in the order made, so what's saved always
 /// matches the last change.
-// A failure is deterministic (legacy data no channel wrote), and retrying
-// would parse that data again each time.
+// A failure shows at once: storage that can't read the selection won't on a
+// retry either.
 
 abstract class _$TakeoutSelectionNotifier
     extends $AsyncNotifier<TakeoutSelection?> {

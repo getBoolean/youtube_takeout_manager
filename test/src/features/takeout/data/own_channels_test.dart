@@ -5,7 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_import_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_parser.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_extraction_service.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 

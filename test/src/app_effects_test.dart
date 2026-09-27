@@ -5,13 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 
 class _Thumbnails extends ChannelThumbnailFetcher {
@@ -60,6 +61,9 @@ void main() {
         legacySignInMigrationProvider.overrideWith(
           (ref) async => started.add('legacy sign-in'),
         ),
+        legacyTakeoutMigrationProvider.overrideWith(
+          (ref) async => started.add('legacy takeouts'),
+        ),
         channelThumbnailFetcherProvider.overrideWith(
           () => _Thumbnails(started),
         ),
@@ -79,6 +83,7 @@ void main() {
 
     expect(started, {
       'legacy sign-in',
+      'legacy takeouts',
       'thumbnails',
       'video titles',
       'emoji names',

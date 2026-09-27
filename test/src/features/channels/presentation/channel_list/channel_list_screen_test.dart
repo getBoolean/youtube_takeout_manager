@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,8 +9,10 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/skeleton.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
@@ -20,6 +22,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeo
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
@@ -41,7 +44,6 @@ const _data = TakeoutData(
 TakeoutImportPlan _plan({int newlyDeletedComments = 0}) => TakeoutImportPlan(
   accountId: 'UCme',
   mergedData: _data,
-  csvFiles: const {},
   goneCommentIds: const {},
   goneLiveChatIds: const {},
   newlyDeletedCommentCount: newlyDeletedComments,
@@ -52,9 +54,9 @@ TakeoutImportPlan _plan({int newlyDeletedComments = 0}) => TakeoutImportPlan(
 
 class _Picker implements ZipPickerRepository {
   @override
-  Future<FilePickerResult?> pickZips() async => FilePickerResult([
-    PlatformFile(name: 'takeout-001.zip', size: 1, bytes: Uint8List(1)),
-  ]);
+  Future<List<PickedZip>?> pickZips() async => [
+    (name: 'takeout-001.zip', bytes: Uint8List(1)),
+  ];
 }
 
 /// Nothing saved until a takeout is imported.
@@ -75,7 +77,7 @@ class _Takeout extends TakeoutImporter {
 
   @override
   Future<TakeoutImportPlan> prepareImport(
-    FilePickerResult picked, {
+    List<PickedZip> zips, {
     required bool merge,
   }) async => plan;
 
@@ -126,6 +128,7 @@ void main() {
     WidgetTester tester, {
     TakeoutImportPlan? plan,
     TakeoutNotifier Function()? notifier,
+    Future<void> Function(Ref ref)? migration,
   }) async {
     tester.view.physicalSize = const Size(800, 900);
     tester.view.devicePixelRatio = 1;
@@ -136,6 +139,9 @@ void main() {
         overrides: [
           ...fixture.fixtureOverrides(),
           takeoutProvider.overrideWith(notifier ?? _NoTakeout.new),
+          legacyTakeoutMigrationProvider.overrideWith(
+            migration ?? (ref) async {},
+          ),
           takeoutImporterProvider.overrideWith(() => takeout),
           savedTakeoutsProvider.overrideWith(_Saved.new),
           takeoutSelectionProvider.overrideWith(_Selection.new),
@@ -206,5 +212,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TakeoutsDialog), findsOneWidget);
+  });
+
+  testWidgets('shows the list loading, not an import prompt, while data saved '
+      'before per-account storage moves', (tester) async {
+    final moving = Completer<void>();
+    await pumpScreen(tester, migration: (ref) => moving.future);
+
+    expect(find.text('Import your Google Takeout data'), findsNothing);
+    expect(find.byType(SkeletonAvatar), findsWidgets);
+
+    moving.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Import your Google Takeout data'), findsOneWidget);
+  });
+
+  testWidgets("data saved before per-account storage that can't be moved "
+      'says why', (tester) async {
+    await pumpScreen(
+      tester,
+      migration: (ref) async => throw const LegacyTakeoutMigrationException(
+        "Your saved data couldn't be matched to a YouTube channel (NUL). "
+        'Import your takeout again.',
+      ),
+    );
+
+    expect(find.text('Failed to load saved data'), findsOneWidget);
+    expect(
+      find.textContaining("couldn't be matched to a YouTube channel"),
+      findsOneWidget,
+    );
+    expect(find.text('Import your Google Takeout data'), findsNothing);
+  });
+
+  testWidgets('after data that failed to move, an imported takeout shows', (
+    tester,
+  ) async {
+    await pumpScreen(
+      tester,
+      migration: (ref) async =>
+          throw const LegacyTakeoutMigrationException('No channel.'),
+    );
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Import a takeout'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(CloseButton));
+    await tester.pumpAndSettle();
+
+    expect(takeout.committed, hasLength(1));
+    expect(find.text('Failed to load saved data'), findsNothing);
+    expect(find.text('A channel I commented on'), findsOneWidget);
   });
 }

@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +29,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeo
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
@@ -77,9 +77,7 @@ final _workSummary = TakeoutSummary(
   countsKnown: true,
 );
 
-final _picked = FilePickerResult([
-  PlatformFile(name: 'takeout-001.zip', size: 1, bytes: Uint8List(1)),
-]);
+final _picked = [(name: 'takeout-001.zip', bytes: Uint8List(1))];
 
 TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
   accountId: accountId,
@@ -96,7 +94,6 @@ TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
     liveChats: [],
     subscriptionsByChannelId: {},
   ),
-  csvFiles: const {},
   goneCommentIds: const {},
   goneLiveChatIds: const {},
   newlyDeletedCommentCount: 0,
@@ -184,7 +181,7 @@ class _Takeout extends TakeoutImporter {
 
   @override
   Future<TakeoutImportPlan> prepareImport(
-    FilePickerResult picked, {
+    List<PickedZip> zips, {
     required bool merge,
   }) async => _planFor(saved.isEmpty ? 'UCnew' : saved.first);
 
@@ -199,7 +196,7 @@ class _Takeout extends TakeoutImporter {
 
 class _Picker implements ZipPickerRepository {
   @override
-  Future<FilePickerResult?> pickZips() async => _picked;
+  Future<List<PickedZip>?> pickZips() async => _picked;
 }
 
 class _Processing extends DeletionProcessing {

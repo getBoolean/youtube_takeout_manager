@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 
+import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import '../domain/takeout_channel.dart';
 
 /// A channel's comment and live chat counts, e.g. "1,234 comments · 5 live
@@ -22,18 +23,7 @@ String describeTakeout(TakeoutSummary summary) {
   ].join(' · ');
 }
 
-String _describeCounts(int comments, int liveChats) {
-  final number = NumberFormat.decimalPattern();
-  return [
-    Intl.plural(
-      comments,
-      one: '1 comment',
-      other: '${number.format(comments)} comments',
-    ),
-    Intl.plural(
-      liveChats,
-      one: '1 live chat',
-      other: '${number.format(liveChats)} live chats',
-    ),
-  ].join(' · ');
-}
+String _describeCounts(int comments, int liveChats) => [
+  formatCount(comments, 'comment'),
+  formatCount(liveChats, 'live chat'),
+].join(' · ');

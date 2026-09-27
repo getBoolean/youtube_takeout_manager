@@ -1,57 +1,35 @@
-import 'dart:typed_data';
-
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import '../domain/channel_id.dart';
-import '../domain/own_channel.dart';
-import '../domain/takeout_channel.dart';
-import '../domain/subscription.dart';
-import '../domain/takeout_data.dart';
-import '../domain/takeout_import_plan.dart';
-import 'takeout_csv_encoder.dart';
-import 'takeout_import_service.dart';
-import 'zip_extraction_service.dart';
-
-typedef PickedZip = ({String name, Uint8List bytes});
-
-typedef TakeoutImportRequest = ({
-  List<PickedZip> zips,
-  TakeoutData? saved,
-
-  /// Whether to add the zips to [saved] instead of replacing it.
-  bool merge,
-
-  Set<String> deletedCommentIds,
-  Set<String> deletedLiveChatIds,
-
-  /// Each saved takeout's channels, by the ID it's saved under. An import
-  /// goes into the one it shares a channel with.
-  Map<String, Set<String>> savedChannelSets,
-
-  /// The takeout selected when the import started.
-  String? activeTakeoutId,
-});
-
-/// The export time Google puts in takeout zip names, e.g.
-/// `takeout-20260412T074021Z-3-001.zip`.
-final _exportTime = RegExp(r'takeout-(\d{8}t\d{6}z)', caseSensitive: false);
+import 'channel_id.dart';
+import 'own_channel.dart';
+import 'subscription.dart';
+import 'takeout_channel.dart';
+import 'takeout_data.dart';
+import 'takeout_export.dart';
+import 'takeout_import_plan.dart';
+import 'takeout_import_request.dart';
 
 final _epoch = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 
-/// Top-level function for `compute` — reads the picked zips, merges them
-/// with the saved data and works out which items are no longer on YouTube.
+/// Merges [exports], the picked takeouts read, with the saved data and works
+/// out which items are no longer on YouTube.
 ///
 /// For each kind, the account's items missing from the newest source of
 /// that kind are gone, unless they were created after that source was
-/// exported. Throws a [TakeoutImportException] when the zips can't be
-/// imported safely.
-TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
-  final saved = request.saved;
-  final base = request.merge ? saved : null;
-  final exports = _readExports(request.zips);
-  final accountId = _resolveTakeout(exports, request);
+/// exported. Throws a [TakeoutImportException] when they can't be imported
+/// safely.
+TakeoutImportPlan planTakeoutImport(
+  List<TakeoutExport> exports,
+  TakeoutImportContext context,
+) {
+  if (exports.isEmpty) {
+    throw ArgumentError.value(exports, 'exports', 'No takeouts to import');
+  }
+  final base = context.merge ? context.saved : null;
+  final picked = [for (final e in exports) _Source.export(e)];
+  final accountId = _resolveTakeout(picked, context);
 
-  final sources = [if (base != null) _Source.saved(base), ...exports]
+  final sources = [if (base != null) _Source.saved(base), ...picked]
     ..sort((a, b) => _compareSnapshots(a.snapshot, a, b.snapshot, b));
 
   final comments = <String, Comment>{};
@@ -73,10 +51,13 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
   final newestLiveChats = _newestWith(sources, (s) => s.liveChats);
   // Only channels in the newest source can have items found gone: a channel
   // moved to another account isn't in newer takeouts, but its items aren't
-  // gone. Rows without a Channel ID are the takeout's own.
+  // gone. Rows without a Channel ID count as the channel the takeout is
+  // saved under, even when its channel.csv names another main channel.
   bool inSource(_Newest? newest, String author) =>
       newest != null &&
-      newest.channels.contains(author.isEmpty ? accountId : author);
+      newest.channels.contains(
+        authorChannelId(author, mainChannelId: accountId),
+      );
   final goneComments = _findGone(newestComments, {
     for (final c in comments.values)
       if (inSource(newestComments, c.channelId)) c.commentId: c.createdAt,
@@ -92,8 +73,8 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
     liveChats: liveChats.values.toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
     subscriptionsByChannelId: subscriptions,
-    skippedCommentRows: _sum(exports, (e) => e.data.skippedCommentRows),
-    skippedLiveChatRows: _sum(exports, (e) => e.data.skippedLiveChatRows),
+    skippedCommentRows: _sum(picked, (e) => e.data.skippedCommentRows),
+    skippedLiveChatRows: _sum(picked, (e) => e.data.skippedLiveChatRows),
     latestExportAt: sources.last.snapshot,
     commentsSnapshot: newestComments?.snapshot,
     liveChatsSnapshot: newestLiveChats?.snapshot,
@@ -106,14 +87,13 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
     accountId: accountId,
     mergedData: mergedData,
     channels: takeoutChannelsOf(mergedData, takeoutId: accountId),
-    csvFiles: encodeTakeoutCsvs(mergedData),
     goneCommentIds: goneComments.ids,
     goneLiveChatIds: goneLiveChats.ids,
     newlyDeletedCommentCount: goneComments.ids
-        .difference(request.deletedCommentIds)
+        .difference(context.deletedCommentIds)
         .length,
     newlyDeletedLiveChatCount: goneLiveChats.ids
-        .difference(request.deletedLiveChatIds)
+        .difference(context.deletedLiveChatIds)
         .length,
     newCommentCount: comments.keys
         .where((id) => !baseCommentIds.contains(id))
@@ -123,22 +103,8 @@ TakeoutImportPlan planTakeoutImport(TakeoutImportRequest request) {
         .length,
     commentCheckSkipped: goneComments.skipped,
     liveChatCheckSkipped: goneLiveChats.skipped,
-    baseTakeoutId: request.activeTakeoutId,
+    baseTakeoutId: context.activeTakeoutId,
   );
-}
-
-/// The channel that wrote most of [data]'s comments and live chats, or null
-/// if it has none.
-String? mostCommonAuthorChannelId(TakeoutData data) {
-  final counts = <String, int>{};
-  for (final id in [
-    for (final c in data.comments) c.channelId,
-    for (final l in data.liveChats) l.channelId,
-  ]) {
-    if (id.isNotEmpty) counts[id] = (counts[id] ?? 0) + 1;
-  }
-  if (counts.isEmpty) return null;
-  return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
 }
 
 /// Orders sources by the time of their data. On a tie the export is the
@@ -160,13 +126,13 @@ class _Source {
   /// The channels it has: listed in its channel.csv, or writing its items.
   Set<String> get channels => {
     ...data.ownChannels.keys,
-    ..._authorChannelIds(data),
+    ...data.authorChannelIds,
   };
   final _Kind comments;
   final _Kind liveChats;
 
   factory _Source.saved(TakeoutData data) {
-    final snapshot = data.latestExportAt ?? _newestItem(data) ?? _epoch;
+    final snapshot = data.latestExportAt ?? data.newestItemAt ?? _epoch;
     return _Source._(
       data: data,
       snapshot: snapshot,
@@ -184,28 +150,24 @@ class _Source {
     );
   }
 
-  factory _Source.export({
-    required DateTime? exportedAt,
-    required ({TakeoutData data, CsvPages commentPages, CsvPages liveChatPages})
-    parsed,
-  }) {
-    final data = parsed.data;
-    final snapshot = exportedAt ?? _newestItem(data) ?? _epoch;
+  factory _Source.export(TakeoutExport export) {
+    final data = export.data;
+    final snapshot = export.exportedAt ?? data.newestItemAt ?? _epoch;
     return _Source._(
       data: data,
       snapshot: snapshot,
       isSaved: false,
       comments: _Kind(
-        present: parsed.commentPages.isNotEmpty,
+        present: export.commentPages.isNotEmpty,
         ids: {for (final c in data.comments) c.commentId},
         time: snapshot,
-        untrusted: _untrusted(parsed.commentPages, data.skippedCommentRows),
+        untrusted: _untrusted(export.commentPages, data.skippedCommentRows),
       ),
       liveChats: _Kind(
-        present: parsed.liveChatPages.isNotEmpty,
+        present: export.liveChatPages.isNotEmpty,
         ids: {for (final l in data.liveChats) l.liveChatId},
         time: snapshot,
-        untrusted: _untrusted(parsed.liveChatPages, data.skippedLiveChatRows),
+        untrusted: _untrusted(export.liveChatPages, data.skippedLiveChatRows),
       ),
     );
   }
@@ -278,42 +240,6 @@ _Newest? _newestWith(List<_Source> sources, _Kind Function(_Source) kindOf) {
   return (kind: kind, snapshot: kind.snapshot, channels: newest.channels);
 }
 
-List<_Source> _readExports(List<PickedZip> zips) {
-  final zipsByExport = <DateTime?, List<PickedZip>>{};
-  for (final zip in zips) {
-    final time = _exportTime.firstMatch(zip.name)?.group(1)?.toUpperCase();
-    zipsByExport
-        .putIfAbsent(time != null ? DateTime.parse(time) : null, () => [])
-        .add(zip);
-  }
-
-  if (zipsByExport.length > 1 && zipsByExport.containsKey(null)) {
-    final names = zipsByExport[null]!.map((z) => '"${z.name}"').join(', ');
-    throw TakeoutImportException(
-      "Can't tell which takeout $names belongs to. Keep the original "
-      'takeout-… file names, or add one takeout at a time.',
-    );
-  }
-
-  final exports = <_Source>[];
-  for (final MapEntry(key: exportedAt, value: zips) in zipsByExport.entries) {
-    final files = ZipExtractionService().extractRelevantFiles([
-      for (final zip in zips) zip.bytes,
-    ]);
-    if (files.isEmpty) continue;
-    exports.add(
-      _Source.export(exportedAt: exportedAt, parsed: parseTakeoutFiles(files)),
-    );
-  }
-  if (exports.isEmpty) {
-    throw const TakeoutImportException(
-      'No comments, live chats or subscriptions were found in the selected '
-      'files.',
-    );
-  }
-  return exports;
-}
-
 /// Works out which saved takeout the exports go into. They must all be from
 /// one Google account: the same main channel when both name one, otherwise
 /// sharing a channel. They go into the saved takeout they share a channel
@@ -321,14 +247,13 @@ List<_Source> _readExports(List<PickedZip> zips) {
 /// wrote most). Throws when they share channels with two saved takeouts, or
 /// when merging them into a takeout other than the one selected. Replacing
 /// with another takeout is allowed.
-String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
+String _resolveTakeout(List<_Source> exports, TakeoutImportContext context) {
   final titles = {
-    for (final export in [
-      ...exports,
-      if (request.saved case final saved?) _Source.saved(saved),
+    for (final data in [
+      for (final export in exports) export.data,
+      ?context.saved,
     ])
-      for (final own in export.data.ownChannels.values)
-        own.channelId: ?own.title,
+      for (final own in data.ownChannels.values) own.channelId: ?own.title,
   };
   Set<String>? found;
   String? main;
@@ -347,8 +272,7 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
         );
       }
     }
-    final own = export.data.ownChannels;
-    final exportMain = own.length == 1 ? own.keys.single : null;
+    final exportMain = export.data.listedMainChannelId;
     if (found == null) {
       found = {...channels};
       main = exportMain;
@@ -368,20 +292,18 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
     found.addAll(channels);
     main ??= exportMain;
   }
-  // _readExports never returns an empty list.
+  // planTakeoutImport refuses an empty list.
   final channels = found!;
 
   // Data saved before takeouts were kept per account can mix channels; it
   // belongs to the one that wrote most of it.
-  final saved = request.saved;
-  final activeId =
-      request.activeTakeoutId ??
-      (saved != null ? mostCommonAuthorChannelId(saved) : null);
+  final saved = context.saved;
+  final activeId = context.activeTakeoutId ?? saved?.mostCommonAuthor;
   final savedSets = {
-    ...request.savedChannelSets,
+    ...context.savedChannelSets,
     if (activeId != null &&
         saved != null &&
-        !request.savedChannelSets.containsKey(activeId))
+        !context.savedChannelSets.containsKey(activeId))
       activeId: {activeId, ..._Source.saved(saved).channels},
   };
 
@@ -400,10 +322,10 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
   final takeoutId =
       matches.singleOrNull ??
       main ??
-      _mostCommonAuthor(exports) ??
+      mostCommonAuthorIn([for (final e in exports) e.data]) ??
       channels.first;
 
-  if (!request.merge || activeId == null || takeoutId == activeId) {
+  if (!context.merge || activeId == null || takeoutId == activeId) {
     return takeoutId;
   }
   throw TakeoutAccountMismatchException(
@@ -413,21 +335,6 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportRequest request) {
     foundChannelIds: channels,
     titlesById: titles,
   );
-}
-
-/// The channel that wrote most items across [exports].
-String? _mostCommonAuthor(List<_Source> exports) {
-  final counts = <String, int>{};
-  for (final export in exports) {
-    for (final id in [
-      for (final c in export.data.comments) c.channelId,
-      for (final l in export.data.liveChats) l.channelId,
-    ]) {
-      if (id.isNotEmpty) counts[id] = (counts[id] ?? 0) + 1;
-    }
-  }
-  if (counts.isEmpty) return null;
-  return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
 }
 
 /// IDs in [createdAtById] that the [newest] source of their kind no longer
@@ -479,22 +386,6 @@ bool _isComplete(CsvPages pages) {
     if (rowsByPage[n] != pageSize) return false;
   }
   return rowsByPage[lastPage]! < pageSize;
-}
-
-Set<String> _authorChannelIds(TakeoutData data) => {
-  for (final c in data.comments) c.channelId,
-  for (final l in data.liveChats) l.channelId,
-}..remove('');
-
-DateTime? _newestItem(TakeoutData data) {
-  DateTime? newest;
-  for (final t in [
-    for (final c in data.comments) c.createdAt,
-    for (final l in data.liveChats) l.createdAt,
-  ]) {
-    if (newest == null || t.isAfter(newest)) newest = t;
-  }
-  return newest;
 }
 
 int _sum(List<_Source> sources, int Function(_Source) count) =>

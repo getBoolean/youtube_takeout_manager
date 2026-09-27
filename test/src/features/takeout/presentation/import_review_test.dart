@@ -22,7 +22,6 @@ const _plan = TakeoutImportPlan(
     liveChats: [],
     subscriptionsByChannelId: {},
   ),
-  csvFiles: {},
   goneCommentIds: {},
   goneLiveChatIds: {},
   newlyDeletedCommentCount: 0,

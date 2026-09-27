@@ -53,3 +53,81 @@ class KindSnapshot with KindSnapshotMappable {
 
   const KindSnapshot({required this.exportedAt, required this.complete});
 }
+
+/// How many comments and live chats a channel wrote.
+typedef ItemCounts = ({int comments, int liveChats});
+
+/// Who wrote a takeout's items, and which of its channels is the main one.
+extension TakeoutDataAuthors on TakeoutData {
+  /// How many comments and live chats each channel wrote, by author channel
+  /// ID, '' for rows without one.
+  Map<String, ItemCounts> get countsByAuthor {
+    final counts = <String, ItemCounts>{};
+    for (final c in comments) {
+      final n = counts[c.channelId] ?? (comments: 0, liveChats: 0);
+      counts[c.channelId] = (comments: n.comments + 1, liveChats: n.liveChats);
+    }
+    for (final l in liveChats) {
+      final n = counts[l.channelId] ?? (comments: 0, liveChats: 0);
+      counts[l.channelId] = (comments: n.comments, liveChats: n.liveChats + 1);
+    }
+    return counts;
+  }
+
+  /// The channels that wrote its items. Rows without a Channel ID are left
+  /// out.
+  Set<String> get authorChannelIds => countsByAuthor.keys.toSet()..remove('');
+
+  /// When its newest comment or live chat was written, or null if it has
+  /// none.
+  DateTime? get newestItemAt {
+    DateTime? newest;
+    for (final t in [
+      for (final c in comments) c.createdAt,
+      for (final l in liveChats) l.createdAt,
+    ]) {
+      if (newest == null || t.isAfter(newest)) newest = t;
+    }
+    return newest;
+  }
+
+  /// The channel that wrote most of its comments and live chats, or null if
+  /// it has none.
+  String? get mostCommonAuthor => mostCommonAuthorIn([this]);
+
+  /// The main channel its channel.csv names, see [listedMainChannelId].
+  String? get listedMainChannelId => listedMainChannelIdOf(ownChannels);
+
+  /// Its main channel when saved under [takeoutId]: the one its channel.csv
+  /// names, otherwise the one it's saved under.
+  String mainChannelId(String takeoutId) => listedMainChannelId ?? takeoutId;
+
+  /// The channel that wrote a row with [channelId] when saved under
+  /// [takeoutId]. Rows without a Channel ID are the main channel's.
+  String authorOf(String channelId, {required String takeoutId}) =>
+      authorChannelId(channelId, mainChannelId: mainChannelId(takeoutId));
+}
+
+/// The channel that wrote a row with [channelId]: rows without a Channel ID
+/// are [mainChannelId]'s.
+String authorChannelId(String channelId, {required String mainChannelId}) =>
+    channelId.isEmpty ? mainChannelId : channelId;
+
+/// The channel that wrote most items across [data], or null if none did.
+String? mostCommonAuthorIn(Iterable<TakeoutData> data) {
+  final counts = <String, int>{};
+  for (final d in data) {
+    for (final MapEntry(key: id, value: n) in d.countsByAuthor.entries) {
+      if (id.isNotEmpty) {
+        counts[id] = (counts[id] ?? 0) + n.comments + n.liveChats;
+      }
+    }
+  }
+  if (counts.isEmpty) return null;
+  return counts.entries.reduce((a, b) => b.value > a.value ? b : a).key;
+}
+
+/// The main channel of a takeout whose channel.csv lists [own]: the only
+/// one listed, or null when it lists none or several.
+String? listedMainChannelIdOf(Map<String, OwnChannel> own) =>
+    own.length == 1 ? own.keys.single : null;
