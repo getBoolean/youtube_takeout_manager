@@ -4,7 +4,7 @@ import '../domain/loaded_takeout.dart';
 import '../domain/own_channel.dart';
 import '../domain/takeout_channel.dart';
 import '../domain/takeout_data.dart';
-import 'csv_parser_service.dart';
+import 'csv_parser.dart';
 import 'takeout_files.dart';
 import 'takeout_meta_codec.dart';
 import 'takeout_repository.dart';
@@ -20,7 +20,7 @@ TakeoutSummary parseTakeoutSummary(
   String takeoutId,
   Map<String, Uint8List> summaryFiles,
 ) {
-  final parser = CsvParserService();
+  final parser = CsvParser();
   final own = <String, OwnChannel>{};
   final vanityNames = <String, String>{};
   Map<String, ItemCounts>? counts;

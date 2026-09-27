@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/comment_segments.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
 import '../data/youtube_emoji_name_repository.dart';
 import '../domain/emoji_key.dart';
@@ -39,7 +39,9 @@ class EmojiNameResolver extends _$EmojiNameResolver {
   /// Never throws. Backs off when YouTube is unreachable, and pauses lookups
   /// for [_pauseAfterFormatChange] when its responses stop parsing.
   Future<void> resolveMissing() async {
-    if (kIsWeb || ref.read(emojiNamesProvider).isResolving) return;
+    if (kIsWeb || (ref.read(emojiNamesProvider).value?.isResolving ?? false)) {
+      return;
+    }
     final names = ref.read(emojiNamesProvider.notifier);
     try {
       await _resolveMissing(names);
@@ -51,14 +53,14 @@ class EmojiNameResolver extends _$EmojiNameResolver {
   }
 
   Future<void> _resolveMissing(EmojiNames names) async {
-    await names.cacheLoaded;
+    await ref.read(emojiNamesProvider.future);
     final pausedUntil = await _cacheRepository.loadPausedUntil();
     if (pausedUntil != null && DateTime.now().isBefore(pausedUntil)) {
       names.pauseLookups();
       return;
     }
 
-    final known = ref.read(emojiNamesProvider).names;
+    final known = ref.read(emojiNamesProvider).requireValue.names;
     final keysByVideo = <String, Set<String>>{};
     final timesByVideo = <String, List<DateTime>>{};
     for (final chat in ref.read(
@@ -91,7 +93,7 @@ class EmojiNameResolver extends _$EmojiNameResolver {
     var formatFailures = 0;
     for (final MapEntry(key: videoId, value: keys) in keysByVideo.entries) {
       final wanted = keys.difference(
-        ref.read(emojiNamesProvider).names.keys.toSet(),
+        ref.read(emojiNamesProvider).requireValue.names.keys.toSet(),
       );
       if (wanted.isEmpty) continue;
       if (!first) await Future<void>.delayed(const Duration(seconds: 1));

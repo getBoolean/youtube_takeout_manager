@@ -35,7 +35,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
   /// Queues [channelIds] without a picture yet, fetching once there's a
   /// batch of 10.
   void queueChannelIds(Set<String> channelIds) {
-    final known = ref.read(channelThumbnailsProvider).keys.toSet();
+    final known = {...?ref.read(channelThumbnailsProvider).value?.keys};
     final uncached = channelIds.difference(known).difference(const {
       unknownChannelId,
     });
@@ -73,7 +73,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
         await ref
             .read(quotaProvider.notifier)
             .recordUsage(QuotaOperation.channelsList);
-        thumbnails.add(fetched);
+        await thumbnails.add(fetched);
       }
       await thumbnails.persist();
     } catch (e) {

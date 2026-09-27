@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import 'search_match_marker.dart';
 
 /// Renders text with substrings matching [query] visually emphasized; matched

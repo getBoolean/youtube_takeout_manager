@@ -30,7 +30,7 @@ Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
         deletesLeft: ref
             .watch(quotaProvider)
             .value
-            ?.affordableOperations(QuotaOperation.deleteComment.cost),
+            ?.affordableOperations(QuotaOperation.deleteCost),
       ),
     ),
   );

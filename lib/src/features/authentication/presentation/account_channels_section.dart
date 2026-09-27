@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/label_badge.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
@@ -125,7 +126,7 @@ class _ChannelRow extends StatelessWidget {
     final theme = Theme.of(context);
     final name = channel.displayName;
     // The tiniest windows need the room for the name.
-    final showAvatar = MediaQuery.sizeOf(context).width >= 200;
+    final showAvatar = !isTinyWidth(context);
     final notice = this.notice;
     return Material(
       color: viewing

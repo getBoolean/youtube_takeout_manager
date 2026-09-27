@@ -2,14 +2,16 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import '../application/export_service.dart';
 import '../domain/export_format.dart';
+import 'export_service.dart';
 
-part 'export_controller.g.dart';
+part 'export_notifier.g.dart';
 
 enum ExportResult { success, cancelled, error }
 
-@riverpod
+/// Whether an export is running. Kept alive so an export outlives the
+/// widget that started it.
+@Riverpod(keepAlive: true)
 class ExportNotifier extends _$ExportNotifier {
   @override
   bool build() => false; // isExporting
@@ -23,20 +25,15 @@ class ExportNotifier extends _$ExportNotifier {
   }) async {
     state = true;
     try {
-      final service = ExportService();
-      final content = switch (format) {
-        ExportFormat.csv => service.exportToCsv(
-          comments,
-          liveChats,
-          channelNames: channelNames,
-        ),
-        ExportFormat.json => service.exportToJson(
-          comments,
-          liveChats,
-          channelNames: channelNames,
-        ),
-      };
-      final saved = await service.saveToFile(content, filename, format);
+      final saved = await ref
+          .read(exportServiceProvider)
+          .export(
+            comments: comments,
+            liveChats: liveChats,
+            format: format,
+            filename: filename,
+            channelNames: channelNames,
+          );
       return saved ? ExportResult.success : ExportResult.cancelled;
     } catch (_) {
       return ExportResult.error;

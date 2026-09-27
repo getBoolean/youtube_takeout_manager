@@ -112,9 +112,30 @@ void main() {
     await fetch(c, {'UCa'});
 
     expect(clients.used, ['UCother']);
-    expect(c.read(channelThumbnailsProvider), {
+    expect(c.read(channelThumbnailsProvider).value, {
       'UCa': 'https://yt3.example/UCa',
     });
+  });
+
+  test('keeps saved pictures and saves fetched ones with them', () async {
+    SharedPreferences.setMockInitialValues({
+      'flutter.cached_channel_thumbnails': '{"UCold":"https://saved/UCold"}',
+    });
+    final c = container(clients: _Clients(), signIns: _SignIns());
+    await pumpEventQueue();
+
+    await fetch(c, {'UCold', 'UCa'});
+
+    final pictures = {
+      'UCold': 'https://saved/UCold',
+      'UCa': 'https://yt3.example/UCa',
+    };
+    expect(c.read(channelThumbnailsProvider).value, pictures);
+    final prefs = await SharedPreferences.getInstance();
+    expect(
+      prefs.getString('cached_channel_thumbnails'),
+      '{"UCold":"https://saved/UCold","UCa":"https://yt3.example/UCa"}',
+    );
   });
 
   test('loads nothing without a sign-in', () async {
@@ -137,7 +158,7 @@ void main() {
     await fetch(c, {'UCa'});
 
     expect(signIns.failed, ['UCother']);
-    expect(c.read(channelThumbnailsProvider), isEmpty);
+    expect(c.read(channelThumbnailsProvider).value, isEmpty);
   });
 
   test('fetches pictures once 10 new channels show', () async {
@@ -151,7 +172,7 @@ void main() {
     c.read(_shown.notifier).set([for (var i = 0; i < 10; i++) 'UC$i']);
     await pumpEventQueue();
     expect(clients.used, ['UCother']);
-    expect(c.read(channelThumbnailsProvider), hasLength(10));
+    expect(c.read(channelThumbnailsProvider).value, hasLength(10));
   });
 
   test('fetches the rest once video titles are done', () async {
@@ -165,7 +186,7 @@ void main() {
 
     progress.complete();
     await pumpEventQueue();
-    expect(c.read(channelThumbnailsProvider), {
+    expect(c.read(channelThumbnailsProvider).value, {
       'UCa': 'https://yt3.example/UCa',
     });
   });

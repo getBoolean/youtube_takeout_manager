@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_parser.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/data/zip_extraction_service.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/data/zip_extractor.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
 
 Uint8List _bytes(String s) => Uint8List.fromList(utf8.encode(s));
@@ -79,7 +79,7 @@ void main() {
     }
     final zip = ZipEncoder().encodeBytes(archive);
 
-    final files = ZipExtractionService().extractRelevantFiles([zip]);
+    final files = ZipExtractor().extractRelevantFiles([zip]);
 
     expect(
       files.keys,

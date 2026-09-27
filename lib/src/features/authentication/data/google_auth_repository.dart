@@ -14,7 +14,7 @@ part 'google_auth_repository.g.dart';
 
 @Riverpod(keepAlive: true)
 GoogleAuthRepository googleAuthRepository(Ref ref) =>
-    platform.createGoogleAuthRepository();
+    GoogleAuthRepository.platform();
 
 const scopes = [
   'https://www.googleapis.com/auth/youtube.force-ssl',
@@ -46,6 +46,10 @@ bool isSignInFailure(Object error) => switch (error) {
 /// - Web: Google Identity Services popup via `auth_browser`
 abstract class GoogleAuthRepository {
   GoogleAuthRepository();
+
+  /// This platform's implementation. Named, so implementations and fakes
+  /// can extend this class and share [fetchUserInfo].
+  factory GoogleAuthRepository.platform() = platform.GoogleAuthRepositoryImpl;
 
   /// Asks the user to sign in, choosing an account and channel. Null if they
   /// cancel or refuse.

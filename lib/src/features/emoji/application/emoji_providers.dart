@@ -6,10 +6,10 @@ import 'package:youtube_takeout_manager/src/features/channels/application/search
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_options_state.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/comment_segments.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/unicode_emoji_catalog.dart';
 import '../domain/channel_emoji.dart';
 import '../domain/emoji_key.dart';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/comment_spans.dart';
 import '../application/emoji_names.dart';
 import '../domain/emoji_key.dart';
 import '../domain/emoji_shortcode.dart';

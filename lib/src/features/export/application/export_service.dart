@@ -1,16 +1,51 @@
 import 'dart:convert';
 
 import 'package:csv/csv.dart';
-import 'package:file_saver/file_saver.dart';
-import 'package:flutter/foundation.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../data/export_file_repository.dart';
 import '../domain/export_format.dart';
+
+part 'export_service.g.dart';
+
+@Riverpod(keepAlive: true)
+ExportService exportService(Ref ref) =>
+    ExportService(ref.watch(exportFileRepositoryProvider));
 
 /// Service for exporting comments and live chats to CSV or JSON files.
 class ExportService {
   static final _csv = Csv();
+
+  final ExportFileRepository _files;
+
+  ExportService(this._files);
+
+  /// Writes [comments] and [liveChats] as [format] and saves them as
+  /// [filename]. Returns `true` if the file was saved, `false` if the user
+  /// cancelled.
+  Future<bool> export({
+    required List<Comment> comments,
+    required List<LiveChat> liveChats,
+    required ExportFormat format,
+    required String filename,
+    Map<String, String>? channelNames,
+  }) {
+    final content = switch (format) {
+      ExportFormat.csv => exportToCsv(
+        comments,
+        liveChats,
+        channelNames: channelNames,
+      ),
+      ExportFormat.json => exportToJson(
+        comments,
+        liveChats,
+        channelNames: channelNames,
+      ),
+    };
+    return _files.save(content, filename, format);
+  }
 
   /// Generates a CSV string from comments and live chats.
   String exportToCsv(
@@ -102,37 +137,6 @@ class ExportService {
     };
 
     return const JsonEncoder.withIndent('  ').convert(data);
-  }
-
-  /// Saves content to a file using the platform-appropriate mechanism.
-  /// Returns `true` if the file was saved, `false` if the user cancelled.
-  Future<bool> saveToFile(
-    String content,
-    String filename,
-    ExportFormat format,
-  ) async {
-    final ext = format == ExportFormat.csv ? 'csv' : 'json';
-    final mimeType = format == ExportFormat.csv ? MimeType.csv : MimeType.json;
-    final bytes = Uint8List.fromList(utf8.encode(content));
-
-    if (kIsWeb) {
-      final result = await FileSaver.instance.saveFile(
-        name: filename,
-        bytes: bytes,
-        fileExtension: ext,
-        mimeType: mimeType,
-      );
-      return result.isNotEmpty;
-    }
-
-    final result = await FileSaver.instance.saveAs(
-      name: filename,
-      bytes: bytes,
-      fileExtension: ext,
-      mimeType: mimeType,
-    );
-
-    return result != null;
   }
 
   /// Sanitizes a string for use as a filename.

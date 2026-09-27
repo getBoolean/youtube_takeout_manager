@@ -9,7 +9,7 @@ import 'takeout_files.dart';
 /// Google Takeout splits large exports into multiple independent zip files
 /// (e.g. takeout-*-001.zip, takeout-*-002.zip). Each is a standard zip archive
 /// containing a subset of the exported files.
-class ZipExtractionService {
+class ZipExtractor {
   /// Extracts the [TakeoutFile]s Google's takeouts have from the provided
   /// zip file bytes.
   ///

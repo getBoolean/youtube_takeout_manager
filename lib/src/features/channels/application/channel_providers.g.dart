@@ -160,7 +160,7 @@ final channelThumbnailsProvider = ChannelThumbnailsProvider._();
 /// Channel pictures by channel ID, kept on this device. Fetching more is
 /// `ChannelThumbnailFetcher`'s.
 final class ChannelThumbnailsProvider
-    extends $NotifierProvider<ChannelThumbnails, Map<String, String>> {
+    extends $AsyncNotifierProvider<ChannelThumbnails, Map<String, String>> {
   /// Channel pictures by channel ID, kept on this device. Fetching more is
   /// `ChannelThumbnailFetcher`'s.
   ChannelThumbnailsProvider._()
@@ -180,32 +180,25 @@ final class ChannelThumbnailsProvider
   @$internal
   @override
   ChannelThumbnails create() => ChannelThumbnails();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Map<String, String> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Map<String, String>>(value),
-    );
-  }
 }
 
-String _$channelThumbnailsHash() => r'fc21e1dccf7611e6c526f593fbf16bededfd52c0';
+String _$channelThumbnailsHash() => r'3e488d40e00cd2702cdc2fa6f7638fbdef9382f8';
 
 /// Channel pictures by channel ID, kept on this device. Fetching more is
 /// `ChannelThumbnailFetcher`'s.
 
-abstract class _$ChannelThumbnails extends $Notifier<Map<String, String>> {
-  Map<String, String> build();
+abstract class _$ChannelThumbnails extends $AsyncNotifier<Map<String, String>> {
+  FutureOr<Map<String, String>> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<Map<String, String>, Map<String, String>>;
+    final ref =
+        this.ref as $Ref<AsyncValue<Map<String, String>>, Map<String, String>>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<Map<String, String>, Map<String, String>>,
-              Map<String, String>,
+              AnyNotifier<AsyncValue<Map<String, String>>, Map<String, String>>,
+              AsyncValue<Map<String, String>>,
               Object?,
               Object?
             >;
@@ -252,7 +245,7 @@ final class ChannelsProvider
   }
 }
 
-String _$channelsHash() => r'b001bc3341bff22a6187140c86ad7d991e70b3fd';
+String _$channelsHash() => r'67fc735ac258f2c8f7078b9f32ef3eddb27723a0';
 
 @ProviderFor(channelById)
 final channelByIdProvider = ChannelByIdFamily._();
@@ -311,7 +304,7 @@ final class ChannelByIdProvider
   }
 }
 
-String _$channelByIdHash() => r'6f09b6980b36f7605a04dba394dd767a14a13026';
+String _$channelByIdHash() => r'293a2ec2b6d6da9c72fef1d2ed8b55ca0cbdc885';
 
 final class ChannelByIdFamily extends $Family
     with $FunctionalFamilyOverride<Channel?, String> {

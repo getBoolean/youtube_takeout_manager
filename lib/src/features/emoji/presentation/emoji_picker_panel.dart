@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import '../application/emoji_names.dart';
 import '../application/frequent_emojis.dart';
 import '../domain/channel_emoji.dart';
+import '../domain/emoji_names_state.dart';
 import '../domain/emoji_picker_sections.dart';
 import '../domain/picker_emoji.dart';
 import '../domain/unicode_emoji.dart';
@@ -341,7 +342,8 @@ class _PreviewFooter extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final status = ref.watch(emojiNamesProvider);
+    final status =
+        ref.watch(emojiNamesProvider).value ?? const EmojiNamesState();
     final hasChannelEmojis = groups.any((g) => g.emojis.isNotEmpty);
 
     Widget details(PickerEmoji emoji, String? subtitle, {bool? resolved}) {

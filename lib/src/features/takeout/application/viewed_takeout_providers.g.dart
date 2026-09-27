@@ -171,7 +171,7 @@ final class OwnChannelThumbnailsProvider
 }
 
 String _$ownChannelThumbnailsHash() =>
-    r'c4a2c628dd9fd13079fa790587f922803a3911e6';
+    r'6ec2b2de30832dc42e0819b78661c7e82a57b2ad';
 
 /// The ID of the channel being viewed: the one last chosen in the selected
 /// takeout while it's still there, otherwise the takeout's main channel.

@@ -1,3 +1,5 @@
+import 'package:youtube_takeout_manager/src/utils/web_url.dart';
+
 /// Stable identifier for a custom emoji image, shared between the Takeout
 /// `customEmojiUrl` and the URLs returned by YouTube's live chat API.
 ///
@@ -12,10 +14,7 @@ String emojiKey(String url) {
 
 /// Whether [url] is an image URL. For emojis it couldn't export, Takeout
 /// writes "Failed to get emoji URL" instead.
-bool isEmojiImageUrl(String url) {
-  final scheme = Uri.tryParse(url)?.scheme;
-  return scheme == 'https' || scheme == 'http';
-}
+bool isEmojiImageUrl(String url) => isWebUrl(url);
 
 /// Name used for an emoji whose real name could not be resolved.
 String fallbackEmojiName(String key) =>

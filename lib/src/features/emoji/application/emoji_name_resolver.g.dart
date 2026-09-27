@@ -50,7 +50,7 @@ final class EmojiNameResolverProvider
   }
 }
 
-String _$emojiNameResolverHash() => r'617982af8a2c4af7cb1a0cda914113feca8b535b';
+String _$emojiNameResolverHash() => r'0ab88a055f41155d65bf8e23e45ea60a3181457f';
 
 /// Looks up names for the custom emojis in the viewed channel's live chats
 /// once they're loaded. An effect: nothing depends on it, so it can read

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:youtube_takeout_manager/src/utils/web_url.dart';
+
 /// Copies an image's URL, e.g. to check one that won't load.
 Future<void> copyImageUrl(BuildContext context, String url) async {
   await Clipboard.setData(ClipboardData(text: url));
@@ -34,11 +36,6 @@ class ImageUrlMenu extends StatefulWidget {
 class _ImageUrlMenuState extends State<ImageUrlMenu> {
   final _controller = MenuController();
 
-  bool get _isWebUrl {
-    final scheme = Uri.tryParse(widget.url)?.scheme;
-    return scheme == 'https' || scheme == 'http';
-  }
-
   @override
   Widget build(BuildContext context) {
     return MenuAnchor(
@@ -60,7 +57,7 @@ class _ImageUrlMenuState extends State<ImageUrlMenu> {
   }
 
   Widget _item() {
-    if (!_isWebUrl) {
+    if (!isWebUrl(widget.url)) {
       return MenuItemButton(
         leadingIcon: const Icon(Icons.link_off),
         child: Text(widget.unavailableLabel),

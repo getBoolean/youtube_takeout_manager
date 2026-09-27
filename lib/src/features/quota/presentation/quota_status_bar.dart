@@ -35,7 +35,7 @@ class QuotaStatusBar extends ConsumerWidget {
         final remaining = quota.unitsRemaining;
         final progress = total > 0 ? used / total : 0.0;
         final deletesAffordable = quota.affordableOperations(
-          QuotaOperation.deleteComment.cost,
+          QuotaOperation.deleteCost,
         );
 
         final defaultProgressColor = Theme.of(context).colorScheme.primary;

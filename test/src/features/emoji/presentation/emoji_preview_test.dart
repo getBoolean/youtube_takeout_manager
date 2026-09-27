@@ -10,7 +10,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_nam
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_image.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_url_menu.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/comment_spans.dart';
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));

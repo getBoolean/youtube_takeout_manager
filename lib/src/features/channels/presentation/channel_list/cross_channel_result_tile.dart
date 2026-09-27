@@ -7,9 +7,9 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/delete
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/comment_spans.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_tile.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';

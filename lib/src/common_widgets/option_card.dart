@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'breakpoints.dart';
+
 /// A tappable card for one choice in a dialog.
 ///
 /// With [selected] set, it's one of a set of choices confirmed by a separate
@@ -41,7 +43,7 @@ class OptionCard extends StatelessWidget {
     // their content by its intrinsic width.
     final windowWidth = MediaQuery.sizeOf(context).width;
     final showIcon = windowWidth >= 280;
-    final showIndicator = windowWidth >= 200;
+    final showIndicator = !isTinyWidth(context);
 
     return Semantics(
       button: true,

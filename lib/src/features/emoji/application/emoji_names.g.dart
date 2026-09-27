@@ -19,7 +19,7 @@ final emojiNamesProvider = EmojiNamesProvider._();
 /// `emojiKey`, kept on this device. Looking up the rest is
 /// `EmojiNameResolver`'s.
 final class EmojiNamesProvider
-    extends $NotifierProvider<EmojiNames, EmojiNamesState> {
+    extends $AsyncNotifierProvider<EmojiNames, EmojiNamesState> {
   /// Custom emoji names resolved from YouTube live chat replays, keyed by
   /// `emojiKey`, kept on this device. Looking up the rest is
   /// `EmojiNameResolver`'s.
@@ -40,33 +40,25 @@ final class EmojiNamesProvider
   @$internal
   @override
   EmojiNames create() => EmojiNames();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(EmojiNamesState value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<EmojiNamesState>(value),
-    );
-  }
 }
 
-String _$emojiNamesHash() => r'4fd36edef5ee380004bde61ce576b352accda714';
+String _$emojiNamesHash() => r'a2159be4c4f66e1a582148c72707488df762b157';
 
 /// Custom emoji names resolved from YouTube live chat replays, keyed by
 /// `emojiKey`, kept on this device. Looking up the rest is
 /// `EmojiNameResolver`'s.
 
-abstract class _$EmojiNames extends $Notifier<EmojiNamesState> {
-  EmojiNamesState build();
+abstract class _$EmojiNames extends $AsyncNotifier<EmojiNamesState> {
+  FutureOr<EmojiNamesState> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<EmojiNamesState, EmojiNamesState>;
+    final ref = this.ref as $Ref<AsyncValue<EmojiNamesState>, EmojiNamesState>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<EmojiNamesState, EmojiNamesState>,
-              EmojiNamesState,
+              AnyNotifier<AsyncValue<EmojiNamesState>, EmojiNamesState>,
+              AsyncValue<EmojiNamesState>,
               Object?,
               Object?
             >;
@@ -124,4 +116,4 @@ final class EmojiNamesByKeyProvider
   }
 }
 
-String _$emojiNamesByKeyHash() => r'399c47b22a9a067f9f175338a99305afc46668b5';
+String _$emojiNamesByKeyHash() => r'89ac0fe70379f22eaa8a38e177fe235ef830f23f';

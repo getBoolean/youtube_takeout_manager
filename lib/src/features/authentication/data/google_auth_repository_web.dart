@@ -4,11 +4,9 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'google_auth_repository.dart';
 
-GoogleAuthRepository createGoogleAuthRepository() => WebGoogleAuthRepository();
-
 /// On web there are no refresh tokens: a sign-in lasts as long as its access
 /// token, about an hour.
-class WebGoogleAuthRepository extends GoogleAuthRepository {
+class GoogleAuthRepositoryImpl extends GoogleAuthRepository {
   static const _expiryBuffer = Duration(minutes: 5);
 
   final _sessions = <String, ({http.Client client, String accessToken})>{};

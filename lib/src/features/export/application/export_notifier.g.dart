@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'export_controller.dart';
+part of 'export_notifier.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -8,19 +8,25 @@ part of 'export_controller.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Whether an export is running. Kept alive so an export outlives the
+/// widget that started it.
 
 @ProviderFor(ExportNotifier)
 final exportProvider = ExportNotifierProvider._();
 
+/// Whether an export is running. Kept alive so an export outlives the
+/// widget that started it.
 final class ExportNotifierProvider
     extends $NotifierProvider<ExportNotifier, bool> {
+  /// Whether an export is running. Kept alive so an export outlives the
+  /// widget that started it.
   ExportNotifierProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
         name: r'exportProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -41,7 +47,10 @@ final class ExportNotifierProvider
   }
 }
 
-String _$exportNotifierHash() => r'eff146966d1aa6cf3ec5a9c7043606752f5477ac';
+String _$exportNotifierHash() => r'4858c9c9729f7b64aae6d3bc1e59233abdbc6451';
+
+/// Whether an export is running. Kept alive so an export outlives the
+/// widget that started it.
 
 abstract class _$ExportNotifier extends $Notifier<bool> {
   bool build();

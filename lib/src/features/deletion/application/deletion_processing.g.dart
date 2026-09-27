@@ -51,7 +51,7 @@ final class DeletionProcessingProvider
 }
 
 String _$deletionProcessingHash() =>
-    r'97316e907169de4563ce8966f6561457268c51c0';
+    r'f2f5b41e928d8d6f9b4c82b7dae8bd6c6c9d4f97';
 
 /// Deletes queued items through the YouTube API, one at a time, and says
 /// whether it's doing so. A service: nothing depends on it, so it can read

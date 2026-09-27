@@ -51,7 +51,7 @@ final class ChannelThumbnailFetcherProvider
 }
 
 String _$channelThumbnailFetcherHash() =>
-    r'9461e0285f078eed6db8de3f02aeafb722b16866';
+    r'7e47eaff2976135eadc6367f7e25496bc4e77440';
 
 /// Fetches pictures for the channels the viewed channel interacted with, in
 /// batches of 10 as they appear, and the rest once video titles are done.

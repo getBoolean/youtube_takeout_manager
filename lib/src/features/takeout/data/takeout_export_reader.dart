@@ -2,7 +2,7 @@ import '../domain/takeout_export.dart';
 import '../domain/takeout_import_plan.dart';
 import '../domain/takeout_import_request.dart';
 import 'takeout_parser.dart';
-import 'zip_extraction_service.dart';
+import 'zip_extractor.dart';
 
 /// The export time Google puts in takeout zip names, e.g.
 /// `takeout-20260412T074021Z-3-001.zip`.
@@ -30,7 +30,7 @@ List<TakeoutExport> readTakeoutExports(List<PickedZip> zips) {
 
   final exports = <TakeoutExport>[];
   for (final MapEntry(key: exportedAt, value: zips) in zipsByExport.entries) {
-    final files = ZipExtractionService().extractRelevantFiles([
+    final files = ZipExtractor().extractRelevantFiles([
       for (final zip in zips) zip.bytes,
     ]);
     if (files.isEmpty) continue;

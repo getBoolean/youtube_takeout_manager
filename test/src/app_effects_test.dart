@@ -121,9 +121,10 @@ void main() {
     }
 
     expect(lookups.videos, ['v1']);
-    expect(c.read(emojiNamesProvider).names.values.map((e) => e.name), [
-      'wave',
-    ]);
-    expect(c.read(emojiNamesProvider).isResolving, isFalse);
+    expect(
+      c.read(emojiNamesProvider).requireValue.names.values.map((e) => e.name),
+      ['wave'],
+    );
+    expect(c.read(emojiNamesProvider).requireValue.isResolving, isFalse);
   });
 }

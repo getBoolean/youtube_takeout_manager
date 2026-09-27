@@ -6,7 +6,7 @@ import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_i
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import '../data/channel_cache_repository.dart';
 import '../domain/channel.dart';
 
@@ -52,25 +52,27 @@ class ChannelThumbnails extends _$ChannelThumbnails {
       ref.read(channelCacheRepositoryProvider);
 
   @override
-  Map<String, String> build() {
-    ref.watch(channelCacheRepositoryProvider);
-    loadCache();
-    return {};
-  }
+  Future<Map<String, String>> build() =>
+      ref.watch(channelCacheRepositoryProvider).loadCachedThumbnails();
 
-  /// Loads cached channel thumbnails from local storage.
-  Future<void> loadCache() async {
-    final cached = await _cacheRepository.loadCachedThumbnails();
-    if (cached.isNotEmpty) {
-      state = {...state, ...cached};
-    }
+  /// Adds fetched pictures by channel ID, once the saved ones are in so
+  /// they don't replace these. Unreadable saved ones count as none.
+  Future<void> add(Map<String, String> thumbnails) async {
+    await future.catchError((Object _) => const <String, String>{});
+    state = AsyncData({...?state.value, ...thumbnails});
   }
-
-  /// Adds fetched pictures by channel ID.
-  void add(Map<String, String> thumbnails) => state = {...state, ...thumbnails};
 
   /// Keeps the pictures on this device.
-  Future<void> persist() => _cacheRepository.saveThumbnails(state);
+  Future<void> persist() =>
+      _cacheRepository.saveThumbnails(state.value ?? const {});
+
+  /// Forgets every picture, here and on this device, so they're fetched
+  /// again.
+  Future<void> clear() async {
+    await future.catchError((Object _) => const <String, String>{});
+    await _cacheRepository.clearThumbnails();
+    state = const AsyncData({});
+  }
 }
 
 @riverpod
@@ -93,7 +95,7 @@ List<Channel> channels(Ref ref) {
   };
 
   final titlesFromVideos = ref.watch(channelTitlesFromVideosProvider);
-  final thumbnails = ref.watch(channelThumbnailsProvider);
+  final thumbnails = ref.watch(channelThumbnailsProvider).value ?? const {};
 
   final channels = [
     for (final id in channelIds)
@@ -165,6 +167,6 @@ Channel? channelById(Ref ref, String channelId) {
     liveChatCount: liveChatsByChannel[channelId]?.length ?? 0,
     subscriptions: takeout.subscriptionsByChannelId,
     titlesFromVideos: ref.watch(channelTitlesFromVideosProvider),
-    thumbnails: ref.watch(channelThumbnailsProvider),
+    thumbnails: ref.watch(channelThumbnailsProvider).value ?? const {},
   );
 }

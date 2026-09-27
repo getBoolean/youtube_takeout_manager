@@ -96,7 +96,7 @@ class _Quota extends QuotaRepository {
     : state = QuotaState(
         usageByOperation: {
           QuotaOperation.videosList:
-              10000 - deletes * QuotaOperation.deleteComment.cost,
+              dailyQuotaLimit - deletes * QuotaOperation.deleteCost,
         },
         periodStart: DateTime.now().toUtc(),
       ),

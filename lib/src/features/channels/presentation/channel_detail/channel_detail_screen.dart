@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
@@ -132,7 +133,7 @@ class ChannelDetailScreen extends HookConsumerWidget {
             ...queue.appBarActions,
             // Leaves room for the back button in the narrowest windows; it's
             // still on Channels.
-            if (MediaQuery.sizeOf(context).width >= 200) const AccountButton(),
+            if (!isTinyWidth(context)) const AccountButton(),
           ],
           bottom: commentCount > 0 && liveChatCount > 0
               ? ChannelTabBar(

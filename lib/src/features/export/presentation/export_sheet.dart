@@ -3,9 +3,9 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
+import '../application/export_notifier.dart';
 import '../application/export_service.dart';
 import '../domain/export_format.dart';
-import 'export_controller.dart';
 
 /// Asks whether to export as CSV or JSON. Returns the pick, or null if the
 /// sheet was dismissed.
@@ -29,13 +29,15 @@ Future<ExportFormat?> showExportFormatSheet(BuildContext context) {
           ListTile(
             leading: const Icon(Icons.table_chart_outlined),
             title: const Text('Export as CSV'),
-            subtitle: const Text('Comma-separated values (.csv)'),
+            subtitle: Text(
+              'Comma-separated values (.${ExportFormat.csv.extension})',
+            ),
             onTap: () => Navigator.pop(context, ExportFormat.csv),
           ),
           ListTile(
             leading: const Icon(Icons.data_object),
             title: const Text('Export as JSON'),
-            subtitle: const Text('Structured data (.json)'),
+            subtitle: Text('Structured data (.${ExportFormat.json.extension})'),
             onTap: () => Navigator.pop(context, ExportFormat.json),
           ),
         ],
@@ -56,7 +58,6 @@ Future<void> exportChannel(
   required List<LiveChat> liveChats,
 }) async {
   final filename = ExportService.sanitizeFilename('${channelName}_export');
-  final ext = format == ExportFormat.csv ? 'csv' : 'json';
   final result = await ref
       .read(exportProvider.notifier)
       .exportData(
@@ -71,9 +72,9 @@ Future<void> exportChannel(
 
   switch (result) {
     case ExportResult.success:
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Exported $filename.$ext')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Exported $filename.${format.extension}')),
+      );
     case ExportResult.error:
       ScaffoldMessenger.of(
         context,

@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/comment_spans.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_tile.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/presentation/superchat_card.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/live_chat.dart';
 

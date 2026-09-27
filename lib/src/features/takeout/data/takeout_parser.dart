@@ -6,7 +6,7 @@ import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_data.dart';
 import '../domain/takeout_export.dart';
-import 'csv_parser_service.dart';
+import 'csv_parser.dart';
 import 'takeout_files.dart';
 import 'takeout_meta_codec.dart';
 
@@ -24,7 +24,7 @@ TakeoutExport parseTakeoutFiles(
   Map<String, Uint8List> files, {
   DateTime? exportedAt,
 }) {
-  final csvParser = CsvParserService();
+  final csvParser = CsvParser();
 
   final comments = <Comment>[];
   final liveChats = <LiveChat>[];

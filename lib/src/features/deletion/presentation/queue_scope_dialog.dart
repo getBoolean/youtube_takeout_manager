@@ -115,9 +115,7 @@ class _QueueScopeDialogState extends State<QueueScopeDialog> {
               ? null
               : () => Navigator.pop(context, widget.scopes[selected].targets),
           // Left out in the narrowest windows so the button still fits.
-          icon: MediaQuery.sizeOf(context).width >= 200
-              ? const Icon(Icons.playlist_add)
-              : null,
+          icon: isTinyWidth(context) ? null : const Icon(Icons.playlist_add),
           label: Text('Queue $count', overflow: TextOverflow.ellipsis),
         ),
       ],

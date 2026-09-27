@@ -7,10 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
 import 'google_auth_repository.dart';
 
-GoogleAuthRepository createGoogleAuthRepository() =>
-    NativeGoogleAuthRepository();
-
-class NativeGoogleAuthRepository extends GoogleAuthRepository {
+class GoogleAuthRepositoryImpl extends GoogleAuthRepository {
   final _sessions =
       <
         String,

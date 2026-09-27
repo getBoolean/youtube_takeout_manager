@@ -13,45 +13,37 @@ part 'emoji_names.g.dart';
 class EmojiNames extends _$EmojiNames {
   EmojiNameCacheRepository get _cacheRepository =>
       ref.read(emojiNameCacheRepositoryProvider);
-  late Future<void> _cacheLoaded;
 
   @override
-  EmojiNamesState build() {
-    ref.watch(emojiNameCacheRepositoryProvider);
-    _cacheLoaded = _loadCache();
-    return const EmojiNamesState();
-  }
+  Future<EmojiNamesState> build() async => EmojiNamesState(
+    names: await ref.watch(emojiNameCacheRepositoryProvider).loadNames(),
+  );
 
-  /// Completes once the names kept on this device are in.
-  Future<void> get cacheLoaded => _cacheLoaded;
-
-  Future<void> _loadCache() async {
-    final cached = await _cacheRepository.loadNames();
-    if (cached.isNotEmpty) {
-      state = state.copyWith(names: {...cached, ...state.names});
-    }
-  }
+  EmojiNamesState get _current => state.value ?? const EmojiNamesState();
 
   /// Notes that names are being looked up, and whether lookups are paused.
   void setResolving({required bool resolving, bool? lookupUnavailable}) =>
-      state = state.copyWith(
-        isResolving: resolving,
-        lookupUnavailable: lookupUnavailable,
+      state = AsyncData(
+        _current.copyWith(
+          isResolving: resolving,
+          lookupUnavailable: lookupUnavailable,
+        ),
       );
 
   /// Notes that lookups are paused, YouTube's responses having changed.
-  void pauseLookups() => state = state.copyWith(lookupUnavailable: true);
+  void pauseLookups() =>
+      state = AsyncData(_current.copyWith(lookupUnavailable: true));
 
   /// Adds looked-up names and keeps them on this device.
   Future<void> addNames(Map<String, ResolvedEmoji> found) async {
-    state = state.copyWith(names: {...state.names, ...found});
-    await _cacheRepository.saveNames(state.names);
+    state = AsyncData(_current.copyWith(names: {..._current.names, ...found}));
+    await _cacheRepository.saveNames(_current.names);
   }
 }
 
 /// Resolved emoji names keyed by `emojiKey`, for search matching.
 @Riverpod(keepAlive: true)
 Map<String, String> emojiNamesByKey(Ref ref) {
-  final names = ref.watch(emojiNamesProvider).names;
+  final names = ref.watch(emojiNamesProvider).value?.names ?? const {};
   return names.map((key, value) => MapEntry(key, value.name));
 }

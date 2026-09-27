@@ -78,9 +78,7 @@ class DeletionProcessing extends _$DeletionProcessing {
       await quota.resetIfNewDay();
 
       while (!_isPaused) {
-        final canDelete = await quota.canAfford(
-          QuotaOperation.deleteComment.cost,
-        );
+        final canDelete = await quota.canAfford(QuotaOperation.deleteCost);
         if (!canDelete) {
           await queue.markRemainingPending(
             DeletionItemStatus.quotaExceeded,

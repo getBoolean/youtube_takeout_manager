@@ -38,7 +38,7 @@ List<TakeoutChannel> takeoutChannels(Ref ref) => withThumbnails(
 /// already loaded, by channel ID.
 @Riverpod(keepAlive: true)
 Map<String, String> ownChannelThumbnails(Ref ref) => {
-  ...ref.watch(channelThumbnailsProvider),
+  ...?ref.watch(channelThumbnailsProvider).value,
   ...ref.watch(signedInChannelThumbnailsProvider),
 };
 

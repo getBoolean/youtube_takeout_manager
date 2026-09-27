@@ -5,8 +5,8 @@ import 'dart:typed_data';
 import 'package:csv/csv.dart';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/comment_segments.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
 import '../domain/takeout_import_plan.dart';
@@ -35,7 +35,7 @@ class CsvParseResult<T> {
 /// within the same zip. Column presence differs (e.g. Post ID, Currency Code,
 /// Parent Live Chat ID may or may not be present). This parser builds a column
 /// index map from each file's header to handle all variants.
-class CsvParserService {
+class CsvParser {
   static final _csv = Csv(autoDetect: false);
 
   /// Parses a comments CSV file into a list of [Comment] objects.

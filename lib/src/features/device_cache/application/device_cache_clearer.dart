@@ -1,7 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
-import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
@@ -20,10 +19,9 @@ class DeviceCacheClearer extends _$DeviceCacheClearer {
   /// kept on this device.
   Future<void> clear() async {
     await ref.read(videoCacheRepositoryProvider).clearCache();
-    await ref.read(channelCacheRepositoryProvider).clearThumbnails();
+    await ref.read(channelThumbnailsProvider.notifier).clear();
 
     ref.invalidate(videoMetadataProvider);
-    ref.invalidate(channelThumbnailsProvider);
     // Fetches what was cleared again.
     ref.invalidate(videoTitleFetcherProvider);
   }

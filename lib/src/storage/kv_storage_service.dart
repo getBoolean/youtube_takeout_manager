@@ -13,7 +13,7 @@ KvStorageService kvStorageService(Ref ref) => KvStorageService();
 /// Platform-agnostic key-value storage.
 ///
 /// - Native: delegates to SharedPreferences
-/// - Web: uses IndexedDB (with one-time migration from localStorage)
+/// - Web: uses IndexedDB
 abstract class KvStorageService {
   factory KvStorageService() = platform.KvStorageServiceImpl;
 
