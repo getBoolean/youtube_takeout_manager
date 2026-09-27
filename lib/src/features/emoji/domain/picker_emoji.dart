@@ -13,9 +13,13 @@ sealed class PickerEmoji {
   /// Text inserted into the search field.
   String get insertText;
 
-  /// Stable id for Frequently Used.
+  /// Stable id for Frequently Used (see [pickerEmojiForUse]).
   String get usageId;
 }
+
+// Usage id prefixes. Ids are saved on the device, so these can't change.
+const _customUsage = 'c:';
+const _unicodeUsage = 'u:';
 
 final class CustomPickerEmoji extends PickerEmoji {
   final ChannelEmoji emoji;
@@ -27,7 +31,7 @@ final class CustomPickerEmoji extends PickerEmoji {
   @override
   String get insertText => emoji.token;
   @override
-  String get usageId => 'c:${emoji.key}';
+  String get usageId => '$_customUsage${emoji.key}';
 
   @override
   bool operator ==(Object other) =>
@@ -49,7 +53,7 @@ final class UnicodePickerEmoji extends PickerEmoji {
   @override
   String get insertText => emoji.emoji;
   @override
-  String get usageId => 'u:${emoji.emoji}';
+  String get usageId => '$_unicodeUsage${emoji.emoji}';
 
   @override
   bool operator ==(Object other) =>
@@ -58,4 +62,23 @@ final class UnicodePickerEmoji extends PickerEmoji {
       other.name == name;
   @override
   int get hashCode => Object.hash(emoji.emoji, name);
+}
+
+/// The emoji [usageId] was recorded for, if it's one of [customByKey]
+/// (keyed by [ChannelEmoji.key]) or [standardByEmoji] (keyed by
+/// [UnicodeEmoji.emoji]).
+PickerEmoji? pickerEmojiForUse(
+  String usageId, {
+  required Map<String, ChannelEmoji> customByKey,
+  required Map<String, UnicodeEmoji> standardByEmoji,
+}) {
+  if (usageId.startsWith(_unicodeUsage)) {
+    final emoji = standardByEmoji[usageId.substring(_unicodeUsage.length)];
+    return emoji == null ? null : UnicodePickerEmoji(emoji);
+  }
+  if (usageId.startsWith(_customUsage)) {
+    final emoji = customByKey[usageId.substring(_customUsage.length)];
+    return emoji == null ? null : CustomPickerEmoji(emoji);
+  }
+  return null;
 }

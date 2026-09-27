@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/application/frequent_emojis.dart';
 
 const _key = 'flutter.emoji.frequentlyUsed';
 

@@ -7,8 +7,10 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_names.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_lookup.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/resolved_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';

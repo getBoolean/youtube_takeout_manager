@@ -6,8 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_names.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_image.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_url_menu.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 
 void main() {

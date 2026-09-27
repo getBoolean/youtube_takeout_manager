@@ -7,7 +7,8 @@ import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
@@ -237,7 +238,7 @@ class ChannelDetailBody extends HookConsumerWidget {
         header,
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: DebouncedSearchBar(
+          child: EmojiSearchBar(
             hintText: switch (kinds) {
               [QueueItemKind.comment] => 'Search comments...',
               [QueueItemKind.liveChat] => 'Search live chats...',

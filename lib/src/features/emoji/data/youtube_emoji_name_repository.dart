@@ -5,7 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
+import '../domain/emoji_key.dart';
+import '../domain/emoji_lookup.dart';
+import '../domain/emoji_shortcode.dart';
+import '../domain/resolved_emoji.dart';
 
 part 'youtube_emoji_name_repository.g.dart';
 
@@ -14,65 +17,6 @@ YoutubeEmojiNameRepository youtubeEmojiNameRepository(Ref ref) {
   final repository = YoutubeEmojiNameRepository();
   ref.onDispose(repository.close);
   return repository;
-}
-
-/// A custom emoji name learned from YouTube's live chat data.
-class ResolvedEmoji {
-  /// Name without colons or leading underscore, e.g. `shortsad`.
-  final String name;
-
-  /// Channel that owns the emoji (prefix of YouTube's `emojiId`).
-  final String? ownerChannelId;
-
-  const ResolvedEmoji({required this.name, this.ownerChannelId});
-
-  static ResolvedEmoji? tryFromJson(Object? json) {
-    if (json is! Map) return null;
-    final name = json['name'];
-    final owner = json['owner'];
-    if (name is! String || !isValidEmojiName(name)) return null;
-    return ResolvedEmoji(
-      name: name,
-      ownerChannelId: owner is String ? owner : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {'name': name, 'owner': ownerChannelId};
-}
-
-/// Data needed from a watch page to request its live chat replay.
-class LiveChatReplayInfo {
-  final String continuation;
-  final DateTime startTime;
-  final String clientVersion;
-
-  const LiveChatReplayInfo({
-    required this.continuation,
-    required this.startTime,
-    required this.clientVersion,
-  });
-}
-
-enum EmojiLookupStatus {
-  /// Requests succeeded (emojis may or may not have been found).
-  ok,
-
-  /// The video has no chat replay (not a stream, private, members-only...).
-  noReplay,
-
-  /// Offline, timed out or rate limited; worth retrying later.
-  networkError,
-
-  /// YouTube's page or response no longer looks like what we parse. Likely an
-  /// upstream change; callers should stop making requests.
-  unexpectedFormat,
-}
-
-class EmojiLookupResult {
-  final EmojiLookupStatus status;
-  final Map<String, ResolvedEmoji> found;
-
-  const EmojiLookupResult(this.status, [this.found = const {}]);
 }
 
 const _defaultClientVersion = '2.20260922.01.00';
@@ -196,12 +140,6 @@ class YoutubeEmojiNameRepository {
 final _startTimestamp = RegExp(r'"startTimestamp":"([^"]+)"');
 final _clientVersion = RegExp(r'"INNERTUBE_CLIENT_VERSION":"([^"]+)"');
 final _initialData = RegExp(r'ytInitialData\s*=\s*(\{.+?\});\s*</script>');
-final _validEmojiName = RegExp(r'^[\w-]+$');
-
-/// Names are inserted into `:name:` search tokens, so anything unexpected is
-/// rejected rather than trusted.
-bool isValidEmojiName(String name) =>
-    name.length <= 64 && _validEmojiName.hasMatch(name);
 
 /// Extracts the replay continuation, stream start and client version from a
 /// watch page.

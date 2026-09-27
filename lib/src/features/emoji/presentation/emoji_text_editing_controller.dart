@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/channel_emoji.dart';
+import '../domain/emoji_shortcode.dart';
 import '../domain/unicode_emoji.dart';
 import 'emoji_preview.dart';
 
@@ -16,10 +17,6 @@ import 'emoji_preview.dart';
 /// the emoji (like Discord), unless a channel emoji has that name.
 class EmojiTextEditingController extends TextEditingController {
   EmojiTextEditingController({super.text});
-
-  static final _token = RegExp(r':_?([\w-]+):');
-  static final _wordChar = RegExp(r'\w');
-  static final _plainName = RegExp(r'^[\w-]+$');
 
   /// Standard emojis a typed `:name:` converts to, keyed by lowercase short
   /// name.
@@ -46,10 +43,10 @@ class EmojiTextEditingController extends TextEditingController {
   List<(TextRange, ChannelEmoji)> emojiTokens(String text) {
     if (_emojisByName.isEmpty || !text.contains(':')) return const [];
     final result = <(TextRange, ChannelEmoji)>[];
-    for (final match in _token.allMatches(text)) {
-      final emoji = _lookup(match[1]!);
+    for (final (:start, :end, :name) in emojiTokensIn(text)) {
+      final emoji = _lookup(name);
       if (emoji != null) {
-        result.add((TextRange(start: match.start, end: match.end), emoji));
+        result.add((TextRange(start: start, end: end), emoji));
       }
     }
     return result;
@@ -148,22 +145,18 @@ class EmojiTextEditingController extends TextEditingController {
       return null;
     }
 
-    final open = caret >= 2 ? next.text.lastIndexOf(':', caret - 2) : -1;
-    if (open < 0) return null;
-    // `10:30:` or `word:fire:` isn't a shortcode.
-    if (open > 0 && _wordChar.hasMatch(next.text[open - 1])) return null;
-    final name = next.text.substring(open + 1, caret - 1).toLowerCase();
+    final closed = closedEmojiName(next.text, caret);
     // A channel emoji with this name wins; `:_name:` never matches.
-    if (!_plainName.hasMatch(name) || _emojisByName.containsKey(name)) {
-      return null;
-    }
-    final emoji = unicodeEmojisByName[name];
+    if (closed == null || _emojisByName.containsKey(closed.name)) return null;
+    final emoji = unicodeEmojisByName[closed.name];
     if (emoji == null) return null;
 
     onShortcodeConverted?.call(emoji);
     return TextEditingValue(
-      text: next.text.replaceRange(open, caret, emoji.emoji),
-      selection: TextSelection.collapsed(offset: open + emoji.emoji.length),
+      text: next.text.replaceRange(closed.start, caret, emoji.emoji),
+      selection: TextSelection.collapsed(
+        offset: closed.start + emoji.emoji.length,
+      ),
     );
   }
 

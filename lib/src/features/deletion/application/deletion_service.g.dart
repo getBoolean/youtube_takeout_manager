@@ -47,7 +47,7 @@ final class DeletionServiceProvider
   }
 }
 
-String _$deletionServiceHash() => r'9017a5e14b77bc39c3855ff9a5eb5f1bf1f4863e';
+String _$deletionServiceHash() => r'6ce042b55f3a164e8ad5bfd6f939e8076f4fa32b';
 
 /// Queues items for deletion, removes them locally, and starts deleting
 /// them. A service: nothing depends on it, so it can read any provider.

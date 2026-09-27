@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_image.dart';
 
 void main() {
   // Network images always fail under flutter_test, like a deleted emoji.

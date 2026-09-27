@@ -8,7 +8,8 @@ import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -115,7 +116,7 @@ class ChannelListScreen extends ConsumerWidget {
               children: [
                 Padding(
                   padding: _searchBarPadding,
-                  child: DebouncedSearchBar(
+                  child: EmojiSearchBar(
                     hintText: 'Search channels and comments...',
                     emojis: EmojiSearchConfig(
                       groups: ref.watch(allChannelEmojiGroupsProvider),

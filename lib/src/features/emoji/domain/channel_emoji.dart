@@ -5,7 +5,7 @@ part 'channel_emoji.mapper.dart';
 /// A custom channel emoji found in the user's Takeout comments/live chats.
 @MappableClass()
 class ChannelEmoji with ChannelEmojiMappable {
-  /// See `emojiKey` in comment_text_parser.dart.
+  /// See `emojiKey` in emoji_key.dart.
   final String key;
   final String url;
 

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_lookup.dart';
 
 const _key =
     'nqCqL7OuHfRl5bstpirPEbLuD9ldK6pyPVVzCWLjjAWk3lN5EMwErHNozzjGajgr0f3hQ0TXfA';

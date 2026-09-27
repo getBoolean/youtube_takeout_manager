@@ -6,7 +6,9 @@ import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_i
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/emoji_name_cache_repository.dart';
 import '../data/youtube_emoji_name_repository.dart';
-import 'emoji_providers.dart';
+import '../domain/emoji_key.dart';
+import '../domain/emoji_lookup.dart';
+import 'emoji_names.dart';
 
 part 'emoji_name_resolver.g.dart';
 

@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
-import '../application/emoji_providers.dart';
+import '../application/emoji_names.dart';
+import '../application/frequent_emojis.dart';
 import '../domain/channel_emoji.dart';
-import '../domain/emoji_use.dart';
+import '../domain/emoji_picker_sections.dart';
 import '../domain/picker_emoji.dart';
 import '../domain/unicode_emoji.dart';
-import 'emoji_preview.dart';
+import 'emoji_image.dart';
+import 'emoji_url_menu.dart';
 
 /// Emoji picker for the search bars, laid out like Discord's: Frequently
 /// Used, one section per channel, then the standard emoji categories, with a
@@ -30,19 +32,6 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
   ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
 }
 
-/// One picker section. [id] is [_frequentId], a channel id or a
-/// [UnicodeEmojiCategory].
-typedef _Section = ({
-  Object id,
-  String title,
-  IconData? icon,
-  ChannelEmojiGroup? channel,
-  List<PickerEmoji> emojis,
-});
-
-const _frequentId = #frequent;
-const _maxFrequent = 16;
-
 IconData _categoryIcon(UnicodeEmojiCategory category) => switch (category) {
   UnicodeEmojiCategory.people => Icons.emoji_emotions_outlined,
   UnicodeEmojiCategory.nature => Icons.emoji_nature_outlined,
@@ -54,13 +43,21 @@ IconData _categoryIcon(UnicodeEmojiCategory category) => switch (category) {
   UnicodeEmojiCategory.flags => Icons.emoji_flags_outlined,
 };
 
-final _nameSeparators = RegExp('[_-]');
-
 class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   final _scrollController = ScrollController();
   final _sectionKeys = <Object, GlobalKey>{};
   final _hovered = ValueNotifier<PickerEmoji?>(null);
+  late EmojiPickerContent _content = _buildContent();
   String _filter = '';
+
+  @override
+  void didUpdateWidget(EmojiPickerPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.groups, widget.groups) ||
+        !identical(oldWidget.standardEmojis, widget.standardEmojis)) {
+      _content = _buildContent();
+    }
+  }
 
   @override
   void dispose() {
@@ -69,112 +66,10 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
     super.dispose();
   }
 
-  List<UnicodeEmoji>? _standardSource;
-  List<_Section> _standardSections = const [];
-  Map<String, UnicodeEmoji> _standardByEmoji = const {};
-
-  /// Builds the standard emoji sections when [EmojiPickerPanel.standardEmojis]
-  /// changes.
-  void _syncStandardSections() {
-    final source = widget.standardEmojis;
-    if (identical(source, _standardSource)) return;
-    _standardSource = source;
-    final byCategory = <UnicodeEmojiCategory, List<PickerEmoji>>{};
-    for (final emoji in source) {
-      byCategory
-          .putIfAbsent(emoji.category, () => [])
-          .add(UnicodePickerEmoji(emoji));
-    }
-    _standardSections = [
-      for (final category in UnicodeEmojiCategory.values)
-        if (byCategory[category] case final emojis?)
-          (
-            id: category,
-            title: category.label,
-            icon: _categoryIcon(category),
-            channel: null,
-            emojis: emojis,
-          ),
-    ];
-    _standardByEmoji = {for (final emoji in source) emoji.emoji: emoji};
-  }
-
-  /// Every section, unfiltered.
-  List<_Section> _allSections(List<EmojiUse> uses) {
-    final channelSections = <_Section>[];
-    final customById = <String, CustomPickerEmoji>{};
-    for (final group in widget.groups) {
-      if (group.emojis.isEmpty) continue;
-      final emojis = [for (final e in group.emojis) CustomPickerEmoji(e)];
-      for (final emoji in emojis) {
-        customById[emoji.usageId] = emoji;
-      }
-      channelSections.add((
-        id: group.channelId,
-        title: group.displayTitle,
-        icon: null,
-        channel: group,
-        emojis: emojis,
-      ));
-    }
-
-    // Only emojis this picker offers, i.e. used in what the search covers.
-    _syncStandardSections();
-    final frequent = <PickerEmoji>[];
-    for (final use in uses) {
-      final PickerEmoji? emoji = use.id.startsWith('u:')
-          ? switch (_standardByEmoji[use.id.substring(2)]) {
-              final e? => UnicodePickerEmoji(e),
-              null => null,
-            }
-          : customById[use.id];
-      if (emoji == null) continue;
-      frequent.add(emoji);
-      if (frequent.length == _maxFrequent) break;
-    }
-
-    return [
-      if (frequent.isNotEmpty)
-        (
-          id: _frequentId,
-          title: 'Frequently Used',
-          icon: Icons.schedule,
-          channel: null,
-          emojis: frequent,
-        ),
-      ...channelSections,
-      ..._standardSections,
-    ];
-  }
-
-  /// [all] narrowed to emojis matching the filter. Frequently Used is hidden
-  /// while filtering, since its emojis also appear in their own section.
-  List<_Section> _visibleSections(List<_Section> all) {
-    final filter = _filter.toLowerCase().replaceAll(':', '');
-    if (filter.isEmpty) return all;
-    final spaced = filter.replaceAll(_nameSeparators, ' ');
-    bool matches(PickerEmoji emoji) => switch (emoji) {
-      CustomPickerEmoji(:final emoji) => emoji.name.toLowerCase().contains(
-        filter,
-      ),
-      UnicodePickerEmoji(:final emoji) =>
-        emoji.shortNames.any((name) => name.contains(filter)) ||
-            emoji.name.toLowerCase().contains(spaced),
-    };
-    return [
-      for (final section in all)
-        if (section.id != _frequentId)
-          if (section.emojis.where(matches).toList() case final emojis
-              when emojis.isNotEmpty)
-            (
-              id: section.id,
-              title: section.title,
-              icon: section.icon,
-              channel: section.channel,
-              emojis: emojis,
-            ),
-    ];
-  }
+  EmojiPickerContent _buildContent() => EmojiPickerContent(
+    groups: widget.groups,
+    standardEmojis: widget.standardEmojis,
+  );
 
   void _jumpTo(Object id) {
     final context = _sectionKeys[id]?.currentContext;
@@ -195,8 +90,8 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final uses = ref.watch(frequentEmojisProvider).value ?? const [];
-    final all = _allSections(uses);
-    final sections = _visibleSections(all);
+    final all = _content.sections(uses);
+    final sections = filterEmojiPickerSections(all, _filter);
     final width = (MediaQuery.sizeOf(context).width - 32).clamp(240.0, 380.0);
 
     // The size must stay tight: MenuAnchor measures its children's intrinsic
@@ -286,24 +181,30 @@ class _EmojiPickerPanelState extends ConsumerState<EmojiPickerPanel> {
 
 /// A section's channel avatar or category icon.
 class _SectionIcon extends StatelessWidget {
-  final _Section section;
+  final EmojiPickerSection section;
   final double size;
 
   const _SectionIcon({required this.section, required this.size});
 
   @override
   Widget build(BuildContext context) {
-    if (section.channel case final channel?) {
-      return ChannelAvatar(
-        name: channel.displayTitle,
-        thumbnailUrl: channel.thumbnailUrl,
-        radius: size / 2,
-      );
+    final IconData icon;
+    switch (section) {
+      case ChannelEmojiSection(:final channel):
+        return ChannelAvatar(
+          name: channel.displayTitle,
+          thumbnailUrl: channel.thumbnailUrl,
+          radius: size / 2,
+        );
+      case FrequentEmojiSection():
+        icon = Icons.schedule;
+      case CategoryEmojiSection(:final category):
+        icon = _categoryIcon(category);
     }
     return SizedBox.square(
       dimension: size,
       child: Icon(
-        section.icon,
+        icon,
         size: size * 0.8,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
@@ -312,8 +213,8 @@ class _SectionIcon extends StatelessWidget {
 }
 
 class _SectionRail extends StatelessWidget {
-  final List<_Section> sections;
-  final ValueChanged<_Section> onTap;
+  final List<EmojiPickerSection> sections;
+  final ValueChanged<EmojiPickerSection> onTap;
 
   const _SectionRail({required this.sections, required this.onTap});
 
@@ -329,8 +230,8 @@ class _SectionRail extends StatelessWidget {
           for (final (i, section) in sections.indexed) ...[
             // Separates Frequently Used and channels from the categories.
             if (i > 0 &&
-                section.id is UnicodeEmojiCategory &&
-                sections[i - 1].id is! UnicodeEmojiCategory)
+                section is CategoryEmojiSection &&
+                sections[i - 1] is! CategoryEmojiSection)
               const Divider(height: 9, indent: 12, endIndent: 12),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
@@ -355,7 +256,7 @@ class _SectionRail extends StatelessWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  final _Section section;
+  final EmojiPickerSection section;
 
   const _SectionHeader({super.key, required this.section});
 

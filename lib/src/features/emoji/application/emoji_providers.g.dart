@@ -8,123 +8,62 @@ part of 'emoji_providers.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`, kept on this device. Looking up the rest is
-/// `EmojiNameResolver`'s.
+/// Each channel's comments and live chats read for emojis, parsing each one
+/// once.
 
-@ProviderFor(EmojiNames)
-final emojiNamesProvider = EmojiNamesProvider._();
+@ProviderFor(channelEmojiScans)
+final channelEmojiScansProvider = ChannelEmojiScansProvider._();
 
-/// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`, kept on this device. Looking up the rest is
-/// `EmojiNameResolver`'s.
-final class EmojiNamesProvider
-    extends $NotifierProvider<EmojiNames, EmojiNamesState> {
-  /// Custom emoji names resolved from YouTube live chat replays, keyed by
-  /// `emojiKey`, kept on this device. Looking up the rest is
-  /// `EmojiNameResolver`'s.
-  EmojiNamesProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'emojiNamesProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
+/// Each channel's comments and live chats read for emojis, parsing each one
+/// once.
 
-  @override
-  String debugGetCreateSourceHash() => _$emojiNamesHash();
-
-  @$internal
-  @override
-  EmojiNames create() => EmojiNames();
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(EmojiNamesState value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<EmojiNamesState>(value),
-    );
-  }
-}
-
-String _$emojiNamesHash() => r'4fd36edef5ee380004bde61ce576b352accda714';
-
-/// Custom emoji names resolved from YouTube live chat replays, keyed by
-/// `emojiKey`, kept on this device. Looking up the rest is
-/// `EmojiNameResolver`'s.
-
-abstract class _$EmojiNames extends $Notifier<EmojiNamesState> {
-  EmojiNamesState build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<EmojiNamesState, EmojiNamesState>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<EmojiNamesState, EmojiNamesState>,
-              EmojiNamesState,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
-
-/// Resolved emoji names keyed by `emojiKey`, for search matching.
-
-@ProviderFor(emojiNamesByKey)
-final emojiNamesByKeyProvider = EmojiNamesByKeyProvider._();
-
-/// Resolved emoji names keyed by `emojiKey`, for search matching.
-
-final class EmojiNamesByKeyProvider
+final class ChannelEmojiScansProvider
     extends
         $FunctionalProvider<
-          Map<String, String>,
-          Map<String, String>,
-          Map<String, String>
+          Map<String, ChannelEmojiScan>,
+          Map<String, ChannelEmojiScan>,
+          Map<String, ChannelEmojiScan>
         >
-    with $Provider<Map<String, String>> {
-  /// Resolved emoji names keyed by `emojiKey`, for search matching.
-  EmojiNamesByKeyProvider._()
+    with $Provider<Map<String, ChannelEmojiScan>> {
+  /// Each channel's comments and live chats read for emojis, parsing each one
+  /// once.
+  ChannelEmojiScansProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'emojiNamesByKeyProvider',
+        name: r'channelEmojiScansProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$emojiNamesByKeyHash();
+  String debugGetCreateSourceHash() => _$channelEmojiScansHash();
 
   @$internal
   @override
-  $ProviderElement<Map<String, String>> $createElement(
+  $ProviderElement<Map<String, ChannelEmojiScan>> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  Map<String, String> create(Ref ref) {
-    return emojiNamesByKey(ref);
+  Map<String, ChannelEmojiScan> create(Ref ref) {
+    return channelEmojiScans(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Map<String, String> value) {
+  Override overrideWithValue(Map<String, ChannelEmojiScan> value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Map<String, String>>(value),
+      providerOverride: $SyncValueProvider<Map<String, ChannelEmojiScan>>(
+        value,
+      ),
     );
   }
 }
 
-String _$emojiNamesByKeyHash() => r'399c47b22a9a067f9f175338a99305afc46668b5';
+String _$channelEmojiScansHash() => r'e98f73fe298e97f744ff88e11695597789418317';
 
 /// Custom emojis used in each channel's comments and live chats, most used
 /// first.
@@ -181,7 +120,7 @@ final class ChannelEmojisProvider
   }
 }
 
-String _$channelEmojisHash() => r'775ec4be97a98ee97c7fdd4018f04aeadf95fd2c';
+String _$channelEmojisHash() => r'7985027b934eabc6b085a7e7871d4747e7e6a614';
 
 /// Emoji picker sections for every channel with custom emojis, in the same
 /// order as the channel list.
@@ -237,61 +176,7 @@ final class AllChannelEmojiGroupsProvider
 }
 
 String _$allChannelEmojiGroupsHash() =>
-    r'd015f9dc7250f39aae55e6b7a78d0ab62a3473df';
-
-/// Emojis the user inserted into a search, most used first (ties: most
-/// recent). Once full, the least recently used entry makes room for a new one.
-
-@ProviderFor(FrequentEmojis)
-final frequentEmojisProvider = FrequentEmojisProvider._();
-
-/// Emojis the user inserted into a search, most used first (ties: most
-/// recent). Once full, the least recently used entry makes room for a new one.
-final class FrequentEmojisProvider
-    extends $AsyncNotifierProvider<FrequentEmojis, List<EmojiUse>> {
-  /// Emojis the user inserted into a search, most used first (ties: most
-  /// recent). Once full, the least recently used entry makes room for a new one.
-  FrequentEmojisProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'frequentEmojisProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$frequentEmojisHash();
-
-  @$internal
-  @override
-  FrequentEmojis create() => FrequentEmojis();
-}
-
-String _$frequentEmojisHash() => r'0af6917bc8d80a4c3618e10e0f367aed837ef2d0';
-
-/// Emojis the user inserted into a search, most used first (ties: most
-/// recent). Once full, the least recently used entry makes room for a new one.
-
-abstract class _$FrequentEmojis extends $AsyncNotifier<List<EmojiUse>> {
-  FutureOr<List<EmojiUse>> build();
-  @$mustCallSuper
-  @override
-  void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<List<EmojiUse>>, List<EmojiUse>>;
-    final element =
-        ref.element
-            as $ClassProviderElement<
-              AnyNotifier<AsyncValue<List<EmojiUse>>, List<EmojiUse>>,
-              AsyncValue<List<EmojiUse>>,
-              Object?,
-              Object?
-            >;
-    element.handleCreate(ref, build);
-  }
-}
+    r'4e1507a9e53ea02b199909d2c6217d9cf8cf0094';
 
 /// Emoji picker section for a single channel (empty if it has no emojis).
 
@@ -362,7 +247,7 @@ final class ChannelEmojiGroupsProvider
 }
 
 String _$channelEmojiGroupsHash() =>
-    r'b52f74afe96c21b4a82a8b1d602d53328cc4876a';
+    r'fc36da58e581522d22757b200ed2bd77ef8efe86';
 
 /// Emoji picker section for a single channel (empty if it has no emojis).
 
@@ -385,64 +270,6 @@ final class ChannelEmojiGroupsFamily extends $Family
   @override
   String toString() => r'channelEmojiGroupsProvider';
 }
-
-/// Standard emojis in each channel's comments and live chats: the ones a
-/// search there would find (see [UnicodeEmojiCatalog.find]).
-
-@ProviderFor(unicodeEmojisByChannel)
-final unicodeEmojisByChannelProvider = UnicodeEmojisByChannelProvider._();
-
-/// Standard emojis in each channel's comments and live chats: the ones a
-/// search there would find (see [UnicodeEmojiCatalog.find]).
-
-final class UnicodeEmojisByChannelProvider
-    extends
-        $FunctionalProvider<
-          Map<String, Set<UnicodeEmoji>>,
-          Map<String, Set<UnicodeEmoji>>,
-          Map<String, Set<UnicodeEmoji>>
-        >
-    with $Provider<Map<String, Set<UnicodeEmoji>>> {
-  /// Standard emojis in each channel's comments and live chats: the ones a
-  /// search there would find (see [UnicodeEmojiCatalog.find]).
-  UnicodeEmojisByChannelProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'unicodeEmojisByChannelProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$unicodeEmojisByChannelHash();
-
-  @$internal
-  @override
-  $ProviderElement<Map<String, Set<UnicodeEmoji>>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  Map<String, Set<UnicodeEmoji>> create(Ref ref) {
-    return unicodeEmojisByChannel(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Map<String, Set<UnicodeEmoji>> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<Map<String, Set<UnicodeEmoji>>>(
-        value,
-      ),
-    );
-  }
-}
-
-String _$unicodeEmojisByChannelHash() =>
-    r'ef01f9f069c2f6e508fce4d4ffe13b084e46fbb4';
 
 /// Standard emojis in the titles of each channel's videos that have the
 /// user's comments or live chats, which a channel search can match.
@@ -501,7 +328,7 @@ final class TitleUnicodeEmojisByChannelProvider
 }
 
 String _$titleUnicodeEmojisByChannelHash() =>
-    r'0d1b638821f0eccc8e05985e36e98fa2038e0d46';
+    r'20ee26c9b69b65a73d399a656287189d0758ff09';
 
 /// Standard emojis used in any comment or live chat, in picker order.
 
@@ -554,7 +381,7 @@ final class AllUsedUnicodeEmojisProvider
 }
 
 String _$allUsedUnicodeEmojisHash() =>
-    r'06b9c2d96ca2384fb58ab87eb9b0b18f6eefc476';
+    r'e33ae782da510fe013efb055727a3eaf497fec51';
 
 /// Standard emojis a search of [channelId] can find, in picker order: those
 /// in its comments and live chats, and in its video titles while the search
@@ -631,7 +458,7 @@ final class ChannelUnicodeEmojisProvider
 }
 
 String _$channelUnicodeEmojisHash() =>
-    r'134ebcc73eeee3d81eaef5319b4bfbd32d9247a7';
+    r'a6a02460ebb30e6bc7ac9adccaa552b63f9e901f';
 
 /// Standard emojis a search of [channelId] can find, in picker order: those
 /// in its comments and live chats, and in its video titles while the search

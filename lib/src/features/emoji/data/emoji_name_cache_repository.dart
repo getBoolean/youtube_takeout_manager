@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
-import 'youtube_emoji_name_repository.dart';
+import '../domain/resolved_emoji.dart';
 
 part 'emoji_name_cache_repository.g.dart';
 

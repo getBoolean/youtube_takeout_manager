@@ -8,7 +8,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/data/unicode_emoji_catalog.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/channel_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_picker_panel.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_text_editing_controller.dart';
@@ -201,7 +202,7 @@ void main() {
     });
   });
 
-  group('DebouncedSearchBar emoji autocomplete', () {
+  group('EmojiSearchBar emoji autocomplete', () {
     Future<List<String>> pumpBar(
       WidgetTester tester, {
       List<ChannelEmojiGroup> groups = _shylily,
@@ -212,7 +213,7 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             home: Scaffold(
-              body: DebouncedSearchBar(
+              body: EmojiSearchBar(
                 hintText: 'Search',
                 onQueryChanged: queries.add,
                 emojis: EmojiSearchConfig(

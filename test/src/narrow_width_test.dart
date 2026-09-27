@@ -44,7 +44,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/selection_action_bar.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
@@ -334,7 +335,7 @@ Widget _channelPage({required bool liveChats}) {
           const ChannelActionsHeader(channelId: fixture.channelId),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: DebouncedSearchBar(
+            child: EmojiSearchBar(
               hintText: 'Search comments and live chats...',
               emojis: EmojiSearchConfig(
                 groups: const [],
