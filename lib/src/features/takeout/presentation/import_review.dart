@@ -25,7 +25,11 @@ class ImportReview extends StatelessWidget {
       children: [
         if (plan.channels.length > 1 ||
             (!merge && plan.channels.isNotEmpty)) ...[
-          Text('Channels in this takeout', style: theme.textTheme.titleSmall),
+          Text(
+            'Channels in this takeout',
+            key: const ValueKey('import-review-channels'),
+            style: theme.textTheme.titleSmall,
+          ),
           for (final channel in plan.channels)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -62,20 +66,23 @@ class ImportReview extends StatelessWidget {
           const SizedBox(height: 4),
           if (plan.newlyDeletedCommentCount > 0)
             _Line(
+              key: const ValueKey('import-marks-comments-deleted'),
               Icons.delete_outline,
               '${formatCount(plan.newlyDeletedCommentCount, 'comment')} will '
               'be marked deleted',
             ),
           if (plan.newlyDeletedLiveChatCount > 0)
             _Line(
+              key: const ValueKey('import-marks-live-chats-deleted'),
               Icons.delete_outline,
               '${formatCount(plan.newlyDeletedLiveChatCount, 'live chat')} '
               'will be marked deleted',
             ),
         ],
-        for (final warning in _warnings()) ...[
+        for (final (:key, :warning) in _warnings()) ...[
           const SizedBox(height: 12),
           _Notice(
+            key: ValueKey(key),
             icon: Icons.info_outline,
             color: theme.colorScheme.tertiary,
             text: warning,
@@ -85,7 +92,8 @@ class ImportReview extends StatelessWidget {
     );
   }
 
-  List<String> _warnings() {
+  /// Each warning, keyed by the kind it's about.
+  List<({String key, String warning})> _warnings() {
     String? warning(
       DeletionCheckSkipReason? reason,
       int skippedRows,
@@ -113,12 +121,16 @@ class ImportReview extends StatelessWidget {
 
     final data = plan.mergedData;
     return [
-      ?warning(plan.commentCheckSkipped, data.skippedCommentRows, 'comment'),
-      ?warning(
-        plan.liveChatCheckSkipped,
-        data.skippedLiveChatRows,
-        'live chat',
-      ),
+      if (warning(plan.commentCheckSkipped, data.skippedCommentRows, 'comment')
+          case final text?)
+        (key: 'import-warning-comments', warning: text),
+      if (warning(
+            plan.liveChatCheckSkipped,
+            data.skippedLiveChatRows,
+            'live chat',
+          )
+          case final text?)
+        (key: 'import-warning-live-chats', warning: text),
     ];
   }
 }
@@ -127,7 +139,7 @@ class _Line extends StatelessWidget {
   final IconData icon;
   final String text;
 
-  const _Line(this.icon, this.text);
+  const _Line(this.icon, this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +161,12 @@ class _Notice extends StatelessWidget {
   final Color color;
   final String text;
 
-  const _Notice({required this.icon, required this.color, required this.text});
+  const _Notice({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
 
   @override
   Widget build(BuildContext context) {

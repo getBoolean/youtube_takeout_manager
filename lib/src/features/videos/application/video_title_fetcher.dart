@@ -71,7 +71,8 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   }
 
   // Record quota usage for videos.list API calls.
-  final batchCount = (uncachedIds.length + 49) ~/ 50;
+  const batchSize = YoutubeVideoRepository.batchSize;
+  final batchCount = (uncachedIds.length + batchSize - 1) ~/ batchSize;
   if (batchCount > 0) {
     await ref
         .read(quotaProvider.notifier)

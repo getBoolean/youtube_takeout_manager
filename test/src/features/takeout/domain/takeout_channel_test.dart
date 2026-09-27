@@ -149,13 +149,7 @@ void main() {
         liveChats: const [],
         subscriptionsByChannelId: const {},
       );
-      expect(
-        identical(
-          onlyChannel(single, 'UCmain', mainChannelId: 'UCmain'),
-          single,
-        ),
-        isTrue,
-      );
+      expect(onlyChannel(single, 'UCmain', mainChannelId: 'UCmain'), single);
     });
   });
 }

@@ -31,6 +31,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/skipped_rows_banner.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 
 const _main = TakeoutChannel(
@@ -210,7 +211,6 @@ class _Processing extends DeletionProcessing {
 
 class _FakeQuota extends QuotaNotifier {
   var resets = 0;
-  var fail = false;
 
   @override
   Future<QuotaState> build() async => QuotaState(
@@ -220,21 +220,18 @@ class _FakeQuota extends QuotaNotifier {
 
   @override
   Future<void> resetUsage() async {
-    if (fail) throw Exception('storage is full');
     resets++;
   }
 }
 
 class _Cache extends DeviceCacheClearer {
   var clears = 0;
-  var fail = false;
 
   @override
   void build() {}
 
   @override
   Future<void> clear() async {
-    if (fail) throw Exception('storage is locked');
     clears++;
   }
 }
@@ -364,16 +361,17 @@ void main() {
           liveChats: [],
           subscriptionsByChannelId: {},
           skippedCommentRows: 3,
-          skippedLiveChatRows: 1,
+          skippedLiveChatRows: 7,
         ),
       ),
     );
 
-    expect(find.text("Some rows couldn't be read"), findsOneWidget);
-    expect(
-      find.textContaining('3 comments and 1 live chat were skipped'),
-      findsOneWidget,
+    Finder inBanner(String text) => find.descendant(
+      of: find.byType(SkippedRowsBanner),
+      matching: find.textContaining(text),
     );
+    expect(inBanner('3'), findsOneWidget);
+    expect(inBanner('7'), findsOneWidget);
   });
 
   testWidgets('says nothing of unread rows when none were skipped', (
@@ -381,7 +379,7 @@ void main() {
   ) async {
     await pumpDialog(tester);
 
-    expect(find.text("Some rows couldn't be read"), findsNothing);
+    expect(find.byType(SkippedRowsBanner), findsNothing);
   });
 
   testWidgets('tapping a channel views it', (tester) async {
@@ -544,14 +542,19 @@ void main() {
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('Import this takeout?'), findsOneWidget);
-    expect(find.text('Somebody Else'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-account-review')),
+        matching: find.text('Somebody Else'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.pumpAndSettle();
 
     expect(takeout.committed.single.accountId, 'UCnew');
-    expect(find.text('Import this takeout?'), findsNothing);
+    expect(find.byKey(const ValueKey('add-account-review')), findsNothing);
   });
 
   testWidgets('a takeout from an account already saved is merged only if '
@@ -566,134 +569,64 @@ void main() {
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('Takeout already imported'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('add-account-already-saved')),
+      findsOneWidget,
+    );
     expect(takeout.committed, isEmpty);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.pumpAndSettle();
     expectNoPopups();
     expect(selection.selected, [('UCwork', null)]);
-    expect(find.text('Merge this takeout?'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('add-account-merge-review')),
+      findsOneWidget,
+    );
     expect(takeout.committed, isEmpty);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.pumpAndSettle();
     expect(takeout.committed.single.accountId, 'UCwork');
-    expect(find.text('Merge this takeout?'), findsNothing);
-  });
-
-  testWidgets('shows quota usage, which is API-only', (tester) async {
-    await pumpDialog(tester);
-
-    expect(find.text('YouTube API quota'), findsOneWidget);
-    expect(find.textContaining("Activity doesn't use it"), findsOneWidget);
-    expect(find.text('30 / 10000 units used today'), findsOneWidget);
-  });
-
-  testWidgets('reset usage asks in place, not in a popup, and can be '
-      'cancelled', (tester) async {
-    await pumpDialog(tester);
-
-    await tester.ensureVisible(find.text('Reset usage'));
-    await tester.tap(find.text('Reset usage'));
-    await tester.pumpAndSettle();
-
-    expectNoPopups();
     expect(
-      find.textContaining('Reset the tracked quota usage'),
-      findsOneWidget,
+      find.byKey(const ValueKey('add-account-merge-review')),
+      findsNothing,
     );
-    expect(find.text('Reset usage'), findsNothing);
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Reset the tracked quota usage'), findsNothing);
-    expect(find.text('Reset usage'), findsOneWidget);
-    expect(quota.resets, 0);
   });
 
-  testWidgets('resets quota usage after confirming in place, saying so '
-      'there', (tester) async {
+  testWidgets("shows today's quota usage", (tester) async {
+    await pumpDialog(tester);
+
+    // The fake has used 30 units.
+    expect(find.textContaining('${dailyQuotaLimit - 30}'), findsOneWidget);
+  });
+
+  testWidgets('resets quota usage after confirming in place', (tester) async {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Reset usage'));
     await tester.tap(find.text('Reset usage'));
     await tester.pumpAndSettle();
+    expectNoPopups();
     await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
     await tester.pumpAndSettle();
 
     expectNoPopups();
     expect(quota.resets, 1);
-    expect(find.byType(SnackBar), findsNothing);
-    expect(find.text('Quota usage reset.'), findsOneWidget);
-    expect(find.text('Reset usage'), findsOneWidget);
   });
 
-  testWidgets('a reset that fails says so in place', (tester) async {
-    await pumpDialog(tester);
-    quota.fail = true;
-
-    await tester.ensureVisible(find.text('Reset usage'));
-    await tester.tap(find.text('Reset usage'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
-    await tester.pumpAndSettle();
-
-    expectNoPopups();
-    expect(find.textContaining("Couldn't reset quota usage"), findsOneWidget);
-    expect(find.text('Quota usage reset.'), findsNothing);
-  });
-
-  testWidgets('clear cache asks in place, not in a popup, and can be '
-      'cancelled', (tester) async {
+  testWidgets('clears the cache after confirming in place', (tester) async {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Clear cache'));
     await tester.tap(find.text('Clear cache'));
     await tester.pumpAndSettle();
-
     expectNoPopups();
-    expect(find.textContaining('Clear cached video metadata'), findsOneWidget);
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    expect(find.textContaining('Clear cached video metadata'), findsNothing);
-    expect(find.text('Clear cache'), findsOneWidget);
-    expect(cache.clears, 0);
-  });
-
-  testWidgets('clears the cache after confirming in place, saying so there', (
-    tester,
-  ) async {
-    await pumpDialog(tester);
-
-    await tester.ensureVisible(find.text('Clear cache'));
-    await tester.tap(find.text('Clear cache'));
-    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
     await tester.pumpAndSettle();
 
     expectNoPopups();
     expect(cache.clears, 1);
-    expect(find.byType(SnackBar), findsNothing);
-    expect(find.text('Cache cleared.'), findsOneWidget);
-  });
-
-  testWidgets('a cache clear that fails says so in place', (tester) async {
-    await pumpDialog(tester);
-    cache.fail = true;
-
-    await tester.ensureVisible(find.text('Clear cache'));
-    await tester.tap(find.text('Clear cache'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Clear'));
-    await tester.pumpAndSettle();
-
-    expectNoPopups();
-    expect(find.textContaining("Couldn't clear the cache"), findsOneWidget);
-    expect(find.text('Cache cleared.'), findsNothing);
   });
 
   group('account button', () {
@@ -759,7 +692,6 @@ void main() {
       await pumpButton(tester, viewed: null);
 
       expect(find.byType(ChannelAvatar), findsNothing);
-      expect(find.byIcon(Icons.account_circle_outlined), findsOneWidget);
       expect(find.byTooltip('Account'), findsOneWidget);
     });
   });

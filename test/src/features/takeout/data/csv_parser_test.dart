@@ -72,6 +72,8 @@ void main() {
       final result = parser.parseCommentsCsv(_toBytes(csv));
       expect(result.items, hasLength(1));
       expect(result.skippedRowCount, 0);
+      // The row's text keeps its line break rather than ending there.
+      expect(result.items.single.rawCommentText, contains('line1\nline2'));
     });
 
     test('parses comment with commas in quoted text field', () {
@@ -190,6 +192,8 @@ void main() {
       final result = parser.parseLiveChatsCsv(_toBytes(csv));
       expect(result.items, hasLength(1));
       expect(result.skippedRowCount, 0);
+      // The row's text keeps its line break rather than ending there.
+      expect(result.items.single.rawText, contains('line1\nline2'));
     });
 
     test('parses multiple live chats without skipping any', () {

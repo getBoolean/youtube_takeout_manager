@@ -206,6 +206,7 @@ class _RemovableState extends State<_Removable> {
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: NoticeBanner(
+            key: const ValueKey('remove-takeout-error'),
             title: "Couldn't remove the takeout",
             onDismiss: () => setState(() => _error = null),
             children: [Text('$error')],

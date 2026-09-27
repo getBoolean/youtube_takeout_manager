@@ -8,6 +8,8 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -15,22 +17,6 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_ti
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
-
-final _takeout = TakeoutData(
-  comments: [
-    Comment(
-      commentId: 'c1',
-      channelId: 'UCme',
-      createdAt: DateTime.utc(2026),
-      price: 0,
-      videoId: 'v1',
-      rawCommentText: '',
-      displayText: '',
-    ),
-  ],
-  liveChats: const [],
-  subscriptionsByChannelId: const {},
-);
 
 class _Clients extends GoogleAuthRepository {
   final used = <String>[];
@@ -45,16 +31,22 @@ class _Clients extends GoogleAuthRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// The API, holding the videos in [existing] (just v1 when null).
 class _Videos extends YoutubeVideoRepository {
   final bool signInFails;
+  final Set<String>? existing;
 
-  _Videos({this.signInFails = false});
+  /// The IDs asked for, per fetch.
+  final requested = <Set<String>>[];
+
+  _Videos({this.signInFails = false, this.existing});
 
   @override
   Stream<Video> fetchVideoMetadataStream(
     http.Client authClient,
     Set<String> videoIds,
   ) async* {
+    requested.add(videoIds);
     if (signInFails) {
       throw ServerRequestFailedException(
         'invalid_grant',
@@ -62,7 +54,9 @@ class _Videos extends YoutubeVideoRepository {
         responseContent: {'error': 'invalid_grant'},
       );
     }
-    yield const Video(videoId: 'v1', channelId: 'UCvideo');
+    for (final id in existing ?? const {'v1'}) {
+      if (videoIds.contains(id)) yield Video(videoId: id, channelId: 'UCvideo');
+    }
   }
 }
 
@@ -76,21 +70,43 @@ class _SignIns extends SignInService {
   Future<void> signInFailed(String channelId) async => failed.add(channelId);
 }
 
+/// A takeout commenting on each of [videoIds].
+TakeoutData _takeoutOn(Iterable<String> videoIds) => TakeoutData(
+  comments: [
+    for (final id in videoIds)
+      Comment(
+        commentId: 'c-$id',
+        channelId: 'UCme',
+        createdAt: DateTime.utc(2026),
+        price: 0,
+        videoId: id,
+        rawCommentText: '',
+        displayText: '',
+      ),
+  ],
+  liveChats: const [],
+  subscriptionsByChannelId: const {},
+);
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   Future<(ProviderContainer, _Clients, _SignIns)> load({
-    required bool signInFails,
+    bool signInFails = false,
+    TakeoutData? takeout,
+    _Videos? videos,
   }) async {
     final clients = _Clients();
     final signIns = _SignIns();
     final c = ProviderContainer(
       overrides: [
-        viewedTakeoutProvider.overrideWithValue(AsyncData(_takeout)),
+        viewedTakeoutProvider.overrideWithValue(
+          AsyncData(takeout ?? _takeoutOn(['v1'])),
+        ),
         readSessionChannelIdProvider.overrideWithValue('UCother'),
         googleAuthRepositoryProvider.overrideWithValue(clients),
         youtubeVideoRepositoryProvider.overrideWithValue(
-          _Videos(signInFails: signInFails),
+          videos ?? _Videos(signInFails: signInFails),
         ),
         signInServiceProvider.overrideWith(() => signIns),
       ],
@@ -107,7 +123,7 @@ void main() {
   }
 
   test('loads video details with whichever sign-in is available', () async {
-    final (c, clients, _) = await load(signInFails: false);
+    final (c, clients, _) = await load();
 
     expect(clients.used, ['UCother']);
     expect(await c.read(videoCacheRepositoryProvider).loadCachedVideos(), {
@@ -124,5 +140,64 @@ void main() {
       await c.read(videoCacheRepositoryProvider).loadNotFoundIds(),
       isEmpty,
     );
+  });
+
+  group('fetching', () {
+    // More than one batch's worth, so it takes several calls.
+    final ids = [
+      for (var i = 0; i <= YoutubeVideoRepository.batchSize; i++) 'v$i',
+    ];
+    final existing = {
+      for (final (i, id) in ids.indexed)
+        if (i.isEven) id,
+    };
+    final gone = ids.toSet().difference(existing);
+
+    test('videos the API lacks are saved as not found, and neither they nor '
+        'fetched ones are asked for again', () async {
+      final first = _Videos(existing: existing);
+      final (c, _, _) = await load(takeout: _takeoutOn(ids), videos: first);
+
+      expect(first.requested.single, ids.toSet());
+      final cache = c.read(videoCacheRepositoryProvider);
+      expect((await cache.loadCachedVideos()).keys.toSet(), existing);
+      expect(await cache.loadNotFoundIds(), gone);
+
+      final again = _Videos(existing: existing);
+      await load(takeout: _takeoutOn([...ids, 'vNew']), videos: again);
+
+      expect(again.requested, [
+        {'vNew'},
+      ]);
+    });
+
+    test('videos kept on this device are not fetched', () async {
+      final (c, _, _) = await load(takeout: _takeoutOn(['v1']));
+      expect(
+        (await c.read(videoCacheRepositoryProvider).loadCachedVideos()).keys,
+        ['v1'],
+      );
+
+      final again = _Videos();
+      await load(takeout: _takeoutOn(['v1', 'v2']), videos: again);
+
+      expect(again.requested, [
+        {'v2'},
+      ]);
+    });
+
+    test('records one videos.list call per batch fetched', () async {
+      final (c, _, _) = await load(
+        takeout: _takeoutOn(ids),
+        videos: _Videos(existing: existing),
+      );
+
+      final batches = (ids.length / YoutubeVideoRepository.batchSize).ceil();
+      final quota = await c.read(quotaProvider.future);
+      expect(
+        quota.usageFor(QuotaOperation.videosList),
+        batches * QuotaOperation.videosList.cost,
+      );
+    });
   });
 }

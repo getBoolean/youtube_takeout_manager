@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
 
@@ -20,11 +21,11 @@ final _rejected = MockClient(
 
 void main() {
   test('video details stop when the sign-in stops working', () async {
-    expect(
+    await expectLater(
       YoutubeVideoRepository().fetchVideoMetadataStream(_rejected, {
         'v1',
       }).toList(),
-      throwsA(anything),
+      throwsA(predicate(isSignInFailure)),
     );
   });
 
@@ -39,9 +40,9 @@ void main() {
   });
 
   test('channel avatars stop when the sign-in stops working', () async {
-    expect(
+    await expectLater(
       YoutubeChannelRepository().fetchChannelThumbnails(_rejected, {'UCa'}),
-      throwsA(anything),
+      throwsA(predicate(isSignInFailure)),
     );
   });
 }

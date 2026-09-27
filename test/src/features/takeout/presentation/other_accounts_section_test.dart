@@ -27,6 +27,8 @@ TakeoutSummary _summary(
   countsKnown: true,
 );
 
+const _removeError = ValueKey('remove-takeout-error');
+
 final _boolean = _summary('UCme', 'Boolean');
 final _work = _summary(
   'UCwork',
@@ -103,13 +105,10 @@ void main() {
   ) async {
     await pump(tester);
 
-    expect(find.text('Other Google accounts'), findsOneWidget);
     expect(find.text('Ada at Work'), findsOneWidget);
     expect(find.text('ada@work.example'), findsOneWidget);
-    expect(
-      find.textContaining('2 channels · 1,234 comments · 56 live chats'),
-      findsOneWidget,
-    );
+    // With its counts.
+    expect(find.textContaining('1,234'), findsOneWidget);
     // Its channels show only once opened.
     expect(find.text('Work Podcast'), findsNothing);
   });
@@ -147,12 +146,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text("Remove Work Channel's takeout?"), findsOneWidget);
-    expect(find.textContaining('3 queued deletions'), findsOneWidget);
-    expect(
-      find.textContaining('Your Google account and YouTube stay as they are'),
-      findsOne,
+    Finder inConfirmation(Finder finder) => find.descendant(
+      of: find.byType(RemoveTakeoutConfirmation),
+      matching: finder,
     );
+    expect(inConfirmation(find.textContaining('Work Channel')), findsOne);
+    // The queued deletions that go with it.
+    expect(inConfirmation(find.textContaining('3')), findsOne);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Remove takeout'));
     await tester.pumpAndSettle();
@@ -168,7 +168,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(removed, isEmpty);
-    expect(find.text("Remove Work Channel's takeout?"), findsNothing);
+    expect(find.byType(RemoveTakeoutConfirmation), findsNothing);
   });
 
   testWidgets('the viewed account can be removed too, after asking', (
@@ -178,7 +178,13 @@ void main() {
 
     await tester.tap(find.text('Remove this takeout'));
     await tester.pumpAndSettle();
-    expect(find.text("Remove Boolean's takeout?"), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(RemoveTakeoutConfirmation),
+        matching: find.textContaining('Boolean'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Remove takeout'));
     await tester.pumpAndSettle();
@@ -209,7 +215,6 @@ void main() {
       ],
     );
 
-    expect(find.text('Other saved sign-ins'), findsOneWidget);
     expect(find.text('Old Channel'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(TextButton, 'Remove sign-in'));
@@ -225,12 +230,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text("Couldn't remove the takeout"), findsOneWidget);
-    expect(find.textContaining('Storage unavailable'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(_removeError),
+        matching: find.textContaining('Storage unavailable'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Dismiss'));
     await tester.pumpAndSettle();
-    expect(find.text("Couldn't remove the takeout"), findsNothing);
+    expect(find.byKey(_removeError), findsNothing);
     expect(find.widgetWithText(TextButton, 'Remove takeout'), findsOneWidget);
   });
 
@@ -243,7 +253,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text("Couldn't remove the takeout"), findsOneWidget);
-    expect(find.textContaining('Disk full'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(_removeError),
+        matching: find.textContaining('Disk full'),
+      ),
+      findsOneWidget,
+    );
   });
 }

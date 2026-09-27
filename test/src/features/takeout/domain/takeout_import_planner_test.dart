@@ -42,7 +42,9 @@ TakeoutExport _export({
   List<Comment>? comments,
   List<LiveChat>? liveChats,
   CsvPages? commentPages,
+  CsvPages? liveChatPages,
   int skippedCommentRows = 0,
+  int skippedLiveChatRows = 0,
   Map<String, Subscription> subscriptions = const {},
   List<String> listed = const [],
 }) => TakeoutExport(
@@ -52,8 +54,10 @@ TakeoutExport _export({
     liveChats: liveChats ?? const [],
     subscriptionsByChannelId: subscriptions,
     skippedCommentRows: skippedCommentRows,
+    skippedLiveChatRows: skippedLiveChatRows,
     ownChannels: {
-      for (final id in listed) id: OwnChannel(channelId: id, title: 'T'),
+      for (final id in listed)
+        id: OwnChannel(channelId: id, title: 'Title $id'),
     },
   ),
   commentPages:
@@ -62,7 +66,12 @@ TakeoutExport _export({
         if (comments != null)
           (page: 0, rows: comments.length + skippedCommentRows),
       },
-  liveChatPages: {if (liveChats != null) (page: 0, rows: liveChats.length)},
+  liveChatPages:
+      liveChatPages ??
+      {
+        if (liveChats != null)
+          (page: 0, rows: liveChats.length + skippedLiveChatRows),
+      },
 );
 
 /// Saved data as the app saves it: each kind remembers when its newest
@@ -388,6 +397,80 @@ void main() {
 
       expect(plan.commentCheckSkipped, isNull);
       expect(plan.goneCommentIds, {'B', 'C'});
+    });
+  });
+
+  group('live chats missing from the newest takeout', () {
+    /// Saved live chats L1 and L2 from a takeout exported Feb 1.
+    final saved = _saved(
+      liveChats: [
+        _liveChat('L1', '2026-01-01T00:00:00Z'),
+        _liveChat('L2', '2026-01-02T00:00:00Z'),
+      ],
+      latestExportAt: _feb,
+    );
+
+    /// A Mar 1 takeout whose live chats have only L1.
+    TakeoutImportPlan planWith({
+      CsvPages? pages,
+      int skippedRows = 0,
+      Set<String> deleted = const {},
+    }) => planTakeoutImport(
+      [
+        _export(
+          at: _mar,
+          liveChats: [_liveChat('L1', '2026-01-01T00:00:00Z')],
+          liveChatPages: pages,
+          skippedLiveChatRows: skippedRows,
+        ),
+      ],
+      (
+        saved: saved,
+        merge: true,
+        deletedCommentIds: const {},
+        deletedLiveChatIds: deleted,
+        savedChannelSets: const {},
+        activeTakeoutId: null,
+      ),
+    );
+
+    test('are marked deleted when the live chat files are complete', () {
+      final plan = planWith();
+
+      expect(plan.liveChatCheckSkipped, isNull);
+      expect(plan.goneLiveChatIds, {'L2'});
+      expect(plan.newlyDeletedLiveChatCount, 1);
+    });
+
+    test('already marked ones are not counted as newly deleted', () {
+      final plan = planWith(deleted: {'L2'});
+
+      expect(plan.goneLiveChatIds, {'L2'});
+      expect(plan.newlyDeletedLiveChatCount, 0);
+    });
+
+    test('are left alone when a live chat file is missing', () {
+      final plan = planWith(pages: {(page: 0, rows: 1), (page: 2, rows: 1)});
+
+      expect(
+        plan.liveChatCheckSkipped,
+        DeletionCheckSkipReason.incompleteFiles,
+      );
+      expect(plan.goneLiveChatIds, isEmpty);
+      expect(plan.newlyDeletedLiveChatCount, 0);
+      expect(
+        plan.mergedData.liveChats.map((l) => l.liveChatId),
+        containsAll(['L1', 'L2']),
+      );
+    });
+
+    test('are left alone when live chat rows could not be read', () {
+      final plan = planWith(skippedRows: 1);
+
+      expect(plan.liveChatCheckSkipped, DeletionCheckSkipReason.unparsedRows);
+      expect(plan.goneLiveChatIds, isEmpty);
+      expect(plan.newlyDeletedLiveChatCount, 0);
+      expect(plan.mergedData.skippedLiveChatRows, 1);
     });
   });
 
@@ -863,7 +946,7 @@ void main() {
           isA<TakeoutAccountMismatchException>().having(
             (e) => e.titlesById,
             'titles',
-            {'UCa': 'T', 'UCb': 'T'},
+            {'UCa': 'Title UCa', 'UCb': 'Title UCb'},
           ),
         ),
       );

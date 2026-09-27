@@ -101,8 +101,13 @@ void main() {
     await pump(tester, const AddAccountReview(_plan));
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text('Import this takeout?'), findsOneWidget);
-    expect(find.text('Somebody Else'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-account-review')),
+        matching: find.text('Somebody Else'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Import'));
     await tester.tap(find.text('Cancel'));
@@ -115,9 +120,18 @@ void main() {
   ) async {
     await pump(tester, const AddAccountAlreadySaved('UCme'));
 
-    expect(find.text('Takeout already imported'), findsOneWidget);
-    expect(find.textContaining("from Boolean's account"), findsOneWidget);
-    expect(find.textContaining('Merging shows Boolean'), findsOneWidget);
+    // Names the account, and that merging switches to it.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-account-already-saved')),
+        matching: find.textContaining('Boolean'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('merge-switches-account')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.tap(find.text('Cancel'));
@@ -132,8 +146,11 @@ void main() {
       viewedTakeoutId: 'UCme',
     );
 
-    expect(find.textContaining('(the one shown)'), findsOneWidget);
-    expect(find.textContaining('Merging shows'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('merge-into-shown-account')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('merge-switches-account')), findsNothing);
   });
 
   testWidgets("can't merge while deleting", (tester) async {
@@ -146,8 +163,13 @@ void main() {
   testWidgets('reviews the merge before saving it', (tester) async {
     await pump(tester, const AddAccountMergeReview(_mergePlan));
 
-    expect(find.text('Merge this takeout?'), findsOneWidget);
-    expect(find.text('3 new comments'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-account-merge-review')),
+        matching: find.textContaining('3'),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
     await tester.tap(find.text('Cancel'));
@@ -168,8 +190,13 @@ void main() {
     );
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text('Different YouTube account'), findsOneWidget);
-    expect(find.text('Nothing was imported.'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('add-account-failed')),
+        matching: find.byKey(const ValueKey('nothing-imported')),
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byTooltip('Dismiss'));
     expect(dismisses, 1);

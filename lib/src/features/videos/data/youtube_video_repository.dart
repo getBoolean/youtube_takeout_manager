@@ -25,12 +25,13 @@ String? thumbnailUrlOf(yt.ThumbnailDetails? thumbnails) =>
 ///
 /// Each `videos.list` call costs 1 quota unit and accepts up to 50 video IDs.
 class YoutubeVideoRepository {
-  static const _batchSize = 50;
+  /// How many video IDs one `videos.list` call takes.
+  static const batchSize = 50;
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
   /// Streams individual [Video] objects as they are fetched from the API.
   ///
-  /// Batches requests in groups of [_batchSize] for efficiency, but yields
+  /// Batches requests in groups of [batchSize] for efficiency, but yields
   /// each video individually as it is parsed from the response.
   Stream<Video> fetchVideoMetadataStream(
     http.Client authClient,
@@ -39,8 +40,8 @@ class YoutubeVideoRepository {
     final youtube = yt.YouTubeApi(authClient);
     final idList = videoIds.toList();
 
-    for (var i = 0; i < idList.length; i += _batchSize) {
-      final batch = idList.sublist(i, min(i + _batchSize, idList.length));
+    for (var i = 0; i < idList.length; i += batchSize) {
+      final batch = idList.sublist(i, min(i + batchSize, idList.length));
 
       try {
         final response = await youtube.videos.list(['snippet'], id: batch);
@@ -64,7 +65,7 @@ class YoutubeVideoRepository {
         // Continue with remaining batches on error
       }
 
-      if (i + _batchSize < idList.length) {
+      if (i + batchSize < idList.length) {
         await Future.delayed(_delayBetweenRequests);
       }
     }

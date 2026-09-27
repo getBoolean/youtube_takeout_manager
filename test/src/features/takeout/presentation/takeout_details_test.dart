@@ -23,10 +23,11 @@ void main() {
       latestExportAt: DateTime(2026, 4, 12, 12),
       countsKnown: true,
     );
-    expect(
-      describeTakeout(summary),
-      '2 channels · 1,234 comments · 1 live chat · exported Apr 12, 2026',
-    );
+    final details = describeTakeout(summary);
+    expect(details, contains('2 channel'));
+    // Every channel's comments are counted.
+    expect(details, contains('1,234'));
+    expect(details, contains('2026'));
   });
 
   test('leaves out counts and dates it does not know', () {

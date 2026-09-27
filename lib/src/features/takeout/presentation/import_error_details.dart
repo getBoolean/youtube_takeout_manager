@@ -32,12 +32,14 @@ class ImportErrorDetails extends StatelessWidget {
         )) ...[
           const SizedBox(height: 16),
           _ChannelIds(
+            key: const ValueKey('import-error-expected-channels'),
             label: 'Expected',
             channelIds: expectedChannelIds,
             titlesById: titlesById,
           ),
           const SizedBox(height: 12),
           _ChannelIds(
+            key: const ValueKey('import-error-found-channels'),
             label: 'In this takeout',
             channelIds: foundChannelIds,
             titlesById: titlesById,
@@ -46,6 +48,7 @@ class ImportErrorDetails extends StatelessWidget {
         const SizedBox(height: 16),
         Text(
           'Nothing was imported.',
+          key: const ValueKey('nothing-imported'),
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -61,6 +64,7 @@ class _ChannelIds extends StatelessWidget {
   final Map<String, String> titlesById;
 
   const _ChannelIds({
+    super.key,
     required this.label,
     required this.channelIds,
     required this.titlesById,
