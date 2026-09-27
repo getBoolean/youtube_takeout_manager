@@ -34,6 +34,9 @@ class _Harness {
   final headerBuilds = <String>[];
   final itemBuilds = <String>[];
 
+  /// How many times the list asked for an item's key.
+  int itemKeyLookups = 0;
+
   /// Header states passed to each built header, keyed by group.
   final statesSeen = <String, Set<_HeaderState>>{};
 
@@ -60,7 +63,10 @@ Future<_Harness> _pump(
           groups: groups,
           groupKey: (group) => group.key,
           itemsOf: (group) => group.items,
-          itemKey: (item) => item,
+          itemKey: (item) {
+            h.itemKeyLookups++;
+            return item;
+          },
           controller: h.controller,
           scrollController: h.scroll,
           createHeaderState: (group, status, vsync) =>
@@ -218,6 +224,39 @@ void main() {
     expect(await revealed, isTrue);
     expect(tester.getTopLeft(find.text('g60-i5')).dy, _headerHeight + 12);
     expect(tester.getTopLeft(_header('g60')).dy, 0);
+  });
+
+  testWidgets(
+    'a far jump in a 100,000-row list lands on its row, looking up only '
+    'rows near it',
+    (tester) async {
+      final h = await _pump(tester, groups: _groups(1000, 100));
+      await tester.pump();
+      h.itemKeyLookups = 0;
+
+      // Each group is 50 + 100 * 40 = 4050px, so g700-i37 starts here.
+      h.scroll.jumpTo(700 * 4050 + _headerHeight + 37 * _itemHeight);
+      await tester.pump();
+      await tester.pump();
+
+      // i37 and i38 are under the pinned header.
+      expect(tester.getTopLeft(find.text('g700-i39')).dy, 2 * _itemHeight);
+      expect(_header('g700'), findsOneWidget);
+      expect(h.itemKeyLookups, lessThan(2000));
+    },
+  );
+
+  testWidgets('reveals a far item in a 100,000-row list', (tester) async {
+    final h = await _pump(tester, groups: _groups(1000, 100));
+    final revealed = h.controller.revealItem(
+      'g900-i50',
+      gap: 12,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+    await tester.pumpAndSettle();
+    expect(await revealed, isTrue);
+    expect(tester.getTopLeft(find.text('g900-i50')).dy, _headerHeight + 12);
   });
 
   test('only depends on Flutter', () {

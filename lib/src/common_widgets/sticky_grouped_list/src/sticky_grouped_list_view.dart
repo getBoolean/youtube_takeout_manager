@@ -100,9 +100,13 @@ class _StickyGroupedListViewState<G, I, S>
   /// Groups whose headers the pinnable slots hold.
   Set<int> _pinnableGroups = {};
 
-  /// Extent of every row laid out so far, keyed like the rows, for
-  /// estimating where unmeasured rows sit.
-  final Map<Object, double> _measuredExtents = {};
+  /// Extent of every row laid out so far, keyed like the rows, with the key
+  /// of the group it was in, for estimating where unmeasured rows sit.
+  final Map<Object, ({double extent, Object group})> _measuredExtents = {};
+
+  /// Sum and count of the measured item extents in each group, by group
+  /// key, so estimates can step over whole groups instead of every row.
+  final Map<Object, (double, int)> _groupItemExtentSums = {};
   (double, int) _headerExtentSum = (0, 0);
   (double, int) _itemExtentSum = (0, 0);
   bool _rebuildScheduled = false;
@@ -544,7 +548,7 @@ class _StickyGroupedListViewState<G, I, S>
   };
 
   double _estimatedExtentOf(int row) =>
-      _measuredExtents[_rowKey(row)] ??
+      _measuredExtents[_rowKey(row)]?.extent ??
       _averageExtent(header: _rows.rowAt(row) is HeaderRow);
 
   double _averageExtent({required bool header}) {
@@ -553,9 +557,30 @@ class _StickyGroupedListViewState<G, I, S>
     return math.max(facts.averageExtent, 1.0);
   }
 
+  /// The estimated extent of group [g]'s rows: its header, and its items
+  /// while it's expanded.
+  double _estimatedGroupExtent(int g) {
+    final key = widget.groupKey(widget.groups[g]);
+    final header =
+        _measuredExtents[('header', key)]?.extent ??
+        _averageExtent(header: true);
+    final shown = _rows.shownItemCount(g);
+    if (shown == 0) return header;
+    final (sum, count) = _groupItemExtentSums[key] ?? (0.0, 0);
+    // More measured than shown when the group lost items since; scale down.
+    final items = count <= shown
+        ? sum + (shown - count) * _averageExtent(header: false)
+        : sum * shown / count;
+    return header + items;
+  }
+
   double _estimatedOffsetOfRow(int row) {
+    final group = _rows.groupIndexAt(row);
     var offset = 0.0;
-    for (var r = 0; r < row; r++) {
+    for (var g = 0; g < group; g++) {
+      offset += _estimatedGroupExtent(g);
+    }
+    for (var r = _rows.headerRowOf(group); r < row; r++) {
       offset += _estimatedExtentOf(r);
     }
     return offset;
@@ -564,10 +589,18 @@ class _StickyGroupedListViewState<G, I, S>
   @override
   (int, double) estimateRowAt(double scrollOffset) {
     var offset = 0.0;
-    for (var row = 0; row < _rows.length; row++) {
-      final extent = _estimatedExtentOf(row);
-      if (offset + extent > scrollOffset) return (row, offset);
-      offset += extent;
+    for (var g = 0; g < _rows.groupCount; g++) {
+      final extent = _estimatedGroupExtent(g);
+      if (offset + extent <= scrollOffset) {
+        offset += extent;
+        continue;
+      }
+      for (var row = _rows.headerRowOf(g); row < _rows.endRowOf(g); row++) {
+        final rowExtent = _estimatedExtentOf(row);
+        if (offset + rowExtent > scrollOffset) return (row, offset);
+        offset += rowExtent;
+      }
+      // Its rows add up to less than the group's estimate; look on.
     }
     final last = math.max(0, _rows.length - 1);
     return (last, math.max(0.0, offset - _estimatedExtentOf(last)));
@@ -580,20 +613,31 @@ class _StickyGroupedListViewState<G, I, S>
     for (var row = first; row <= last; row++) {
       final key = _rowKey(row);
       final extent = facts.extentOf(row)!;
+      final group = widget.groupKey(widget.groups[_rows.groupIndexAt(row)]);
       final isHeader = key is (String, Object) && key.$1 == 'header';
       final previous = _measuredExtents[key];
-      _measuredExtents[key] = extent;
+      _measuredExtents[key] = (extent: extent, group: group);
       if (isHeader) {
         _headerExtentSum = (
-          _headerExtentSum.$1 - (previous ?? 0) + extent,
+          _headerExtentSum.$1 - (previous?.extent ?? 0) + extent,
           _headerExtentSum.$2 + (previous == null ? 1 : 0),
         );
-      } else {
-        _itemExtentSum = (
-          _itemExtentSum.$1 - (previous ?? 0) + extent,
-          _itemExtentSum.$2 + (previous == null ? 1 : 0),
+        continue;
+      }
+      _itemExtentSum = (
+        _itemExtentSum.$1 - (previous?.extent ?? 0) + extent,
+        _itemExtentSum.$2 + (previous == null ? 1 : 0),
+      );
+      // The item may have moved groups since it was last measured.
+      if (previous != null) {
+        final (sum, count) = _groupItemExtentSums[previous.group]!;
+        _groupItemExtentSums[previous.group] = (
+          sum - previous.extent,
+          count - 1,
         );
       }
+      final (sum, count) = _groupItemExtentSums[group] ?? (0.0, 0);
+      _groupItemExtentSums[group] = (sum + extent, count + 1);
     }
   }
 }
