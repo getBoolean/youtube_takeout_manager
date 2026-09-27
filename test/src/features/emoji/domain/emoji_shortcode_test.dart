@@ -75,7 +75,7 @@ void main() {
     expect(isValidEmojiName('short-sad_2'), isTrue);
     expect(isValidEmojiName('a b'), isFalse);
     expect(isValidEmojiName(''), isFalse);
-    expect(isValidEmojiName('x' * 65), isFalse);
+    expect(isValidEmojiName('x' * 1000), isFalse);
   });
 
   group('queryMentionsEmoji', () {

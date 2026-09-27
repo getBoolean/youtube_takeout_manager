@@ -22,6 +22,11 @@ class GoogleAccountHeader extends StatelessWidget {
   /// Whether the other accounts are shown.
   final bool expanded;
 
+  /// Keys of what the header says without a takeout, and before any of its
+  /// channels signs in.
+  static const noTakeoutKey = ValueKey('account-no-takeout');
+  static const notSignedInKey = ValueKey('account-not-signed-in');
+
   const GoogleAccountHeader({
     super.key,
     this.profile,
@@ -38,7 +43,11 @@ class GoogleAccountHeader extends StatelessWidget {
     final profile = this.profile;
     if (main == null && profile == null) {
       return _toggleable(
-        Text('No takeout imported', style: theme.textTheme.titleMedium),
+        Text(
+          'No takeout imported',
+          key: noTakeoutKey,
+          style: theme.textTheme.titleMedium,
+        ),
       );
     }
     final secondary = theme.textTheme.bodyMedium?.copyWith(
@@ -78,7 +87,12 @@ class GoogleAccountHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(name, style: theme.textTheme.titleMedium),
-                for (final detail in details) Text(detail, style: secondary),
+                for (final detail in details)
+                  Text(
+                    detail,
+                    key: profile == null ? notSignedInKey : null,
+                    style: secondary,
+                  ),
                 if (exported != null)
                   Text(
                     'Takeout exported '

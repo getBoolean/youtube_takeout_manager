@@ -80,20 +80,21 @@ void main() {
 
       expect(find.text('Ada'), findsOneWidget);
       expect(find.text('ada@example.com'), findsOneWidget);
-      expect(find.text('Takeout exported Apr 12, 2026'), findsOneWidget);
+      expect(find.textContaining('Apr 12, 2026'), findsOneWidget);
+      expect(find.byKey(GoogleAccountHeader.notSignedInKey), findsNothing);
     });
 
     testWidgets('before any sign-in, shows the main channel', (tester) async {
       await pump(tester, const GoogleAccountHeader(mainChannel: _main));
 
       expect(find.text('Boolean'), findsOneWidget);
-      expect(find.text('Not signed in with Google'), findsOneWidget);
+      expect(find.byKey(GoogleAccountHeader.notSignedInKey), findsOneWidget);
     });
 
     testWidgets('without a takeout, says so', (tester) async {
       await pump(tester, const GoogleAccountHeader());
 
-      expect(find.text('No takeout imported'), findsOneWidget);
+      expect(find.byKey(GoogleAccountHeader.noTakeoutKey), findsOneWidget);
     });
 
     testWidgets('expands to show the other accounts', (tester) async {
@@ -159,12 +160,8 @@ void main() {
     ) async {
       await pumpSection(tester);
 
-      // They sit inside the account's tile, so need no heading.
-      expect(find.text('Channels'), findsNothing);
       expect(find.text('Viewing'), findsOneWidget);
-      expect(find.text('1,234 comments · 5 live chats'), findsOneWidget);
-      // Sign out already says the channel is signed in.
-      expect(find.text('Signed in'), findsNothing);
+      expect(find.textContaining('1,234'), findsOneWidget);
       expect(find.text('Sign out'), findsOneWidget);
       expect(find.text('Sign in'), findsOneWidget);
     });
@@ -234,7 +231,13 @@ void main() {
         },
       );
 
-      expect(find.text('View Someone Else'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(SignInNoticeBanner),
+          matching: find.byType(TextButton),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets(

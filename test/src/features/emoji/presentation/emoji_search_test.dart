@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/data/unicode_emoji_catalog.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/channel_emoji.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_picker_sections.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
@@ -47,6 +49,13 @@ const _shylily = [
   ),
 ];
 const _fire = '\u{1F525}';
+
+/// The header of the picker section with this id.
+Finder _section(Object id) => find.byKey(emojiPickerSectionKey(id));
+final _shylilySection = _section('UC1');
+final _peopleSection = _section(UnicodeEmojiCategory.people);
+final _frequentSection = _section(frequentSectionId);
+final _copyUrl = find.byKey(ImageUrlMenu.copyKey);
 
 EmojiTextEditingController _controller(String text) =>
     EmojiTextEditingController()
@@ -288,7 +297,7 @@ void main() {
       await tester.tap(find.byTooltip('Search by emoji'));
       await tester.pumpAndSettle();
 
-      expect(find.text('SHYLILY'), findsOneWidget);
+      expect(_shylilySection, findsOneWidget);
       await tester.tap(find.bySemanticsLabel(':shypraise:'));
       await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
@@ -326,9 +335,9 @@ void main() {
       await pumpBar(tester);
       await openPicker(tester);
 
-      expect(find.text('SHYLILY'), findsOneWidget);
-      expect(find.text('PEOPLE'), findsOneWidget);
-      expect(find.text('FREQUENTLY USED'), findsNothing);
+      expect(_shylilySection, findsOneWidget);
+      expect(_peopleSection, findsOneWidget);
+      expect(_frequentSection, findsNothing);
     });
 
     testWidgets('finding and picking a standard emoji inserts it', (
@@ -338,7 +347,7 @@ void main() {
       await openPicker(tester);
       await findInPicker(tester, 'fire');
 
-      expect(find.text('SHYLILY'), findsNothing);
+      expect(_shylilySection, findsNothing);
       await tester.tap(find.bySemanticsLabel(':fire:'));
       await tester.pumpAndSettle(const Duration(milliseconds: 400));
 
@@ -354,18 +363,18 @@ void main() {
       await tester.pumpAndSettle();
 
       await openPicker(tester);
-      expect(find.text('FREQUENTLY USED'), findsOneWidget);
+      expect(_frequentSection, findsOneWidget);
       expect(find.bySemanticsLabel(':fire:'), findsWidgets);
 
       // Hidden while filtering, like Discord.
       await findInPicker(tester, 'fire');
-      expect(find.text('FREQUENTLY USED'), findsNothing);
+      expect(_frequentSection, findsNothing);
     });
 
     testWidgets('the rail jumps to a category', (tester) async {
       await pumpBar(tester);
       await openPicker(tester);
-      expect(find.text('FLAGS').hitTestable(), findsNothing);
+      expect(_section(UnicodeEmojiCategory.flags).hitTestable(), findsNothing);
 
       final rail = find.descendant(
         of: find.byType(EmojiPickerPanel),
@@ -382,7 +391,10 @@ void main() {
       await tester.tap(find.byTooltip('Flags'));
       await tester.pumpAndSettle();
 
-      expect(find.text('FLAGS').hitTestable(), findsOneWidget);
+      expect(
+        _section(UnicodeEmojiCategory.flags).hitTestable(),
+        findsOneWidget,
+      );
     });
 
     testWidgets('standard emojis are offered without channel emojis', (
@@ -391,7 +403,7 @@ void main() {
       await pumpBar(tester, groups: const []);
       await openPicker(tester);
 
-      expect(find.text('PEOPLE'), findsOneWidget);
+      expect(_peopleSection, findsOneWidget);
     });
 
     testWidgets('offers only the given standard emojis', (tester) async {
@@ -399,8 +411,8 @@ void main() {
       await pumpBar(tester, standard: [fire]);
       await openPicker(tester);
 
-      expect(find.text('NATURE'), findsOneWidget);
-      expect(find.text('PEOPLE'), findsNothing);
+      expect(_section(UnicodeEmojiCategory.nature), findsOneWidget);
+      expect(_peopleSection, findsNothing);
       expect(find.byTooltip('People'), findsNothing);
       expect(find.bySemanticsLabel(':fire:'), findsOneWidget);
       expect(find.bySemanticsLabel(':grinning:'), findsNothing);
@@ -431,11 +443,11 @@ void main() {
         kind: PointerDeviceKind.mouse,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Copy image URL'));
+      await tester.tap(_copyUrl);
       await tester.pumpAndSettle();
 
       expect(clipboard.value, _shypraise.url);
-      expect(find.text('SHYLILY'), findsOneWidget); // picker still open
+      expect(_shylilySection, findsOneWidget); // picker still open
 
       // A click elsewhere in the picker dismisses the menu, not the picker.
       // (The mouse now hovers the emoji, so the footer names it too.)
@@ -445,16 +457,16 @@ void main() {
         kind: PointerDeviceKind.mouse,
       );
       await tester.pumpAndSettle();
-      expect(find.text('Copy image URL'), findsOneWidget);
-      await tester.tap(find.text('SHYLILY'));
+      expect(_copyUrl, findsOneWidget);
+      await tester.tap(_shylilySection);
       await tester.pumpAndSettle();
-      expect(find.text('Copy image URL'), findsNothing);
-      expect(find.text('SHYLILY'), findsOneWidget);
+      expect(_copyUrl, findsNothing);
+      expect(_shylilySection, findsOneWidget);
 
       // Long press works too, for touch.
       await tester.longPress(find.bySemanticsLabel(':shortsad:'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Copy image URL'));
+      await tester.tap(_copyUrl);
       await tester.pumpAndSettle();
       expect(clipboard.value, _shortsad.url);
     });
@@ -537,12 +549,16 @@ void main() {
     });
 
     testWidgets('a time is not an emoji name', (tester) async {
+      final suggestions = find.byKey(EmojiSearchBar.suggestionsKey);
       await pumpBar(tester);
       await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'at :sh');
+      await tester.pump();
+      expect(suggestions, findsOneWidget);
+
       await tester.enterText(find.byType(TextField), 'at 10:30');
       await tester.pump();
-
-      expect(find.textContaining('EMOJI MATCHING'), findsNothing);
+      expect(suggestions, findsNothing);
     });
   });
 }

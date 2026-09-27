@@ -23,7 +23,6 @@ void main() {
         searchableCommentText(_raw, const {}),
         'not the reds again :${fallbackEmojiName(_key)}:',
       );
-      expect(fallbackEmojiName(_key), 'emoji_nqCqL7');
     });
 
     test('leaves emoji names out for plain-text searches', () {

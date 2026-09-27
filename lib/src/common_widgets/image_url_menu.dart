@@ -21,6 +21,11 @@ class ImageUrlMenu extends StatefulWidget {
   final String unavailableLabel;
   final Widget child;
 
+  /// Keys of the menu item that copies the URL, and of the disabled one shown
+  /// when there's no URL.
+  static const copyKey = ValueKey('image-url-copy');
+  static const unavailableKey = ValueKey('image-url-unavailable');
+
   const ImageUrlMenu({
     super.key,
     required this.url,
@@ -59,11 +64,13 @@ class _ImageUrlMenuState extends State<ImageUrlMenu> {
   Widget _item() {
     if (!isWebUrl(widget.url)) {
       return MenuItemButton(
+        key: ImageUrlMenu.unavailableKey,
         leadingIcon: const Icon(Icons.link_off),
         child: Text(widget.unavailableLabel),
       );
     }
     return MenuItemButton(
+      key: ImageUrlMenu.copyKey,
       leadingIcon: const Icon(Icons.link),
       // Only this menu: inside another menu that one stays open.
       closeOnActivate: false,

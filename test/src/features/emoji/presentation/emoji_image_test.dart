@@ -24,8 +24,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.image_not_supported_outlined), findsNWidgets(2));
-    expect(find.text('Image no longer available'), findsOneWidget);
+    expect(find.byKey(EmojiImage.placeholderKey), findsNWidgets(2));
+    // Only the one asked to explain says why.
+    expect(find.textContaining('available'), findsOneWidget);
   });
 
   testWidgets('says when Takeout had no image URL', (tester) async {
@@ -39,7 +40,7 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
-    expect(find.text('Not included in Takeout'), findsOneWidget);
+    expect(find.byKey(EmojiImage.placeholderKey), findsOneWidget);
+    expect(find.textContaining('Takeout'), findsOneWidget);
   });
 }

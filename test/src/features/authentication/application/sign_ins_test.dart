@@ -20,6 +20,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 /// Credentials whose access token names the channel they're for.
@@ -65,6 +66,10 @@ class _FakeAuthRepository extends GoogleAuthRepository {
   final sessions = <String>{};
   final closed = <(String, bool)>[];
 
+  /// Each session's access token, and what it calls once refreshed.
+  final tokens = <String, String>{};
+  final onRefreshedFor = <String, void Function(AccessCredentials)>{};
+
   @override
   Future<AccessCredentials?> requestCredentials() async => next;
 
@@ -81,7 +86,11 @@ class _FakeAuthRepository extends GoogleAuthRepository {
     String channelId,
     AccessCredentials credentials, {
     required void Function(AccessCredentials credentials) onRefreshed,
-  }) => sessions.add(channelId);
+  }) {
+    sessions.add(channelId);
+    tokens[channelId] = credentials.accessToken.data;
+    onRefreshedFor[channelId] = onRefreshed;
+  }
 
   @override
   bool hasSession(String channelId) => sessions.contains(channelId);
@@ -174,6 +183,26 @@ void main() {
     expect(await storedChannels(), {'UCa'});
   });
 
+  test('refreshed tokens are saved and used after a restart', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'google_auth_credentials:UCa': _saved('UCa'),
+    });
+    final first = container();
+    await first.read(savedSignInsProvider.future);
+    expect(repository.tokens['UCa'], 'UCa');
+
+    repository.onRefreshedFor['UCa']!(_credentials('refreshed'));
+    await pumpEventQueue();
+
+    final saved = await store().loadAll();
+    expect(saved.single.credentials.accessToken.data, 'refreshed');
+
+    first.dispose();
+    repository = _FakeAuthRepository();
+    await container().read(savedSignInsProvider.future);
+    expect(repository.tokens['UCa'], 'refreshed');
+  });
+
   test('the viewed channel is signed in only with its own sign-in', () async {
     FlutterSecureStorage.setMockInitialValues({
       'google_auth_credentials:UCa': _saved('UCa'),
@@ -200,7 +229,10 @@ void main() {
     expect(c.read(authProvider)?.email, 'UCa@example.com');
     expect(await storedChannels(), {'UCa'});
     // Looking up the channel costs a unit.
-    expect((await c.read(quotaProvider.future)).unitsUsed, 1);
+    expect(
+      (await c.read(quotaProvider.future)).unitsUsed,
+      QuotaOperation.channelsList.cost,
+    );
   });
 
   test('signing in with another channel saves it for that channel and warns, '
@@ -365,7 +397,10 @@ void main() {
       expect(c.read(authProvider)?.channelId, 'UCa');
       expect(await storedChannels(), {'UCa'});
       expect(await store().loadLegacy(), isNull);
-      expect((await c.read(quotaProvider.future)).unitsUsed, 1);
+      expect(
+        (await c.read(quotaProvider.future)).unitsUsed,
+        QuotaOperation.channelsList.cost,
+      );
     });
 
     test('is kept to try again when offline', () async {

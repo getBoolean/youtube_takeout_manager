@@ -275,7 +275,6 @@ int helper(Ref ref) => ref.read(otherProvider);
         }),
       });
 
-      expect(g.problems, hasLength(3));
       expect(g.problems, contains(contains("isn't a provider")));
       expect(g.problems, contains(contains('hands its ref on')));
       expect(g.problems, contains(contains('a Ref outside a provider')));

@@ -7,7 +7,7 @@ import 'unicode_emoji.dart';
 const frequentSectionId = #frequent;
 
 /// Most emojis Frequently Used shows.
-const _maxFrequent = 16;
+const maxFrequentShown = 16;
 
 final _nameSeparators = RegExp('[_-]');
 
@@ -128,7 +128,7 @@ class EmojiPickerContent {
       );
       if (emoji == null) continue;
       frequent.add(emoji);
-      if (frequent.length == _maxFrequent) break;
+      if (frequent.length == maxFrequentShown) break;
     }
     return [
       if (frequent.isNotEmpty) FrequentEmojiSection(frequent),

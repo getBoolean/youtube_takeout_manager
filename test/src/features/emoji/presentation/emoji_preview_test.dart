@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/search_match_marker.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_names.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_image.dart';
@@ -48,6 +49,22 @@ void main() {
 
   final preview = find.text(':shortsad:');
 
+  /// Records text copied to the clipboard.
+  ValueNotifier<String?> mockClipboard(WidgetTester tester) {
+    final copied = ValueNotifier<String?>(null);
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied.value = (call.arguments as Map)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    return copied;
+  }
+
   testWidgets('tapping an emoji shows its preview, not the tile action', (
     tester,
   ) async {
@@ -63,18 +80,7 @@ void main() {
   testWidgets('right-click copies the image URL, not the tile action', (
     tester,
   ) async {
-    String? copied;
-    final messenger = tester.binding.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      if (call.method == 'Clipboard.setData') {
-        copied = (call.arguments as Map)['text'] as String?;
-      }
-      return null;
-    });
-    addTearDown(
-      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
-    );
-
+    final copied = mockClipboard(tester);
     final tileTaps = await pumpTile(tester);
     await tester.tap(
       find.byType(EmojiPreview),
@@ -82,17 +88,17 @@ void main() {
       kind: PointerDeviceKind.mouse,
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Copy image URL'));
+    await tester.tap(find.byKey(ImageUrlMenu.copyKey));
     await tester.pumpAndSettle();
 
-    expect(copied, 'https://yt3.ggpht.com/k1');
-    expect(find.text('Image URL copied'), findsOneWidget);
+    expect(copied.value, 'https://yt3.ggpht.com/k1');
     expect(tileTaps.value, 0);
   });
 
   testWidgets('offers no URL for an emoji Takeout couldn\'t export', (
     tester,
   ) async {
+    final copied = mockClipboard(tester);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -113,11 +119,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Copy image URL'), findsNothing);
-    final item = tester.widget<MenuItemButton>(
-      find.widgetWithText(MenuItemButton, 'No image URL in Takeout'),
-    );
-    expect(item.onPressed, isNull);
+    expect(find.byKey(ImageUrlMenu.copyKey), findsNothing);
+    await tester.tap(find.byKey(ImageUrlMenu.unavailableKey));
+    await tester.pumpAndSettle();
+    expect(copied.value, isNull);
   });
 
   testWidgets('hover shows the preview and clicking keeps it open', (

@@ -5,7 +5,8 @@ import '../domain/emoji_use.dart';
 
 part 'frequent_emojis.g.dart';
 
-const _maxFrequentEmojis = 50;
+/// Most emoji uses kept.
+const maxFrequentEmojis = 50;
 
 /// Emojis the user inserted into a search, most used first (ties: most
 /// recent). Once full, the least recently used entry makes room for a new one.
@@ -33,7 +34,7 @@ class FrequentEmojis extends _$FrequentEmojis {
       for (final use in current)
         if (use.id != id) use,
     ];
-    if (uses.length >= _maxFrequentEmojis) {
+    if (uses.length >= maxFrequentEmojis) {
       uses.remove(
         uses.reduce((a, b) => a.lastUsed.isBefore(b.lastUsed) ? a : b),
       );

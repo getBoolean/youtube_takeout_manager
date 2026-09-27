@@ -320,6 +320,7 @@ class _DeletionRunningBanner extends ConsumerWidget {
         ref.watch(deletionProcessingProvider) ==
         DeletionProcessingState.pausing;
     return NoticeBanner(
+      key: const ValueKey('deletion-running'),
       title: 'Deleting through the YouTube API',
       error: false,
       actions: [

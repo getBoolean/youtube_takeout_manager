@@ -26,15 +26,19 @@ void main() {
     expect(names['k2']!.ownerChannelId, isNull);
   });
 
-  test('saves names in the same format', () async {
+  test('saved names load again after a restart', () async {
     SharedPreferences.setMockInitialValues({});
     await repository().saveNames({
       'k1': const ResolvedEmoji(name: 'shortsad', ownerChannelId: 'UC1'),
       'k2': const ResolvedEmoji(name: 'wave'),
     });
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('cached_emoji_names'), _stored);
+    final names = await repository().loadNames();
+    expect(names.keys, unorderedEquals(['k1', 'k2']));
+    expect(names['k1']!.name, 'shortsad');
+    expect(names['k1']!.ownerChannelId, 'UC1');
+    expect(names['k2']!.name, 'wave');
+    expect(names['k2']!.ownerChannelId, isNull);
   });
 
   test('drops entries that are not valid names', () async {
@@ -53,5 +57,49 @@ void main() {
   test('ignores corrupt data', () async {
     SharedPreferences.setMockInitialValues({_key: 'not json'});
     expect(await repository().loadNames(), isEmpty);
+  });
+
+  test('loads nothing before anything is saved', () async {
+    SharedPreferences.setMockInitialValues({});
+    final repository = EmojiNameCacheRepository(KvStorageService());
+
+    expect(await repository.loadNames(), isEmpty);
+    expect(await repository.loadAttempts(), isEmpty);
+    expect(await repository.loadPausedUntil(), isNull);
+  });
+
+  test('saved scan times load again after a restart', () async {
+    SharedPreferences.setMockInitialValues({});
+    final attempts = {
+      'v1': DateTime.utc(2026, 3, 4, 5, 6, 7),
+      'v2': DateTime(2026, 1, 2),
+    };
+    await repository().saveAttempts(attempts);
+
+    expect(await repository().loadAttempts(), attempts);
+  });
+
+  test('a saved pause loads again after a restart', () async {
+    SharedPreferences.setMockInitialValues({});
+    final until = DateTime.utc(2026, 5, 6, 7, 8, 9);
+    await repository().savePausedUntil(until);
+
+    expect(await repository().loadPausedUntil(), until);
+  });
+
+  test('ignores corrupt scan times and pauses', () async {
+    SharedPreferences.setMockInitialValues({
+      'flutter.emoji_resolve_attempts':
+          '{"ok":"2026-01-02T00:00:00.000Z","number":5,"text":"soon"}',
+      'flutter.emoji_lookup_paused_until': 'not a date',
+    });
+
+    expect(await repository().loadAttempts(), {'ok': DateTime.utc(2026, 1, 2)});
+    expect(await repository().loadPausedUntil(), isNull);
+
+    SharedPreferences.setMockInitialValues({
+      'flutter.emoji_resolve_attempts': 'not json',
+    });
+    expect(await repository().loadAttempts(), isEmpty);
   });
 }

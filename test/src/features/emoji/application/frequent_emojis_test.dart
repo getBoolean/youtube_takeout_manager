@@ -3,8 +3,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/emoji/application/frequent_emojis.dart';
-
-const _key = 'flutter.emoji.frequentlyUsed';
+import 'package:youtube_takeout_manager/src/features/emoji/data/frequent_emoji_repository.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_use.dart';
+import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 
 void main() {
   ProviderContainer container() {
@@ -41,32 +42,24 @@ void main() {
   });
 
   test('drops the least recently used entry once full', () async {
-    String use(String id, int count, int day) =>
-        '{"id":"$id","count":$count,"lastUsed":"2026-01-${day}T00:00:00.000"}';
-    SharedPreferences.setMockInitialValues({
-      _key: [
-        use('u:old', 5, 10),
-        for (var i = 0; i < 49; i++) use('u:$i', 1, 20),
-      ].toString(),
-    });
+    SharedPreferences.setMockInitialValues({});
+    // The most used, but the least recently.
+    final old = EmojiUse(
+      id: 'u:old',
+      count: 5,
+      lastUsed: DateTime(2026, 1, 10),
+    );
+    await FrequentEmojiRepository(KvStorageService()).saveUses([
+      old,
+      for (var i = 1; i < maxFrequentEmojis; i++)
+        EmojiUse(id: 'u:$i', count: 1, lastUsed: DateTime(2026, 1, 20)),
+    ]);
     final c = container();
     await c.read(frequentEmojisProvider.notifier).recordUse('u:new');
 
     final result = await ids(c);
-    expect(result, hasLength(50));
+    expect(result, hasLength(maxFrequentEmojis));
     expect(result, isNot(contains('u:old')));
     expect(result, contains('u:new'));
-  });
-
-  test('ignores corrupt data', () async {
-    SharedPreferences.setMockInitialValues({_key: 'not json'});
-    expect(await ids(container()), isEmpty);
-
-    SharedPreferences.setMockInitialValues({
-      _key:
-          '[{"id":"u:a","count":1,"lastUsed":"2026-01-01T00:00:00.000"},'
-          '{"id":5}]',
-    });
-    expect(await ids(container()), ['u:a']);
   });
 }

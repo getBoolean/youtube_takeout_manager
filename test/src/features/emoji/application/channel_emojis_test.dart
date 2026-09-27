@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_names.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/channel_emoji.dart';
+import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_key.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
@@ -80,8 +81,8 @@ void main() {
     final emojis = container(names: {'k2': 'wave'}).read(channelEmojisProvider);
 
     expect(emojis.keys, unorderedEquals(['a', 'b']));
-    expect(emojis['a'], const [
-      ChannelEmoji(
+    expect(emojis['a'], [
+      const ChannelEmoji(
         key: 'k2',
         url: 'https://yt3.ggpht.com/k2',
         name: 'wave',
@@ -92,7 +93,7 @@ void main() {
       ChannelEmoji(
         key: 'k1',
         url: 'https://yt3.ggpht.com/k1',
-        name: 'emoji_k1',
+        name: fallbackEmojiName('k1'),
         channelId: 'a',
         usageCount: 1,
         resolved: false,

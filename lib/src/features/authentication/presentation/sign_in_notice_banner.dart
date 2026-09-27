@@ -15,6 +15,12 @@ class SignInNoticeBanner extends StatelessWidget {
   final VoidCallback? onViewChosen;
   final VoidCallback onDismiss;
 
+  /// Keys of the banner for each kind of [SignInNotice].
+  static const otherChannelChosenKey = ValueKey('sign-in-notice-other-channel');
+  static const noYouTubeChannelKey = ValueKey('sign-in-notice-no-channel');
+  static const signInFailedKey = ValueKey('sign-in-notice-failed');
+  static const stoppedWorkingKey = ValueKey('sign-in-notice-stopped-working');
+
   const SignInNoticeBanner({
     super.key,
     required this.notice,
@@ -30,6 +36,7 @@ class SignInNoticeBanner extends StatelessWidget {
     final targetName = targetTitle ?? targetChannelId;
     return switch (notice) {
       OtherChannelChosen(:final chosen) => NoticeBanner(
+        key: otherChannelChosenKey,
         title: 'Signed in with another channel',
         onDismiss: onDismiss,
         actions: [
@@ -65,6 +72,7 @@ class SignInNoticeBanner extends StatelessWidget {
         ],
       ),
       NoYouTubeChannel() => NoticeBanner(
+        key: noYouTubeChannelKey,
         title: 'No YouTube channel',
         onDismiss: onDismiss,
         children: [
@@ -76,11 +84,13 @@ class SignInNoticeBanner extends StatelessWidget {
         ],
       ),
       SignInFailed(:final message) => NoticeBanner(
+        key: signInFailedKey,
         title: 'Sign-in failed',
         onDismiss: onDismiss,
         children: [Text(message)],
       ),
       SignInStoppedWorking() => NoticeBanner(
+        key: stoppedWorkingKey,
         title: 'Sign-in stopped working',
         onDismiss: onDismiss,
         children: [

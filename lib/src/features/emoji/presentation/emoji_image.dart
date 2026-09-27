@@ -57,6 +57,9 @@ class EmojiImage extends StatelessWidget {
   /// Adds a caption under the placeholder saying why there's no image.
   final bool explainMissing;
 
+  /// Key of the placeholder shown instead of a missing image.
+  static const placeholderKey = ValueKey('emoji-image-placeholder');
+
   const EmojiImage({
     super.key,
     required this.url,
@@ -82,6 +85,7 @@ class EmojiImage extends StatelessWidget {
   Widget _placeholder(BuildContext context, String reason) {
     final theme = Theme.of(context);
     final placeholder = Container(
+      key: placeholderKey,
       width: size,
       height: size,
       decoration: BoxDecoration(

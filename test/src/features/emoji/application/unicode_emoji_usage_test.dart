@@ -119,11 +119,9 @@ void main() {
   );
 
   test('leaves title emojis out while titles are not searched', () async {
-    SharedPreferences.setMockInitialValues({
-      'flutter.search.matchGroupTitles': false,
-    });
     final c = container();
     await settle(c);
+    await c.read(searchOptionsProvider.notifier).setMatchGroupTitles(false);
     expect(names(c.read(channelUnicodeEmojisProvider('a'))), [
       'thumbsup',
       'fire',

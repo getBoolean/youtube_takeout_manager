@@ -33,6 +33,11 @@ class EmojiPickerPanel extends ConsumerStatefulWidget {
   ConsumerState<EmojiPickerPanel> createState() => _EmojiPickerPanelState();
 }
 
+/// Key of the header of the picker section whose [EmojiPickerSection.id] is
+/// [sectionId].
+Key emojiPickerSectionKey(Object sectionId) =>
+    ValueKey(('emoji-picker-section', sectionId));
+
 IconData _categoryIcon(UnicodeEmojiCategory category) => switch (category) {
   UnicodeEmojiCategory.people => Icons.emoji_emotions_outlined,
   UnicodeEmojiCategory.nature => Icons.emoji_nature_outlined,
@@ -265,6 +270,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
+      key: emojiPickerSectionKey(section.id),
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
       child: Row(
         children: [

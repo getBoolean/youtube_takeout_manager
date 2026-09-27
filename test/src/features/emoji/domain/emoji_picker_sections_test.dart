@@ -59,10 +59,14 @@ final _redCircle = _standard(
 EmojiUse _use(String id) =>
     EmojiUse(id: id, count: 1, lastUsed: DateTime(2026));
 
-/// Each section as its title and the `:name:`s in it.
+/// Each section as its id and the `:name:`s in it.
 List<String> _shown(List<EmojiPickerSection> sections) => [
   for (final section in sections)
-    '${section.title}: ${section.emojis.map((e) => e.token).join(' ')}',
+    '${switch (section.id) {
+      frequentSectionId => 'frequent',
+      UnicodeEmojiCategory(:final name) => name,
+      final id => id,
+    }}: ${section.emojis.map((e) => e.token).join(' ')}',
 ];
 
 void main() {
@@ -73,11 +77,11 @@ void main() {
 
   test('channels, then standard emojis by category', () {
     expect(_shown(content.sections(const [])), [
-      'Shylily: :shortsad: :shy_wave:',
+      'UC1: :shortsad: :shy_wave:',
       'UC3: :gg:',
-      'People: :grinning:',
-      'Nature: :fire:',
-      'Symbols: :red_circle:',
+      'people: :grinning:',
+      'nature: :fire:',
+      'symbols: :red_circle:',
     ]);
   });
 
@@ -93,6 +97,8 @@ void main() {
     ]);
     expect(sections[0], isA<FrequentEmojiSection>());
     expect((sections[1] as ChannelEmojiSection).channel, _groups[0]);
+    // A channel without a title goes by its id.
+    expect(sections[2].title, 'UC3');
     expect(
       (sections[3] as CategoryEmojiSection).category,
       UnicodeEmojiCategory.people,
@@ -106,23 +112,25 @@ void main() {
       _use('c:shortsad'),
       _use('u:😢'),
     ]);
-    expect(_shown(sections).first, 'Frequently Used: :fire: :shortsad:');
+    expect(_shown(sections).first, 'frequent: :fire: :shortsad:');
   });
 
-  test('Frequently Used shows at most 16', () {
+  test('Frequently Used keeps the first uses, up to its limit', () {
+    const count = maxFrequentShown + 4;
     final many = EmojiPickerContent(
       groups: [
         ChannelEmojiGroup(
           channelId: 'UC1',
-          emojis: [for (var i = 0; i < 20; i++) _custom('e$i')],
+          emojis: [for (var i = 0; i < count; i++) _custom('e$i')],
         ),
       ],
       standardEmojis: const [],
     );
     final sections = many.sections([
-      for (var i = 0; i < 20; i++) _use('c:e$i'),
+      for (var i = 0; i < count; i++) _use('c:e$i'),
     ]);
-    expect(sections.first.emojis, hasLength(16));
+    expect(sections.first.emojis, hasLength(maxFrequentShown));
+    expect(sections.first.emojis.first.token, ':e0:');
   });
 
   group('filterEmojiPickerSections', () {
@@ -135,21 +143,21 @@ void main() {
     });
 
     test('matches channel emoji names', () {
-      expect(filter('SHORT'), ['Shylily: :shortsad:']);
+      expect(filter('SHORT'), ['UC1: :shortsad:']);
     });
 
     test('matches standard short names and Unicode names', () {
-      expect(filter('fir'), ['Nature: :fire:']);
-      expect(filter('red_circ'), ['Symbols: :red_circle:']);
-      expect(filter('grinning-face'), ['People: :grinning:']);
+      expect(filter('fir'), ['nature: :fire:']);
+      expect(filter('red_circ'), ['symbols: :red_circle:']);
+      expect(filter('grinning-face'), ['people: :grinning:']);
     });
 
     test('ignores colons', () {
-      expect(filter(':shy_wave:'), ['Shylily: :shy_wave:']);
+      expect(filter(':shy_wave:'), ['UC1: :shy_wave:']);
     });
 
     test('hides Frequently Used and empty sections', () {
-      expect(filter('fire'), ['Nature: :fire:']);
+      expect(filter('fire'), ['nature: :fire:']);
       expect(filter('nothing'), isEmpty);
     });
   });

@@ -406,7 +406,10 @@ void main() {
 
     expect(auth.signIns, ['UCalt']);
     expectNoPopups();
-    expect(find.text('Signed in with another channel'), findsOneWidget);
+    expect(
+      find.byKey(SignInNoticeBanner.otherChannelChosenKey),
+      findsOneWidget,
+    );
     Finder inBanner(Finder finder) =>
         find.descendant(of: find.byType(SignInNoticeBanner), matching: finder);
     expect(inBanner(find.text('Someone Else')), findsOneWidget);
@@ -447,7 +450,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('No YouTube channel'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.noYouTubeChannelKey), findsOneWidget);
   });
 
   testWidgets('a failed sign-in shows on the row', (tester) async {
@@ -457,7 +460,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expectNoPopups();
-    expect(find.text('Sign-in failed'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.signInFailedKey), findsOneWidget);
+    expect(find.textContaining('offline'), findsOneWidget);
   });
 
   testWidgets('a sign-in that stopped working shows on its row', (
@@ -469,7 +473,7 @@ void main() {
         .read(lostSignInProvider.notifier)
         .report(const SignInProfile(channelId: 'UCalt'));
     await tester.pumpAndSettle();
-    expect(find.text('Sign-in stopped working'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.stoppedWorkingKey), findsOneWidget);
 
     await tester.tap(find.byTooltip('Dismiss'));
     await tester.pumpAndSettle();
@@ -490,7 +494,7 @@ void main() {
   ) async {
     await pumpDialog(tester, processing: DeletionProcessingState.running);
 
-    expect(find.text('Deleting through the YouTube API'), findsOneWidget);
+    expect(find.byKey(const ValueKey('deletion-running')), findsOneWidget);
     expect(find.text('Pause deletion'), findsOneWidget);
 
     await tester.tap(find.text('Sign out'));

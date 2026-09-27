@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:googleapis_auth/googleapis_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
+import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
@@ -42,9 +47,68 @@ class _Selection extends TakeoutSelectionNotifier {
       const TakeoutSelection(takeoutId: 'UCme');
 }
 
+/// Only another channel of the account is signed in, not the viewed one.
 class _SignIns extends SavedSignIns {
   @override
-  Future<Map<String, SignInProfile>> build() async => const {};
+  Future<Map<String, SignInProfile>> build() async => const {
+    'UCother': SignInProfile(channelId: 'UCother'),
+  };
+}
+
+/// A client that says which channel's sign-in it was made with.
+class _SessionClient extends http.BaseClient {
+  final String channelId;
+
+  _SessionClient(this.channelId);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      throw UnimplementedError();
+}
+
+class _Sessions extends GoogleAuthRepository {
+  @override
+  Future<AccessCredentials?> requestCredentials() async => null;
+
+  @override
+  bool isUsable(AccessCredentials credentials) => true;
+
+  @override
+  http.Client clientFor(AccessCredentials credentials) =>
+      throw UnimplementedError();
+
+  @override
+  void addSession(
+    String channelId,
+    AccessCredentials credentials, {
+    required void Function(AccessCredentials credentials) onRefreshed,
+  }) {}
+
+  @override
+  bool hasSession(String channelId) => channelId == 'UCother';
+
+  @override
+  http.Client getAuthenticatedClient(String channelId) =>
+      _SessionClient(channelId);
+
+  @override
+  Future<void> closeSession(String channelId, {bool revoke = false}) async {}
+}
+
+/// Records which sign-in fetched which channels' pictures.
+class _Channels extends YoutubeChannelRepository {
+  final sessions = <String>[];
+  final fetched = <String>{};
+
+  @override
+  Future<Map<String, String>> fetchChannelThumbnails(
+    http.Client authClient,
+    Set<String> channelIds,
+  ) async {
+    sessions.add((authClient as _SessionClient).channelId);
+    fetched.addAll(channelIds);
+    return {for (final id in channelIds) id: 'https://yt3.ggpht.com/$id'};
+  }
 }
 
 class _NoCache implements ChannelCacheRepository {
@@ -59,33 +123,41 @@ class _NoCache implements ChannelCacheRepository {
 }
 
 void main() {
-  test('channel pictures can be fetched with the sign-in that reads them, '
-      "which doesn't depend on those pictures", () async {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
+  test('a signed-out viewed channel still gets channel pictures, read with '
+      'another saved sign-in', () async {
+    final channels = _Channels();
     final container = ProviderContainer(
       overrides: [
         takeoutProvider.overrideWith(_Takeout.new),
         takeoutSelectionProvider.overrideWith(_Selection.new),
         savedSignInsProvider.overrideWith(_SignIns.new),
+        googleAuthRepositoryProvider.overrideWithValue(_Sessions()),
+        youtubeChannelRepositoryProvider.overrideWithValue(channels),
         channelCacheRepositoryProvider.overrideWithValue(_NoCache()),
         channelsProvider.overrideWithValue(const []),
       ],
     );
     addTearDown(container.dispose);
-    container.listen(readSessionChannelIdProvider, (_, _) {});
     container
+      ..listen(readSessionChannelIdProvider, (_, _) {})
       ..listen(channelThumbnailsProvider, (_, _) {})
       ..listen(channelThumbnailFetcherProvider, (_, _) {});
     await container.read(takeoutProvider.future);
     await container.read(takeoutSelectionProvider.future);
     await container.read(savedSignInsProvider.future);
-    container.read(readSessionChannelIdProvider);
+    await container.read(channelThumbnailsProvider.future);
 
-    // Enough channels to fetch a batch, which reads the sign-in to use.
+    final fetcher = container.read(channelThumbnailFetcherProvider.notifier)
+      ..queueChannelIds({'UC1', 'UC2'});
+    await fetcher.flushQueue();
+
+    expect(channels.sessions, ['UCother']);
+    expect(channels.fetched, {'UC1', 'UC2'});
     expect(
-      () => container
-          .read(channelThumbnailFetcherProvider.notifier)
-          .queueChannelIds({for (var i = 0; i < 10; i++) 'UC$i'}),
-      returnsNormally,
+      container.read(channelThumbnailsProvider).value,
+      containsPair('UC1', 'https://yt3.ggpht.com/UC1'),
     );
   });
 }

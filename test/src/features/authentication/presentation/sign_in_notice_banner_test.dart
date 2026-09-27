@@ -39,13 +39,14 @@ void main() {
   ) async {
     await pump(tester, const OtherChannelChosen(_chosen));
 
-    expect(find.text('Signed in with another channel'), findsOneWidget);
-    expect(find.text('You chose'), findsOneWidget);
+    expect(
+      find.byKey(SignInNoticeBanner.otherChannelChosenKey),
+      findsOneWidget,
+    );
     expect(find.text('Someone Else'), findsOneWidget);
-    expect(find.text('Signing in for'), findsOneWidget);
     expect(find.text('Gaming Alt'), findsOneWidget);
-    expect(find.textContaining('saved for Someone Else'), findsOneWidget);
-    expect(find.textContaining('View '), findsNothing);
+    // Nothing to view it with.
+    expect(find.byType(TextButton), findsNothing);
 
     await tester.tap(find.byTooltip('Dismiss'));
     expect(dismissed, 1);
@@ -63,21 +64,24 @@ void main() {
   testWidgets('explains an account without a YouTube channel', (tester) async {
     await pump(tester, const NoYouTubeChannel());
 
-    expect(find.text('No YouTube channel'), findsOneWidget);
-    expect(find.textContaining('Nothing was saved'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.noYouTubeChannelKey), findsOneWidget);
+    expect(find.textContaining('Gaming Alt'), findsOneWidget);
   });
 
   testWidgets('says why signing in failed', (tester) async {
     await pump(tester, const SignInFailed('Exception: offline'));
 
-    expect(find.text('Sign-in failed'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.signInFailedKey), findsOneWidget);
     expect(find.textContaining('offline'), findsOneWidget);
   });
 
   testWidgets('says a sign-in stopped working', (tester) async {
     await pump(tester, const SignInStoppedWorking());
 
-    expect(find.text('Sign-in stopped working'), findsOneWidget);
-    expect(find.textContaining('Sign in again'), findsOneWidget);
+    expect(find.byKey(SignInNoticeBanner.stoppedWorkingKey), findsOneWidget);
+    expect(find.textContaining('Gaming Alt'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Dismiss'));
+    expect(dismissed, 1);
   });
 }

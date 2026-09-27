@@ -26,12 +26,11 @@ void main() {
     expect(await repository().loadUses(), _uses);
   });
 
-  test('saves uses in the same format', () async {
+  test('saved uses load again after a restart', () async {
     SharedPreferences.setMockInitialValues({});
     await repository().saveUses(_uses);
 
-    final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('emoji.frequentlyUsed'), _stored);
+    expect(await repository().loadUses(), _uses);
   });
 
   test('loads nothing before anything is saved', () async {

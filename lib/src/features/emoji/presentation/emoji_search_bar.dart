@@ -30,6 +30,9 @@ class EmojiSearchBar extends ConsumerStatefulWidget {
   final List<Widget>? trailing;
   final EmojiSearchConfig? emojis;
 
+  /// Key of the emoji suggestions shown while a `:name` is typed.
+  static const suggestionsKey = ValueKey('emoji-suggestions');
+
   const EmojiSearchBar({
     super.key,
     required this.hintText,
@@ -235,6 +238,7 @@ class _EmojiSearchBarState extends ConsumerState<EmojiSearchBar> {
         // Taps here must not count as "outside" the field and unfocus it.
         child: TextFieldTapRegion(
           child: Material(
+            key: EmojiSearchBar.suggestionsKey,
             elevation: 3,
             color: theme.colorScheme.surfaceContainer,
             borderRadius: BorderRadius.circular(12),
