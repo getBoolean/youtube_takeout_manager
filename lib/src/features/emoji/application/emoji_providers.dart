@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -21,22 +23,29 @@ part 'emoji_providers.g.dart';
 /// The emojis in one channel's comments and live chats. Filled in by
 /// [channelEmojiScans]; read-only after that.
 class ChannelEmojiScan {
+  final _customCounts = <String, int>{};
+  final _customUrls = <String, String>{};
+  final _standardEmojis = <UnicodeEmoji>{};
+  final _videoIds = <String>{};
+
   /// Uses of each custom emoji, keyed by `emojiKey`, in the order first
   /// seen.
-  final Map<String, int> customCounts = {};
+  late final Map<String, int> customCounts = UnmodifiableMapView(_customCounts);
 
   /// A Takeout URL of each custom emoji, keyed by `emojiKey`.
-  final Map<String, String> customUrls = {};
+  late final Map<String, String> customUrls = UnmodifiableMapView(_customUrls);
 
   /// Standard emojis in the text: the ones a search would find (see
   /// [UnicodeEmojiCatalog.find]).
-  final Set<UnicodeEmoji> standardEmojis = {};
+  late final Set<UnicodeEmoji> standardEmojis = UnmodifiableSetView(
+    _standardEmojis,
+  );
 
   /// Videos the comments and live chats were posted on.
-  final Set<String> videoIds = {};
+  late final Set<String> videoIds = UnmodifiableSetView(_videoIds);
 
   void _add(Interaction item) {
-    if (item.videoId case final videoId?) videoIds.add(videoId);
+    if (item.videoId case final videoId?) _videoIds.add(videoId);
     final raw = item.rawText;
     final mayHaveCustom = raw.contains('customEmojiUrl');
     final mayHaveStandard = _hasNonAscii(raw);
@@ -45,10 +54,10 @@ class ChannelEmojiScan {
       switch (segment) {
         case EmojiSegment(:final url) when mayHaveCustom:
           final key = emojiKey(url);
-          customUrls.putIfAbsent(key, () => url);
-          customCounts[key] = (customCounts[key] ?? 0) + 1;
+          _customUrls.putIfAbsent(key, () => url);
+          _customCounts[key] = (_customCounts[key] ?? 0) + 1;
         case TextSegment(:final text) when mayHaveStandard:
-          _addUnicodeEmojis(text, standardEmojis);
+          _addUnicodeEmojis(text, _standardEmojis);
         case _:
           break;
       }
@@ -67,7 +76,7 @@ Map<String, ChannelEmojiScan> channelEmojiScans(Ref ref) {
       items.forEach(scan._add);
     });
   }
-  return result;
+  return UnmodifiableMapView(result);
 }
 
 /// Custom emojis used in each channel's comments and live chats, most used

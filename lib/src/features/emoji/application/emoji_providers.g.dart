@@ -63,7 +63,7 @@ final class ChannelEmojiScansProvider
   }
 }
 
-String _$channelEmojiScansHash() => r'e98f73fe298e97f744ff88e11695597789418317';
+String _$channelEmojiScansHash() => r'59731f54433b4ff56dd7edf440b3c2887412e072';
 
 /// Custom emojis used in each channel's comments and live chats, most used
 /// first.

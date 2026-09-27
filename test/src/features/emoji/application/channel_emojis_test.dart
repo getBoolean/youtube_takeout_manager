@@ -124,4 +124,17 @@ void main() {
     ]);
     expect(c.read(channelEmojiGroupsProvider('c')), isEmpty);
   });
+
+  test('the shared emoji scans cannot be changed by their readers', () {
+    final c = container();
+    final scans = c.read(channelEmojiScansProvider);
+    final scan = scans['a']!;
+
+    expect(() => scans.remove('a'), throwsUnsupportedError);
+    expect(() => scan.customCounts['k1'] = 99, throwsUnsupportedError);
+    expect(() => scan.customUrls.clear(), throwsUnsupportedError);
+    expect(() => scan.standardEmojis.clear(), throwsUnsupportedError);
+    expect(() => scan.videoIds.add('v9'), throwsUnsupportedError);
+    expect(c.read(channelEmojisProvider)['a'], hasLength(2));
+  });
 }
