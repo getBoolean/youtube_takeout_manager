@@ -112,6 +112,22 @@ class ChannelListRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [HistoryScreen]
+class HistoryRoute extends PageRouteInfo<void> {
+  const HistoryRoute({List<PageRouteInfo>? children})
+    : super(HistoryRoute.name, initialChildren: children);
+
+  static const String name = 'HistoryRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const HistoryScreen();
+    },
+  );
+}
+
+/// generated route for
 /// [ScriptDeletionScreen]
 class ScriptDeletionRoute extends PageRouteInfo<void> {
   const ScriptDeletionRoute({List<PageRouteInfo>? children})

@@ -1,6 +1,6 @@
 # YouTube Takeout Manager
 
-Google Takeout exports your YouTube comment history but gives you no way to browse, search, or delete it. **YouTube Takeout Manager** imports the export and lets you do all three, individually or in bulk.
+Google Takeout exports your YouTube comment history but gives you no way to browse, search, or delete it. **YouTube Takeout Manager** imports the export and lets you do all three, individually or in bulk. It also lets you browse and search the watch and search history in the same export.
 
 Runs on Windows, macOS, Linux, Web, Android, and iOS.
 
@@ -18,6 +18,15 @@ YouTube scatters your comments across the videos they were posted on — no unif
 - Match against video titles; expand matched groups
 - Collapsible sticky video headers
 - Super Chat cards with tier colors and pricing
+
+**History**
+
+- Watch and search history from the takeout (HTML or JSON), day by day with sticky date headers
+- One search across watched titles, channels and searches, ignoring case and accents
+- Jump to a date; show everything watched from one channel
+- Top channels by videos watched
+- Takeouts merge: entries a newer takeout no longer has stay, marked removed from YouTube history
+- Read-only: YouTube's API can't delete watch or search history
 
 **Delete**
 

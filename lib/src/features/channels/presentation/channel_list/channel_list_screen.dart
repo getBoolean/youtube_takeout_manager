@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -109,7 +110,11 @@ class ChannelListScreen extends ConsumerWidget {
       Scaffold(
         appBar: SelectionAppBar(
           title: const Text('Channels'),
-          actions: [...queue.appBarActions, const AccountButton()],
+          actions: [
+            ...queue.appBarActions,
+            const HistoryButton(),
+            const AccountButton(),
+          ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(_searchBarHeight),
             child: Stack(
@@ -242,7 +247,8 @@ class _LoadingSkeleton extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channels'),
-        actions: const [AccountButton()],
+        // Where the app bar's buttons will be once it's loaded.
+        actions: const [HistoryButton(enabled: false), AccountButton()],
         bottom: const PreferredSize(
           preferredSize: Size.fromHeight(_searchBarHeight),
           child: Padding(

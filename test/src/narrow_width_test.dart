@@ -47,6 +47,13 @@ import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_pro
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_channel_filter.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
@@ -670,6 +677,40 @@ void main() {
     () => const SearchOptionsDialog(options: SearchOptionsState()),
   );
 
+  final historyOverrides = [takeoutHistoryProvider.overrideWith(_History.new)];
+  fitsAtEveryWidth(
+    'the history page',
+    () => const HistoryPage(),
+    overrides: historyOverrides,
+  );
+  fitsAtEveryWidth(
+    "the history page's watches of one channel",
+    () => const HistoryPage(),
+    overrides: historyOverrides,
+    then: (tester) async {
+      ProviderScope.containerOf(tester.element(find.byType(HistoryPage)))
+          .read(historyChannelFilterProvider.notifier)
+          .show(
+            const HistoryChannel(
+              channelId: 'UClong',
+              title: 'A channel with a very long name indeed, it goes on',
+            ),
+          );
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+  for (final (tab, name) in [(1, 'searches'), (2, 'channels')]) {
+    fitsAtEveryWidth(
+      "the history page's $name",
+      () => const HistoryPage(),
+      overrides: historyOverrides,
+      then: (tester) async {
+        await tester.tap(find.byType(Tab).at(tab));
+        await tester.pump(const Duration(seconds: 1));
+      },
+    );
+  }
+
   testWidgets('narrow tiles never overflow their trailing widgets', (
     tester,
   ) async {
@@ -707,4 +748,40 @@ void main() {
       );
     }
   });
+}
+
+/// History with long titles and names, and every badge.
+class _History extends TakeoutHistoryNotifier {
+  @override
+  Future<TakeoutHistory?> build() async => TakeoutHistory(
+    watches: [
+      WatchEntry(
+        time: DateTime(2026, 4, 12, 20),
+        kind: WatchKind.video,
+        music: true,
+        title:
+            'A video with a very long title that goes on and on well past '
+            'the edge of any narrow window',
+        url: 'https://music.youtube.com/watch?v=long',
+        channelTitle: 'A channel with a very long name indeed, it goes on',
+        channelUrl: 'https://www.youtube.com/channel/UClong',
+        removedAt: DateTime.utc(2026, 5),
+      ),
+      WatchEntry(
+        time: DateTime(2026, 4, 11, 9),
+        kind: WatchKind.post,
+        title: 'A post',
+        url: 'https://www.youtube.com/post/Ugkx',
+        channelTitle: 'Short',
+      ),
+    ],
+    searches: [
+      SearchEntry(
+        time: DateTime(2026, 4, 12, 8),
+        music: true,
+        query: 'a search for something with a great many words in it indeed',
+        removedAt: DateTime.utc(2026, 5),
+      ),
+    ],
+  );
 }

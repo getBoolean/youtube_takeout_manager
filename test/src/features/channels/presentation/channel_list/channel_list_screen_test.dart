@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dar
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/no_takeout_views.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/skeleton.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
@@ -167,6 +168,22 @@ void main() {
 
     expect(find.byType(TakeoutImportPrompt), findsOneWidget);
     expect(find.byType(AccountButton), findsOneWidget);
+  });
+
+  testWidgets('history can be opened once there is a takeout', (tester) async {
+    await pumpScreen(tester);
+    expect(find.byType(HistoryButton), findsNothing);
+
+    await tester.tap(find.text('Select zip files'));
+    await tester.pumpAndSettle();
+
+    final button = tester.widget<IconButton>(
+      find.descendant(
+        of: find.byType(HistoryButton),
+        matching: find.byType(IconButton),
+      ),
+    );
+    expect(button.onPressed, isNotNull);
   });
 
   testWidgets('a clean first takeout is saved straight away and its channels '

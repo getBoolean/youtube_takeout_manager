@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_detail_screen.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/script_deletion_screen.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
 
 part 'app_router.gr.dart';
 
@@ -16,5 +17,6 @@ class AppRouter extends RootStackRouter {
     // The queue now lives beside the channel lists.
     RedirectRoute(path: '/deletion-queue', redirectTo: '/channels'),
     AutoRoute(page: ScriptDeletionRoute.page, path: '/script-deletion'),
+    AutoRoute(page: HistoryRoute.page, path: '/history'),
   ];
 }
