@@ -4,6 +4,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_placement.dart';
@@ -139,10 +140,20 @@ class ChannelDetailScreen extends HookConsumerWidget {
             if (!isTinyWidth(context)) const AccountButton(),
           ],
           bottom: commentCount > 0 && liveChatCount > 0
-              ? ChannelTabBar(
+              ? CountedTabBar(
                   controller: tabController,
-                  commentCount: commentCount,
-                  liveChatCount: liveChatCount,
+                  tabs: [
+                    CountedTab(
+                      icon: Icons.comment_outlined,
+                      label: 'Comments',
+                      count: commentCount,
+                    ),
+                    CountedTab(
+                      icon: Icons.chat_bubble_outline,
+                      label: 'Live Chats',
+                      count: liveChatCount,
+                    ),
+                  ],
                 )
               : null,
         ),

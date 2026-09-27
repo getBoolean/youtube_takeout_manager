@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
@@ -320,10 +321,20 @@ Widget _channelPage({required bool liveChats}) {
           channelUrl: 'https://www.youtube.com/channel/ch',
         ),
         actions: const [DeletionQueueIconButton(), AccountButton()],
-        bottom: ChannelTabBar(
+        bottom: CountedTabBar(
           controller: TabController(length: 2, vsync: const TestVSync()),
-          commentCount: 1234,
-          liveChatCount: 567,
+          tabs: const [
+            CountedTab(
+              icon: Icons.comment_outlined,
+              label: 'Comments',
+              count: 1234,
+            ),
+            CountedTab(
+              icon: Icons.chat_bubble_outline,
+              label: 'Live Chats',
+              count: 567,
+            ),
+          ],
         ),
       ),
       body: Column(
@@ -658,49 +669,6 @@ void main() {
     'the search options dialog',
     () => const SearchOptionsDialog(options: SearchOptionsState()),
   );
-
-  group('ChannelTabBar', () {
-    Future<void> pumpTabs(WidgetTester tester, double width) async {
-      tester.view.physicalSize = Size(width, 200);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            appBar: AppBar(
-              bottom: ChannelTabBar(
-                controller: TabController(length: 2, vsync: const TestVSync()),
-                commentCount: 68,
-                liveChatCount: 12,
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pump(const Duration(seconds: 1));
-    }
-
-    testWidgets('shows the full labels when they fit', (tester) async {
-      await pumpTabs(tester, 800);
-
-      expect(find.byType(ChannelTabLabel), findsNWidgets(2));
-    });
-
-    testWidgets('falls back to icons, keeping both tabs on screen', (
-      tester,
-    ) async {
-      await pumpTabs(tester, 120);
-
-      expect(find.byType(ChannelTabLabel), findsNothing);
-      expect(find.byTooltip('Comments (68)'), findsOneWidget);
-      expect(find.byTooltip('Live Chats (12)'), findsOneWidget);
-      for (final tab in find.byType(Tab).evaluate()) {
-        final rect = tester.getRect(find.byWidget(tab.widget));
-        expect(rect.left, greaterThanOrEqualTo(0));
-        expect(rect.right, lessThanOrEqualTo(120));
-      }
-    });
-  });
 
   testWidgets('narrow tiles never overflow their trailing widgets', (
     tester,
