@@ -20,6 +20,19 @@ class VideoFetchProgress extends _$VideoFetchProgress {
       state = (isFetching: false, fetched: state.total, total: state.total);
 }
 
+/// Videos to fetch details of besides the viewed takeout's, e.g. those of
+/// new items in a takeout being reviewed. Fetching them is
+/// `videoTitleFetcher`'s.
+@Riverpod(keepAlive: true)
+class ExtraVideoIds extends _$ExtraVideoIds {
+  @override
+  Set<String> build() => const {};
+
+  void set(Set<String> ids) => state = ids;
+
+  void clear() => state = const {};
+}
+
 /// Details of the videos commented or chatted on, by video ID, kept on this
 /// device. Fetching more is `videoTitleFetcher`'s.
 @Riverpod(keepAlive: true)

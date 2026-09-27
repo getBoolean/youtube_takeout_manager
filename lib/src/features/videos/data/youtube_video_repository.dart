@@ -32,11 +32,14 @@ class YoutubeVideoRepository {
   /// Streams individual [Video] objects as they are fetched from the API.
   ///
   /// Batches requests in groups of [batchSize] for efficiency, but yields
-  /// each video individually as it is parsed from the response.
+  /// each video individually as it is parsed from the response. Calls
+  /// [onResponse] as each request is answered, so its quota can be counted
+  /// as it's used.
   Stream<Video> fetchVideoMetadataStream(
     http.Client authClient,
-    Set<String> videoIds,
-  ) async* {
+    Set<String> videoIds, {
+    void Function()? onResponse,
+  }) async* {
     final youtube = yt.YouTubeApi(authClient);
     final idList = videoIds.toList();
 
@@ -45,6 +48,7 @@ class YoutubeVideoRepository {
 
       try {
         final response = await youtube.videos.list(['snippet'], id: batch);
+        onResponse?.call();
 
         for (final item in response.items ?? <yt.Video>[]) {
           if (item.id == null || item.snippet == null) continue;

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
@@ -12,9 +14,10 @@ import 'video_providers.dart';
 
 part 'video_title_fetcher.g.dart';
 
-/// Fetches details, like titles, of the viewed channel's videos not kept on
-/// this device yet, with whichever sign-in can read them. Starts over when
-/// that sign-in or the viewed takeout changes, dropping the run under way.
+/// Fetches details, like titles, of the viewed channel's videos and the
+/// [ExtraVideoIds] not kept on this device yet, with whichever sign-in can
+/// read them. Starts over when that sign-in, the viewed takeout or the extra
+/// videos change, dropping the run under way.
 ///
 /// An effect: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
@@ -22,6 +25,7 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   // Watched before anything is awaited, so a change always starts over.
   final sessionChannelId = ref.watch(readSessionChannelIdProvider);
   final takeout = ref.watch(viewedTakeoutProvider).value;
+  final extraIds = ref.watch(extraVideoIdsProvider);
   if (sessionChannelId == null || takeout == null) return;
 
   final cache = ref.read(videoCacheRepositoryProvider);
@@ -31,6 +35,7 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   final videoIds = <String>{
     for (final c in takeout.comments) ?c.videoId,
     for (final c in takeout.liveChats) ?c.videoId,
+    ...extraIds,
   };
   final notFoundIds = await cache.loadNotFoundIds();
   final uncachedIds = videoIds
@@ -44,13 +49,26 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   final client = ref
       .read(googleAuthRepositoryProvider)
       .getAuthenticatedClient(sessionChannelId);
+  // Dropping this run stops its requests, which fail uncounted.
+  ref.onDispose(client.close);
+  // Read up front: a change of sign-in or videos drops this run, after
+  // which ref can't be used, but what it did is still saved and counted.
+  final quota = ref.read(quotaProvider.notifier);
+  final signIns = ref.read(signInServiceProvider.notifier);
   final fetchedIds = <String>{};
 
   try {
     await for (final video
         in ref
             .read(youtubeVideoRepositoryProvider)
-            .fetchVideoMetadataStream(client, uncachedIds)) {
+            .fetchVideoMetadataStream(
+              client,
+              uncachedIds,
+              // Counted as each request is answered, so usage shows as it
+              // grows.
+              onResponse: () =>
+                  unawaited(quota.recordUsage(QuotaOperation.videosList)),
+            )) {
       videos.add(video);
       fetchedIds.add(video.videoId);
       progress.update(fetchedIds.length);
@@ -60,26 +78,14 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
     if (!isSignInFailure(e)) rethrow;
     // Keep what was fetched, but don't take the rest to be gone: the
     // sign-in failed, not the videos.
-    await videos.persist();
-    await ref
-        .read(signInServiceProvider.notifier)
-        .signInFailed(sessionChannelId);
+    await signIns.signInFailed(sessionChannelId);
     return;
   } finally {
     client.close();
     progress.complete();
+    // Also when this run is dropped, so what it fetched isn't lost.
+    await videos.persist();
   }
-
-  // Record quota usage for videos.list API calls.
-  const batchSize = YoutubeVideoRepository.batchSize;
-  final batchCount = (uncachedIds.length + batchSize - 1) ~/ batchSize;
-  if (batchCount > 0) {
-    await ref
-        .read(quotaProvider.notifier)
-        .recordUsage(QuotaOperation.videosList, count: batchCount);
-  }
-
-  await videos.persist();
 
   final newNotFound = uncachedIds.difference(fetchedIds);
   if (newNotFound.isNotEmpty) {

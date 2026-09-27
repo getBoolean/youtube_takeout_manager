@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
@@ -31,21 +33,26 @@ class _Clients extends GoogleAuthRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-/// The API, holding the videos in [existing] (just v1 when null).
+/// The API, holding the videos in [existing] (just v1 when null), answering
+/// in batches as the real one does.
 class _Videos extends YoutubeVideoRepository {
   final bool signInFails;
   final Set<String>? existing;
 
+  /// Keeps each fetch from asking for its second batch until completed.
+  final Completer<void>? hold;
+
   /// The IDs asked for, per fetch.
   final requested = <Set<String>>[];
 
-  _Videos({this.signInFails = false, this.existing});
+  _Videos({this.signInFails = false, this.existing, this.hold});
 
   @override
   Stream<Video> fetchVideoMetadataStream(
     http.Client authClient,
-    Set<String> videoIds,
-  ) async* {
+    Set<String> videoIds, {
+    void Function()? onResponse,
+  }) async* {
     requested.add(videoIds);
     if (signInFails) {
       throw ServerRequestFailedException(
@@ -54,9 +61,23 @@ class _Videos extends YoutubeVideoRepository {
         responseContent: {'error': 'invalid_grant'},
       );
     }
-    for (final id in existing ?? const {'v1'}) {
-      if (videoIds.contains(id)) yield Video(videoId: id, channelId: 'UCvideo');
+    const size = YoutubeVideoRepository.batchSize;
+    final ids = videoIds.toList();
+    for (var i = 0; i < ids.length; i += size) {
+      if (i > 0) await hold?.future;
+      onResponse?.call();
+      for (final id in ids.skip(i).take(size)) {
+        if ((existing ?? const {'v1'}).contains(id)) {
+          yield Video(videoId: id, channelId: 'UCvideo');
+        }
+      }
     }
+  }
+}
+
+Future<void> _settle() async {
+  for (var i = 0; i < 20; i++) {
+    await pumpEventQueue();
   }
 }
 
@@ -171,6 +192,26 @@ void main() {
       ]);
     });
 
+    test('extra videos, like those of a takeout being reviewed, are fetched '
+        'too', () async {
+      final videos = _Videos(existing: {'v1', 'vReviewed'});
+      final (c, _, _) = await load(takeout: _takeoutOn(['v1']), videos: videos);
+
+      c.read(extraVideoIdsProvider.notifier).set({'v1', 'vReviewed'});
+      for (var i = 0; i < 20; i++) {
+        await pumpEventQueue();
+      }
+
+      expect(videos.requested, [
+        {'v1'},
+        {'vReviewed'},
+      ]);
+      expect(
+        (await c.read(videoCacheRepositoryProvider).loadCachedVideos()).keys,
+        containsAll(['v1', 'vReviewed']),
+      );
+    });
+
     test('videos kept on this device are not fetched', () async {
       final (c, _, _) = await load(takeout: _takeoutOn(['v1']));
       expect(
@@ -197,6 +238,51 @@ void main() {
       expect(
         quota.usageFor(QuotaOperation.videosList),
         batches * QuotaOperation.videosList.cost,
+      );
+    });
+
+    test(
+      'counts each call as it is answered, not once the fetch is done',
+      () async {
+        final hold = Completer<void>();
+        final (c, _, _) = await load(
+          takeout: _takeoutOn(ids),
+          videos: _Videos(existing: existing, hold: hold),
+        );
+        Future<int> used() async => (await c.read(
+          quotaProvider.future,
+        )).usageFor(QuotaOperation.videosList);
+
+        expect(await used(), QuotaOperation.videosList.cost);
+
+        hold.complete();
+        await _settle();
+        expect(await used(), 2 * QuotaOperation.videosList.cost);
+      },
+    );
+
+    test('a fetch dropped partway still keeps what it fetched', () async {
+      // The extra videos are asked for after v1, so v1 is in the first batch.
+      final extra = {for (final id in ids) 'extra-$id'};
+      final hold = Completer<void>();
+      final (c, _, _) = await load(
+        takeout: _takeoutOn(['v1']),
+        videos: _Videos(existing: {'v1', ...extra}, hold: hold),
+      );
+      c.read(extraVideoIdsProvider.notifier).set(extra);
+      await _settle();
+
+      // Dropped with nothing left to fetch, so no later run saves for it.
+      c.read(extraVideoIdsProvider.notifier).clear();
+      hold.complete();
+      await _settle();
+
+      expect(
+        (await c.read(videoCacheRepositoryProvider).loadCachedVideos()).keys,
+        containsAll([
+          'v1',
+          ...extra.take(YoutubeVideoRepository.batchSize - 1),
+        ]),
       );
     });
   });

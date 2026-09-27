@@ -8,27 +8,30 @@ part of 'video_title_fetcher.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Fetches details, like titles, of the viewed channel's videos not kept on
-/// this device yet, with whichever sign-in can read them. Starts over when
-/// that sign-in or the viewed takeout changes, dropping the run under way.
+/// Fetches details, like titles, of the viewed channel's videos and the
+/// [ExtraVideoIds] not kept on this device yet, with whichever sign-in can
+/// read them. Starts over when that sign-in, the viewed takeout or the extra
+/// videos change, dropping the run under way.
 ///
 /// An effect: nothing depends on it, so it can read any provider.
 
 @ProviderFor(videoTitleFetcher)
 final videoTitleFetcherProvider = VideoTitleFetcherProvider._();
 
-/// Fetches details, like titles, of the viewed channel's videos not kept on
-/// this device yet, with whichever sign-in can read them. Starts over when
-/// that sign-in or the viewed takeout changes, dropping the run under way.
+/// Fetches details, like titles, of the viewed channel's videos and the
+/// [ExtraVideoIds] not kept on this device yet, with whichever sign-in can
+/// read them. Starts over when that sign-in, the viewed takeout or the extra
+/// videos change, dropping the run under way.
 ///
 /// An effect: nothing depends on it, so it can read any provider.
 
 final class VideoTitleFetcherProvider
     extends $FunctionalProvider<AsyncValue<void>, void, Stream<void>>
     with $FutureModifier<void>, $StreamProvider<void> {
-  /// Fetches details, like titles, of the viewed channel's videos not kept on
-  /// this device yet, with whichever sign-in can read them. Starts over when
-  /// that sign-in or the viewed takeout changes, dropping the run under way.
+  /// Fetches details, like titles, of the viewed channel's videos and the
+  /// [ExtraVideoIds] not kept on this device yet, with whichever sign-in can
+  /// read them. Starts over when that sign-in, the viewed takeout or the extra
+  /// videos change, dropping the run under way.
   ///
   /// An effect: nothing depends on it, so it can read any provider.
   VideoTitleFetcherProvider._()
@@ -56,4 +59,4 @@ final class VideoTitleFetcherProvider
   }
 }
 
-String _$videoTitleFetcherHash() => r'd61a98ca9054a95d5f7f8f45dc8b63825b9787e6';
+String _$videoTitleFetcherHash() => r'f9ae2d1ebacb570099f368fd298fe0c2bdf2cdae';
