@@ -77,16 +77,17 @@ class _Takeout extends TakeoutImporter {
   void build() {}
 
   @override
-  Future<TakeoutImportPlan> prepareImport(
+  Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
-  }) async => plan;
+  }) async => (plan: plan, csvFiles: const <String, Uint8List>{});
 
   @override
   Future<bool> hasSavedData(String accountId) async => false;
 
   @override
-  Future<void> commitImport(TakeoutImportPlan plan) async {
+  Future<void> commitImport(PreparedImport prepared) async {
+    final plan = prepared.plan;
     committed.add(plan);
     await ref.read(takeoutSelectionProvider.notifier).select(plan.accountId);
     ref

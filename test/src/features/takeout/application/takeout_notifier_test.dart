@@ -198,12 +198,19 @@ void main() {
       ]);
       final notifier = c.read(takeoutImporterProvider.notifier);
 
-      final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
-      await notifier.commitImport(plan);
+      final prepared = await notifier.prepareImport(
+        _newerTakeout(),
+        merge: true,
+      );
+      await notifier.commitImport(prepared);
 
       expect(await commentIds(c), ['D', 'C', 'B', 'A']);
       expect(await deletedCommentIds(c), {'B'});
       expect(await queuedItemIds(c), ['C']);
+      expect(
+        repository.accounts['UCme'],
+        encodeTakeoutCsvs(prepared.plan.mergedData),
+      );
 
       final restarted = container();
       expect(await commentIds(restarted), ['D', 'C', 'B', 'A']);
@@ -225,7 +232,7 @@ void main() {
           }),
         );
 
-    final plan = await c
+    final (:plan, csvFiles: _) = await c
         .read(takeoutImporterProvider.notifier)
         .prepareImport(_newerTakeout(), merge: true);
 
@@ -257,13 +264,13 @@ void main() {
     final savedFiles = repository.accounts['UCme'];
     final notifier = c.read(takeoutImporterProvider.notifier);
 
-    final plan = await notifier.prepareImport(
+    final prepared = await notifier.prepareImport(
       _newerTakeout(channel: 'UCother'),
       merge: false,
     );
-    await notifier.commitImport(plan);
+    await notifier.commitImport(prepared);
 
-    expect(plan.accountId, 'UCother');
+    expect(prepared.plan.accountId, 'UCother');
     expect(await commentIds(c), ['D', 'C', 'A']);
     expect(repository.accounts['UCme'], same(savedFiles));
     expect(repository.accounts.keys, unorderedEquals(['UCme', 'UCother']));
@@ -352,11 +359,11 @@ void main() {
     await c.read(deletionQueueRepositoryProvider).saveQueue([_pending('B')]);
     final savedFiles = repository.accounts['UCme'];
     final notifier = c.read(takeoutImporterProvider.notifier);
-    final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
+    final prepared = await notifier.prepareImport(_newerTakeout(), merge: true);
 
     repository.failSaves = true;
     await expectLater(
-      notifier.commitImport(plan),
+      notifier.commitImport(prepared),
       throwsA(isA<FileSystemException>()),
     );
 
@@ -446,8 +453,11 @@ void main() {
       c.listen(takeoutProvider, (_, _) {});
       final notifier = c.read(takeoutImporterProvider.notifier);
 
-      final plan = await notifier.prepareImport(_newerTakeout(), merge: false);
-      await notifier.commitImport(plan);
+      final prepared = await notifier.prepareImport(
+        _newerTakeout(),
+        merge: false,
+      );
+      await notifier.commitImport(prepared);
 
       expect(
         (await c.read(takeoutSelectionProvider.future))?.takeoutId,
@@ -587,7 +597,7 @@ void main() {
       final c = withSignIns();
       await c.read(takeoutProvider.future);
 
-      final plan = await c
+      final (:plan, csvFiles: _) = await c
           .read(takeoutImporterProvider.notifier)
           .prepareImport(_newerTakeout(channel: 'UCalt'), merge: false);
 
@@ -598,13 +608,16 @@ void main() {
       final c = withSignIns();
       await c.read(takeoutProvider.future);
       final notifier = c.read(takeoutImporterProvider.notifier);
-      final plan = await notifier.prepareImport(_newerTakeout(), merge: true);
+      final prepared = await notifier.prepareImport(
+        _newerTakeout(),
+        merge: true,
+      );
       final savedFiles = repository.accounts['UCme'];
 
       await c.read(takeoutSelectionProvider.notifier).select('UCother');
 
       await expectLater(
-        notifier.commitImport(plan),
+        notifier.commitImport(prepared),
         throwsA(isA<TakeoutImportException>()),
       );
       expect(repository.accounts['UCme'], same(savedFiles));
@@ -671,12 +684,12 @@ void main() {
       final c = container();
       await c.read(takeoutProvider.future);
       final notifier = c.read(takeoutImporterProvider.notifier);
-      final plan = await notifier.prepareImport(
+      final prepared = await notifier.prepareImport(
         _newerTakeout(channel: 'UCnew'),
         merge: false,
       );
 
-      await notifier.commitImport(plan);
+      await notifier.commitImport(prepared);
 
       expect((await c.read(takeoutProvider.future))!.id, 'UCnew');
       expect(await commentIds(c), unorderedEquals(['A', 'C', 'D']));

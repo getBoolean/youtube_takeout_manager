@@ -26,9 +26,11 @@ class AddAccountWorking extends AddAccountState {
 
 /// Read and ready to be looked over before it's saved as its own account.
 class AddAccountReview extends AddAccountState {
-  final TakeoutImportPlan plan;
+  final PreparedImport prepared;
 
-  const AddAccountReview(this.plan);
+  const AddAccountReview(this.prepared);
+
+  TakeoutImportPlan get plan => prepared.plan;
 }
 
 /// The takeout is from an account already saved: nothing is imported unless
@@ -42,9 +44,11 @@ class AddAccountAlreadySaved extends AddAccountState {
 /// Read for merging into its saved account, now shown, and ready to be
 /// looked over before it's saved.
 class AddAccountMergeReview extends AddAccountState {
-  final TakeoutImportPlan plan;
+  final PreparedImport prepared;
 
-  const AddAccountMergeReview(this.plan);
+  const AddAccountMergeReview(this.prepared);
+
+  TakeoutImportPlan get plan => prepared.plan;
 }
 
 /// Reading or saving it failed. Nothing was imported.
@@ -75,15 +79,16 @@ class AddAccountImport extends _$AddAccountImport {
       _picked = picked;
       state = const AddAccountWorking();
       final takeouts = ref.read(takeoutImporterProvider.notifier);
-      final plan = await takeouts.prepareImport(picked, merge: false);
+      final prepared = await takeouts.prepareImport(picked, merge: false);
+      final plan = prepared.plan;
       if (await takeouts.hasSavedData(plan.accountId)) {
         if (ref.mounted) state = AddAccountAlreadySaved(plan.accountId);
         return false;
       }
       final first = (await ref.read(savedTakeoutsProvider.future)).isEmpty;
       if (!ref.mounted) return false;
-      if (first && !plan.needsReview) return await _save(plan);
-      state = AddAccountReview(plan);
+      if (first && !plan.needsReview) return await _save(prepared);
+      state = AddAccountReview(prepared);
     } catch (e) {
       if (ref.mounted) state = AddAccountFailed(e);
     }
@@ -105,10 +110,10 @@ class AddAccountImport extends _$AddAccountImport {
         ))?.takeoutId;
         if (shown != takeoutId) await selection.select(takeoutId);
         await ref.read(takeoutProvider.future);
-        final plan = await ref
+        final prepared = await ref
             .read(takeoutImporterProvider.notifier)
             .prepareImport(picked, merge: true);
-        if (ref.mounted) state = AddAccountMergeReview(plan);
+        if (ref.mounted) state = AddAccountMergeReview(prepared);
       } catch (e) {
         if (ref.mounted) state = AddAccountFailed(e);
       }
@@ -118,19 +123,19 @@ class AddAccountImport extends _$AddAccountImport {
   /// Saves the reviewed takeout, as its own account or merged into its
   /// saved one, and shows it. Returns whether it was saved.
   Future<bool> confirm() async {
-    final plan = switch (state) {
-      AddAccountReview(:final plan) ||
-      AddAccountMergeReview(:final plan) => plan,
+    final prepared = switch (state) {
+      AddAccountReview(:final prepared) ||
+      AddAccountMergeReview(:final prepared) => prepared,
       _ => null,
     };
-    if (plan == null) return false;
-    return _save(plan);
+    if (prepared == null) return false;
+    return _save(prepared);
   }
 
-  Future<bool> _save(TakeoutImportPlan plan) async {
+  Future<bool> _save(PreparedImport prepared) async {
     state = const AddAccountWorking();
     try {
-      await ref.read(takeoutImporterProvider.notifier).commitImport(plan);
+      await ref.read(takeoutImporterProvider.notifier).commitImport(prepared);
       if (ref.mounted) dismiss();
       return true;
     } catch (e) {

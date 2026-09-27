@@ -98,7 +98,7 @@ void main() {
   });
 
   testWidgets('reviews the takeout in place before adding it', (tester) async {
-    await pump(tester, const AddAccountReview(_plan));
+    await pump(tester, const AddAccountReview((plan: _plan, csvFiles: {})));
 
     expect(find.byType(Dialog), findsNothing);
     expect(
@@ -161,7 +161,10 @@ void main() {
   });
 
   testWidgets('reviews the merge before saving it', (tester) async {
-    await pump(tester, const AddAccountMergeReview(_mergePlan));
+    await pump(
+      tester,
+      const AddAccountMergeReview((plan: _mergePlan, csvFiles: {})),
+    );
 
     expect(
       find.descendant(

@@ -104,18 +104,19 @@ class _Takeout extends TakeoutImporter {
   void build() {}
 
   @override
-  Future<TakeoutImportPlan> prepareImport(
+  Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
   }) async {
     prepared.add(merge);
     if (importError case final error?) throw error;
     if (failNext case final error?) throw error;
-    return plan;
+    return (plan: plan, csvFiles: const <String, Uint8List>{});
   }
 
   @override
-  Future<void> commitImport(TakeoutImportPlan plan) async {
+  Future<void> commitImport(PreparedImport prepared) async {
+    final plan = prepared.plan;
     await commitGate?.future;
     committed.add(plan);
   }

@@ -21,10 +21,22 @@ import 'takeout_selection_notifier.dart';
 
 part 'takeout_importer.g.dart';
 
-/// Top-level function for `compute` — reads the picked zips and works out
-/// what importing them would change.
-TakeoutImportPlan _readAndPlan(TakeoutImportRequest request) =>
-    planTakeoutImport(readTakeoutExports(request.zips), request.context);
+/// A worked-out import and the CSV files that saving it writes, encoded
+/// while the zips are read so committing only has to save them.
+typedef PreparedImport = ({
+  TakeoutImportPlan plan,
+  Map<String, Uint8List> csvFiles,
+});
+
+/// Top-level function for `compute` — reads the picked zips, works out what
+/// importing them would change, and encodes the result for saving.
+PreparedImport _readAndPlan(TakeoutImportRequest request) {
+  final plan = planTakeoutImport(
+    readTakeoutExports(request.zips),
+    request.context,
+  );
+  return (plan: plan, csvFiles: encodeTakeoutCsvs(plan.mergedData));
+}
 
 /// Imports takeouts: works out what picked zips would change, then saves
 /// them, marking what they found gone. A service: nothing depends on it, so
@@ -35,10 +47,10 @@ class TakeoutImporter extends _$TakeoutImporter {
   void build() {}
 
   /// Reads the picked [zips] and works out what importing them would
-  /// change, without saving anything. [merge] adds them to the saved data
-  /// instead of replacing it. Throws a [TakeoutImportException] when they
-  /// can't be imported safely.
-  Future<TakeoutImportPlan> prepareImport(
+  /// change, and encodes the files saving it writes, without saving
+  /// anything. [merge] adds them to the saved data instead of replacing it.
+  /// Throws a [TakeoutImportException] when they can't be imported safely.
+  Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
   }) async {
@@ -62,10 +74,11 @@ class TakeoutImporter extends _$TakeoutImporter {
     ));
   }
 
-  /// Marks the items [plan] found gone as deleted and drops their pending
-  /// deletions, then saves its data in its takeout's folder and selects that
-  /// takeout.
-  Future<void> commitImport(TakeoutImportPlan plan) async {
+  /// Marks the items [prepared]'s plan found gone as deleted and drops their
+  /// pending deletions, then saves its files in its takeout's folder and
+  /// selects that takeout.
+  Future<void> commitImport(PreparedImport prepared) async {
+    final (:plan, :csvFiles) = prepared;
     if (await _selectedTakeoutId() != plan.baseTakeoutId) {
       throw const TakeoutImportException(
         'Another takeout was opened while this one was being read. Import '
@@ -86,7 +99,6 @@ class TakeoutImporter extends _$TakeoutImporter {
       if (ids.isNotEmpty) await queue.dropUnprocessed(ids, kind);
     }
 
-    final csvFiles = await compute(encodeTakeoutCsvs, plan.mergedData);
     await ref
         .read(takeoutRepositoryProvider)
         .saveCsvs(plan.accountId, csvFiles);

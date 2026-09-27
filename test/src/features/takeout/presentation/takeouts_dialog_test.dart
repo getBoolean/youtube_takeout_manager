@@ -182,14 +182,17 @@ class _Takeout extends TakeoutImporter {
   void build() {}
 
   @override
-  Future<TakeoutImportPlan> prepareImport(
+  Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
-  }) async => _planFor(saved.isEmpty ? 'UCnew' : saved.first);
+  }) async => (
+    plan: _planFor(saved.isEmpty ? 'UCnew' : saved.first),
+    csvFiles: const <String, Uint8List>{},
+  );
 
   @override
-  Future<void> commitImport(TakeoutImportPlan plan) async =>
-      committed.add(plan);
+  Future<void> commitImport(PreparedImport prepared) async =>
+      committed.add(prepared.plan);
 
   @override
   Future<bool> hasSavedData(String accountId) async =>

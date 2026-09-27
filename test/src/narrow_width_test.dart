@@ -587,9 +587,11 @@ void main() {
           _addAccount(const AddAccountIdle()),
           _addAccount(const AddAccountIdle(), prominent: true),
           _addAccount(const AddAccountWorking()),
-          _addAccount(AddAccountReview(_longPlan)),
+          _addAccount(AddAccountReview((plan: _longPlan, csvFiles: const {}))),
           _addAccount(const AddAccountAlreadySaved('UCme')),
-          _addAccount(AddAccountMergeReview(_longPlan)),
+          _addAccount(
+            AddAccountMergeReview((plan: _longPlan, csvFiles: const {})),
+          ),
           _addAccount(
             const AddAccountFailed(
               TakeoutAccountMismatchException(

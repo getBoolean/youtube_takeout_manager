@@ -47,7 +47,7 @@ final class AddAccountImportProvider
   }
 }
 
-String _$addAccountImportHash() => r'462c5f66c5c38c9a3c928507b3725d217a4af152';
+String _$addAccountImportHash() => r'52493219be1b7b332578fe166557f28e6d47b1dc';
 
 /// Imports a takeout in place: as its own account, or merged into its saved
 /// account only if the user says so. Nothing is ever replaced.
