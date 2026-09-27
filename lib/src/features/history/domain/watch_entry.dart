@@ -58,6 +58,6 @@ class WatchEntry with WatchEntryMappable {
   /// Title and channel folded for search, worked out once.
   final String searchText;
 
-  static final _videoIdPattern = RegExp(r'[?&]v=([\w-]+)');
+  static final _videoIdPattern = RegExp(r'(?:[?&]v=|/shorts/)([\w-]+)');
   static final _channelIdPattern = RegExp(r'/channel/([\w-]+)');
 }
