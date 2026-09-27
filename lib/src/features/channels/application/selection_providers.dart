@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
@@ -16,11 +18,20 @@ part 'selection_providers.g.dart';
 // search results when it's null.
 
 /// Whether the screen is picking items to delete. Each channel's screen
-/// starts out of it whenever it opens.
+/// starts out of it whenever it opens, and drops its picks when it closes.
 @riverpod
 class SelectionMode extends _$SelectionMode {
   @override
   bool build({String? channelId}) {
+    // Picks would otherwise outlive the screen, e.g. showing as picked in
+    // the channel list's search. Other providers can't be changed while
+    // this is disposing, so the set is held now and cleared just after.
+    final deletionSet = ref.watch(deletionSetProvider.notifier);
+    var selecting = false;
+    listenSelf((_, next) => selecting = next);
+    ref.onDispose(() {
+      if (selecting) scheduleMicrotask(deletionSet.clearIfInUse);
+    });
     if (channelId == null) {
       // The results vanish once the search clears, and aren't this
       // channel's once another is viewed.

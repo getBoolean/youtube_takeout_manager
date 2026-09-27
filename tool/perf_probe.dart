@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
@@ -63,12 +64,18 @@ Future<void> _probe(ProviderContainer container) async {
   for (final c in picks.take(3)) {
     final sw = Stopwatch()..start();
     final sub1 = container.listen(
-      filteredGroupedChannelLiveChatsProvider(c.channelId),
+      filteredGroupedChannelInteractionsProvider(
+        QueueItemKind.liveChat,
+        c.channelId,
+      ),
       (_, _) {},
     );
     final t1 = sw.elapsedMicroseconds;
     final sub2 = container.listen(
-      filteredGroupedChannelCommentsProvider(c.channelId),
+      filteredGroupedChannelInteractionsProvider(
+        QueueItemKind.comment,
+        c.channelId,
+      ),
       (_, _) {},
     );
     _log(

@@ -301,7 +301,7 @@ final class FilteredSearchInteractionsProvider
 }
 
 String _$filteredSearchInteractionsHash() =>
-    r'ff7b46c2ffefd2e57cc1bb255f736c090a6a817b';
+    r'02a2c73fc90eada8053a56ca793a75b730ed6f3e';
 
 /// Flat list of [kind]'s items currently visible in search results,
 /// excluding any already marked as deleted. Empty when the search query is

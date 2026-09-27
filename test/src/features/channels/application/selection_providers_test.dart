@@ -114,6 +114,47 @@ void main() {
       expect(c.read(selectionModeProvider(channelId: 'UCa')), isFalse);
     });
 
+    test(
+      "closing a channel's screen while selecting drops the selection",
+      () async {
+        final c = container();
+        // Kept by the channel list below the screen.
+        c.listen(deletionSetProvider, (_, _) {});
+        final screen = c.listen(
+          selectionModeProvider(channelId: 'UCa'),
+          (_, _) {},
+        );
+        c.read(selectionModeProvider(channelId: 'UCa').notifier).enter();
+        c.read(deletionSetProvider.notifier).addAll({'c1'});
+
+        screen.close();
+        await c.pump();
+        // The picks are dropped just after the screen is.
+        await Future<void>.delayed(Duration.zero);
+
+        expect(c.read(deletionSetProvider), isEmpty);
+      },
+    );
+
+    test("closing a channel's screen that isn't selecting keeps the channel "
+        "list's selection", () async {
+      final c = container();
+      c.listen(deletionSetProvider, (_, _) {});
+      c.listen(selectionModeProvider(), (_, _) {});
+      final screen = c.listen(
+        selectionModeProvider(channelId: 'UCa'),
+        (_, _) {},
+      );
+      c.read(selectionModeProvider().notifier).enter();
+      c.read(deletionSetProvider.notifier).addAll({'c1'});
+
+      screen.close();
+      await c.pump();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(c.read(deletionSetProvider), {'c1'});
+    });
+
     test('the channel list leaves it when the search clears', () {
       final c = container();
       c.listen(channelSearchQueryProvider, (_, _) {});

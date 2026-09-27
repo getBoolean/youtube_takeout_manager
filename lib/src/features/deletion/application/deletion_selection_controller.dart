@@ -48,4 +48,10 @@ class DeletionSet extends _$DeletionSet {
   void clear() {
     state = {};
   }
+
+  /// Clears, unless the set has been disposed, e.g. when nothing else used
+  /// it once a screen closed.
+  void clearIfInUse() {
+    if (ref.mounted) clear();
+  }
 }

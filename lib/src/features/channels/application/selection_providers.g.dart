@@ -9,17 +9,17 @@ part of 'selection_providers.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Whether the screen is picking items to delete. Each channel's screen
-/// starts out of it whenever it opens.
+/// starts out of it whenever it opens, and drops its picks when it closes.
 
 @ProviderFor(SelectionMode)
 final selectionModeProvider = SelectionModeFamily._();
 
 /// Whether the screen is picking items to delete. Each channel's screen
-/// starts out of it whenever it opens.
+/// starts out of it whenever it opens, and drops its picks when it closes.
 final class SelectionModeProvider
     extends $NotifierProvider<SelectionMode, bool> {
   /// Whether the screen is picking items to delete. Each channel's screen
-  /// starts out of it whenever it opens.
+  /// starts out of it whenever it opens, and drops its picks when it closes.
   SelectionModeProvider._({
     required SelectionModeFamily super.from,
     required String? super.argument,
@@ -64,10 +64,10 @@ final class SelectionModeProvider
   }
 }
 
-String _$selectionModeHash() => r'6b5fe2e08dcd0e7bd904f48277a10408c97a15be';
+String _$selectionModeHash() => r'bb48407789d6931935b15b639422bf8999c58b3a';
 
 /// Whether the screen is picking items to delete. Each channel's screen
-/// starts out of it whenever it opens.
+/// starts out of it whenever it opens, and drops its picks when it closes.
 
 final class SelectionModeFamily extends $Family
     with $ClassFamilyOverride<SelectionMode, bool, bool, bool, String?> {
@@ -81,7 +81,7 @@ final class SelectionModeFamily extends $Family
       );
 
   /// Whether the screen is picking items to delete. Each channel's screen
-  /// starts out of it whenever it opens.
+  /// starts out of it whenever it opens, and drops its picks when it closes.
 
   SelectionModeProvider call({String? channelId}) =>
       SelectionModeProvider._(argument: channelId, from: this);
@@ -91,7 +91,7 @@ final class SelectionModeFamily extends $Family
 }
 
 /// Whether the screen is picking items to delete. Each channel's screen
-/// starts out of it whenever it opens.
+/// starts out of it whenever it opens, and drops its picks when it closes.
 
 abstract class _$SelectionMode extends $Notifier<bool> {
   late final _$args = ref.$arg as String?;

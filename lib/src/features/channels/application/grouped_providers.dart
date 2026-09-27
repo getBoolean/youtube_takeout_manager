@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
@@ -81,7 +83,8 @@ List<Interaction> filteredSearchInteractions(
   final groups = ref.watch(
     filteredGroupedChannelInteractionsProvider(kind, channelId),
   );
-  final deleted = ref.watch(deletedIdsProvider).value?[kind] ?? const {};
+  final deleted =
+      ref.watch(deletedIdsProvider.select((s) => s.value?[kind])) ?? const {};
   return [
     for (final g in groups)
       for (final item in g.items)

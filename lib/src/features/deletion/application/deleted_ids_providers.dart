@@ -1,3 +1,5 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
@@ -33,9 +35,13 @@ class DeletedIds extends _$DeletedIds {
     // Read and update the state without awaiting in between, so concurrent
     // calls can't overwrite each other's IDs.
     final current = state.requireValue;
+    // An untouched kind keeps its set, so what watches only that kind
+    // doesn't rebuild.
     final updated = {
       for (final kind in QueueItemKind.values)
-        kind: {...?current[kind], ...targets.idsOf(kind)},
+        kind: targets.idsOf(kind).isEmpty
+            ? current[kind] ?? const {}
+            : {...?current[kind], ...targets.idsOf(kind)},
     };
     state = AsyncData(updated);
     await Future.wait([
@@ -69,7 +75,9 @@ Set<String> failedIds(Ref ref, QueueItemKind kind) =>
 @riverpod
 InteractionStatuses interactionStatuses(Ref ref, QueueItemKind kind) =>
     InteractionStatuses(
-      deleted: ref.watch(deletedIdsProvider).value?[kind] ?? const {},
+      deleted:
+          ref.watch(deletedIdsProvider.select((s) => s.value?[kind])) ??
+          const {},
       failed: ref.watch(failedIdsProvider(kind)),
       queued: ref.watch(queuedIdsProvider(kind)),
     );

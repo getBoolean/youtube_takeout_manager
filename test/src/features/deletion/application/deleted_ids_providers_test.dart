@@ -209,4 +209,32 @@ void main() {
     expect(chats.of('chat'), InteractionStatus.failed);
     expect(chats.of('gone'), InteractionStatus.deleted);
   });
+
+  test("marking comments deleted leaves live chats' statuses be", () async {
+    SharedPreferences.setMockInitialValues({});
+    final c = container();
+    await c.read(deletedIdsProvider.future);
+    await c.read(deletionQueueProvider.future);
+    var liveChatUpdates = 0;
+    c.listen(
+      interactionStatusesProvider(_liveChat),
+      (_, _) => liveChatUpdates++,
+    );
+
+    await c
+        .read(deletedIdsProvider.notifier)
+        .markDeleted(
+          DeletionTargets.ids({
+            _comment: {'gone'},
+          }),
+        );
+    // Lets dependents rebuild.
+    await c.pump();
+
+    expect(
+      c.read(interactionStatusesProvider(_comment)).of('gone'),
+      InteractionStatus.deleted,
+    );
+    expect(liveChatUpdates, 0);
+  });
 }

@@ -106,7 +106,9 @@ class _FakeDeletedIds extends DeletedIds {
   };
 }
 
-List<Override> fixtureOverrides() => [
+/// With [fakeQueue] false, what's queued and failed comes from the real
+/// deletion queue instead.
+List<Override> fixtureOverrides({bool fakeQueue = true}) => [
   filteredGroupedChannelInteractionsProvider(
     QueueItemKind.comment,
     channelId,
@@ -117,14 +119,20 @@ List<Override> fixtureOverrides() => [
   ).overrideWithValue(liveChatGroups),
   videoMetadataProvider.overrideWith(_FakeVideoMetadata.new),
   deletedIdsProvider.overrideWith(_FakeDeletedIds.new),
-  queuedIdsProvider(QueueItemKind.comment).overrideWithValue({commentId(2, 0)}),
-  failedIdsProvider(QueueItemKind.comment).overrideWithValue({commentId(2, 1)}),
-  queuedIdsProvider(
-    QueueItemKind.liveChat,
-  ).overrideWithValue({liveChatId(1, 0)}),
-  failedIdsProvider(
-    QueueItemKind.liveChat,
-  ).overrideWithValue({liveChatId(1, 1)}),
+  if (fakeQueue) ...[
+    queuedIdsProvider(
+      QueueItemKind.comment,
+    ).overrideWithValue({commentId(2, 0)}),
+    failedIdsProvider(
+      QueueItemKind.comment,
+    ).overrideWithValue({commentId(2, 1)}),
+    queuedIdsProvider(
+      QueueItemKind.liveChat,
+    ).overrideWithValue({liveChatId(1, 0)}),
+    failedIdsProvider(
+      QueueItemKind.liveChat,
+    ).overrideWithValue({liveChatId(1, 1)}),
+  ],
 ];
 
 enum ListKind { comments, liveChats }

@@ -83,6 +83,21 @@ void main() {
     expect(find.text('0 live chats'), findsOneWidget);
   });
 
+  testWidgets('groups the digits of large counts', (tester) async {
+    await openDialog(tester, [
+      QueueScope(
+        icon: Icons.comment_outlined,
+        title: 'All comments in Ada',
+        targets: DeletionTargets(
+          commentSnippets: {for (var i = 0; i < 1234; i++) 'c$i': null},
+        ),
+        describeCount: QueueScope.describeComments,
+      ),
+    ]);
+
+    expect(find.text('1,234 comments'), findsOneWidget);
+  });
+
   testWidgets('preselects the first scope and queues it', (tester) async {
     await openDialog(tester, [_matches, _allComments]);
 

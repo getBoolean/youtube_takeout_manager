@@ -17,7 +17,7 @@ class ConfirmedActionSection extends StatefulWidget {
   /// Shown once [onConfirm] is done.
   final String done;
 
-  /// Shown, with the error, if [onConfirm] throws.
+  /// Shown if [onConfirm] throws, with the message when it's an [Exception].
   final String failed;
 
   final Future<void> Function() onConfirm;
@@ -52,8 +52,21 @@ class _ConfirmedActionSectionState extends State<ConfirmedActionSection> {
     try {
       await widget.onConfirm();
       outcome = (message: widget.done, error: false);
-    } catch (e) {
-      outcome = (message: '${widget.failed}: $e', error: true);
+    } on Exception catch (e) {
+      final text = '$e'.replaceFirst(RegExp('^Exception: '), '');
+      outcome = (message: '${widget.failed}: $text', error: true);
+    } catch (e, stack) {
+      // A bug, not something the user can act on: report it, and leave the
+      // section ready to try again.
+      FlutterError.reportError(
+        FlutterErrorDetails(
+          exception: e,
+          stack: stack,
+          library: 'confirmed action section',
+          context: ErrorDescription('while running "${widget.actionLabel}"'),
+        ),
+      );
+      outcome = (message: widget.failed, error: true);
     }
     if (!mounted) return;
     setState(() {

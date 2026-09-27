@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
+import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import '../domain/deletion_targets.dart';
 import 'deletion_actions.dart';
 
@@ -23,14 +23,11 @@ class QueueScope {
     this.describeCount = describeItems,
   });
 
-  static String describeItems(int count) =>
-      Intl.plural(count, one: '1 item', other: '$count items');
+  static String describeItems(int count) => formatCount(count, 'item');
 
-  static String describeComments(int count) =>
-      Intl.plural(count, one: '1 comment', other: '$count comments');
+  static String describeComments(int count) => formatCount(count, 'comment');
 
-  static String describeLiveChats(int count) =>
-      Intl.plural(count, one: '1 live chat', other: '$count live chats');
+  static String describeLiveChats(int count) => formatCount(count, 'live chat');
 }
 
 /// Asks which of [scopes] to add to the deletion queue, then queues it.

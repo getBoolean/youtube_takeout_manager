@@ -37,7 +37,7 @@ final class DeletedIdsProvider
   DeletedIds create() => DeletedIds();
 }
 
-String _$deletedIdsHash() => r'b7edaac8677c0f17efb55c33af258d9d1c0de881';
+String _$deletedIdsHash() => r'8a8833cb242485ab4b27c00fcb0de2ce142ad564';
 
 /// The IDs of each kind's items known to be deleted.
 
@@ -291,7 +291,7 @@ final class InteractionStatusesProvider
 }
 
 String _$interactionStatusesHash() =>
-    r'36c903800ae8fabe90818149e97b44add397cdd7';
+    r'377bad4faed35ab8ae377117b28893416531ac18';
 
 /// Which of [kind]'s items are deleted, failed or queued.
 
