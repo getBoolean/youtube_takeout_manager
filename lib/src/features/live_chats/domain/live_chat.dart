@@ -1,5 +1,6 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
@@ -37,4 +38,9 @@ class LiveChat with LiveChatMappable implements Interaction {
   QueueItemKind get kind => QueueItemKind.liveChat;
   @override
   String? get postId => null;
+  @override
+  T when<T>({
+    required T Function(Comment) comment,
+    required T Function(LiveChat) liveChat,
+  }) => liveChat(this);
 }

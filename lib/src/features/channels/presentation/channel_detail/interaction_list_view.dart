@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/comments/presentation/comment_tile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/presentation/live_chat_tile.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/grouped_providers.dart';
@@ -104,8 +102,8 @@ class _InteractionTileConsumer extends ConsumerWidget {
           }
         : () {};
 
-    return switch (item) {
-      final Comment comment => CommentTile(
+    return item.when(
+      comment: (comment) => CommentTile(
         comment: comment,
         isSelected: isSelected,
         status: status,
@@ -114,7 +112,7 @@ class _InteractionTileConsumer extends ConsumerWidget {
         onTap: onTap,
         onLongPress: onLongPress,
       ),
-      final LiveChat liveChat => LiveChatTile(
+      liveChat: (liveChat) => LiveChatTile(
         liveChat: liveChat,
         isSelected: isSelected,
         status: status,
@@ -123,12 +121,7 @@ class _InteractionTileConsumer extends ConsumerWidget {
         onTap: onTap,
         onLongPress: onLongPress,
       ),
-      _ => throw ArgumentError.value(
-        item,
-        'item',
-        'Not a comment or live chat',
-      ),
-    };
+    );
   }
 
   Future<void> _showActions(BuildContext context, WidgetRef ref) async {

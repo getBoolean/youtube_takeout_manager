@@ -2,6 +2,7 @@ import 'package:dart_mappable/dart_mappable.dart';
 
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 
 part 'comment.mapper.dart';
 
@@ -41,4 +42,9 @@ class Comment with CommentMappable implements Interaction {
   QueueItemKind get kind => QueueItemKind.comment;
   @override
   String get rawText => rawCommentText;
+  @override
+  T when<T>({
+    required T Function(Comment) comment,
+    required T Function(LiveChat) liveChat,
+  }) => comment(this);
 }

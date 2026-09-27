@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/adaptive_action_button.dart';
-import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletable_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
@@ -12,7 +11,6 @@ import 'package:youtube_takeout_manager/src/features/export/presentation/export_
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
 import '../../application/grouped_providers.dart';
@@ -94,8 +92,9 @@ class ChannelActionsHeader extends ConsumerWidget {
 
   Future<void> _export(BuildContext context, WidgetRef ref) async {
     final channelName = _channelName(ref);
-    final comments = _itemsOf(ref, QueueItemKind.comment).cast<Comment>();
-    final liveChats = _itemsOf(ref, QueueItemKind.liveChat).cast<LiveChat>();
+    final (:comments, :liveChats) = splitInteractions([
+      for (final kind in QueueItemKind.values) ..._itemsOf(ref, kind),
+    ]);
     final format = await showExportFormatSheet(context);
     if (format == null || !context.mounted) return;
     await exportChannel(
