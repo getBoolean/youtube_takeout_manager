@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_placement.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
@@ -86,7 +86,7 @@ class ChannelListScreen extends ConsumerWidget {
         TakeoutLoadFailed(error: takeoutAsync.error!),
       );
     }
-    final queue = DeletionQueueHost.of(context);
+    final queue = DeletionQueuePlacement.of(context);
     if (takeoutAsync.hasValue && takeoutAsync.value == null) {
       // Data saved before takeouts were kept per account may be moving
       // into one. Only while nothing is selected: its failure stays, and an

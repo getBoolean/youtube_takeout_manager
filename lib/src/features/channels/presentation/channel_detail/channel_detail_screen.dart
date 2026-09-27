@@ -6,7 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_placement.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
@@ -88,7 +88,10 @@ class ChannelDetailScreen extends HookConsumerWidget {
     // Keeps the screen's selection mode while it's open, loading included.
     ref.watch(selectionModeProvider(channelId: channelId));
 
-    final queue = DeletionQueueHost.of(context, currentChannelId: channelId);
+    final queue = DeletionQueuePlacement.of(
+      context,
+      currentChannelId: channelId,
+    );
     final takeoutAsync = ref.watch(viewedTakeoutProvider);
     if (takeoutAsync.isLoading ||
         (!takeoutAsync.hasValue && !takeoutAsync.hasError)) {

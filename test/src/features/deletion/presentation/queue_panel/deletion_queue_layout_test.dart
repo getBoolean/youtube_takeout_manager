@@ -7,7 +7,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_pane_expanded.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_host.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_placement.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_panel.dart';
@@ -81,7 +81,7 @@ void main() {
         child: MaterialApp(
           home: Builder(
             builder: (context) {
-              final queue = DeletionQueueHost.of(context);
+              final queue = DeletionQueuePlacement.of(context);
               return queue.wrap(
                 Scaffold(appBar: AppBar(actions: queue.appBarActions)),
               );

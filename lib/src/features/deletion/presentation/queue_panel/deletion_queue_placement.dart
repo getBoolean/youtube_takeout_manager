@@ -6,13 +6,13 @@ import 'deletion_queue_summary_bar.dart';
 
 /// The pieces a screen needs to show the deletion queue in the layout that
 /// fits the window.
-class DeletionQueueHost {
+class DeletionQueuePlacement {
   final DeletionQueueLayout layout;
 
   /// The channel the screen shows, whose items are listed first.
   final String? currentChannelId;
 
-  DeletionQueueHost.of(BuildContext context, {this.currentChannelId})
+  DeletionQueuePlacement.of(BuildContext context, {this.currentChannelId})
     : layout = deletionQueueLayoutOf(context);
 
   /// The screen's [scaffold] with the docked pane or strip beside it, full
