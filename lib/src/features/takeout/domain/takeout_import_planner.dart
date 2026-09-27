@@ -89,18 +89,14 @@ TakeoutImportPlan planTakeoutImport(
     channels: takeoutChannelsOf(mergedData, takeoutId: accountId),
     goneCommentIds: goneComments.ids,
     goneLiveChatIds: goneLiveChats.ids,
-    newlyDeletedCommentCount: goneComments.ids
-        .difference(context.deletedCommentIds)
-        .length,
-    newlyDeletedLiveChatCount: goneLiveChats.ids
-        .difference(context.deletedLiveChatIds)
-        .length,
-    newCommentCount: comments.keys
-        .where((id) => !baseCommentIds.contains(id))
-        .length,
-    newLiveChatCount: liveChats.keys
-        .where((id) => !baseLiveChatIds.contains(id))
-        .length,
+    newlyDeletedCommentIds: goneComments.ids.difference(
+      context.deletedCommentIds,
+    ),
+    newlyDeletedLiveChatIds: goneLiveChats.ids.difference(
+      context.deletedLiveChatIds,
+    ),
+    newCommentIds: comments.keys.toSet().difference(baseCommentIds),
+    newLiveChatIds: liveChats.keys.toSet().difference(baseLiveChatIds),
     commentCheckSkipped: goneComments.skipped,
     liveChatCheckSkipped: goneLiveChats.skipped,
     baseTakeoutId: context.activeTakeoutId,

@@ -24,10 +24,10 @@ const _plan = TakeoutImportPlan(
   ),
   goneCommentIds: {},
   goneLiveChatIds: {},
-  newlyDeletedCommentCount: 0,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: {},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {},
+  newLiveChatIds: {},
 );
 
 const _mergePlan = TakeoutImportPlan(
@@ -39,24 +39,21 @@ const _mergePlan = TakeoutImportPlan(
   ),
   goneCommentIds: {},
   goneLiveChatIds: {},
-  newlyDeletedCommentCount: 0,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 3,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: {},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {'c1', 'c2', 'c3'},
+  newLiveChatIds: {},
 );
 
 void main() {
   late int starts, confirms, dismisses;
-  late int merges;
 
   Future<void> pump(
     WidgetTester tester,
     AddAccountState state, {
     bool enabled = true,
-    String? viewedTakeoutId,
   }) {
     starts = confirms = dismisses = 0;
-    merges = 0;
     return tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -64,12 +61,9 @@ void main() {
             child: AddAccountSection(
               state: state,
               enabled: enabled,
-              accountNames: const {'UCme': 'Boolean'},
-              viewedTakeoutId: viewedTakeoutId,
               onStart: () => starts++,
               onConfirm: () => confirms++,
               onDismiss: () => dismisses++,
-              onMerge: () => merges++,
             ),
           ),
         ),
@@ -115,49 +109,15 @@ void main() {
     expect(dismisses, 1);
   });
 
-  testWidgets('warns an account is already imported, asking to merge', (
-    tester,
-  ) async {
-    await pump(tester, const AddAccountAlreadySaved('UCme'));
-
-    // Names the account, and that merging switches to it.
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('add-account-already-saved')),
-        matching: find.textContaining('Boolean'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('merge-switches-account')),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
-    await tester.tap(find.text('Cancel'));
-    expect(merges, 1);
-    expect(dismisses, 1);
-  });
-
-  testWidgets('merging into the account shown needs no switch', (tester) async {
+  testWidgets("can't merge while deleting", (tester) async {
     await pump(
       tester,
-      const AddAccountAlreadySaved('UCme'),
-      viewedTakeoutId: 'UCme',
+      const AddAccountMergeReview((plan: _mergePlan, csvFiles: {})),
+      enabled: false,
     );
-
-    expect(
-      find.byKey(const ValueKey('merge-into-shown-account')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('merge-switches-account')), findsNothing);
-  });
-
-  testWidgets("can't merge while deleting", (tester) async {
-    await pump(tester, const AddAccountAlreadySaved('UCme'), enabled: false);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
-    expect(merges, 0);
+    expect(confirms, 0);
   });
 
   testWidgets('reviews the merge before saving it', (tester) async {

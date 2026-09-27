@@ -9,6 +9,9 @@ import 'package:youtube_takeout_manager/src/features/interactions/presentation/s
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/live_chat.dart';
 
+/// Stands in for a live chat with no text, which can be a membership event.
+const emptyLiveChatLabel = 'Likely a membership event or deleted message';
+
 class LiveChatTile extends StatelessWidget {
   final LiveChat liveChat;
   final bool isSelected;
@@ -61,7 +64,7 @@ class LiveChatTile extends StatelessWidget {
       iconColor: theme.colorScheme.secondary,
       title: liveChat.rawText.trim().isEmpty
           ? Text(
-              'Likely a membership event or deleted message',
+              emptyLiveChatLabel,
               style: theme.textTheme.bodyMedium?.copyWith(
                 fontStyle: FontStyle.italic,
                 color: theme.colorScheme.onSurfaceVariant,

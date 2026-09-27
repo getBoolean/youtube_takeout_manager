@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/add_account_import.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
@@ -16,6 +17,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_chan
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 
 final _picked = [PickedZip.bytes('takeout-001.zip', Uint8List(1))];
 
@@ -28,10 +30,10 @@ const _plan = TakeoutImportPlan(
   ),
   goneCommentIds: {},
   goneLiveChatIds: {},
-  newlyDeletedCommentCount: 0,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: {},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {},
+  newLiveChatIds: {},
 );
 
 /// A plan with something to look over even as a first import.
@@ -44,10 +46,10 @@ const _planWithDeleted = TakeoutImportPlan(
   ),
   goneCommentIds: {'gone'},
   goneLiveChatIds: {},
-  newlyDeletedCommentCount: 1,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: {'gone'},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {},
+  newLiveChatIds: {},
 );
 
 const _savedSummary = TakeoutSummary(
@@ -89,7 +91,7 @@ class _Takeout extends TakeoutImporter {
   final Set<String> saved;
   final Completer<void>? commitGate;
   final TakeoutImportPlan plan;
-  Object? failNext;
+  Object? mergeError;
   final prepared = <bool>[];
   final committed = <TakeoutImportPlan>[];
 
@@ -110,7 +112,7 @@ class _Takeout extends TakeoutImporter {
   }) async {
     prepared.add(merge);
     if (importError case final error?) throw error;
-    if (failNext case final error?) throw error;
+    if (mergeError case final error? when merge) throw error;
     return (plan: plan, csvFiles: const <String, Uint8List>{});
   }
 
@@ -232,44 +234,64 @@ void main() {
     expect(takeout.committed, isEmpty);
   });
 
-  test(
-    'a takeout from an account already saved asks whether to merge',
-    () async {
-      final c = container(picked: _picked, saved: {'UCnew'});
-
-      await c.read(addAccountImportProvider.notifier).start();
-
-      final state = c.read(addAccountImportProvider);
-      expect(state, isA<AddAccountAlreadySaved>());
-      expect((state as AddAccountAlreadySaved).takeoutId, 'UCnew');
-      expect(takeout.committed, isEmpty);
-    },
-  );
-
-  test('merging shows that account, then reviews the merge', () async {
+  test('a takeout from an account already saved shows that account, then '
+      'reviews the merge', () async {
     final c = container(picked: _picked, saved: {'UCnew'});
     final add = c.read(addAccountImportProvider.notifier);
-    await add.start();
 
-    await add.merge();
+    expect(await add.start(), isFalse);
 
     expect(selection.selected, ['UCnew']);
     expect(takeout.prepared, [false, true]);
-    final state = c.read(addAccountImportProvider);
-    expect(state, isA<AddAccountMergeReview>());
+    expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
     expect(takeout.committed, isEmpty);
 
-    await add.confirm();
+    expect(await add.confirm(), isTrue);
     expect(takeout.committed, [same(_plan)]);
     expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
   });
 
+  test(
+    "a merge review asks for its new items' videos until it's done",
+    () async {
+      Comment comment(String id, String videoId) => Comment(
+        commentId: id,
+        channelId: 'UCnew',
+        createdAt: DateTime.utc(2026),
+        price: 0,
+        videoId: videoId,
+        rawCommentText: '',
+        displayText: '',
+      );
+      final plan = TakeoutImportPlan(
+        accountId: 'UCnew',
+        mergedData: TakeoutData(
+          comments: [comment('new', 'vNew'), comment('old', 'vOld')],
+          liveChats: const [],
+          subscriptionsByChannelId: const {},
+        ),
+        goneCommentIds: const {},
+        goneLiveChatIds: const {},
+        newlyDeletedCommentIds: const {},
+        newlyDeletedLiveChatIds: const {},
+        newCommentIds: const {'new'},
+        newLiveChatIds: const {},
+      );
+      final c = container(picked: _picked, saved: {'UCnew'}, plan: plan);
+      final add = c.read(addAccountImportProvider.notifier);
+
+      await add.start();
+      expect(c.read(extraVideoIdsProvider), {'vNew'});
+
+      add.dismiss();
+      expect(c.read(extraVideoIdsProvider), isEmpty);
+    },
+  );
+
   test('merging into the account shown stays on it', () async {
     final c = container(picked: _picked, saved: {'UCnew'}, viewing: 'UCnew');
-    final add = c.read(addAccountImportProvider.notifier);
-    await add.start();
 
-    await add.merge();
+    await c.read(addAccountImportProvider.notifier).start();
 
     expect(selection.selected, isEmpty);
     expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
@@ -277,11 +299,9 @@ void main() {
 
   test('a merge that fails to read says why', () async {
     final c = container(picked: _picked, saved: {'UCnew'});
-    final add = c.read(addAccountImportProvider.notifier);
-    await add.start();
-    takeout.failNext = const TakeoutImportException('Not a takeout.');
+    takeout.mergeError = const TakeoutImportException('Not a takeout.');
 
-    await add.merge();
+    await c.read(addAccountImportProvider.notifier).start();
 
     expect(c.read(addAccountImportProvider), isA<AddAccountFailed>());
   });

@@ -165,9 +165,9 @@ void main() {
         'B',
         'A',
       ]);
-      expect(plan.newCommentCount, 1);
+      expect(plan.newCommentIds, {'D'});
       expect(plan.goneCommentIds, {'B'});
-      expect(plan.newlyDeletedCommentCount, 1);
+      expect(plan.newlyDeletedCommentIds, {'B'});
     });
 
     test('the newer text replaces the saved text', () {
@@ -181,7 +181,7 @@ void main() {
       final plan = _plan([newer], saved: _savedAbc, deletedCommentIds: {'B'});
 
       expect(plan.goneCommentIds, {'B'});
-      expect(plan.newlyDeletedCommentCount, 0);
+      expect(plan.newlyDeletedCommentIds, isEmpty);
     });
 
     test('adding the same takeout again changes nothing', () {
@@ -189,7 +189,7 @@ void main() {
 
       final plan = _plan([export], saved: _savedAbc);
 
-      expect(plan.newCommentCount, 0);
+      expect(plan.newCommentIds, isEmpty);
       expect(plan.goneCommentIds, isEmpty);
     });
 

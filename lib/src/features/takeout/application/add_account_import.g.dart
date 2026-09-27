@@ -9,17 +9,20 @@ part of 'add_account_import.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Imports a takeout in place: as its own account, or merged into its saved
-/// account only if the user says so. Nothing is ever replaced.
+/// account. Either is looked over before it's saved; nothing is ever
+/// replaced.
 
 @ProviderFor(AddAccountImport)
 final addAccountImportProvider = AddAccountImportProvider._();
 
 /// Imports a takeout in place: as its own account, or merged into its saved
-/// account only if the user says so. Nothing is ever replaced.
+/// account. Either is looked over before it's saved; nothing is ever
+/// replaced.
 final class AddAccountImportProvider
     extends $NotifierProvider<AddAccountImport, AddAccountState> {
   /// Imports a takeout in place: as its own account, or merged into its saved
-  /// account only if the user says so. Nothing is ever replaced.
+  /// account. Either is looked over before it's saved; nothing is ever
+  /// replaced.
   AddAccountImportProvider._()
     : super(
         from: null,
@@ -47,10 +50,11 @@ final class AddAccountImportProvider
   }
 }
 
-String _$addAccountImportHash() => r'52493219be1b7b332578fe166557f28e6d47b1dc';
+String _$addAccountImportHash() => r'dd26d063b26f4d0a261ec5e22132812c238c1388';
 
 /// Imports a takeout in place: as its own account, or merged into its saved
-/// account only if the user says so. Nothing is ever replaced.
+/// account. Either is looked over before it's saved; nothing is ever
+/// replaced.
 
 abstract class _$AddAccountImport extends $Notifier<AddAccountState> {
   AddAccountState build();

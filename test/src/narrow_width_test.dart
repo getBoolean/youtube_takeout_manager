@@ -215,10 +215,10 @@ final _longPlan = TakeoutImportPlan(
   ),
   goneCommentIds: const {},
   goneLiveChatIds: const {},
-  newlyDeletedCommentCount: 0,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: const {},
+  newlyDeletedLiveChatIds: const {},
+  newCommentIds: const {},
+  newLiveChatIds: const {},
   commentCheckSkipped: DeletionCheckSkipReason.unparsedRows,
 );
 
@@ -228,12 +228,9 @@ Widget _addAccount(AddAccountState state, {bool prominent = false}) =>
       idleLabel: prominent ? 'Select zip files' : null,
       prominent: prominent,
       enabled: true,
-      accountNames: const {'UCme': 'A channel with a fairly long name'},
-      viewedTakeoutId: 'UCother',
       onStart: () {},
       onConfirm: () {},
       onDismiss: () {},
-      onMerge: () {},
     );
 
 const _notices = <String, SignInNotice>{
@@ -588,7 +585,6 @@ void main() {
           _addAccount(const AddAccountIdle(), prominent: true),
           _addAccount(const AddAccountWorking()),
           _addAccount(AddAccountReview((plan: _longPlan, csvFiles: const {}))),
-          _addAccount(const AddAccountAlreadySaved('UCme')),
           _addAccount(
             AddAccountMergeReview((plan: _longPlan, csvFiles: const {})),
           ),
@@ -604,6 +600,38 @@ void main() {
         ],
       ),
     ),
+  );
+  fitsAtEveryWidth(
+    'a merge review listing its new comments',
+    () => Scaffold(
+      body: ListView(
+        children: [
+          _addAccount(
+            AddAccountMergeReview((
+              plan: TakeoutImportPlan(
+                accountId: 'UCother',
+                mergedData: TakeoutData(
+                  comments: [_comment],
+                  liveChats: const [],
+                  subscriptionsByChannelId: const {},
+                ),
+                goneCommentIds: const {},
+                goneLiveChatIds: const {},
+                newlyDeletedCommentIds: const {},
+                newlyDeletedLiveChatIds: const {},
+                newCommentIds: {_comment.commentId},
+                newLiveChatIds: const {},
+              ),
+              csvFiles: const {},
+            )),
+          ),
+        ],
+      ),
+    ),
+    then: (tester) async {
+      await tester.tap(find.byKey(const ValueKey('import-new-comments')));
+      await tester.pumpAndSettle();
+    },
   );
   fitsAtEveryWidth(
     'the queue dialog',

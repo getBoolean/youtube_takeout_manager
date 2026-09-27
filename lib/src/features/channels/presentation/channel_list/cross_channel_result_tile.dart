@@ -2,15 +2,10 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
-import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/interactions/presentation/comment_spans.dart';
-import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_tile.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_result_tile.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
-import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
 import '../../application/selection_providers.dart';
@@ -29,7 +24,6 @@ class CrossChannelResultTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final item = result.item;
-    final theme = Theme.of(context);
     final channel = ref.watch(channelByIdProvider(result.channelId));
     final status = ref
         .watch(interactionStatusesProvider(item.kind))
@@ -39,17 +33,6 @@ class CrossChannelResultTile extends ConsumerWidget {
     );
     final selectionMode = selectionModeProvider();
     final selecting = ref.watch(selectionMode);
-    final spans = buildCommentSpans(
-      item.rawText,
-      emojiSize: 16,
-      emojiBuilder: EmojiPreview.highlighting(query),
-    );
-
-    final isComment = item.kind == QueueItemKind.comment;
-    final channelName = channel?.channelTitle ?? result.channelId;
-    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
 
     void toggleSelection() {
       ref.read(deletionSetProvider.notifier).toggle(item.id);
@@ -68,50 +51,12 @@ class CrossChannelResultTile extends ConsumerWidget {
       );
     }
 
-    return InteractionTile(
+    return InteractionResultTile(
+      item: item,
+      channelName: channel?.channelTitle ?? result.channelId,
+      channelThumbnailUrl: channel?.thumbnailUrl,
       status: status,
-      icon: isComment ? Icons.comment_outlined : Icons.chat_bubble_outline,
-      iconColor: isComment
-          ? theme.colorScheme.primary
-          : theme.colorScheme.secondary,
-      dimUnselectable: true,
-      title: HighlightedText.rich(
-        spans,
-        query: query,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodyMedium,
-      ),
-      // One line of text with the avatar inline, so it ellipsizes instead
-      // of overflowing when narrow.
-      subtitle: Text.rich(
-        TextSpan(
-          children: [
-            const TextSpan(text: 'on '),
-            if (channel?.thumbnailUrl != null)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: ClipOval(
-                    child: Image.network(
-                      channel!.thumbnailUrl!,
-                      width: 14,
-                      height: 14,
-                      fit: BoxFit.cover,
-                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                    ),
-                  ),
-                ),
-              ),
-            TextSpan(text: '$channelName · ${formatDateTime(item.createdAt)}'),
-          ],
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: subtitleStyle,
-      ),
-      trailing: const Icon(Icons.chevron_right),
+      query: query,
       isSelected: isSelected,
       selectionMode: selecting,
       onTap: selecting

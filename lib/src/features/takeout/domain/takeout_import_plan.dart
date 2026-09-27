@@ -30,13 +30,26 @@ class TakeoutImportPlan {
   final Set<String> goneCommentIds;
   final Set<String> goneLiveChatIds;
 
-  /// How many of the gone IDs weren't already marked deleted.
-  final int newlyDeletedCommentCount;
-  final int newlyDeletedLiveChatCount;
+  /// The gone IDs that weren't already marked deleted.
+  final Set<String> newlyDeletedCommentIds;
+  final Set<String> newlyDeletedLiveChatIds;
 
-  /// Items that weren't in the saved data.
-  final int newCommentCount;
-  final int newLiveChatCount;
+  /// IDs of items that weren't in the saved data.
+  final Set<String> newCommentIds;
+  final Set<String> newLiveChatIds;
+
+  int get newlyDeletedCommentCount => newlyDeletedCommentIds.length;
+  int get newlyDeletedLiveChatCount => newlyDeletedLiveChatIds.length;
+  int get newCommentCount => newCommentIds.length;
+  int get newLiveChatCount => newLiveChatIds.length;
+
+  /// The videos the new items are on.
+  Set<String> get newItemVideoIds => {
+    for (final c in mergedData.comments)
+      if (newCommentIds.contains(c.commentId)) ?c.videoId,
+    for (final l in mergedData.liveChats)
+      if (newLiveChatIds.contains(l.liveChatId)) ?l.videoId,
+  };
 
   final DeletionCheckSkipReason? commentCheckSkipped;
   final DeletionCheckSkipReason? liveChatCheckSkipped;
@@ -52,10 +65,10 @@ class TakeoutImportPlan {
     this.channels = const [],
     required this.goneCommentIds,
     required this.goneLiveChatIds,
-    required this.newlyDeletedCommentCount,
-    required this.newlyDeletedLiveChatCount,
-    required this.newCommentCount,
-    required this.newLiveChatCount,
+    required this.newlyDeletedCommentIds,
+    required this.newlyDeletedLiveChatIds,
+    required this.newCommentIds,
+    required this.newLiveChatIds,
     this.commentCheckSkipped,
     this.liveChatCheckSkipped,
     this.baseTakeoutId,

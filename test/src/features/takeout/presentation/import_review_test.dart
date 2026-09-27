@@ -1,54 +1,105 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_items_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_review.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 
+Comment _comment(String id) => Comment(
+  commentId: id,
+  channelId: 'UCnew',
+  createdAt: DateTime.utc(2026),
+  price: 0,
+  rawCommentText: 'text of $id',
+  displayText: 'text of $id',
+);
+
+LiveChat _liveChat(String id) => LiveChat(
+  liveChatId: id,
+  channelId: 'UCnew',
+  createdAt: DateTime.utc(2026),
+  price: 0,
+  rawText: 'text of $id',
+  displayText: 'text of $id',
+);
+
+/// A plan whose counted items are in its data, named e.g. `new comment 0`
+/// and `gone live chat 1`, alongside an unchanged comment and live chat.
 TakeoutImportPlan _plan({
+  int newComments = 0,
   int newlyDeletedComments = 0,
   int newlyDeletedLiveChats = 0,
   DeletionCheckSkipReason? commentCheckSkipped,
   DeletionCheckSkipReason? liveChatCheckSkipped,
   int skippedLiveChatRows = 0,
-}) => TakeoutImportPlan(
-  accountId: 'UCnew',
-  channels: const [
-    TakeoutChannel(
-      channelId: 'UCnew',
-      title: 'Somebody Else',
-      isMain: true,
-      listed: true,
+}) {
+  Set<String> ids(String prefix, int count) => {
+    for (var i = 0; i < count; i++) '$prefix $i',
+  };
+  final newCommentIds = ids('new comment', newComments);
+  final goneCommentIds = ids('gone comment', newlyDeletedComments);
+  final goneLiveChatIds = ids('gone live chat', newlyDeletedLiveChats);
+  return TakeoutImportPlan(
+    accountId: 'UCnew',
+    channels: const [
+      TakeoutChannel(
+        channelId: 'UCnew',
+        title: 'Somebody Else',
+        isMain: true,
+        listed: true,
+      ),
+    ],
+    mergedData: TakeoutData(
+      comments: [
+        for (final id in {...newCommentIds, ...goneCommentIds, 'kept'})
+          _comment(id),
+      ],
+      liveChats: [
+        for (final id in {...goneLiveChatIds, 'kept'}) _liveChat(id),
+      ],
+      subscriptionsByChannelId: const {},
+      skippedLiveChatRows: skippedLiveChatRows,
     ),
-  ],
-  mergedData: TakeoutData(
-    comments: const [],
-    liveChats: const [],
-    subscriptionsByChannelId: const {},
-    skippedLiveChatRows: skippedLiveChatRows,
-  ),
-  goneCommentIds: const {},
-  goneLiveChatIds: const {},
-  newlyDeletedCommentCount: newlyDeletedComments,
-  newlyDeletedLiveChatCount: newlyDeletedLiveChats,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
-  commentCheckSkipped: commentCheckSkipped,
-  liveChatCheckSkipped: liveChatCheckSkipped,
-);
+    goneCommentIds: goneCommentIds,
+    goneLiveChatIds: goneLiveChatIds,
+    newlyDeletedCommentIds: goneCommentIds,
+    newlyDeletedLiveChatIds: goneLiveChatIds,
+    newCommentIds: newCommentIds,
+    newLiveChatIds: const {},
+    commentCheckSkipped: commentCheckSkipped,
+    liveChatCheckSkipped: liveChatCheckSkipped,
+  );
+}
+
+const _newComments = ValueKey('import-new-comments');
+const _newLiveChats = ValueKey('import-new-live-chats');
 
 const _commentsMarked = ValueKey('import-marks-comments-deleted');
 const _liveChatsMarked = ValueKey('import-marks-live-chats-deleted');
 const _commentWarning = ValueKey('import-warning-comments');
 const _liveChatWarning = ValueKey('import-warning-live-chats');
 
+class _NoVideos extends VideoMetadata {
+  @override
+  Stream<Map<String, Video>> build() => Stream.value(const {});
+}
+
 Future<void> _pump(WidgetTester tester, TakeoutImportPlan plan) =>
     tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: ImportReview(plan: plan, merge: true),
+      ProviderScope(
+        overrides: [videoMetadataProvider.overrideWith(_NoVideos.new)],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: ImportReview(plan: plan, merge: true),
+            ),
           ),
         ),
       ),
@@ -93,6 +144,51 @@ void main() {
 
     expect(_textIn(_commentsMarked, '12'), findsOneWidget);
     expect(_textIn(_liveChatsMarked, '3'), findsOneWidget);
+  });
+
+  testWidgets('opens a list of just the new comments', (tester) async {
+    await _pump(tester, _plan(newComments: 2, newlyDeletedComments: 1));
+
+    expect(find.textContaining('text of new comment 0'), findsNothing);
+
+    await tester.tap(find.byKey(_newComments));
+    await tester.pumpAndSettle();
+    final dialog = find.byType(ImportItemsDialog);
+    Finder inDialog(String text) =>
+        find.descendant(of: dialog, matching: find.textContaining(text));
+    expect(inDialog('text of new comment 0'), findsOneWidget);
+    expect(inDialog('text of new comment 1'), findsOneWidget);
+    expect(inDialog('text of gone comment'), findsNothing);
+    expect(inDialog('kept'), findsNothing);
+
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+    expect(dialog, findsNothing);
+  });
+
+  testWidgets('opens a list of what will be marked deleted, shown deleted', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _plan(newlyDeletedComments: 2, newlyDeletedLiveChats: 1),
+    );
+
+    await tester.tap(find.byKey(_liveChatsMarked));
+    await tester.pumpAndSettle();
+
+    final dialog = tester.widget<ImportItemsDialog>(
+      find.byType(ImportItemsDialog),
+    );
+    expect(dialog.items.map((i) => i.id), ['gone live chat 0']);
+  });
+
+  testWidgets('a count of nothing has nothing to open', (tester) async {
+    await _pump(tester, _plan());
+
+    await tester.tap(find.byKey(_newLiveChats));
+    await tester.pumpAndSettle();
+    expect(find.byType(ImportItemsDialog), findsNothing);
   });
 
   testWidgets('leaves out a kind with nothing to mark deleted', (tester) async {

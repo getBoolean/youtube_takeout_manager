@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/delet
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/youtube_links.dart';
 
 /// What can be done with one comment or live chat from its actions sheet.
 enum ItemAction { openOnYouTube, retry, removeFromQueue, queue, removeLocally }
@@ -95,14 +96,11 @@ Future<void> runItemAction(
 ) async {
   switch (action) {
     case ItemAction.openOnYouTube:
-      final videoId = item.videoId;
-      if (videoId == null) return;
-      // Comments open scrolled to themselves.
-      final uri = Uri.https('www.youtube.com', '/watch', {
-        'v': videoId,
-        if (item.kind == QueueItemKind.comment) 'lc': item.id,
-      });
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (item.videoId == null) return;
+      final uri = youtubeUrlOf(item);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
     case ItemAction.retry:
       await ref
           .read(deletionQueueProvider.notifier)

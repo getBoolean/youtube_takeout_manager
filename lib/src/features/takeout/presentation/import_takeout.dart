@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import '../application/add_account_import.dart';
-import '../application/saved_takeouts.dart';
 import '../application/takeout_selection_notifier.dart';
 import 'add_account_section.dart';
 import 'leave_channel_screens.dart';
@@ -31,7 +30,6 @@ class ImportTakeout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final saved = ref.watch(savedTakeoutsProvider).value ?? const [];
     final import = ref.read(addAccountImportProvider.notifier);
     return AddAccountSection(
       state: ref.watch(addAccountImportProvider),
@@ -39,29 +37,27 @@ class ImportTakeout extends ConsumerWidget {
           ref.watch(deletionProcessingProvider) == DeletionProcessingState.idle,
       idleLabel: idleLabel,
       prominent: prominent,
-      accountNames: {for (final t in saved) t.id: t.main.displayName},
-      viewedTakeoutId: ref.watch(
-        takeoutSelectionProvider.select((s) => s.value?.takeoutId),
-      ),
-      // A first import is saved without a review when it needs none.
-      onStart: () => _whenImported(context, import.start),
-      onConfirm: () => _whenImported(context, import.confirm),
+      // A first import is saved without a review when it needs none, and
+      // one to merge shows the account it's for while it's reviewed.
+      onStart: () => _whenShownChanges(context, ref, import.start),
+      onConfirm: () => _whenShownChanges(context, ref, import.confirm),
       onDismiss: import.dismiss,
-      // Merging shows the account it's for; the review stays open here.
-      onMerge: () => leaveChannelScreensAfter(context, import.merge),
     );
   }
 
-  /// Runs [step], and once it has saved a takeout, leaves screens tied to
-  /// the channel shown before.
-  Future<void> _whenImported(
+  /// Runs [step], and once it has saved a takeout or shown another one,
+  /// leaves screens tied to the channel shown before.
+  Future<void> _whenShownChanges(
     BuildContext context,
+    WidgetRef ref,
     Future<bool> Function() step,
   ) async {
     final router = StackRouterScope.of(context)?.controller;
-    if (await step() && context.mounted) {
-      leaveChannelScreens(router);
-      onImported?.call();
-    }
+    String? shown() => ref.read(takeoutSelectionProvider).value?.takeoutId;
+    final before = shown();
+    final saved = await step();
+    if (!context.mounted) return;
+    if (saved || shown() != before) leaveChannelScreens(router);
+    if (saved) onImported?.call();
   }
 }

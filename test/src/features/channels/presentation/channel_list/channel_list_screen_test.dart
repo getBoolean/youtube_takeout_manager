@@ -47,10 +47,12 @@ TakeoutImportPlan _plan({int newlyDeletedComments = 0}) => TakeoutImportPlan(
   mergedData: _data,
   goneCommentIds: const {},
   goneLiveChatIds: const {},
-  newlyDeletedCommentCount: newlyDeletedComments,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: {
+    for (var i = 0; i < newlyDeletedComments; i++) 'gone$i',
+  },
+  newlyDeletedLiveChatIds: const {},
+  newCommentIds: const {},
+  newLiveChatIds: const {},
 );
 
 class _Picker implements ZipPickerRepository {

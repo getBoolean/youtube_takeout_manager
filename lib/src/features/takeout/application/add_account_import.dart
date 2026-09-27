@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_import_plan.dart';
 import '../domain/takeout_import_request.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'saved_takeouts.dart';
 import 'takeout_importer.dart';
 import 'takeout_notifier.dart';
@@ -33,16 +34,8 @@ class AddAccountReview extends AddAccountState {
   TakeoutImportPlan get plan => prepared.plan;
 }
 
-/// The takeout is from an account already saved: nothing is imported unless
-/// the user chooses to merge it into that account.
-class AddAccountAlreadySaved extends AddAccountState {
-  final String takeoutId;
-
-  const AddAccountAlreadySaved(this.takeoutId);
-}
-
-/// Read for merging into its saved account, now shown, and ready to be
-/// looked over before it's saved.
+/// From an account already saved, so read for merging into it, now shown,
+/// and ready to be looked over before it's saved.
 class AddAccountMergeReview extends AddAccountState {
   final PreparedImport prepared;
 
@@ -59,30 +52,29 @@ class AddAccountFailed extends AddAccountState {
 }
 
 /// Imports a takeout in place: as its own account, or merged into its saved
-/// account only if the user says so. Nothing is ever replaced.
+/// account. Either is looked over before it's saved; nothing is ever
+/// replaced.
 @riverpod
 class AddAccountImport extends _$AddAccountImport {
-  /// The zips picked, kept in case they're merged into a saved account.
-  List<PickedZip>? _picked;
-
   @override
   AddAccountState build() => const AddAccountIdle();
 
-  /// Picks takeout zips and reads them for review. The first takeout saved
-  /// skips the review when there's nothing in it to look over. Returns
-  /// whether it was saved.
+  /// Picks takeout zips and reads them for review. One from an account
+  /// already saved is reviewed as a merge into it, showing that account
+  /// first, since merging works on the takeout shown. The first takeout
+  /// saved skips the review when there's nothing in it to look over.
+  /// Returns whether it was saved.
   Future<bool> start() async {
     try {
       // Straight from the click handler: see ZipPickerRepository.pickZips.
       final picked = await ref.read(zipPickerRepositoryProvider).pickZips();
       if (!ref.mounted || picked == null || picked.isEmpty) return false;
-      _picked = picked;
       state = const AddAccountWorking();
       final takeouts = ref.read(takeoutImporterProvider.notifier);
       final prepared = await takeouts.prepareImport(picked, merge: false);
       final plan = prepared.plan;
       if (await takeouts.hasSavedData(plan.accountId)) {
-        if (ref.mounted) state = AddAccountAlreadySaved(plan.accountId);
+        await _reviewMerge(picked, plan.accountId);
         return false;
       }
       final first = (await ref.read(savedTakeoutsProvider.future)).isEmpty;
@@ -95,29 +87,20 @@ class AddAccountImport extends _$AddAccountImport {
     return false;
   }
 
-  /// Shows the saved account the picked takeout is from, since merging
-  /// works on the takeout shown, and reads the takeout to merge into it.
-  Future<void> merge() async {
-    final picked = _picked;
-    if (state case AddAccountAlreadySaved(
-      :final takeoutId,
-    ) when picked != null) {
-      state = const AddAccountWorking();
-      try {
-        final selection = ref.read(takeoutSelectionProvider.notifier);
-        final shown = (await ref.read(
-          takeoutSelectionProvider.future,
-        ))?.takeoutId;
-        if (shown != takeoutId) await selection.select(takeoutId);
-        await ref.read(takeoutProvider.future);
-        final prepared = await ref
-            .read(takeoutImporterProvider.notifier)
-            .prepareImport(picked, merge: true);
-        if (ref.mounted) state = AddAccountMergeReview(prepared);
-      } catch (e) {
-        if (ref.mounted) state = AddAccountFailed(e);
-      }
-    }
+  /// Shows [takeoutId], the saved account [picked] is from, and reads
+  /// [picked] to merge into it.
+  Future<void> _reviewMerge(List<PickedZip> picked, String takeoutId) async {
+    final selection = ref.read(takeoutSelectionProvider.notifier);
+    final shown = (await ref.read(takeoutSelectionProvider.future))?.takeoutId;
+    if (shown != takeoutId) await selection.select(takeoutId);
+    await ref.read(takeoutProvider.future);
+    final prepared = await ref
+        .read(takeoutImporterProvider.notifier)
+        .prepareImport(picked, merge: true);
+    if (!ref.mounted) return;
+    // Named in the review once fetched.
+    ref.read(extraVideoIdsProvider.notifier).set(prepared.plan.newItemVideoIds);
+    state = AddAccountMergeReview(prepared);
   }
 
   /// Saves the reviewed takeout, as its own account or merged into its
@@ -133,6 +116,7 @@ class AddAccountImport extends _$AddAccountImport {
   }
 
   Future<bool> _save(PreparedImport prepared) async {
+    ref.read(extraVideoIdsProvider.notifier).clear();
     state = const AddAccountWorking();
     try {
       await ref.read(takeoutImporterProvider.notifier).commitImport(prepared);
@@ -145,7 +129,7 @@ class AddAccountImport extends _$AddAccountImport {
   }
 
   void dismiss() {
-    _picked = null;
+    ref.read(extraVideoIdsProvider.notifier).clear();
     state = const AddAccountIdle();
   }
 }

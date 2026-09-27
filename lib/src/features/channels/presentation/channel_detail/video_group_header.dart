@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/domain/youtube_links.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../../domain/video_group.dart';
 
@@ -188,12 +189,10 @@ class VideoGroupHeader extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.open_in_new, size: 20),
             tooltip: 'Open on YouTube',
-            onPressed: () {
-              final uri = Uri.https('www.youtube.com', '/watch', {
-                'v': videoId,
-              });
-              launchUrl(uri, mode: LaunchMode.externalApplication);
-            },
+            onPressed: () => launchUrl(
+              youtubeVideoUrl(videoId),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
         IconButton(
           icon: Icon(

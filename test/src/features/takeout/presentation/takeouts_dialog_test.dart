@@ -98,10 +98,10 @@ TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
   ),
   goneCommentIds: const {},
   goneLiveChatIds: const {},
-  newlyDeletedCommentCount: 0,
-  newlyDeletedLiveChatCount: 0,
-  newCommentCount: 0,
-  newLiveChatCount: 0,
+  newlyDeletedCommentIds: const {},
+  newlyDeletedLiveChatIds: const {},
+  newCommentIds: const {},
+  newLiveChatIds: const {},
 );
 
 class _NotSignedIn extends AuthNotifier {
@@ -582,8 +582,8 @@ void main() {
     expect(find.byKey(const ValueKey('add-account-review')), findsNothing);
   });
 
-  testWidgets('a takeout from an account already saved is merged only if '
-      'asked, in place', (tester) async {
+  testWidgets('a takeout from an account already saved shows that account '
+      'and reviews the merge in place', (tester) async {
     await pumpDialog(
       tester,
       saved: [_viewedSummary, _workSummary],
@@ -593,15 +593,6 @@ void main() {
     await tester.tap(find.text('Import a takeout'));
     await tester.pumpAndSettle();
 
-    expectNoPopups();
-    expect(
-      find.byKey(const ValueKey('add-account-already-saved')),
-      findsOneWidget,
-    );
-    expect(takeout.committed, isEmpty);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
-    await tester.pumpAndSettle();
     expectNoPopups();
     expect(selection.selected, [('UCwork', null)]);
     expect(
