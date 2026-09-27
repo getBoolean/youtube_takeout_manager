@@ -22,7 +22,7 @@ import 'channel_actions_header.dart';
 import 'channel_app_bar.dart';
 import 'channel_loading_skeleton.dart';
 import 'interaction_list_view.dart';
-import 'search_options_menu_button.dart';
+import 'search_options_button.dart';
 
 /// A comment or live chat to open the channel's screen scrolled to.
 typedef ScrollTarget = ({QueueItemKind kind, String id});
@@ -251,7 +251,7 @@ class ChannelDetailBody extends HookConsumerWidget {
             ),
             onQueryChanged: (v) =>
                 ref.read(channelContentSearchQueryProvider.notifier).update(v),
-            trailing: const [SearchOptionsMenuButton()],
+            trailing: const [SearchOptionsButton()],
           ),
         ),
         Expanded(

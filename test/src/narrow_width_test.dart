@@ -22,7 +22,7 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/search_resu
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_actions_header.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_app_bar.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/interaction_list_view.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/search_options_menu_button.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/search_options_button.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_header.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/no_takeout_views.dart';
@@ -341,7 +341,7 @@ Widget _channelPage({required bool liveChats}) {
                 standardEmojis: [_fire],
               ),
               onQueryChanged: (_) {},
-              trailing: const [SearchOptionsMenuButton()],
+              trailing: const [SearchOptionsButton()],
             ),
           ),
           Expanded(
@@ -620,6 +620,10 @@ void main() {
       itemCount: 12,
       possibleMembershipEventCount: 3,
     ),
+  );
+  fitsAtEveryWidth(
+    'the search options dialog',
+    () => const SearchOptionsDialog(options: SearchOptionsState()),
   );
 
   group('ChannelTabBar', () {
