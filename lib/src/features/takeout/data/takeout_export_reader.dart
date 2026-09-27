@@ -30,9 +30,7 @@ List<TakeoutExport> readTakeoutExports(List<PickedZip> zips) {
 
   final exports = <TakeoutExport>[];
   for (final MapEntry(key: exportedAt, value: zips) in zipsByExport.entries) {
-    final files = ZipExtractor().extractRelevantFiles([
-      for (final zip in zips) zip.bytes,
-    ]);
+    final files = ZipExtractor().extractRelevantFiles(zips);
     if (files.isEmpty) continue;
     exports.add(parseTakeoutFiles(files, exportedAt: exportedAt));
   }

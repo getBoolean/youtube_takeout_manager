@@ -2,8 +2,32 @@ import 'dart:typed_data';
 
 import 'takeout_data.dart';
 
-/// A takeout zip the user picked, read into memory.
-typedef PickedZip = ({String name, Uint8List bytes});
+/// A takeout zip the user picked.
+sealed class PickedZip {
+  /// Its file name, which tells which export it's part of.
+  final String name;
+
+  const PickedZip._(this.name);
+
+  /// A zip read from [path] when it's imported. Takeouts can hold tens of
+  /// gigabytes of videos, so only the files the import needs are read.
+  const factory PickedZip.file(String name, String path) = PickedZipFile;
+
+  /// A zip already read into memory, as a browser hands it over.
+  const factory PickedZip.bytes(String name, Uint8List bytes) = PickedZipBytes;
+}
+
+final class PickedZipFile extends PickedZip {
+  final String path;
+
+  const PickedZipFile(super.name, this.path) : super._();
+}
+
+final class PickedZipBytes extends PickedZip {
+  final Uint8List bytes;
+
+  const PickedZipBytes(super.name, this.bytes) : super._();
+}
 
 /// What picked takeouts are imported against: the saved data and what's
 /// known about the other saved takeouts.

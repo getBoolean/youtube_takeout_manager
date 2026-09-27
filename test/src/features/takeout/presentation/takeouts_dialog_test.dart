@@ -79,7 +79,7 @@ final _workSummary = TakeoutSummary(
   countsKnown: true,
 );
 
-final _picked = [(name: 'takeout-001.zip', bytes: Uint8List(1))];
+final _picked = [PickedZip.bytes('takeout-001.zip', Uint8List(1))];
 
 TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
   accountId: accountId,

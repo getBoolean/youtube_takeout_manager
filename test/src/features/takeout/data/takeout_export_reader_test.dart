@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -23,13 +26,16 @@ String _commentsCsv(List<String> rows) => [
 String _c(String id, String createdAt, {String channel = 'UCme'}) =>
     '$id,$channel,$createdAt,0,,,vid1,"{""text"":""$id text""}",';
 
-PickedZip _zip(String name, Map<String, String> files) {
+Uint8List _zipBytes(Map<String, String> files) {
   final archive = Archive();
   files.forEach((path, content) {
     archive.addFile(ArchiveFile.string(path, content));
   });
-  return (name: name, bytes: ZipEncoder().encodeBytes(archive));
+  return ZipEncoder().encodeBytes(archive);
 }
+
+PickedZip _zip(String name, Map<String, String> files) =>
+    PickedZip.bytes(name, _zipBytes(files));
 
 Comment _savedComment(String id, String createdAt) => Comment(
   commentId: id,
@@ -84,6 +90,28 @@ void main() {
     ]);
 
     expect(plan.commentCheckSkipped, isNull);
+    expect(plan.goneCommentIds, {'B'});
+    expect(plan.mergedData.latestExportAt, DateTime.utc(2026, 3));
+  });
+
+  test('reads a zip from where it is on disk', () {
+    final dir = Directory.systemTemp.createTempSync('takeout_reader');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final file = File('${dir.path}/takeout-20260301T000000Z-001.zip')
+      ..writeAsBytesSync(
+        _zipBytes({
+          _comments: _commentsCsv([
+            _c('A', '2026-01-01T00:00:00Z'),
+            _c('C', '2026-01-03T00:00:00Z'),
+          ]),
+          '$_dir/videos/a video.mp4': 'not a CSV',
+        }),
+      );
+
+    final plan = _import([
+      PickedZip.file('takeout-20260301T000000Z-001.zip', file.path),
+    ]);
+
     expect(plan.goneCommentIds, {'B'});
     expect(plan.mergedData.latestExportAt, DateTime.utc(2026, 3));
   });

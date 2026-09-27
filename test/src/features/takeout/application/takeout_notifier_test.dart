@@ -125,9 +125,9 @@ List<PickedZip> _newerTakeout({String channel = 'UCme'}) {
       ),
     );
   return [
-    (
-      name: 'takeout-20260301T000000Z-001.zip',
-      bytes: ZipEncoder().encodeBytes(archive),
+    PickedZip.bytes(
+      'takeout-20260301T000000Z-001.zip',
+      ZipEncoder().encodeBytes(archive),
     ),
   ];
 }
@@ -304,9 +304,9 @@ void main() {
       );
     final zips = [
       ..._newerTakeout(),
-      (
-        name: 'takeout-20260301T000000Z-002.zip',
-        bytes: ZipEncoder().encodeBytes(archive),
+      PickedZip.bytes(
+        'takeout-20260301T000000Z-002.zip',
+        ZipEncoder().encodeBytes(archive),
       ),
     ];
     final notifier = container().read(takeoutImporterProvider.notifier);

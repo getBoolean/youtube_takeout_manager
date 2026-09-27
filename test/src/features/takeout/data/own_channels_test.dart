@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_en
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_parser.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_extractor.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/own_channel.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 
 Uint8List _bytes(String s) => Uint8List.fromList(utf8.encode(s));
 
@@ -79,7 +80,9 @@ void main() {
     }
     final zip = ZipEncoder().encodeBytes(archive);
 
-    final files = ZipExtractor().extractRelevantFiles([zip]);
+    final files = ZipExtractor().extractRelevantFiles([
+      PickedZip.bytes('takeout.zip', zip),
+    ]);
 
     expect(
       files.keys,

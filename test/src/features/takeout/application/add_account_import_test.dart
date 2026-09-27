@@ -17,7 +17,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 
-final _picked = [(name: 'takeout-001.zip', bytes: Uint8List(1))];
+final _picked = [PickedZip.bytes('takeout-001.zip', Uint8List(1))];
 
 const _plan = TakeoutImportPlan(
   accountId: 'UCnew',

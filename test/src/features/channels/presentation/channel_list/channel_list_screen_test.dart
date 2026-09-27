@@ -56,7 +56,7 @@ TakeoutImportPlan _plan({int newlyDeletedComments = 0}) => TakeoutImportPlan(
 class _Picker implements ZipPickerRepository {
   @override
   Future<List<PickedZip>?> pickZips() async => [
-    (name: 'takeout-001.zip', bytes: Uint8List(1)),
+    PickedZip.bytes('takeout-001.zip', Uint8List(1)),
   ];
 }
 
