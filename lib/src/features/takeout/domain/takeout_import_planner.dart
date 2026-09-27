@@ -1,4 +1,6 @@
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/history_merge.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'channel_id.dart';
 import 'own_channel.dart';
@@ -16,12 +18,14 @@ final _epoch = DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
 ///
 /// For each kind, the account's items missing from the newest source of
 /// that kind are gone, unless they were created after that source was
-/// exported. Throws a [TakeoutImportException] when they can't be imported
-/// safely.
+/// exported. Their watch and search history is merged into [savedHistory],
+/// the saved takeout's, when merging. Throws a [TakeoutImportException] when
+/// they can't be imported safely.
 TakeoutImportPlan planTakeoutImport(
   List<TakeoutExport> exports,
-  TakeoutImportContext context,
-) {
+  TakeoutImportContext context, {
+  TakeoutHistory? savedHistory,
+}) {
   if (exports.isEmpty) {
     throw ArgumentError.value(exports, 'exports', 'No takeouts to import');
   }
@@ -99,6 +103,10 @@ TakeoutImportPlan planTakeoutImport(
     newLiveChatIds: liveChats.keys.toSet().difference(baseLiveChatIds),
     commentCheckSkipped: goneComments.skipped,
     liveChatCheckSkipped: goneLiveChats.skipped,
+    history: planHistoryImport(
+      saved: context.merge ? savedHistory : null,
+      picked: [for (final e in exports) ?e.history],
+    ),
     baseTakeoutId: context.activeTakeoutId,
   );
 }
@@ -258,7 +266,8 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportContext context) {
     if (channels.isEmpty) {
       throw const TakeoutImportException(
         'The selected takeout has no comments, live chats or channel list, so '
-        "its YouTube account can't be determined.",
+        "its YouTube account can't be determined. Watch and search history "
+        'can only be imported along with one of them.',
       );
     }
     for (final id in channels) {

@@ -52,4 +52,9 @@ typedef TakeoutImportContext = ({
 typedef TakeoutImportRequest = ({
   List<PickedZip> zips,
   TakeoutImportContext context,
+
+  /// The saved takeout's history files, when merging: parsed only if the
+  /// picked zips have history to merge with them, else saved again as they
+  /// are.
+  Map<String, Uint8List> savedHistoryFiles,
 });

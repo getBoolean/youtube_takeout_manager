@@ -1,3 +1,4 @@
+import 'package:youtube_takeout_manager/src/features/history/domain/history_merge.dart';
 import 'takeout_channel.dart';
 import 'takeout_data.dart';
 
@@ -54,6 +55,9 @@ class TakeoutImportPlan {
   final DeletionCheckSkipReason? commentCheckSkipped;
   final DeletionCheckSkipReason? liveChatCheckSkipped;
 
+  /// What it does to the account's watch and search history.
+  final HistoryImport history;
+
   /// The takeout selected when this was worked out. Committing is refused
   /// if another one is selected by then, since this was worked out against
   /// it.
@@ -71,19 +75,21 @@ class TakeoutImportPlan {
     required this.newLiveChatIds,
     this.commentCheckSkipped,
     this.liveChatCheckSkipped,
+    this.history = HistoryImport.none,
     this.baseTakeoutId,
   });
 
   /// Whether there's something to look over before it's saved even as a
   /// first import: items found deleted, a deletion check skipped, or rows
-  /// that couldn't be read.
+  /// or history that couldn't be read.
   bool get needsReview =>
       newlyDeletedCommentCount > 0 ||
       newlyDeletedLiveChatCount > 0 ||
       commentCheckSkipped != null ||
       liveChatCheckSkipped != null ||
       mergedData.skippedCommentRows > 0 ||
-      mergedData.skippedLiveChatRows > 0;
+      mergedData.skippedLiveChatRows > 0 ||
+      history.needsReview;
 }
 
 /// A problem with the picked zips that stops the import before anything is

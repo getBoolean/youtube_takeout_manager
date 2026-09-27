@@ -21,6 +21,10 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
@@ -40,6 +44,9 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_ti
 
 class _MemoryTakeoutRepository implements TakeoutRepository {
   final accounts = <String, Map<String, Uint8List>>{};
+
+  /// Every path [loadCsvs] has returned.
+  final loadedPaths = <String>[];
   Map<String, Uint8List>? legacy;
 
   /// Holds up loading [legacy] until it completes.
@@ -61,11 +68,13 @@ class _MemoryTakeoutRepository implements TakeoutRepository {
     bool Function(String path)? only,
   }) async {
     final files = accounts[accountId];
-    if (files == null || only == null) return files;
-    return {
+    if (files == null) return null;
+    final loaded = {
       for (final MapEntry(:key, :value) in files.entries)
-        if (only(key)) key: value,
+        if (only?.call(key) ?? true) key: value,
     };
+    loadedPaths.addAll(loaded.keys);
+    return loaded;
   }
 
   @override
@@ -472,6 +481,79 @@ void main() {
 
     expect(await notifier.hasSavedData('UCme'), isTrue);
     expect(await notifier.hasSavedData('UCother'), isFalse);
+  });
+
+  group('history', () {
+    /// A takeout exported 2026-03-01 with its channel list and a watch
+    /// history of one video.
+    List<PickedZip> takeoutWithHistory() {
+      const dir = 'Takeout/YouTube and YouTube Music';
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            '$dir/channels/channel.csv',
+            'Channel ID,Channel Title (Original)\r\nUCme,Me',
+          ),
+        )
+        ..addFile(
+          ArchiveFile.string(
+            '$dir/history/watch-history.json',
+            '[{"header": "YouTube", "title": "Watched A video", '
+                '"titleUrl": "https://www.youtube.com/watch?v=v1", '
+                '"time": "2026-02-01T00:00:00Z"}]',
+          ),
+        );
+      return [
+        PickedZip.bytes(
+          'takeout-20260301T000000Z-001.zip',
+          ZipEncoder().encodeBytes(archive),
+        ),
+      ];
+    }
+
+    TakeoutHistory savedHistory() => parseSavedHistory({
+      for (final MapEntry(:key, :value) in repository.accounts['UCme']!.entries)
+        if (isHistoryPath(key)) key: value,
+    });
+
+    Future<void> import(List<PickedZip> zips) async {
+      final notifier = container().read(takeoutImporterProvider.notifier);
+      await notifier.commitImport(
+        await notifier.prepareImport(zips, merge: true),
+      );
+    }
+
+    test('importing saves history beside the comments', () async {
+      await import(takeoutWithHistory());
+
+      expect(savedHistory().watches.single.videoId, 'v1');
+      expect(await commentIds(container()), ['C', 'B', 'A']);
+    });
+
+    test('a later import without history keeps the saved history', () async {
+      await import(takeoutWithHistory());
+
+      await import(_newerTakeout());
+
+      expect(savedHistory().watches.single.videoId, 'v1');
+      expect(await commentIds(container()), ['D', 'C', 'B', 'A']);
+    });
+
+    test("loading a takeout doesn't read its history", () async {
+      repository.accounts['UCme'] = {
+        ...encodeTakeoutCsvs(_savedAbc),
+        ...encodeHistoryCsvs(
+          TakeoutHistory(
+            searches: [SearchEntry(time: DateTime.utc(2026), query: 'cats')],
+          ),
+        ),
+      };
+
+      await container().read(takeoutProvider.future);
+
+      expect(repository.loadedPaths, isNotEmpty);
+      expect(repository.loadedPaths.where(isHistoryPath), isEmpty);
+    });
   });
 
   test('fills in the channel of queued items from before it was saved, from '

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
 import '../data/takeout_parser.dart';
 import '../data/takeout_repository.dart';
 import '../domain/loaded_takeout.dart';
@@ -35,7 +36,11 @@ class TakeoutNotifier extends _$TakeoutNotifier {
       _primed = null;
       return primed;
     }
-    final savedCsvs = await repository.loadCsvs(takeoutId);
+    // History is loaded on its own, only when it's looked at.
+    final savedCsvs = await repository.loadCsvs(
+      takeoutId,
+      only: (path) => !isHistoryPath(path),
+    );
     if (savedCsvs == null) return null;
     final data = await compute(parseCsvFiles, savedCsvs);
     return LoadedTakeout(id: takeoutId, data: data);

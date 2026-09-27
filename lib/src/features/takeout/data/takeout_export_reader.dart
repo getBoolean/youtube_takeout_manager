@@ -36,8 +36,8 @@ List<TakeoutExport> readTakeoutExports(List<PickedZip> zips) {
   }
   if (exports.isEmpty) {
     throw const TakeoutImportException(
-      'No comments, live chats or subscriptions were found in the selected '
-      'files.',
+      'No comments, live chats, subscriptions or history were found in the '
+      'selected files.',
     );
   }
   return exports;

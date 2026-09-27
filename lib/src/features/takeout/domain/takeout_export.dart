@@ -1,3 +1,4 @@
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'takeout_data.dart';
 
 /// Row counts of one kind's numbered CSV files, e.g. `comments(3).csv` is
@@ -17,10 +18,14 @@ class TakeoutExport {
   final CsvPages commentPages;
   final CsvPages liveChatPages;
 
+  /// Its watch and search history, or null when it had neither.
+  final ExportHistory? history;
+
   const TakeoutExport({
     this.exportedAt,
     required this.data,
     this.commentPages = const {},
     this.liveChatPages = const {},
+    this.history,
   });
 }

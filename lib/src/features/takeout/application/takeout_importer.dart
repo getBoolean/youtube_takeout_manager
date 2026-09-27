@@ -5,6 +5,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/delete
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 import '../data/takeout_csv_encoder.dart';
@@ -31,11 +33,27 @@ typedef PreparedImport = ({
 /// Top-level function for `compute` — reads the picked zips, works out what
 /// importing them would change, and encodes the result for saving.
 PreparedImport _readAndPlan(TakeoutImportRequest request) {
+  final exports = readTakeoutExports(request.zips);
+  final savedHistory = request.savedHistoryFiles;
+  // Saved history is only read to merge picked history into it.
   final plan = planTakeoutImport(
-    readTakeoutExports(request.zips),
+    exports,
     request.context,
+    savedHistory: exports.any((e) => e.history != null)
+        ? parseSavedHistory(savedHistory)
+        : null,
   );
-  return (plan: plan, csvFiles: encodeTakeoutCsvs(plan.mergedData));
+  final mergedHistory = plan.history.merged;
+  return (
+    plan: plan,
+    csvFiles: {
+      ...encodeTakeoutCsvs(plan.mergedData),
+      // Saving replaces every file, so history not merged is saved again.
+      ...mergedHistory == null
+          ? savedHistory
+          : encodeHistoryCsvs(mergedHistory),
+    },
+  );
 }
 
 /// Imports takeouts: works out what picked zips would change, then saves
@@ -61,6 +79,12 @@ class TakeoutImporter extends _$TakeoutImporter {
       loaded: loaded,
     );
     final deleted = await ref.read(deletedIdsProvider.future);
+    final activeTakeoutId = await _selectedTakeoutId();
+    final savedHistoryFiles = merge && activeTakeoutId != null
+        ? await ref
+              .read(takeoutRepositoryProvider)
+              .loadCsvs(activeTakeoutId, only: isHistoryPath)
+        : null;
     return compute(_readAndPlan, (
       zips: zips,
       context: (
@@ -69,8 +93,9 @@ class TakeoutImporter extends _$TakeoutImporter {
         merge: merge,
         deletedCommentIds: deleted[QueueItemKind.comment] ?? const {},
         deletedLiveChatIds: deleted[QueueItemKind.liveChat] ?? const {},
-        activeTakeoutId: await _selectedTakeoutId(),
+        activeTakeoutId: activeTakeoutId,
       ),
+      savedHistoryFiles: savedHistoryFiles ?? const {},
     ));
   }
 

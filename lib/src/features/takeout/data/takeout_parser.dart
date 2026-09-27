@@ -1,6 +1,12 @@
 import 'dart:typed_data';
 
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_html_parser.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_json_parser.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
@@ -36,6 +42,8 @@ TakeoutExport parseTakeoutFiles(
   var skippedCommentRows = 0;
   var skippedLiveChatRows = 0;
   TakeoutMeta? meta;
+  HistoryFileRead<WatchEntry>? watches;
+  HistoryFileRead<SearchEntry>? searches;
 
   int page(String path) =>
       int.parse(_pageNumber.firstMatch(path.toLowerCase())?.group(1) ?? '0');
@@ -63,8 +71,23 @@ TakeoutExport parseTakeoutFiles(
       case TakeoutFile.channelUrlConfigs:
         vanityNames.addAll(csvParser.parseChannelUrlConfigsCsv(bytes));
       // Only a saved takeout's summary is read from it.
-      case TakeoutFile.channelCounts || null:
+      case TakeoutFile.channelCounts:
         break;
+      case null:
+        // A zip picked twice has the same history twice; one is enough.
+        switch (HistoryFile.classify(path)) {
+          case HistoryFile.watches when watches == null:
+            watches = _isJson(path)
+                ? parseWatchHistoryJson(bytes)
+                : parseWatchHistoryHtml(bytes);
+          case HistoryFile.searches when searches == null:
+            searches = _isJson(path)
+                ? parseSearchHistoryJson(bytes)
+                : parseSearchHistoryHtml(bytes);
+          // A saved takeout's history is loaded on its own.
+          case _:
+            break;
+        }
     }
   }
 
@@ -90,5 +113,14 @@ TakeoutExport parseTakeoutFiles(
     ),
     commentPages: commentPages,
     liveChatPages: liveChatPages,
+    history: watches == null && searches == null
+        ? null
+        : ExportHistory(
+            exportedAt: exportedAt,
+            watches: watches,
+            searches: searches,
+          ),
   );
 }
+
+bool _isJson(String path) => path.toLowerCase().endsWith('.json');
