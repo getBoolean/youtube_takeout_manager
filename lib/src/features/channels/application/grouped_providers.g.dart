@@ -190,7 +190,7 @@ final class FilteredGroupedChannelInteractionsProvider
 }
 
 String _$filteredGroupedChannelInteractionsHash() =>
-    r'a3dace395618fb1f8de9af2170ba24e17f5d9796';
+    r'de85a62df6d3527cdf1de68cf199d30ac015655a';
 
 /// The groups of [groupedChannelInteractionsProvider] that match the channel
 /// search: by group title, or by the text of their items.

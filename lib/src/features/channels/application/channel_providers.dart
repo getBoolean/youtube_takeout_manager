@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/interactions/application/in
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../data/channel_cache_repository.dart';
@@ -91,26 +92,20 @@ List<Channel> channels(Ref ref) {
     ...liveChatsByChannel.keys,
   };
 
-  final channelTitlesFromVideos = ref.watch(channelTitlesFromVideosProvider);
+  final titlesFromVideos = ref.watch(channelTitlesFromVideosProvider);
   final thumbnails = ref.watch(channelThumbnailsProvider);
 
-  final channels = channelIds.map((id) {
-    final commentCount = commentsByChannel[id]?.length ?? 0;
-    final liveChatCount = liveChatsByChannel[id]?.length ?? 0;
-    if (id == unknownChannelId) {
-      return _unknownChannel(commentCount, liveChatCount);
-    }
-    final sub = subscriptions[id];
-    final channelTitle = sub?.channelTitle ?? channelTitlesFromVideos[id];
-    return Channel(
-      channelId: id,
-      channelTitle: channelTitle,
-      channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$id',
-      thumbnailUrl: thumbnails[id],
-      commentCount: commentCount,
-      liveChatCount: liveChatCount,
-    );
-  }).toList();
+  final channels = [
+    for (final id in channelIds)
+      _channelOf(
+        id,
+        commentCount: commentsByChannel[id]?.length ?? 0,
+        liveChatCount: liveChatsByChannel[id]?.length ?? 0,
+        subscriptions: subscriptions,
+        titlesFromVideos: titlesFromVideos,
+        thumbnails: thumbnails,
+      ),
+  ];
 
   // Most interactions first; items with an unknown channel always last.
   channels.sort((a, b) {
@@ -120,12 +115,34 @@ List<Channel> channels(Ref ref) {
   return channels;
 }
 
-Channel _unknownChannel(int commentCount, int liveChatCount) => Channel(
-  channelId: unknownChannelId,
-  channelTitle: 'Unknown channel',
-  commentCount: commentCount,
-  liveChatCount: liveChatCount,
-);
+/// [id]'s channel: named by the takeout's [subscriptions] or else its videos,
+/// and pictured once its picture is fetched.
+Channel _channelOf(
+  String id, {
+  required int commentCount,
+  required int liveChatCount,
+  required Map<String, Subscription> subscriptions,
+  required Map<String, String> titlesFromVideos,
+  required Map<String, String> thumbnails,
+}) {
+  if (id == unknownChannelId) {
+    return Channel(
+      channelId: unknownChannelId,
+      channelTitle: 'Unknown channel',
+      commentCount: commentCount,
+      liveChatCount: liveChatCount,
+    );
+  }
+  final sub = subscriptions[id];
+  return Channel(
+    channelId: id,
+    channelTitle: sub?.channelTitle ?? titlesFromVideos[id],
+    channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$id',
+    thumbnailUrl: thumbnails[id],
+    commentCount: commentCount,
+    liveChatCount: liveChatCount,
+  );
+}
 
 @riverpod
 Channel? channelById(Ref ref, String channelId) {
@@ -142,22 +159,12 @@ Channel? channelById(Ref ref, String channelId) {
       !liveChatsByChannel.containsKey(channelId)) {
     return null;
   }
-  if (channelId == unknownChannelId) {
-    return _unknownChannel(
-      commentsByChannel[channelId]?.length ?? 0,
-      liveChatsByChannel[channelId]?.length ?? 0,
-    );
-  }
-
-  final sub = takeout.subscriptionsByChannelId[channelId];
-  final titleFromVideos = ref.watch(channelTitlesFromVideosProvider)[channelId];
-  final thumbnail = ref.watch(channelThumbnailsProvider)[channelId];
-  return Channel(
-    channelId: channelId,
-    channelTitle: sub?.channelTitle ?? titleFromVideos,
-    channelUrl: sub?.channelUrl ?? 'https://www.youtube.com/channel/$channelId',
-    thumbnailUrl: thumbnail,
+  return _channelOf(
+    channelId,
     commentCount: commentsByChannel[channelId]?.length ?? 0,
     liveChatCount: liveChatsByChannel[channelId]?.length ?? 0,
+    subscriptions: takeout.subscriptionsByChannelId,
+    titlesFromVideos: ref.watch(channelTitlesFromVideosProvider),
+    thumbnails: ref.watch(channelThumbnailsProvider),
   );
 }

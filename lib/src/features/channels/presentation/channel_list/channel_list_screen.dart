@@ -7,8 +7,6 @@ import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_layout.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_providers.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/debounced_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
@@ -16,10 +14,13 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_pr
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import '../../application/channel_providers.dart';
 import '../../application/cross_channel_search_providers.dart';
+import '../../application/selection_providers.dart';
+import '../../domain/channel.dart';
 import '../../domain/search_result_item.dart';
+import '../selection_bars.dart';
+import '../skeleton.dart';
 import 'channel_list_header.dart';
 import 'channel_tile.dart';
-import 'cross_channel_deletion_bar.dart';
 import 'cross_channel_result_tile.dart';
 import 'no_takeout_views.dart';
 import 'section_header.dart';
@@ -30,88 +31,8 @@ const _searchBarPadding = EdgeInsets.symmetric(horizontal: 16, vertical: 8);
 const _searchBarHeight = 56.0 + 16;
 
 @RoutePage()
-class ChannelListScreen extends ConsumerStatefulWidget {
+class ChannelListScreen extends ConsumerWidget {
   const ChannelListScreen({super.key});
-
-  @override
-  ConsumerState<ChannelListScreen> createState() => _ChannelListScreenState();
-}
-
-class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
-  final ValueNotifier<bool> _selectionMode = ValueNotifier(false);
-
-  void _exitSelectionMode() {
-    _selectionMode.value = false;
-    ref.read(deletionSetProvider.notifier).clear();
-  }
-
-  @override
-  void dispose() {
-    _selectionMode.dispose();
-    super.dispose();
-  }
-
-  Widget _buildLoadingSkeleton() {
-    final theme = Theme.of(context);
-    final skeletonColor = theme.colorScheme.surfaceContainerHighest;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Channels'),
-        actions: const [AccountButton()],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(_searchBarHeight),
-          child: Padding(
-            padding: _searchBarPadding,
-            child: SearchBar(
-              hintText: 'Search channels and comments...',
-              leading: Icon(Icons.search),
-              enabled: false,
-            ),
-          ),
-        ),
-      ),
-      body: ListView.builder(
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 10,
-        itemExtent: 56,
-        itemBuilder: (context, index) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              CircleAvatar(radius: 16, backgroundColor: skeletonColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      height: 14,
-                      width: 140,
-                      decoration: BoxDecoration(
-                        color: skeletonColor,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      height: 12,
-                      width: 80,
-                      decoration: BoxDecoration(
-                        color: skeletonColor,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   /// Before any takeout is shown: [body] centered and scrollable, under the
   /// account button.
@@ -139,7 +60,7 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final takeoutAsync = ref.watch(viewedTakeoutProvider);
 
     final filteredChannels = ref.watch(filteredChannelsProvider);
@@ -154,16 +75,9 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
             query.isEmpty &&
             (progress.isFetching || videoMetadata.isLoading));
 
-    // When the query clears, selection mode makes no sense (results vanish).
-    ref.listen(channelSearchQueryProvider, (_, next) {
-      if (next.isEmpty && _selectionMode.value) {
-        _exitSelectionMode();
-      }
-    });
-    // Nor once another channel is viewed, whose items these aren't.
-    ref.listen(viewedChannelIdProvider, (_, _) {
-      if (_selectionMode.value) _exitSelectionMode();
-    });
+    // Keeps the list's selection mode while the screen is open, loading
+    // included. It leaves by itself when the search clears.
+    final inSelection = ref.watch(selectionModeProvider());
 
     if (takeoutAsync.hasError) {
       return _buildWithoutTakeout(
@@ -176,181 +90,100 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
 
     final queue = DeletionQueueHost.of(context);
     if (isLoading) {
-      return queue.wrap(_buildLoadingSkeleton());
+      return queue.wrap(const _LoadingSkeleton());
     }
 
     final hasResults = filteredChannels.isNotEmpty || searchItems.isNotEmpty;
 
-    final hasSelection = ref.watch(
-      deletionSetProvider.select((s) => s.isNotEmpty),
-    );
-
     return queue.wrap(
-      ValueListenableBuilder<bool>(
-        valueListenable: _selectionMode,
-        builder: (context, inSelection, _) {
-          return Scaffold(
-            appBar: _buildAppBar(
-              context: context,
-              query: query,
-              searchItems: searchItems,
-              inSelection: inSelection,
-              queueActions: queue.appBarActions,
-            ),
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      Scaffold(
+        appBar: SelectionAppBar(
+          title: const Text('Channels'),
+          actions: [...queue.appBarActions, const AccountButton()],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(_searchBarHeight),
+            child: Stack(
               children: [
-                ChannelListHeader(
-                  query: query,
-                  channelCount: filteredChannels.length,
-                  matchCount: searchItems.length,
-                  selectionMode: _selectionMode,
+                Padding(
+                  padding: _searchBarPadding,
+                  child: DebouncedSearchBar(
+                    hintText: 'Search channels and comments...',
+                    emojis: EmojiSearchConfig(
+                      groups: ref.watch(allChannelEmojiGroupsProvider),
+                      standardEmojis: ref.watch(allUsedUnicodeEmojisProvider),
+                    ),
+                    onQueryChanged: (value) => ref
+                        .read(channelSearchQueryProvider.notifier)
+                        .update(value),
+                  ),
                 ),
-                Expanded(
-                  child: !hasResults
-                      ? EmptyState(
-                          icon: progress.isFetching
-                              ? Icons.hourglass_top
-                              : Icons.search_off,
-                          message: progress.isFetching
-                              ? 'Loading channels...'
-                              : query.isNotEmpty
-                              ? 'No results found'
-                              : 'No channels found',
-                        )
-                      : _buildResultsList(
-                          channels: filteredChannels,
-                          items: searchItems,
-                          query: query,
-                          inSelection: inSelection,
-                        ),
+                // Overlaid on the bar's bottom edge so it doesn't change the
+                // bar's height.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Cue.onToggle(
+                    toggled: progress.isFetching && progress.total > 0,
+                    motion: premiumSpring(context),
+                    reverseMotion: premiumSpring(context),
+                    acts: const [ClipAct.height(), OpacityAct.fadeIn()],
+                    child: LinearProgressIndicator(
+                      value: progress.total > 0
+                          ? progress.fetched / progress.total
+                          : 0,
+                    ),
+                  ),
                 ),
               ],
             ),
-            bottomNavigationBar: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedBottomBar(
-                  visible: inSelection && hasSelection,
-                  child: CrossChannelDeletionBar(onExit: _exitSelectionMode),
-                ),
-                if (queue.bottomBar case final bar? when !inSelection) bar,
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar({
-    required BuildContext context,
-    required String query,
-    required List<SearchResultItem> searchItems,
-    required bool inSelection,
-    required List<Widget> queueActions,
-  }) {
-    final progress = ref.watch(videoFetchProgressProvider);
-
-    final Widget? leading;
-    final Widget title;
-    final List<Widget> actions;
-
-    if (inSelection) {
-      final visibleIds = {for (final result in searchItems) result.item.id};
-      final selectedCount = ref
-          .watch(deletionSetProvider)
-          .intersection(visibleIds)
-          .length;
-      final deletableIds = {
-        for (final result in ref.watch(crossChannelDeletableItemsProvider))
-          result.item.id,
-      };
-      leading = CloseButton(onPressed: _exitSelectionMode);
-      title = Text('$selectedCount selected');
-      actions = [SelectAllToggleButton(selectableIds: deletableIds)];
-    } else {
-      leading = null;
-      title = const Text('Channels');
-      actions = [...queueActions, const AccountButton()];
-    }
-
-    final scheme = Theme.of(context).colorScheme;
-    return AppBar(
-      leading: leading,
-      title: title,
-      actions: actions,
-      backgroundColor: inSelection ? scheme.secondaryContainer : null,
-      foregroundColor: inSelection ? scheme.onSecondaryContainer : null,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(_searchBarHeight),
-        child: Stack(
+          ),
+        ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: _searchBarPadding,
-              child: DebouncedSearchBar(
-                hintText: 'Search channels and comments...',
-                emojis: EmojiSearchConfig(
-                  groups: ref.watch(allChannelEmojiGroupsProvider),
-                  standardEmojis: ref.watch(allUsedUnicodeEmojisProvider),
-                ),
-                onQueryChanged: (value) =>
-                    ref.read(channelSearchQueryProvider.notifier).update(value),
-              ),
+            ChannelListHeader(
+              query: query,
+              channelCount: filteredChannels.length,
+              matchCount: searchItems.length,
             ),
-            // Overlaid on the bar's bottom edge so it doesn't change the
-            // bar's height.
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Cue.onToggle(
-                toggled: progress.isFetching && progress.total > 0,
-                motion: premiumSpring(context),
-                reverseMotion: premiumSpring(context),
-                acts: const [ClipAct.height(), OpacityAct.fadeIn()],
-                child: LinearProgressIndicator(
-                  value: progress.total > 0
-                      ? progress.fetched / progress.total
-                      : 0,
-                ),
-              ),
+            Expanded(
+              child: !hasResults
+                  ? EmptyState(
+                      icon: progress.isFetching
+                          ? Icons.hourglass_top
+                          : Icons.search_off,
+                      message: progress.isFetching
+                          ? 'Loading channels...'
+                          : query.isNotEmpty
+                          ? 'No results found'
+                          : 'No channels found',
+                    )
+                  : _buildResultsList(
+                      channels: filteredChannels,
+                      items: searchItems,
+                      query: query,
+                      inSelection: inSelection,
+                    ),
             ),
           ],
         ),
+        bottomNavigationBar: SelectionBottomBar(queueBar: queue.bottomBar),
       ),
     );
   }
 
+  /// Channels first (prioritized), then the comments and live chats that
+  /// match the search.
   Widget _buildResultsList({
-    required List<dynamic> channels,
+    required List<Channel> channels,
     required List<SearchResultItem> items,
     required String query,
     required bool inSelection,
   }) {
-    // Empty query → plain channel list (preserves pre-existing scroll behavior).
-    if (items.isEmpty && query.isEmpty) {
-      return ListView.builder(
-        itemExtent: 56,
-        itemCount: channels.length,
-        itemBuilder: (context, index) {
-          final channel = channels[index];
-          return ChannelTile(
-            key: ValueKey(channel.channelId),
-            channel: channel,
-            highlightQuery: query,
-            onTap: inSelection
-                ? () {}
-                : () => context.router.push(
-                    ChannelDetailRoute(channelId: channel.channelId),
-                  ),
-          );
-        },
-      );
-    }
-
-    // Query active → channels first (prioritized), then cross-channel items.
     return CustomScrollView(
+      // Back at the top when a search starts or ends.
+      key: ValueKey(query.isEmpty),
       slivers: [
         if (channels.isNotEmpty)
           SliverFixedExtentList.builder(
@@ -383,10 +216,60 @@ class _ChannelListScreenState extends ConsumerState<ChannelListScreen> {
               ),
               result: items[index],
               query: query,
-              selectionMode: _selectionMode,
             ),
           ),
       ],
+    );
+  }
+}
+
+/// The channel list's app bar and rows while the takeout loads.
+class _LoadingSkeleton extends StatelessWidget {
+  const _LoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Channels'),
+        actions: const [AccountButton()],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(_searchBarHeight),
+          child: Padding(
+            padding: _searchBarPadding,
+            child: SearchBar(
+              hintText: 'Search channels and comments...',
+              leading: Icon(Icons.search),
+              enabled: false,
+            ),
+          ),
+        ),
+      ),
+      body: ListView.builder(
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 10,
+        itemExtent: 56,
+        itemBuilder: (context, index) => const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              SkeletonAvatar(),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonLine(width: 140, height: 14),
+                    SizedBox(height: 6),
+                    SkeletonLine(width: 80, height: 12),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

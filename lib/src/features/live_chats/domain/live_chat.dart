@@ -35,4 +35,6 @@ class LiveChat with LiveChatMappable implements Interaction {
   String get id => liveChatId;
   @override
   QueueItemKind get kind => QueueItemKind.liveChat;
+  @override
+  String? get postId => null;
 }

@@ -6,7 +6,6 @@ import 'package:youtube_takeout_manager/src/features/interactions/application/in
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import '../domain/search_options_state.dart';
 import '../domain/video_group.dart';
@@ -22,20 +21,6 @@ List<VideoGroup<Interaction>> groupedChannelInteractions(
   QueueItemKind kind,
   String channelId,
 ) => groupByVideo(ref.watch(channelInteractionsProvider(kind, channelId)));
-
-/// Resolves the display title of a group — mirrors `VideoGroupHeader._resolveTitle`
-/// so search can match against what the user actually sees in group headers.
-String _resolveGroupTitle(VideoGroup group, Map<String, Video> videoMap) {
-  switch (group.groupType) {
-    case GroupType.video:
-      return videoMap[group.groupKey]?.title ?? 'Video: ${group.groupKey}';
-    case GroupType.post:
-      final postId = group.groupKey.replaceFirst('post:', '');
-      return 'Community Post: $postId';
-    case GroupType.orphaned:
-      return 'Other';
-  }
-}
 
 /// The groups of [groupedChannelInteractionsProvider] that match the channel
 /// search: by group title, or by the text of their items.
@@ -58,7 +43,7 @@ List<VideoGroup<Interaction>> filteredGroupedChannelInteractions(
   final result = <VideoGroup<Interaction>>[];
   for (final group in groups) {
     if (options.matchGroupTitles) {
-      final title = foldForSearch(_resolveGroupTitle(group, videoMap));
+      final title = foldForSearch(group.title(videoMap[group.videoId]));
       if (title.contains(folded)) {
         result.add(group);
         continue;
@@ -73,13 +58,7 @@ List<VideoGroup<Interaction>> filteredGroupedChannelInteractions(
         .toList();
     if (matching.isNotEmpty) {
       result.add(
-        options.expandMatchedVideos
-            ? group
-            : VideoGroup<Interaction>(
-                groupKey: group.groupKey,
-                groupType: group.groupType,
-                items: matching,
-              ),
+        options.expandMatchedVideos ? group : group.withItems(matching),
       );
     }
   }

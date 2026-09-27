@@ -5,11 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/adaptive_action_button.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletable_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_scope_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import '../../application/cross_channel_search_providers.dart';
-import 'cross_channel_deletion_bar.dart';
+import '../../application/selection_providers.dart';
 
 /// The row above the channel list: how many channels or matches there are,
 /// and buttons to select or queue items for deletion.
@@ -17,14 +18,12 @@ class ChannelListHeader extends ConsumerWidget {
   final String query;
   final int channelCount;
   final int matchCount;
-  final ValueNotifier<bool> selectionMode;
 
   const ChannelListHeader({
     super.key,
     required this.query,
     required this.channelCount,
     required this.matchCount,
-    required this.selectionMode,
   });
 
   @override
@@ -34,15 +33,17 @@ class ChannelListHeader extends ConsumerWidget {
     final deletableMatches = searching
         ? ref.watch(crossChannelDeletableItemsProvider).length
         : 0;
+    final selectionMode = selectionModeProvider();
+    final selecting = ref.watch(selectionMode);
 
     final buttons = [
-      if (searching && !selectionMode.value)
+      if (searching && !selecting)
         AdaptiveActionButton(
           icon: Icons.checklist,
           label: 'Select',
           emphasis: ActionEmphasis.outlined,
           onPressed: deletableMatches > 0
-              ? () => selectionMode.value = true
+              ? () => ref.read(selectionMode.notifier).enter()
               : null,
         ),
       AdaptiveActionButton(
@@ -115,8 +116,8 @@ class ChannelListHeader extends ConsumerWidget {
         QueueScope(
           icon: Icons.search,
           title: 'Matching “$query”',
-          targets: deletionTargetsOf(
-            ref.read(crossChannelDeletableItemsProvider),
+          targets: DeletionTargets.of(
+            ref.read(crossChannelDeletableItemsProvider).map((r) => r.item),
           ),
         ),
       QueueScope(

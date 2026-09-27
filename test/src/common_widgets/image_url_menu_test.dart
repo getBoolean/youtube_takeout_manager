@@ -109,11 +109,7 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: VideoGroupHeader(
-              group: const VideoGroup(
-                groupKey: 'v1',
-                groupType: GroupType.video,
-                items: [],
-              ),
+              group: const VideoGroup.video('v1', []),
               compactMotion: motion,
               isExpanded: false,
               selectionMode: false,

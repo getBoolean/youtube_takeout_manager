@@ -16,18 +16,14 @@ import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
 import '../../application/grouped_providers.dart';
+import '../../application/selection_providers.dart';
 
 /// The row above a channel's lists: export it, and select or queue its items
 /// for deletion.
 class ChannelActionsHeader extends ConsumerWidget {
   final String channelId;
-  final ValueNotifier<bool> selectionMode;
 
-  const ChannelActionsHeader({
-    super.key,
-    required this.channelId,
-    required this.selectionMode,
-  });
+  const ChannelActionsHeader({super.key, required this.channelId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,6 +36,8 @@ class ChannelActionsHeader extends ConsumerWidget {
       ),
     );
     final matchCount = _deletableMatches(ref).count;
+    final selectionMode = selectionModeProvider(channelId: channelId);
+    final selecting = ref.watch(selectionMode);
 
     // Wraps, rather than overflowing, when the window is too narrow for one
     // row.
@@ -59,12 +57,14 @@ class ChannelActionsHeader extends ConsumerWidget {
             spacing: 8,
             runSpacing: 4,
             children: [
-              if (!selectionMode.value)
+              if (!selecting)
                 AdaptiveActionButton(
                   icon: Icons.checklist,
                   label: 'Select',
                   emphasis: ActionEmphasis.outlined,
-                  onPressed: hasItems ? () => selectionMode.value = true : null,
+                  onPressed: hasItems
+                      ? () => ref.read(selectionMode.notifier).enter()
+                      : null,
                 ),
               AdaptiveActionButton(
                 icon: Icons.playlist_add,
@@ -92,14 +92,20 @@ class ChannelActionsHeader extends ConsumerWidget {
       ...ref.watch(filteredSearchInteractionsProvider(kind, channelId)),
   ], skipIds: ref.watch(excludedFromDeletionIdsProvider));
 
-  void _export(BuildContext context, WidgetRef ref) {
-    showExportSheet(
+  Future<void> _export(BuildContext context, WidgetRef ref) async {
+    final channelName = _channelName(ref);
+    final comments = _itemsOf(ref, QueueItemKind.comment).cast<Comment>();
+    final liveChats = _itemsOf(ref, QueueItemKind.liveChat).cast<LiveChat>();
+    final format = await showExportFormatSheet(context);
+    if (format == null || !context.mounted) return;
+    await exportChannel(
       context,
       ref,
+      format: format,
       channelId: channelId,
-      channelName: _channelName(ref),
-      comments: _itemsOf(ref, QueueItemKind.comment).cast<Comment>(),
-      liveChats: _itemsOf(ref, QueueItemKind.liveChat).cast<LiveChat>(),
+      channelName: channelName,
+      comments: comments,
+      liveChats: liveChats,
     );
   }
 

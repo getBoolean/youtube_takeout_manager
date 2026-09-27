@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/selection_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/video_group.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/interaction_list_view.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
@@ -34,39 +35,35 @@ String _commentText(int g, int j) => (g + j).isEven
     : 'Comment $j in group $g, which is long enough to wrap onto a second '
           'line of the tile';
 
-String _groupKey(int i) => switch (i) {
-  28 => 'post:p28',
-  29 => '_orphaned',
-  _ => 'v$i',
-};
-
 GroupType _groupType(int i) => switch (i) {
   28 => GroupType.post,
   29 => GroupType.orphaned,
   _ => GroupType.video,
 };
 
+VideoGroup<Comment> _commentGroup(int g, List<Comment> items) => switch (g) {
+  28 => VideoGroup.post('p28', items),
+  29 => VideoGroup.other(items),
+  _ => VideoGroup.video('v$g', items),
+};
+
 String commentId(int g, int j) => 'c${g}_$j';
 
 final commentGroups = [
   for (var g = 0; g < _commentCounts.length; g++)
-    VideoGroup<Comment>(
-      groupKey: _groupKey(g),
-      groupType: _groupType(g),
-      items: [
-        for (var j = 0; j < _commentCounts[g]; j++)
-          Comment(
-            commentId: commentId(g, j),
-            channelId: channelId,
-            createdAt: DateTime(2024, 6, 30 - g, 12 - j),
-            price: 0,
-            videoId: _groupType(g) == GroupType.video ? 'v$g' : null,
-            postId: _groupType(g) == GroupType.post ? 'p28' : null,
-            rawCommentText: '{"text": "${_commentText(g, j)}"}',
-            displayText: _commentText(g, j),
-          ),
-      ],
-    ),
+    _commentGroup(g, [
+      for (var j = 0; j < _commentCounts[g]; j++)
+        Comment(
+          commentId: commentId(g, j),
+          channelId: channelId,
+          createdAt: DateTime(2024, 6, 30 - g, 12 - j),
+          price: 0,
+          videoId: _groupType(g) == GroupType.video ? 'v$g' : null,
+          postId: _groupType(g) == GroupType.post ? 'p28' : null,
+          rawCommentText: '{"text": "${_commentText(g, j)}"}',
+          displayText: _commentText(g, j),
+        ),
+    ]),
 ];
 
 const _liveChatCounts = [4, 2, 8, 3, 6, 1, 5, 3, 7, 2];
@@ -75,24 +72,20 @@ String liveChatId(int g, int j) => 'l${g}_$j';
 
 final liveChatGroups = [
   for (var g = 0; g < _liveChatCounts.length; g++)
-    VideoGroup<LiveChat>(
-      groupKey: 'v$g',
-      groupType: GroupType.video,
-      items: [
-        for (var j = 0; j < _liveChatCounts[g]; j++)
-          LiveChat(
-            liveChatId: liveChatId(g, j),
-            channelId: channelId,
-            createdAt: DateTime(2024, 6, 30 - g, 12, 59 - j),
-            // Every third chat is a superchat, in two different tiers.
-            price: j % 3 == 1 ? (g.isEven ? 5000000 : 100000000) : 0,
-            currencyCode: j % 3 == 1 ? 'USD' : null,
-            videoId: 'v$g',
-            rawText: '{"text": "Live chat $j in group $g"}',
-            displayText: 'Live chat $j in group $g',
-          ),
-      ],
-    ),
+    VideoGroup<LiveChat>.video('v$g', [
+      for (var j = 0; j < _liveChatCounts[g]; j++)
+        LiveChat(
+          liveChatId: liveChatId(g, j),
+          channelId: channelId,
+          createdAt: DateTime(2024, 6, 30 - g, 12, 59 - j),
+          // Every third chat is a superchat, in two different tiers.
+          price: j % 3 == 1 ? (g.isEven ? 5000000 : 100000000) : 0,
+          currencyCode: j % 3 == 1 ? 'USD' : null,
+          videoId: 'v$g',
+          rawText: '{"text": "Live chat $j in group $g"}',
+          displayText: 'Live chat $j in group $g',
+        ),
+    ]),
 ];
 
 final videos = {
@@ -138,14 +131,17 @@ enum ListKind { comments, liveChats }
 
 class ListHarness {
   final ScrollController scroll;
-  final ValueNotifier<bool> selection;
   final ProviderContainer container;
 
-  ListHarness(this.scroll, this.selection, this.container);
+  ListHarness(this.scroll, this.container);
+
+  /// Whether the list is in selection mode.
+  bool get selecting =>
+      container.read(selectionModeProvider(channelId: channelId));
 }
 
 /// Pumps one of the channel detail list views at 800x900 the way
-/// `ChannelDetailScreen` hosts it: rebuilt whenever selection mode changes.
+/// `ChannelDetailScreen` hosts it.
 Future<ListHarness> pumpList(
   WidgetTester tester, {
   ListKind kind = ListKind.comments,
@@ -157,8 +153,6 @@ Future<ListHarness> pumpList(
 
   final scroll = ScrollController();
   addTearDown(scroll.dispose);
-  final selection = ValueNotifier(false);
-  addTearDown(selection.dispose);
   final container = ProviderContainer(overrides: fixtureOverrides());
   addTearDown(container.dispose);
 
@@ -169,18 +163,14 @@ Future<ListHarness> pumpList(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: Scaffold(
-          body: ValueListenableBuilder<bool>(
-            valueListenable: selection,
-            builder: (context, _, _) => ChannelInteractionListView(
-              kind: switch (kind) {
-                ListKind.comments => QueueItemKind.comment,
-                ListKind.liveChats => QueueItemKind.liveChat,
-              },
-              channelId: channelId,
-              selectionMode: selection,
-              scrollController: scroll,
-              initialScrollTarget: initialScrollTarget,
-            ),
+          body: ChannelInteractionListView(
+            kind: switch (kind) {
+              ListKind.comments => QueueItemKind.comment,
+              ListKind.liveChats => QueueItemKind.liveChat,
+            },
+            channelId: channelId,
+            scrollController: scroll,
+            initialScrollTarget: initialScrollTarget,
           ),
         ),
       ),
@@ -189,7 +179,7 @@ Future<ListHarness> pumpList(
   // Let the async fakes (video metadata stream, deleted ids) resolve.
   await tester.pump();
   await tester.pump();
-  return ListHarness(scroll, selection, container);
+  return ListHarness(scroll, container);
 }
 
 /// Scrolls in steps of at most 150px, one 16ms frame per step, the way wheel

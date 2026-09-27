@@ -252,7 +252,7 @@ final class ChannelsProvider
   }
 }
 
-String _$channelsHash() => r'15154d70db69946f72280c37540bca826392f785';
+String _$channelsHash() => r'b001bc3341bff22a6187140c86ad7d991e70b3fd';
 
 @ProviderFor(channelById)
 final channelByIdProvider = ChannelByIdFamily._();
@@ -311,7 +311,7 @@ final class ChannelByIdProvider
   }
 }
 
-String _$channelByIdHash() => r'a7624c984d4ed61d1bc5640b9c05ef3adac4f5d3';
+String _$channelByIdHash() => r'6f09b6980b36f7605a04dba394dd767a14a13026';
 
 final class ChannelByIdFamily extends $Family
     with $FunctionalFamilyOverride<Channel?, String> {

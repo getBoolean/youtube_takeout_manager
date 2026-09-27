@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/selection_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_result_item.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/cross_channel_result_tile.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
@@ -38,8 +39,8 @@ void main() {
       ],
     );
     addTearDown(container.dispose);
-    final selectionMode = ValueNotifier(selecting);
-    addTearDown(selectionMode.dispose);
+    container.listen(selectionModeProvider(), (_, _) {});
+    if (selecting) container.read(selectionModeProvider().notifier).enter();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -49,7 +50,6 @@ void main() {
             child: CrossChannelResultTile(
               result: SearchResultItem(_comment, channelId: _channelId),
               query: 'queued',
-              selectionMode: selectionMode,
             ),
           ),
         ),

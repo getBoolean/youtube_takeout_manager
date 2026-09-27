@@ -15,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/cross_channel_search_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/grouped_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/search_options_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/selection_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_options_state.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/search_result_item.dart';
@@ -302,10 +303,15 @@ final List<Override> _overrides = [
   queuedItemChannelIdsProvider.overrideWithValue(const {}),
 ];
 
+/// In selection mode from the start.
+class _Selecting extends SelectionMode {
+  @override
+  bool build({String? channelId}) => true;
+}
+
 /// The channel page's parts, laid out as `ChannelDetailScreen` does. (The
 /// screen itself needs the router.)
-Widget _channelPage({required bool liveChats, required bool selecting}) {
-  final selection = ValueNotifier(selecting);
+Widget _channelPage({required bool liveChats}) {
   return Builder(
     builder: (context) => Scaffold(
       appBar: AppBar(
@@ -325,10 +331,7 @@ Widget _channelPage({required bool liveChats, required bool selecting}) {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ChannelActionsHeader(
-            channelId: fixture.channelId,
-            selectionMode: selection,
-          ),
+          const ChannelActionsHeader(channelId: fixture.channelId),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: DebouncedSearchBar(
@@ -345,7 +348,6 @@ Widget _channelPage({required bool liveChats, required bool selecting}) {
             child: ChannelInteractionListView(
               kind: liveChats ? QueueItemKind.liveChat : QueueItemKind.comment,
               channelId: fixture.channelId,
-              selectionMode: selection,
               scrollController: ScrollController(),
             ),
           ),
@@ -364,18 +366,8 @@ Widget _takeoutsDialog([List<Override> overrides = const []]) => ProviderScope(
 Widget _channelListParts() => Scaffold(
   body: ListView(
     children: [
-      ChannelListHeader(
-        query: 'matched',
-        channelCount: 12,
-        matchCount: 15,
-        selectionMode: ValueNotifier(false),
-      ),
-      ChannelListHeader(
-        query: '',
-        channelCount: 12,
-        matchCount: 0,
-        selectionMode: ValueNotifier(false),
-      ),
+      ChannelListHeader(query: 'matched', channelCount: 12, matchCount: 15),
+      ChannelListHeader(query: '', channelCount: 12, matchCount: 0),
       ChannelTile(channel: _channel, onTap: () {}),
       ChannelTile(
         channel: const Channel(
@@ -386,12 +378,10 @@ Widget _channelListParts() => Scaffold(
         ),
         onTap: () {},
       ),
-      for (final selecting in [false, true])
-        CrossChannelResultTile(
-          result: SearchResultItem(_comment, channelId: fixture.channelId),
-          query: 'matched',
-          selectionMode: ValueNotifier(selecting),
-        ),
+      CrossChannelResultTile(
+        result: SearchResultItem(_comment, channelId: fixture.channelId),
+        query: 'matched',
+      ),
     ],
   ),
   bottomNavigationBar: SelectionActionBar(
@@ -405,6 +395,7 @@ void main() {
     String subject,
     Widget Function() build, {
     TakeoutNotifier Function() takeout = _Takeout.new,
+    List<Override> overrides = const [],
     Future<void> Function(WidgetTester tester)? then,
   }) {
     for (final scale in _textScales) {
@@ -419,7 +410,11 @@ void main() {
           // Any overflow fails the test.
           await tester.pumpWidget(
             ProviderScope(
-              overrides: [..._overrides, takeoutProvider.overrideWith(takeout)],
+              overrides: [
+                ..._overrides,
+                takeoutProvider.overrideWith(takeout),
+                ...overrides,
+              ],
               child: MaterialApp(
                 theme: AppTheme.light,
                 builder: (context, child) => MediaQuery(
@@ -440,19 +435,26 @@ void main() {
     }
   }
 
-  fitsAtEveryWidth(
-    'the channel page',
-    () => _channelPage(liveChats: false, selecting: false),
-  );
+  fitsAtEveryWidth('the channel page', () => _channelPage(liveChats: false));
   fitsAtEveryWidth(
     'the channel page while selecting',
-    () => _channelPage(liveChats: false, selecting: true),
+    () => _channelPage(liveChats: false),
+    overrides: [
+      selectionModeProvider(
+        channelId: fixture.channelId,
+      ).overrideWith(_Selecting.new),
+    ],
   );
   fitsAtEveryWidth(
     'the channel page live chats',
-    () => _channelPage(liveChats: true, selecting: false),
+    () => _channelPage(liveChats: true),
   );
   fitsAtEveryWidth('the channel list', _channelListParts);
+  fitsAtEveryWidth(
+    'the channel list while selecting',
+    _channelListParts,
+    overrides: [selectionModeProvider().overrideWith(_Selecting.new)],
+  );
   fitsAtEveryWidth(
     'the unknown channel title',
     () => Scaffold(

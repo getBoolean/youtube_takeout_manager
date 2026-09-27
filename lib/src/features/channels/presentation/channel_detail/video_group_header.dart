@@ -7,7 +7,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
-import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../../domain/video_group.dart';
 
 class VideoGroupHeader extends ConsumerWidget {
@@ -43,11 +42,8 @@ class VideoGroupHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final videoMap = ref.watch(videoMetadataProvider).value ?? {};
-    final Video? video = group.groupType == GroupType.video
-        ? videoMap[group.groupKey]
-        : null;
-
-    final title = _resolveTitle(video);
+    final video = videoMap[group.videoId];
+    final title = group.title(video);
     final subtitle = Intl.plural(
       group.items.length,
       one: '1 item',
@@ -188,13 +184,13 @@ class VideoGroupHeader extends ConsumerWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (showOpenButton && group.groupType == GroupType.video)
+        if (group.videoId case final videoId? when showOpenButton)
           IconButton(
             icon: const Icon(Icons.open_in_new, size: 20),
             tooltip: 'Open on YouTube',
             onPressed: () {
               final uri = Uri.https('www.youtube.com', '/watch', {
-                'v': group.groupKey,
+                'v': videoId,
               });
               launchUrl(uri, mode: LaunchMode.externalApplication);
             },
@@ -209,18 +205,6 @@ class VideoGroupHeader extends ConsumerWidget {
         ),
       ],
     );
-  }
-
-  String _resolveTitle(Video? video) {
-    switch (group.groupType) {
-      case GroupType.video:
-        return video?.title ?? 'Video: ${group.groupKey}';
-      case GroupType.post:
-        final postId = group.groupKey.replaceFirst('post:', '');
-        return 'Community Post: $postId';
-      case GroupType.orphaned:
-        return 'Other';
-    }
   }
 
   Widget _buildThumbnail(String? thumbnailUrl, ThemeData theme) {

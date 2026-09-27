@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat
 import 'package:youtube_takeout_manager/src/features/live_chats/presentation/live_chat_tile.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/grouped_providers.dart';
+import '../../application/selection_providers.dart';
 import 'channel_item_actions.dart';
 import 'video_group_list_view.dart';
 
@@ -20,7 +21,6 @@ import 'video_group_list_view.dart';
 class ChannelInteractionListView extends ConsumerWidget {
   final QueueItemKind kind;
   final String channelId;
-  final ValueNotifier<bool> selectionMode;
   final ScrollController scrollController;
   final String? initialScrollTarget;
 
@@ -28,7 +28,6 @@ class ChannelInteractionListView extends ConsumerWidget {
     super.key,
     required this.kind,
     required this.channelId,
-    required this.selectionMode,
     required this.scrollController,
     this.initialScrollTarget,
   });
@@ -58,13 +57,13 @@ class ChannelInteractionListView extends ConsumerWidget {
     return VideoGroupListView(
       groups: groups,
       statuses: ref.watch(interactionStatusesProvider(kind)),
-      selectionMode: selectionMode,
+      channelId: channelId,
       scrollController: scrollController,
       initialScrollTarget: initialScrollTarget,
       tileBuilder: (context, item, status) => _InteractionTileConsumer(
         item: item,
         status: status,
-        selectionMode: selectionMode,
+        channelId: channelId,
         highlightQuery: query,
       ),
     );
@@ -74,13 +73,13 @@ class ChannelInteractionListView extends ConsumerWidget {
 class _InteractionTileConsumer extends ConsumerWidget {
   final Interaction item;
   final InteractionStatus status;
-  final ValueNotifier<bool> selectionMode;
+  final String channelId;
   final String highlightQuery;
 
   const _InteractionTileConsumer({
     required this.item,
     required this.status,
-    required this.selectionMode,
+    required this.channelId,
     required this.highlightQuery,
   });
 
@@ -89,16 +88,18 @@ class _InteractionTileConsumer extends ConsumerWidget {
     final isSelected = ref.watch(
       deletionSetProvider.select((s) => s.contains(item.id)),
     );
+    final selectionMode = selectionModeProvider(channelId: channelId);
+    final selecting = ref.watch(selectionMode);
     final VoidCallback onTap = status == InteractionStatus.deleted
         ? () {}
-        : selectionMode.value
+        : selecting
         ? (status.isSelectable
               ? () => ref.read(deletionSetProvider.notifier).toggle(item.id)
               : () {})
-        : () => showSingleItemActions(context, ref, item: item, status: status);
+        : () => _showActions(context, ref);
     final VoidCallback onLongPress = status.isSelectable
         ? () {
-            selectionMode.value = true;
+            ref.read(selectionMode.notifier).enter();
             ref.read(deletionSetProvider.notifier).toggle(item.id);
           }
         : () {};
@@ -108,7 +109,7 @@ class _InteractionTileConsumer extends ConsumerWidget {
         comment: comment,
         isSelected: isSelected,
         status: status,
-        selectionMode: selectionMode.value,
+        selectionMode: selecting,
         highlightQuery: highlightQuery,
         onTap: onTap,
         onLongPress: onLongPress,
@@ -117,7 +118,7 @@ class _InteractionTileConsumer extends ConsumerWidget {
         liveChat: liveChat,
         isSelected: isSelected,
         status: status,
-        selectionMode: selectionMode.value,
+        selectionMode: selecting,
         highlightQuery: highlightQuery,
         onTap: onTap,
         onLongPress: onLongPress,
@@ -128,5 +129,15 @@ class _InteractionTileConsumer extends ConsumerWidget {
         'Not a comment or live chat',
       ),
     };
+  }
+
+  Future<void> _showActions(BuildContext context, WidgetRef ref) async {
+    final action = await showItemActionsSheet(
+      context,
+      item: item,
+      status: status,
+    );
+    if (action == null || !context.mounted) return;
+    await runItemAction(context, ref, item, action);
   }
 }

@@ -30,6 +30,21 @@ class DeletionSet extends _$DeletionSet {
     state = {...state}..removeAll(ids);
   }
 
+  /// Picks a group's items that aren't in [ineligibleIds], or drops them
+  /// all when they're already picked.
+  void toggleGroup(
+    Set<String> groupItemIds, {
+    required Set<String> ineligibleIds,
+  }) {
+    final eligible = groupItemIds.difference(ineligibleIds);
+    if (eligible.isEmpty) return;
+    if (eligible.difference(state).isEmpty) {
+      removeAll(eligible);
+    } else {
+      addAll(eligible);
+    }
+  }
+
   void clear() {
     state = {};
   }

@@ -25,20 +25,16 @@ LiveChat _chat(String id, String raw) => LiveChat(
 );
 
 final _groups = [
-  VideoGroup<LiveChat>(
-    groupKey: 'v1',
-    groupType: GroupType.video,
-    items: [
-      _chat(
-        'emoji',
-        '{"text":"not the reds again "},'
-            '{"text":"","emoji":{"customEmojiUrl":"https://yt3.ggpht.com/$_emojiKey"}}',
-      ),
-      _chat('text', '{"text":"he has a short"}'),
-      _chat('heart', '{"text":"love it $_heart"}'),
-      _chat('heart-emoji', '{"text":"love it $_heartEmoji"}'),
-    ],
-  ),
+  VideoGroup<LiveChat>.video('v1', [
+    _chat(
+      'emoji',
+      '{"text":"not the reds again "},'
+          '{"text":"","emoji":{"customEmojiUrl":"https://yt3.ggpht.com/$_emojiKey"}}',
+    ),
+    _chat('text', '{"text":"he has a short"}'),
+    _chat('heart', '{"text":"love it $_heart"}'),
+    _chat('heart-emoji', '{"text":"love it $_heartEmoji"}'),
+  ]),
 ];
 
 void main() {

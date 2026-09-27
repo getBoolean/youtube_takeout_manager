@@ -1,14 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/select_all_toggle_button.dart';
-import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
-import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 
 class ChannelTabLabel extends StatelessWidget {
   final String prefix;
@@ -202,42 +196,5 @@ class ChannelTitle extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-/// "N selected", counting only this channel's comments and live chats.
-class ChannelSelectionTitle extends ConsumerWidget {
-  final String channelId;
-
-  const ChannelSelectionTitle({super.key, required this.channelId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selected = ref.watch(deletionSetProvider);
-    final count = [
-      for (final kind in QueueItemKind.values)
-        ...ref.watch(channelInteractionsProvider(kind, channelId)),
-    ].where((i) => selected.contains(i.id)).length;
-    return Text('$count selected');
-  }
-}
-
-/// Selects or deselects every item in the channel that can still be deleted.
-class ChannelSelectAllAction extends ConsumerWidget {
-  final String channelId;
-
-  const ChannelSelectAllAction({super.key, required this.channelId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final skipIds = ref.watch(excludedFromDeletionIdsProvider);
-    final selectableIds = {
-      for (final kind in QueueItemKind.values)
-        for (final item in ref.watch(
-          channelInteractionsProvider(kind, channelId),
-        ))
-          if (!(skipIds[kind]?.contains(item.id) ?? false)) item.id,
-    };
-    return SelectAllToggleButton(selectableIds: selectableIds);
   }
 }

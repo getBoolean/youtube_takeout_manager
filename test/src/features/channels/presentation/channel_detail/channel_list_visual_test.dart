@@ -16,9 +16,9 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/delet
 
 import 'channel_list_fixture.dart';
 
-Finder _header(String groupKey) => find
+Finder _header(String videoId) => find
     .byWidgetPredicate(
-      (w) => w is VideoGroupHeader && w.group.groupKey == groupKey,
+      (w) => w is VideoGroupHeader && w.group.videoId == videoId,
     )
     .hitTestable();
 
@@ -124,7 +124,7 @@ void main() {
       await tester.pumpAndSettle();
       await tester.longPress(_header('v1'));
       await _frames(tester, 'comments_selection');
-      expect(h.selection.value, isTrue);
+      expect(h.selecting, isTrue);
       expect(
         h.container.read(deletionSetProvider),
         containsAll([commentId(1, 0)]),

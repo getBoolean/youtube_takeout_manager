@@ -9,9 +9,10 @@ import 'provider_graph.dart';
 const _effectsHost = 'appEffectsProvider';
 
 /// Services that read stores but are autoDispose: each belongs to one
-/// widget, and checks `ref.mounted` after every await.
+/// widget or screen, and checks `ref.mounted` after every await.
 const _autoDisposeServices = {
   'addAccountImportProvider',
+  'selectionModeProvider',
   'signInNoticesProvider',
 };
 

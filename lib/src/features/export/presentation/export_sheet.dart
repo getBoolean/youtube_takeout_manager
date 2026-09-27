@@ -7,21 +7,12 @@ import '../application/export_service.dart';
 import '../domain/export_format.dart';
 import 'export_controller.dart';
 
-/// Offers CSV or JSON export of [comments] and [liveChats] and saves the file.
-void showExportSheet(
-  BuildContext context,
-  WidgetRef ref, {
-  required String channelId,
-  required String channelName,
-  required List<Comment> comments,
-  required List<LiveChat> liveChats,
-}) {
-  final filename = ExportService.sanitizeFilename('${channelName}_export');
-  final channelNames = {channelId: channelName};
-
-  showModalBottomSheet(
+/// Asks whether to export as CSV or JSON. Returns the pick, or null if the
+/// sheet was dismissed.
+Future<ExportFormat?> showExportFormatSheet(BuildContext context) {
+  return showModalBottomSheet<ExportFormat>(
     context: context,
-    builder: (ctx) => SafeArea(
+    builder: (context) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -31,7 +22,7 @@ void showExportSheet(
               alignment: Alignment.centerLeft,
               child: Text(
                 'Export Data',
-                style: Theme.of(ctx).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
           ),
@@ -39,35 +30,13 @@ void showExportSheet(
             leading: const Icon(Icons.table_chart_outlined),
             title: const Text('Export as CSV'),
             subtitle: const Text('Comma-separated values (.csv)'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _doExport(
-                context,
-                ref,
-                format: ExportFormat.csv,
-                filename: filename,
-                comments: comments,
-                liveChats: liveChats,
-                channelNames: channelNames,
-              );
-            },
+            onTap: () => Navigator.pop(context, ExportFormat.csv),
           ),
           ListTile(
             leading: const Icon(Icons.data_object),
             title: const Text('Export as JSON'),
             subtitle: const Text('Structured data (.json)'),
-            onTap: () {
-              Navigator.pop(ctx);
-              _doExport(
-                context,
-                ref,
-                format: ExportFormat.json,
-                filename: filename,
-                comments: comments,
-                liveChats: liveChats,
-                channelNames: channelNames,
-              );
-            },
+            onTap: () => Navigator.pop(context, ExportFormat.json),
           ),
         ],
       ),
@@ -75,15 +44,18 @@ void showExportSheet(
   );
 }
 
-Future<void> _doExport(
+/// Saves [comments] and [liveChats] from [channelName]'s channel as [format],
+/// and says in a snack bar whether it worked.
+Future<void> exportChannel(
   BuildContext context,
   WidgetRef ref, {
   required ExportFormat format,
-  required String filename,
+  required String channelId,
+  required String channelName,
   required List<Comment> comments,
   required List<LiveChat> liveChats,
-  required Map<String, String> channelNames,
 }) async {
+  final filename = ExportService.sanitizeFilename('${channelName}_export');
   final ext = format == ExportFormat.csv ? 'csv' : 'json';
   final result = await ref
       .read(exportProvider.notifier)
@@ -92,7 +64,7 @@ Future<void> _doExport(
         liveChats: liveChats,
         format: format,
         filename: filename,
-        channelNames: channelNames,
+        channelNames: {channelId: channelName},
       );
 
   if (!context.mounted) return;

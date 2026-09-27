@@ -12,8 +12,8 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/delet
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import '../../application/channel_content_search_query.dart';
+import '../../application/selection_providers.dart';
 import '../../domain/video_group.dart';
-import 'channel_item_actions.dart';
 import 'header_animation_controller.dart';
 import 'video_group_header.dart';
 
@@ -34,7 +34,9 @@ class VideoGroupListView extends HookConsumerWidget {
   final List<VideoGroup<Interaction>> groups;
   final VideoGroupTileBuilder tileBuilder;
   final InteractionStatuses statuses;
-  final ValueNotifier<bool> selectionMode;
+
+  /// Whose selection mode the headers follow.
+  final String channelId;
   final ScrollController scrollController;
   final String? initialScrollTarget;
 
@@ -43,7 +45,7 @@ class VideoGroupListView extends HookConsumerWidget {
     required this.groups,
     required this.tileBuilder,
     required this.statuses,
-    required this.selectionMode,
+    required this.channelId,
     required this.scrollController,
     this.initialScrollTarget,
   });
@@ -95,7 +97,7 @@ class VideoGroupListView extends HookConsumerWidget {
       return null;
     }, const []);
 
-    useValueChanged<String?, void>(
+    useValueChanged<Object?, void>(
       forcedCompactKey.value,
       (_, _) => controller.refreshHeaderStates(),
     );
@@ -160,7 +162,7 @@ class VideoGroupListView extends HookConsumerWidget {
         group: group,
         compactMotion: motion,
         isExpanded: status.isExpanded,
-        selectionMode: selectionMode,
+        channelId: channelId,
         ineligibleIds: ineligibleIds,
         highlightQuery: query,
         onToggleExpanded: () => controller.toggle(group.groupKey),
@@ -187,7 +189,7 @@ class _GroupHeader extends HookConsumerWidget {
   final VideoGroup<Interaction> group;
   final CueController compactMotion;
   final bool isExpanded;
-  final ValueNotifier<bool> selectionMode;
+  final String channelId;
   final Set<String> ineligibleIds;
   final String highlightQuery;
   final VoidCallback onToggleExpanded;
@@ -196,7 +198,7 @@ class _GroupHeader extends HookConsumerWidget {
     required this.group,
     required this.compactMotion,
     required this.isExpanded,
-    required this.selectionMode,
+    required this.channelId,
     required this.ineligibleIds,
     required this.highlightQuery,
     required this.onToggleExpanded,
@@ -221,19 +223,23 @@ class _GroupHeader extends HookConsumerWidget {
       }),
     );
 
+    final selectionMode = selectionModeProvider(channelId: channelId);
+    void toggleGroup() => ref
+        .read(deletionSetProvider.notifier)
+        .toggleGroup(groupItemIds, ineligibleIds: ineligibleIds);
+
     return VideoGroupHeader(
       group: group,
       compactMotion: compactMotion,
       isExpanded: isExpanded,
-      selectionMode: selectionMode.value,
+      selectionMode: ref.watch(selectionMode),
       allSelected: selection.all,
       someSelected: selection.any && !selection.all,
       highlightQuery: highlightQuery,
-      onToggleGroupSelection: () =>
-          toggleGroupSelection(ref, groupItemIds, ineligibleIds),
+      onToggleGroupSelection: toggleGroup,
       onLongPress: () {
-        selectionMode.value = true;
-        toggleGroupSelection(ref, groupItemIds, ineligibleIds);
+        ref.read(selectionMode.notifier).enter();
+        toggleGroup();
       },
       onToggleExpanded: onToggleExpanded,
     );

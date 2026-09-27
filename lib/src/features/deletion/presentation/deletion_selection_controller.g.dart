@@ -47,7 +47,7 @@ final class DeletionSetProvider
   }
 }
 
-String _$deletionSetHash() => r'de6d1c010a7bbb8acc4da165a2732beaf1a90c46';
+String _$deletionSetHash() => r'548dcfd80aff651c3caf690d1a595e7da04e8789';
 
 /// Manages the set of IDs currently selected for deletion in the UI. Clears
 /// when another channel is viewed, whose items these aren't.

@@ -16,6 +16,10 @@ abstract interface class Interaction {
   /// The video it was posted on, if any.
   String? get videoId;
 
+  /// The community post it was posted on, if any. Live chats are only ever
+  /// on videos.
+  String? get postId;
+
   /// The text as exported, emoji included; see `parseCommentSegments`.
   String get rawText;
 

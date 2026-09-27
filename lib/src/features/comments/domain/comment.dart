@@ -13,6 +13,7 @@ class Comment with CommentMappable implements Interaction {
   final DateTime createdAt;
   final double price;
   final String? parentCommentId;
+  @override
   final String? postId;
   @override
   final String? videoId;

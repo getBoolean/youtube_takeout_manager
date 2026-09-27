@@ -13,18 +13,17 @@ import 'package:youtube_takeout_manager/src/utils/comment_text_parser.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../../application/channel_content_search_query.dart';
 import '../../application/channel_providers.dart';
+import '../../application/selection_providers.dart';
 import '../../domain/search_result_item.dart';
 
 class CrossChannelResultTile extends ConsumerWidget {
   final SearchResultItem result;
   final String query;
-  final ValueNotifier<bool> selectionMode;
 
   const CrossChannelResultTile({
     super.key,
     required this.result,
     required this.query,
-    required this.selectionMode,
   });
 
   @override
@@ -38,6 +37,8 @@ class CrossChannelResultTile extends ConsumerWidget {
     final isSelected = ref.watch(
       deletionSetProvider.select((s) => s.contains(item.id)),
     );
+    final selectionMode = selectionModeProvider();
+    final selecting = ref.watch(selectionMode);
     final spans = buildCommentSpans(
       item.rawText,
       emojiSize: 16,
@@ -112,13 +113,13 @@ class CrossChannelResultTile extends ConsumerWidget {
       ),
       trailing: const Icon(Icons.chevron_right),
       isSelected: isSelected,
-      selectionMode: selectionMode.value,
-      onTap: selectionMode.value
+      selectionMode: selecting,
+      onTap: selecting
           ? (status.isSelectable ? toggleSelection : () {})
           : navigateToDetail,
       onLongPress: status.isSelectable
           ? () {
-              selectionMode.value = true;
+              ref.read(selectionMode.notifier).enter();
               toggleSelection();
             }
           : null,
