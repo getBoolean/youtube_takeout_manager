@@ -1,7 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
-import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import 'deletion_queue_notifier.dart';
 
@@ -25,6 +24,5 @@ List<DeletionQueueItem> viewedQueueItems(Ref ref) {
 @riverpod
 List<DeletionQueueItem> unassignedQueueItems(Ref ref) => [
   for (final i in ref.watch(deletionQueueProvider).value ?? const [])
-    if (i.authorChannelId == null && i.status != DeletionItemStatus.succeeded)
-      i,
+    if (i.authorChannelId == null && !i.status.isDone) i,
 ];

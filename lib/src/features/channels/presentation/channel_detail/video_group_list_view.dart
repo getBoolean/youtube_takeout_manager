@@ -8,7 +8,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/scroll_target_highlight.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/sticky_grouped_list/sticky_grouped_list.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import '../../application/channel_content_search_query.dart';

@@ -5,7 +5,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/comments/presentation/comment_tile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deleted_ids_providers.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';

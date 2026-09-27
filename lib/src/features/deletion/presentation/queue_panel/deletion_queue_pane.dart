@@ -4,10 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 import '../../application/deletion_queue_counts.dart';
 import '../../application/deletion_processing.dart';
+import '../../application/deletion_queue_pane_expanded.dart';
 import 'deletion_queue_layout.dart';
 import 'deletion_queue_panel.dart';
+import 'deletion_queue_sheets.dart';
 
-const deletionQueuePaneWidth = 360.0;
 const _stripWidth = 48.0;
 
 /// The queue docked beside the screen, or the strip it collapses to.

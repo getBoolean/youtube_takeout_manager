@@ -1,3 +1,4 @@
+import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
@@ -8,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/quota/application/quota_not
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import '../data/youtube_deletion_repository.dart';
 import '../domain/deletion_item_status.dart';
+import '../domain/deletion_outcome.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/deletion_targets.dart';
 import 'deleted_ids_providers.dart';
@@ -30,21 +32,11 @@ enum DeletionProcessingState {
 class DeletionProcessing extends _$DeletionProcessing {
   static const _delayBetweenRequests = Duration(milliseconds: 100);
 
-  bool _isProcessing = false;
-  bool _isPaused = false;
-
   @override
   DeletionProcessingState build() => DeletionProcessingState.idle;
 
-  void _setProcessing({required bool processing, required bool paused}) {
-    _isProcessing = processing;
-    _isPaused = paused;
-    state = !processing
-        ? DeletionProcessingState.idle
-        : paused
-        ? DeletionProcessingState.pausing
-        : DeletionProcessingState.running;
-  }
+  bool get _isProcessing => state != DeletionProcessingState.idle;
+  bool get _isPaused => state == DeletionProcessingState.pausing;
 
   Future<void> startYoutubeApiProcessing({required String channelId}) async {
     if (_isProcessing) return;
@@ -63,7 +55,7 @@ class DeletionProcessing extends _$DeletionProcessing {
 
   void pauseProcessing() {
     if (!_isProcessing) return;
-    _setProcessing(processing: true, paused: true);
+    state = DeletionProcessingState.pausing;
   }
 
   /// Deletes [channelId]'s pending items one by one until done, paused or
@@ -74,7 +66,7 @@ class DeletionProcessing extends _$DeletionProcessing {
     // Only the channel's own sign-in may delete its items.
     final authState = ref.read(authProvider);
     if (authState == null || authState.channelId != channelId) return;
-    _setProcessing(processing: true, paused: false);
+    state = DeletionProcessingState.running;
 
     final queue = ref.read(deletionQueueProvider.notifier);
     final quota = ref.read(quotaProvider.notifier);
@@ -98,82 +90,90 @@ class DeletionProcessing extends _$DeletionProcessing {
         }
 
         final items = await ref.read(deletionQueueProvider.future);
-        final nextItem = items.cast<DeletionQueueItem?>().firstWhere(
-          (i) =>
-              i!.status == DeletionItemStatus.pending &&
-              i.authorChannelId == channelId,
-          orElse: () => null,
-        );
+        final nextItem = items
+            .where(
+              (i) =>
+                  i.status == DeletionItemStatus.pending &&
+                  i.authorChannelId == channelId,
+            )
+            .firstOrNull;
         if (nextItem == null) break;
 
-        // Mark as in progress.
-        await queue.updateItem(
-          nextItem.id,
-          nextItem.copyWith(status: DeletionItemStatus.inProgress),
-        );
-
-        // Call the YouTube API.
-        final result = await ref
-            .read(youtubeDeletionRepositoryProvider)
-            .deleteItem(client, nextItem.itemId);
-
-        final now = DateTime.now().toUtc();
-
-        if (result.succeeded) {
-          final op = nextItem.itemType == QueueItemKind.comment
-              ? QuotaOperation.deleteComment
-              : QuotaOperation.deleteLiveChat;
-          await quota.recordUsage(op);
-          await queue.updateItem(
-            nextItem.id,
-            nextItem.copyWith(
-              status: DeletionItemStatus.succeeded,
-              processedAt: now,
-            ),
-          );
-
-          // Persist as deleted and notify UI to re-render with deleted styling.
-          await ref
-              .read(deletedIdsProvider.notifier)
-              .markDeleted(DeletionTargets.fromQueueItems([nextItem]));
-        } else if (result.signInFailed) {
-          // Not the item's fault: keep it to delete once signed in again,
-          // and stop instead of failing every other item the same way.
-          await queue.updateItem(nextItem.id, nextItem);
-          await ref
-              .read(signInServiceProvider.notifier)
-              .signInFailed(channelId);
-          break;
-        } else if (result.quotaExceeded) {
-          await queue.updateItem(
-            nextItem.id,
-            nextItem.copyWith(
-              status: DeletionItemStatus.quotaExceeded,
-              errorMessage: result.error,
-              processedAt: now,
-            ),
-          );
-          await queue.markRemainingPending(
-            DeletionItemStatus.quotaExceeded,
-            channelId,
-          );
-          break;
-        } else {
-          await queue.updateItem(
-            nextItem.id,
-            nextItem.copyWith(
-              status: DeletionItemStatus.failed,
-              errorMessage: result.error,
-              processedAt: now,
-            ),
-          );
-        }
-
+        if (!await _delete(nextItem, channelId, client)) break;
         await Future.delayed(_delayBetweenRequests);
       }
     } finally {
       client.close();
-      _setProcessing(processing: false, paused: _isPaused);
+      state = DeletionProcessingState.idle;
+    }
+  }
+
+  /// Deletes [channelId]'s [item] from YouTube and records how it went.
+  /// Returns whether to go on to the next item.
+  Future<bool> _delete(
+    DeletionQueueItem item,
+    String channelId,
+    http.Client client,
+  ) async {
+    final queue = ref.read(deletionQueueProvider.notifier);
+
+    await queue.updateItem(
+      item.id,
+      item.copyWith(status: DeletionItemStatus.inProgress),
+    );
+    final outcome = await ref
+        .read(youtubeDeletionRepositoryProvider)
+        .deleteItem(client, item.itemId);
+    final now = DateTime.now().toUtc();
+
+    switch (outcome) {
+      case Deleted():
+        await ref
+            .read(quotaProvider.notifier)
+            .recordUsage(
+              item.itemType == QueueItemKind.comment
+                  ? QuotaOperation.deleteComment
+                  : QuotaOperation.deleteLiveChat,
+            );
+        await queue.updateItem(
+          item.id,
+          item.copyWith(status: DeletionItemStatus.succeeded, processedAt: now),
+        );
+        // Persist as deleted and notify UI to re-render with deleted styling.
+        await ref
+            .read(deletedIdsProvider.notifier)
+            .markDeleted(DeletionTargets.fromQueueItems([item]));
+        return true;
+      case SignInFailed():
+        // Not the item's fault: keep it to delete once signed in again,
+        // and stop instead of failing every other item the same way.
+        await queue.updateItem(item.id, item);
+        await ref.read(signInServiceProvider.notifier).signInFailed(channelId);
+        return false;
+      case QuotaExceeded(:final message):
+        await queue.updateItem(
+          item.id,
+          item.copyWith(
+            status: DeletionItemStatus.quotaExceeded,
+            errorMessage: message,
+            processedAt: now,
+          ),
+        );
+        await queue.markRemainingPending(
+          DeletionItemStatus.quotaExceeded,
+          channelId,
+        );
+        return false;
+      case Failed(:final message):
+        await queue.updateItem(
+          item.id,
+          item.copyWith(
+            status: DeletionItemStatus.failed,
+            errorMessage: message,
+            processedAt: now,
+          ),
+        );
+        return true;
     }
   }
 }

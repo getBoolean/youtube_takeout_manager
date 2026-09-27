@@ -1,6 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+part 'script_generator_service.g.dart';
+
+@Riverpod(keepAlive: true)
+ScriptGeneratorService scriptGeneratorService(Ref ref) =>
+    ScriptGeneratorService();
 
 /// Generates a self-contained JavaScript snippet that deletes YouTube comments
 /// and live chat messages via Google's My Activity internal RPC endpoint.

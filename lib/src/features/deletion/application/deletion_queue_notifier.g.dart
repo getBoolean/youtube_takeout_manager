@@ -39,7 +39,7 @@ final class DeletionQueueProvider
   DeletionQueue create() => DeletionQueue();
 }
 
-String _$deletionQueueHash() => r'83ab96c29db1c9db1f0c7fa687d4d57e4e4d9c57';
+String _$deletionQueueHash() => r'c7dd639672046a3d903d2ae15c1146cd71af9d44';
 
 /// The items queued to be deleted, kept on this device. Deleting them
 /// through the YouTube API is `DeletionProcessing`'s.

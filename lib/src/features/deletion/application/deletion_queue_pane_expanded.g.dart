@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'deletion_queue_layout.dart';
+part of 'deletion_queue_pane_expanded.dart';
 
 // **************************************************************************
 // RiverpodGenerator

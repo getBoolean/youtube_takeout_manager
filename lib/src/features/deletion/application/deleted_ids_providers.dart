@@ -6,7 +6,6 @@ import '../data/deleted_ids_repository.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import '../domain/deletion_targets.dart';
-import 'deletion_queue_counts.dart';
 import 'deletion_queue_notifier.dart';
 
 part 'deleted_ids_providers.g.dart';
@@ -52,25 +51,19 @@ class DeletedIds extends _$DeletedIds {
 Set<String> _queueIds(
   List<DeletionQueueItem>? items,
   QueueItemKind kind,
-  Set<DeletionItemStatus> statuses,
+  bool Function(DeletionItemStatus status) test,
 ) => {
   for (final i in items ?? const <DeletionQueueItem>[])
-    if (i.itemType == kind && statuses.contains(i.status)) i.itemId,
+    if (i.itemType == kind && test(i.status)) i.itemId,
 };
 
 @riverpod
-Set<String> queuedIds(Ref ref, QueueItemKind kind) => _queueIds(
-  ref.watch(deletionQueueProvider).value,
-  kind,
-  DeletionQueueCounts.waitingStatuses,
-);
+Set<String> queuedIds(Ref ref, QueueItemKind kind) =>
+    _queueIds(ref.watch(deletionQueueProvider).value, kind, (s) => s.isWaiting);
 
 @riverpod
-Set<String> failedIds(Ref ref, QueueItemKind kind) => _queueIds(
-  ref.watch(deletionQueueProvider).value,
-  kind,
-  DeletionQueueCounts.failedStatuses,
-);
+Set<String> failedIds(Ref ref, QueueItemKind kind) =>
+    _queueIds(ref.watch(deletionQueueProvider).value, kind, (s) => s.isFailed);
 
 /// Which of [kind]'s items are deleted, failed or queued.
 @riverpod

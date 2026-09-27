@@ -3,21 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+import '../domain/deletion_outcome.dart';
 
 part 'youtube_deletion_repository.g.dart';
 
 @Riverpod(keepAlive: true)
 YoutubeDeletionRepository youtubeDeletionRepository(Ref ref) =>
     YoutubeDeletionRepository();
-
-/// How deleting one item went. [signInFailed] means the sign-in stopped
-/// working (access revoked, account deleted) before YouTube could answer.
-typedef DeletionResult = ({
-  bool succeeded,
-  bool quotaExceeded,
-  bool signInFailed,
-  String? error,
-});
 
 /// Deletes YouTube comments and live chat messages
 /// via the YouTube Data API v3.
@@ -29,30 +21,13 @@ typedef DeletionResult = ({
 /// Each delete call costs 50 quota units.
 class YoutubeDeletionRepository {
   /// Deletes a single item from YouTube.
-  ///
-  /// Returns `succeeded: true` on success.
-  /// On failure, returns `succeeded: false` with an error description.
-  /// If the error is a quota exceeded error, `quotaExceeded` is true; if the
-  /// sign-in stopped working, `signInFailed` is.
-  Future<DeletionResult> deleteItem(http.Client client, String itemId) async {
+  Future<DeletionOutcome> deleteItem(http.Client client, String itemId) async {
     final youtube = YouTubeApi(client);
     try {
       await youtube.comments.delete(itemId);
-      return (
-        succeeded: true,
-        quotaExceeded: false,
-        signInFailed: false,
-        error: null,
-      );
+      return const Deleted();
     } catch (e) {
-      if (isSignInFailure(e)) {
-        return (
-          succeeded: false,
-          quotaExceeded: false,
-          signInFailed: true,
-          error: e.toString(),
-        );
-      }
+      if (isSignInFailure(e)) return const SignInFailed();
       if (e is DetailedApiRequestError) {
         final isQuota =
             e.status == 403 &&
@@ -63,19 +38,10 @@ class YoutubeDeletionRepository {
                           err.reason == 'dailyLimitExceeded',
                     ) ==
                     true);
-        return (
-          succeeded: false,
-          quotaExceeded: isQuota,
-          signInFailed: false,
-          error: e.message ?? 'API error ${e.status}',
-        );
+        final message = e.message ?? 'API error ${e.status}';
+        return isQuota ? QuotaExceeded(message) : Failed(message);
       }
-      return (
-        succeeded: false,
-        quotaExceeded: false,
-        signInFailed: false,
-        error: e.toString(),
-      );
+      return Failed(e.toString());
     }
   }
 }

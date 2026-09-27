@@ -619,6 +619,8 @@ void main() {
     () => const DeletionMethodDialog(
       itemCount: 12,
       possibleMembershipEventCount: 3,
+      signedIn: true,
+      deletesLeft: 200,
     ),
   );
   fitsAtEveryWidth(

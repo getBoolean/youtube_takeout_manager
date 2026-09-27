@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_i
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
+import 'status_pill.dart';
 
 class DeletionQueueItemTile extends StatelessWidget {
   final DeletionQueueItem item;
@@ -74,7 +75,7 @@ class DeletionQueueItemTile extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (statusChip) _StatusChip(label: statusLabel, color: statusColor),
+          if (statusChip) StatusPill(label: statusLabel, color: statusColor),
           if (onRemove != null)
             IconButton(
               icon: const Icon(Icons.close, size: 18),
@@ -94,29 +95,3 @@ class DeletionQueueItemTile extends StatelessWidget {
   DeletionItemStatus.failed => ('Failed', Colors.red),
   DeletionItemStatus.quotaExceeded => ('Quota', Colors.orange),
 };
-
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _StatusChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}

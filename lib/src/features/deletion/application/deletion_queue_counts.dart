@@ -1,6 +1,5 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../domain/deletion_item_status.dart';
 import '../domain/deletion_queue_item.dart';
 import 'viewed_queue_items.dart';
 
@@ -8,15 +7,6 @@ part 'deletion_queue_counts.g.dart';
 
 /// How many of the viewed channel's queue items are waiting, failed or done.
 class DeletionQueueCounts {
-  /// Items the next Delete will process, including ones the quota stopped.
-  static const waitingStatuses = {
-    DeletionItemStatus.pending,
-    DeletionItemStatus.inProgress,
-    DeletionItemStatus.quotaExceeded,
-  };
-  static const failedStatuses = {DeletionItemStatus.failed};
-  static const doneStatuses = {DeletionItemStatus.succeeded};
-
   final int waiting;
   final int failed;
   final int done;
@@ -26,9 +16,9 @@ class DeletionQueueCounts {
   factory DeletionQueueCounts.of(Iterable<DeletionQueueItem> items) {
     var waiting = 0, failed = 0, done = 0;
     for (final item in items) {
-      if (waitingStatuses.contains(item.status)) waiting++;
-      if (failedStatuses.contains(item.status)) failed++;
-      if (doneStatuses.contains(item.status)) done++;
+      if (item.status.isWaiting) waiting++;
+      if (item.status.isFailed) failed++;
+      if (item.status.isDone) done++;
     }
     return DeletionQueueCounts(waiting: waiting, failed: failed, done: done);
   }

@@ -8,24 +8,27 @@ part of 'script_deletion_ids.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Holds the set of comment and/or live chat IDs selected for script-based
-/// deletion via My Activity. Used to pass data to the ScriptDeletionScreen
-/// since large ID sets can't be passed via route parameters. Clears when
-/// another channel is viewed, whose items these aren't.
+/// The comments and live chats picked for script-based deletion via My
+/// Activity, each under its kind. Used to pass data to the
+/// ScriptDeletionScreen since large ID sets can't be passed via route
+/// parameters. Clears when another channel is viewed, whose items these
+/// aren't.
 
 @ProviderFor(ScriptDeletionIds)
 final scriptDeletionIdsProvider = ScriptDeletionIdsProvider._();
 
-/// Holds the set of comment and/or live chat IDs selected for script-based
-/// deletion via My Activity. Used to pass data to the ScriptDeletionScreen
-/// since large ID sets can't be passed via route parameters. Clears when
-/// another channel is viewed, whose items these aren't.
+/// The comments and live chats picked for script-based deletion via My
+/// Activity, each under its kind. Used to pass data to the
+/// ScriptDeletionScreen since large ID sets can't be passed via route
+/// parameters. Clears when another channel is viewed, whose items these
+/// aren't.
 final class ScriptDeletionIdsProvider
-    extends $NotifierProvider<ScriptDeletionIds, Set<String>> {
-  /// Holds the set of comment and/or live chat IDs selected for script-based
-  /// deletion via My Activity. Used to pass data to the ScriptDeletionScreen
-  /// since large ID sets can't be passed via route parameters. Clears when
-  /// another channel is viewed, whose items these aren't.
+    extends $NotifierProvider<ScriptDeletionIds, DeletionTargets> {
+  /// The comments and live chats picked for script-based deletion via My
+  /// Activity, each under its kind. Used to pass data to the
+  /// ScriptDeletionScreen since large ID sets can't be passed via route
+  /// parameters. Clears when another channel is viewed, whose items these
+  /// aren't.
   ScriptDeletionIdsProvider._()
     : super(
         from: null,
@@ -45,35 +48,87 @@ final class ScriptDeletionIdsProvider
   ScriptDeletionIds create() => ScriptDeletionIds();
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(Set<String> value) {
+  Override overrideWithValue(DeletionTargets value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<Set<String>>(value),
+      providerOverride: $SyncValueProvider<DeletionTargets>(value),
     );
   }
 }
 
-String _$scriptDeletionIdsHash() => r'aff2edfe8d109ee1849855630bf597e6cf0b6e8f';
+String _$scriptDeletionIdsHash() => r'b6e20d059ed9a2fdb231d4e2620d3c6912d2ba18';
 
-/// Holds the set of comment and/or live chat IDs selected for script-based
-/// deletion via My Activity. Used to pass data to the ScriptDeletionScreen
-/// since large ID sets can't be passed via route parameters. Clears when
-/// another channel is viewed, whose items these aren't.
+/// The comments and live chats picked for script-based deletion via My
+/// Activity, each under its kind. Used to pass data to the
+/// ScriptDeletionScreen since large ID sets can't be passed via route
+/// parameters. Clears when another channel is viewed, whose items these
+/// aren't.
 
-abstract class _$ScriptDeletionIds extends $Notifier<Set<String>> {
-  Set<String> build();
+abstract class _$ScriptDeletionIds extends $Notifier<DeletionTargets> {
+  DeletionTargets build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final ref = this.ref as $Ref<DeletionTargets, DeletionTargets>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<Set<String>, Set<String>>,
-              Set<String>,
+              AnyNotifier<DeletionTargets, DeletionTargets>,
+              DeletionTargets,
               Object?,
               Object?
             >;
     element.handleCreate(ref, build);
   }
 }
+
+/// How many of the script's live chats may be membership events or
+/// already-deleted messages, going by the viewed takeout's text.
+
+@ProviderFor(scriptPossibleMembershipEvents)
+final scriptPossibleMembershipEventsProvider =
+    ScriptPossibleMembershipEventsProvider._();
+
+/// How many of the script's live chats may be membership events or
+/// already-deleted messages, going by the viewed takeout's text.
+
+final class ScriptPossibleMembershipEventsProvider
+    extends $FunctionalProvider<int, int, int>
+    with $Provider<int> {
+  /// How many of the script's live chats may be membership events or
+  /// already-deleted messages, going by the viewed takeout's text.
+  ScriptPossibleMembershipEventsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'scriptPossibleMembershipEventsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$scriptPossibleMembershipEventsHash();
+
+  @$internal
+  @override
+  $ProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int create(Ref ref) {
+    return scriptPossibleMembershipEvents(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$scriptPossibleMembershipEventsHash() =>
+    r'b28a1cfb22f9826368b66486487676744a6aa963';

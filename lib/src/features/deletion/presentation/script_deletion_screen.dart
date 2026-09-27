@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,13 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
-import '../application/deleted_ids_providers.dart';
-import '../application/deletion_queue_notifier.dart';
+import '../application/deletion_service.dart';
 import '../application/script_deletion_ids.dart';
 import '../application/script_generator_service.dart';
 import '../domain/deletion_targets.dart';
+import '../domain/my_activity_results.dart';
+import 'possible_membership_events_notice.dart';
 
 @RoutePage()
 class ScriptDeletionScreen extends ConsumerStatefulWidget {
@@ -31,7 +28,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
   int _currentStep = 0;
   bool _copied = false;
   final _resultsController = TextEditingController();
-  _ImportResult? _importResult;
+  MyActivityResults? _importResult;
 
   @override
   void dispose() {
@@ -41,78 +38,34 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final commentIds = ref.watch(scriptDeletionIdsProvider);
+    final targets = ref.watch(scriptDeletionIdsProvider);
     final theme = Theme.of(context);
 
-    if (commentIds.isEmpty) {
+    if (targets.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Script Deletion')),
         body: const Center(child: Text('No comments selected.')),
       );
     }
 
-    final takeout = ref.watch(viewedTakeoutProvider).value;
-    final uncertainCount = takeout == null
-        ? 0
-        : takeout.liveChats
-              .where(
-                (c) =>
-                    commentIds.contains(c.liveChatId) &&
-                    c.rawText.trim().isEmpty,
-              )
-              .length;
+    final uncertainCount = ref.watch(scriptPossibleMembershipEventsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Delete via My Activity')),
       body: Column(
         children: [
-          if (uncertainCount > 0) _buildUncertainWarning(theme, uncertainCount),
-          Expanded(child: _buildStepper(theme, commentIds)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUncertainWarning(ThemeData theme, int count) {
-    final message = Intl.plural(
-      count,
-      one:
-          '1 item may be a membership event or already-deleted message. '
-          'Deletion may fail for it.',
-      other:
-          '$count items may be membership events or already-deleted '
-          'messages. Deletion may fail for these.',
-    );
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 20,
-            color: theme.colorScheme.onTertiaryContainer,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onTertiaryContainer,
-              ),
+          if (uncertainCount > 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: PossibleMembershipEventsNotice(count: uncertainCount),
             ),
-          ),
+          Expanded(child: _buildStepper(theme, targets)),
         ],
       ),
     );
   }
 
-  Widget _buildStepper(ThemeData theme, Set<String> commentIds) {
+  Widget _buildStepper(ThemeData theme, DeletionTargets targets) {
     return Stepper(
       currentStep: _currentStep,
       onStepContinue: _currentStep < 3
@@ -156,9 +109,9 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       },
       steps: [
         _buildStep1OpenActivity(theme),
-        _buildStep2CopyScript(theme, commentIds),
+        _buildStep2CopyScript(theme, targets),
         _buildStep3RunScript(theme),
-        _buildStep4ImportResults(theme, commentIds),
+        _buildStep4ImportResults(theme, targets),
       ],
     );
   }
@@ -198,7 +151,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
   // Step 2: Copy Script
   // ---------------------------------------------------------------------------
 
-  Step _buildStep2CopyScript(ThemeData theme, Set<String> commentIds) {
+  Step _buildStep2CopyScript(ThemeData theme, DeletionTargets targets) {
     return Step(
       title: const Text('Copy Script'),
       isActive: _currentStep >= 1,
@@ -208,14 +161,14 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
         children: [
           Text(
             Intl.plural(
-              commentIds.length,
+              targets.count,
               one: 'This script will delete 1 item.',
-              other: 'This script will delete ${commentIds.length} items.',
+              other: 'This script will delete ${targets.count} items.',
             ),
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: () => _copyScript(commentIds),
+            onPressed: () => _copyScript(targets),
             icon: Icon(_copied ? Icons.check : Icons.copy),
             label: Text(_copied ? 'Copied!' : 'Copy Script'),
           ),
@@ -224,10 +177,10 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
     );
   }
 
-  Future<void> _copyScript(Set<String> commentIds) async {
-    final script = await ScriptGeneratorService().generateDeletionScript(
-      commentIds,
-    );
+  Future<void> _copyScript(DeletionTargets targets) async {
+    final script = await ref
+        .read(scriptGeneratorServiceProvider)
+        .generateDeletionScript(targets.allIds);
     await Clipboard.setData(ClipboardData(text: script));
     setState(() => _copied = true);
   }
@@ -265,7 +218,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
   // Step 4: Import Results
   // ---------------------------------------------------------------------------
 
-  Step _buildStep4ImportResults(ThemeData theme, Set<String> commentIds) {
+  Step _buildStep4ImportResults(ThemeData theme, DeletionTargets targets) {
     return Step(
       title: const Text('Import Results'),
       isActive: _currentStep >= 3,
@@ -289,73 +242,45 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: () => _importResults(commentIds),
+              onPressed: () => _importResults(targets),
               icon: const Icon(Icons.file_download),
               label: const Text('Import Results'),
             ),
           ] else ...[
-            _buildResultsSummary(theme, commentIds),
+            _buildResultsSummary(theme),
           ],
         ],
       ),
     );
   }
 
-  Future<void> _importResults(Set<String> commentIds) async {
+  Future<void> _importResults(DeletionTargets targets) async {
     final text = _resultsController.text.trim();
     if (text.isEmpty) return;
 
-    try {
-      final map = jsonDecode(text) as Map<String, dynamic>;
-      final succeeded = (map['succeeded'] as List).cast<String>().toSet();
-      final failed = (map['failed'] as List)
-          .map(
-            (e) => (
-              id: (e as Map<String, dynamic>)['id'] as String,
-              error: e['error'] as String,
-            ),
-          )
-          .toList();
-
-      // Split succeeded IDs into comments vs live chats by checking
-      // which set they belong to in the current takeout data.
-      if (succeeded.isNotEmpty) {
-        final takeout = ref.read(viewedTakeoutProvider).value;
-        final commentIdSet =
-            takeout?.comments.map((c) => c.commentId).toSet() ?? {};
-        final liveChatIdSet =
-            takeout?.liveChats.map((c) => c.liveChatId).toSet() ?? {};
-
-        await ref
-            .read(deletedIdsProvider.notifier)
-            .markDeleted(
-              DeletionTargets.ids({
-                QueueItemKind.comment: succeeded.intersection(commentIdSet),
-                QueueItemKind.liveChat: succeeded.intersection(liveChatIdSet),
-              }),
-            );
-      }
-
-      await ref
-          .read(deletionQueueProvider.notifier)
-          .recordMyActivityResults(
-            deletedIds: succeeded,
-            errorsById: {for (final f in failed) f.id: f.error},
-          );
-
-      setState(() {
-        _importResult = _ImportResult(succeeded: succeeded, failed: failed);
-      });
-    } catch (e) {
-      if (mounted) {
+    switch (parseMyActivityResults(text)) {
+      case MalformedMyActivityResults(:final error):
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Invalid JSON: $e')));
-      }
+        ).showSnackBar(SnackBar(content: Text('Invalid JSON: $error')));
+      case final MyActivityResults results:
+        try {
+          await ref
+              .read(deletionServiceProvider.notifier)
+              .recordMyActivityResults(targets, results);
+        } catch (e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Couldn't save the results: $e")),
+          );
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _importResult = results);
     }
   }
 
-  Widget _buildResultsSummary(ThemeData theme, Set<String> commentIds) {
+  Widget _buildResultsSummary(ThemeData theme) {
     final result = _importResult!;
 
     return Column(
@@ -365,7 +290,7 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 20),
             const SizedBox(width: 8),
-            Text('${result.succeeded.length} deleted'),
+            Text('${result.deleted.length} deleted'),
           ],
         ),
         if (result.failed.isNotEmpty) ...[
@@ -399,8 +324,9 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
           OutlinedButton.icon(
             onPressed: () {
               // Retry with just the failed IDs.
-              final failedIds = result.failed.map((f) => f.id).toSet();
-              ref.read(scriptDeletionIdsProvider.notifier).set(failedIds);
+              ref
+                  .read(scriptDeletionIdsProvider.notifier)
+                  .keepOnly(result.errorsById.keys.toSet());
               setState(() {
                 _currentStep = 1;
                 _copied = false;
@@ -415,11 +341,4 @@ class _ScriptDeletionScreenState extends ConsumerState<ScriptDeletionScreen> {
       ],
     );
   }
-}
-
-class _ImportResult {
-  final Set<String> succeeded;
-  final List<({String id, String error})> failed;
-
-  const _ImportResult({required this.succeeded, required this.failed});
 }

@@ -14,9 +14,11 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_panel.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 
 DeletionQueueItem _item(String itemId, DeletionItemStatus status) =>
     DeletionQueueItem(
@@ -93,6 +95,7 @@ void main() {
     List<DeletionQueueItem>? items,
     bool signedIn = false,
     DeletionProcessingState processing = DeletionProcessingState.idle,
+    List<LiveChat> liveChats = const [],
   }) async {
     queue = _FakeQueue(items ?? _items);
     tester.view.physicalSize = const Size(400, 900);
@@ -133,6 +136,15 @@ void main() {
             ),
           ),
           quotaProvider.overrideWith(_FakeQuota.new),
+          viewedTakeoutProvider.overrideWithValue(
+            AsyncData(
+              TakeoutData(
+                comments: const [],
+                liveChats: liveChats,
+                subscriptionsByChannelId: const {},
+              ),
+            ),
+          ),
         ],
         child: const MaterialApp(
           home: Scaffold(body: DeletionQueuePanel(currentChannelId: 'UCb')),
@@ -183,6 +195,39 @@ void main() {
       find.widgetWithText(OptionCard, 'Via YouTube API'),
     );
     expect(api.onTap, isNull);
+  });
+
+  testWidgets('Delete warns about live chats with no text in the takeout', (
+    tester,
+  ) async {
+    DeletionQueueItem chat(String id) => _item(
+      id,
+      DeletionItemStatus.pending,
+    ).copyWith(itemType: QueueItemKind.liveChat, displayTextSnippet: null);
+    LiveChat takeoutChat(String id, String text) => LiveChat(
+      liveChatId: id,
+      channelId: 'UCme',
+      createdAt: DateTime.utc(2026),
+      price: 0,
+      rawText: text,
+      displayText: text,
+    );
+    await pumpPanel(
+      tester,
+      items: [chat('blank'), chat('said')],
+      liveChats: [takeoutChat('blank', ''), takeoutChat('said', 'hi')],
+    );
+
+    await tester.tap(find.text('Delete 2…'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        '1 item may be a membership event or already-deleted message. '
+        'Deletion may fail for it.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('offers the API with the deletes left when signed in', (

@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/script_deletion_ids.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 class _Viewed extends Notifier<String?> {
@@ -39,7 +40,9 @@ void main() {
       'viewed', () {
     final c = container();
     c.listen(scriptDeletionIdsProvider, (_, _) {});
-    c.read(scriptDeletionIdsProvider.notifier).set({'c1'});
+    c
+        .read(scriptDeletionIdsProvider.notifier)
+        .set(const DeletionTargets(commentSnippets: {'c1': null}));
 
     c.read(_viewed.notifier).set('UCb');
 

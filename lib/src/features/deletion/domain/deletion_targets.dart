@@ -68,9 +68,28 @@ class DeletionTargets {
     QueueItemKind.liveChat => liveChatIds,
   };
 
-  /// Live chats with empty text may be membership events or already-deleted
-  /// messages, so deleting them may fail.
-  int get possibleMembershipEventCount => liveChatSnippets.values
-      .where((text) => text == null || text.trim().isEmpty)
+  /// These targets, keeping only [ids].
+  DeletionTargets only(Set<String> ids) => DeletionTargets(
+    commentSnippets: {
+      for (final MapEntry(:key, :value) in commentSnippets.entries)
+        if (ids.contains(key)) key: value,
+    },
+    liveChatSnippets: {
+      for (final MapEntry(:key, :value) in liveChatSnippets.entries)
+        if (ids.contains(key)) key: value,
+    },
+  );
+
+  /// How many of these live chats have no text in [liveChats], the
+  /// takeout's. They may be membership events or already-deleted messages,
+  /// so deleting them may fail. Goes by the takeout's full text, since the
+  /// queue's snippet is shortened or missing.
+  int possibleMembershipEventsIn(Iterable<Interaction> liveChats) => liveChats
+      .where(
+        (c) =>
+            c.kind == QueueItemKind.liveChat &&
+            liveChatSnippets.containsKey(c.id) &&
+            c.rawText.trim().isEmpty,
+      )
       .length;
 }

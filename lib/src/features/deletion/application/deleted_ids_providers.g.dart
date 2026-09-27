@@ -125,7 +125,7 @@ final class QueuedIdsProvider
   }
 }
 
-String _$queuedIdsHash() => r'ef18e6c50c91a73ba55414ae1232a615514dc75b';
+String _$queuedIdsHash() => r'918353a9122167167d351912c3f0953d881af35f';
 
 final class QueuedIdsFamily extends $Family
     with $FunctionalFamilyOverride<Set<String>, QueueItemKind> {
@@ -202,7 +202,7 @@ final class FailedIdsProvider
   }
 }
 
-String _$failedIdsHash() => r'bb2d244840bcd16d3cedff9ea2984ac242399e76';
+String _$failedIdsHash() => r'4c9ac97ccf14a2ea9381f9183b8acfc5d08d0b47';
 
 final class FailedIdsFamily extends $Family
     with $FunctionalFamilyOverride<Set<String>, QueueItemKind> {

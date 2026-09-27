@@ -1,5 +1,4 @@
-import 'dart:async';
-
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -9,67 +8,65 @@ import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
-import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
-import '../application/deletion_queue_notifier.dart';
-import '../application/deletion_processing.dart';
+import 'package:youtube_takeout_manager/src/routing/app_router.dart';
+import '../application/deletion_service.dart';
 import '../domain/deletion_method.dart';
-import '../domain/deletion_targets.dart';
-import 'deletion_actions.dart';
+import 'possible_membership_events_notice.dart';
+import 'status_pill.dart';
 
 /// Asks how to delete the queue's waiting items, then starts that method.
 Future<void> deleteQueuedItems(BuildContext context, WidgetRef ref) async {
-  final channelId = ref.read(viewedChannelIdProvider);
-  if (channelId == null) return;
-  final notifier = ref.read(deletionQueueProvider.notifier);
-  final waiting = DeletionTargets.fromQueueItems(
-    notifier.pendingItemsFor(channelId),
-  );
-  if (waiting.isEmpty) return;
+  final service = ref.read(deletionServiceProvider.notifier);
+  final waiting = service.waiting();
+  if (waiting == null) return;
 
   final method = await showDialog<DeletionMethod>(
     context: context,
-    builder: (_) => DeletionMethodDialog(
-      itemCount: waiting.count,
-      possibleMembershipEventCount: waiting.possibleMembershipEventCount,
+    builder: (_) => Consumer(
+      builder: (context, ref, _) => DeletionMethodDialog(
+        itemCount: waiting.targets.count,
+        possibleMembershipEventCount: waiting.possibleMembershipEvents,
+        signedIn: ref.watch(isAuthenticatedProvider),
+        deletesLeft: ref
+            .watch(quotaProvider)
+            .value
+            ?.affordableOperations(QuotaOperation.deleteComment.cost),
+      ),
     ),
   );
   if (!context.mounted) return;
 
   switch (method) {
     case DeletionMethod.myActivityScript:
-      openMyActivityScript(context, ref, waiting.allIds);
+      service.useMyActivityScript(waiting.targets);
+      context.router.push(const ScriptDeletionRoute());
     case DeletionMethod.youtubeApi:
-      // Runs until the queue is done, paused or out of quota.
-      unawaited(
-        ref
-            .read(deletionProcessingProvider.notifier)
-            .processPendingViaYoutubeApi(channelId: channelId),
-      );
+      service.startYoutubeApiDeletion(waiting.channelId);
     case null:
       return;
   }
 }
 
 /// Picks how to delete [itemCount] items from YouTube: via My Activity, or
-/// via the YouTube API when signed in.
-class DeletionMethodDialog extends ConsumerWidget {
+/// via the YouTube API when [signedIn], which has [deletesLeft] today if
+/// known.
+class DeletionMethodDialog extends StatelessWidget {
   final int itemCount;
   final int possibleMembershipEventCount;
+  final bool signedIn;
+  final int? deletesLeft;
 
   const DeletionMethodDialog({
     super.key,
     required this.itemCount,
     this.possibleMembershipEventCount = 0,
+    required this.signedIn,
+    this.deletesLeft,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final signedIn = ref.watch(isAuthenticatedProvider);
-    final deletesLeft = ref
-        .watch(quotaProvider)
-        .value
-        ?.affordableOperations(QuotaOperation.deleteComment.cost);
-
+  Widget build(BuildContext context) {
+    final deletesLeft = this.deletesLeft;
     return AlertDialog(
       // Title and buttons scroll too, and the margins shrink, so nothing
       // overflows in a tiny window.
@@ -89,7 +86,7 @@ class DeletionMethodDialog extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (possibleMembershipEventCount > 0) ...[
-              _PossibleMembershipEventWarning(
+              PossibleMembershipEventsNotice(
                 count: possibleMembershipEventCount,
               ),
               const SizedBox(height: 12),
@@ -100,7 +97,10 @@ class DeletionMethodDialog extends ConsumerWidget {
               subtitle:
                   "No daily limit, doesn't use API quota. Runs in your "
                   'browser.',
-              badge: const _RecommendedBadge(),
+              badge: const StatusPill(
+                label: 'Recommended',
+                color: Colors.green,
+              ),
               onTap: () =>
                   Navigator.pop(context, DeletionMethod.myActivityScript),
             ),
@@ -131,78 +131,6 @@ class DeletionMethodDialog extends ConsumerWidget {
           child: const Text('Cancel'),
         ),
       ],
-    );
-  }
-}
-
-class _RecommendedBadge extends StatelessWidget {
-  const _RecommendedBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Text(
-        'Recommended',
-        style: TextStyle(
-          color: Colors.green,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-class _PossibleMembershipEventWarning extends StatelessWidget {
-  final int count;
-
-  const _PossibleMembershipEventWarning({required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final message = Intl.plural(
-      count,
-      one:
-          '1 item may be a membership event or already-deleted message. '
-          'Deletion may fail for it.',
-      other:
-          '$count items may be membership events or already-deleted '
-          'messages. Deletion may fail for these.',
-    );
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left out in the narrowest windows so the text still fits.
-          if (MediaQuery.sizeOf(context).width >= 200) ...[
-            Icon(
-              Icons.info_outline,
-              size: 20,
-              color: theme.colorScheme.onTertiaryContainer,
-            ),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onTertiaryContainer,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

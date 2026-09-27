@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/deletion_queue_counts.dart';
 import '../../application/deletion_processing.dart';
-import 'deletion_queue_layout.dart';
+import 'deletion_queue_sheets.dart';
 
 /// Phones' bottom bar summarizing the deletion queue. Tapping it opens the
 /// queue as a bottom sheet. Hidden while the queue is empty.

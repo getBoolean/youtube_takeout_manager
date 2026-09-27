@@ -24,13 +24,10 @@ class DeletionQueue extends _$DeletionQueue {
   }
 
   /// [channelId]'s items still waiting to be deleted, including those
-  /// stopped by the quota.
+  /// stopped by the quota, but not the one being deleted.
   List<DeletionQueueItem> pendingItemsFor(String channelId) => [
     for (final i in state.value ?? const <DeletionQueueItem>[])
-      if (i.authorChannelId == channelId &&
-          (i.status == DeletionItemStatus.pending ||
-              i.status == DeletionItemStatus.quotaExceeded))
-        i,
+      if (i.authorChannelId == channelId && i.status.isReadyToDelete) i,
   ];
 
   // ---------------------------------------------------------------------------
@@ -103,7 +100,7 @@ class DeletionQueue extends _$DeletionQueue {
     (current) => current
         .where(
           (i) =>
-              i.status != DeletionItemStatus.succeeded ||
+              !i.status.isDone ||
               (i.authorChannelId != null && i.authorChannelId != channelId),
         )
         .toList(),
@@ -120,11 +117,7 @@ class DeletionQueue extends _$DeletionQueue {
   /// has matched to one, and that aren't done.
   Future<void> removeUnassigned() => _update(
     (current) => current
-        .where(
-          (i) =>
-              i.authorChannelId != null ||
-              i.status == DeletionItemStatus.succeeded,
-        )
+        .where((i) => i.authorChannelId != null || i.status.isDone)
         .toList(),
   );
 
@@ -163,8 +156,8 @@ class DeletionQueue extends _$DeletionQueue {
               (i) =>
                   !(i.itemType == kind &&
                       itemIds.contains(i.itemId) &&
-                      i.status != DeletionItemStatus.inProgress &&
-                      i.status != DeletionItemStatus.succeeded),
+                      !i.status.isInProgress &&
+                      !i.status.isDone),
             )
             .toList(),
       );
@@ -191,7 +184,7 @@ class DeletionQueue extends _$DeletionQueue {
   }) => _update((current) {
     final now = DateTime.now().toUtc();
     return current.map((i) {
-      if (i.status == DeletionItemStatus.succeeded) return i;
+      if (i.status.isDone) return i;
       if (deletedIds.contains(i.itemId)) {
         return i.copyWith(
           status: DeletionItemStatus.succeeded,

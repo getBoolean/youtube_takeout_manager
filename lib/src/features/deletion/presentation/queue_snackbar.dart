@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'queue_panel/deletion_queue_layout.dart';
-
+/// Says items were queued, with a Show button that runs [onShow] to bring
+/// the queue into view, unless it's null (the queue's already in view).
 void showQueuedForDeletionSnackBar(
-  BuildContext context,
-  WidgetRef ref, {
+  BuildContext context, {
   required String message,
+  VoidCallback? onShow,
 }) {
   final scheme = Theme.of(context).colorScheme;
   final messenger = ScaffoldMessenger.of(context);
-  final showQueue = deletionQueueOpener(context, ref);
   messenger.hideCurrentSnackBar();
   final controller = messenger.showSnackBar(
     SnackBar(
       duration: const Duration(seconds: 4),
       backgroundColor: scheme.surfaceContainerHigh,
       content: Text(message, style: TextStyle(color: scheme.onSurface)),
-      action: showQueue == null
+      action: onShow == null
           ? null
           : SnackBarAction(
               label: 'Show',
               textColor: scheme.primary,
-              onPressed: showQueue,
+              onPressed: onShow,
             ),
     ),
   );

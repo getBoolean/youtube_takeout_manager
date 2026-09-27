@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_content_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/video_group_header.dart';
-import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_selection_controller.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 
 import 'channel_list_fixture.dart';
 

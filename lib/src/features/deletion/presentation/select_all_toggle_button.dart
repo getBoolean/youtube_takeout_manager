@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
-import 'deletion_selection_controller.dart';
+import '../application/deletion_selection_controller.dart';
 
 /// AppBar action that toggles between selecting every id in [selectableIds]
 /// and clearing the selection. The caller decides what "selectable" means
