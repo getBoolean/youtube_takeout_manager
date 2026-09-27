@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,6 +20,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
@@ -42,56 +42,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_impo
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 
-class _MemoryTakeoutRepository implements TakeoutRepository {
-  final accounts = <String, Map<String, Uint8List>>{};
-
-  /// Every path [loadCsvs] has returned.
-  final loadedPaths = <String>[];
-  Map<String, Uint8List>? legacy;
-
-  /// Holds up loading [legacy] until it completes.
-  Completer<void>? legacyGate;
-  bool failSaves = false;
-
-  @override
-  Future<void> saveCsvs(
-    String accountId,
-    Map<String, Uint8List> csvFiles,
-  ) async {
-    if (failSaves) throw const FileSystemException('disk full');
-    accounts[accountId] = {...csvFiles};
-  }
-
-  @override
-  Future<Map<String, Uint8List>?> loadCsvs(
-    String accountId, {
-    bool Function(String path)? only,
-  }) async {
-    final files = accounts[accountId];
-    if (files == null) return null;
-    final loaded = {
-      for (final MapEntry(:key, :value) in files.entries)
-        if (only?.call(key) ?? true) key: value,
-    };
-    loadedPaths.addAll(loaded.keys);
-    return loaded;
-  }
-
-  @override
-  Future<List<String>> listAccountIds() async => accounts.keys.toList();
-
-  @override
-  Future<void> clearCsvs(String accountId) async => accounts.remove(accountId);
-
-  @override
-  Future<Map<String, Uint8List>?> loadLegacyCsvs() async {
-    await legacyGate?.future;
-    return legacy;
-  }
-
-  @override
-  Future<void> clearLegacyCsvs() async => legacy = null;
-}
+import '../memory_takeout_repository.dart';
 
 Comment _comment(String id, String createdAt) => Comment(
   commentId: id,
@@ -150,13 +101,13 @@ DeletionQueueItem _pending(String itemId) => DeletionQueueItem(
 );
 
 void main() {
-  late _MemoryTakeoutRepository repository;
+  late MemoryTakeoutRepository repository;
 
   setUp(() {
     SharedPreferences.setMockInitialValues({
       'flutter.active_takeout_account': 'UCme',
     });
-    repository = _MemoryTakeoutRepository();
+    repository = MemoryTakeoutRepository();
     repository.accounts['UCme'] = encodeTakeoutCsvs(_savedAbc);
   });
 
@@ -537,6 +488,19 @@ void main() {
 
       expect(savedHistory().watches.single.videoId, 'v1');
       expect(await commentIds(container()), ['D', 'C', 'B', 'A']);
+    });
+
+    test('an import reloads the history shown', () async {
+      final c = container();
+      expect((await c.read(takeoutHistoryProvider.future))!.isEmpty, isTrue);
+      final notifier = c.read(takeoutImporterProvider.notifier);
+
+      await notifier.commitImport(
+        await notifier.prepareImport(takeoutWithHistory(), merge: true),
+      );
+
+      final history = await c.read(takeoutHistoryProvider.future);
+      expect(history!.watches.single.videoId, 'v1');
     });
 
     test("loading a takeout doesn't read its history", () async {

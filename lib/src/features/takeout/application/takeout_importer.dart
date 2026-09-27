@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/delete
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_files.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
@@ -127,6 +128,8 @@ class TakeoutImporter extends _$TakeoutImporter {
     await ref
         .read(takeoutRepositoryProvider)
         .saveCsvs(plan.accountId, csvFiles);
+    // Reloaded from what was just saved when it's next looked at.
+    ref.invalidate(takeoutHistoryProvider);
     final loaded = LoadedTakeout(id: plan.accountId, data: plan.mergedData);
     await ref.read(queueChannelAssignerProvider.notifier).assign(loaded);
     final takeout = ref.read(takeoutProvider.notifier);
