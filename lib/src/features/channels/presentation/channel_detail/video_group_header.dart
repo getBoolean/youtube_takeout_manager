@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
-import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/video_thumbnail.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/youtube_links.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../../domain/video_group.dart';
@@ -147,7 +147,14 @@ class VideoGroupHeader extends ConsumerWidget {
         if (thumbnailActs != null) ...[
           Actor(
             acts: thumbnailActs,
-            child: _buildThumbnail(thumbnailUrl, theme),
+            child: VideoThumbnail(
+              url: thumbnailUrl,
+              placeholderIcon: switch (group.groupType) {
+                GroupType.video => Icons.videocam_outlined,
+                GroupType.post => Icons.article_outlined,
+                GroupType.orphaned => Icons.help_outline,
+              },
+            ),
           ),
           const SizedBox(width: 12),
         ],
@@ -203,43 +210,6 @@ class VideoGroupHeader extends ConsumerWidget {
           onPressed: onToggleExpanded,
         ),
       ],
-    );
-  }
-
-  Widget _buildThumbnail(String? thumbnailUrl, ThemeData theme) {
-    if (thumbnailUrl != null) {
-      // Right-click only: a long press on the header starts selection.
-      return ImageUrlMenu(
-        url: thumbnailUrl,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            thumbnailUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, _, _) => _placeholderIcon(theme),
-          ),
-        ),
-      );
-    }
-
-    return _placeholderIcon(theme);
-  }
-
-  Widget _placeholderIcon(ThemeData theme) {
-    final icon = switch (group.groupType) {
-      GroupType.video => Icons.videocam_outlined,
-      GroupType.post => Icons.article_outlined,
-      GroupType.orphaned => Icons.help_outline,
-    };
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Icon(icon, color: theme.colorScheme.onSurfaceVariant),
-      ),
     );
   }
 }

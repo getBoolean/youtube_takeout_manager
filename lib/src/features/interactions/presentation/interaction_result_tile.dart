@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/highlighted_text.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_preview.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/presentation/live_chat_tile.dart';
@@ -52,9 +53,6 @@ class InteractionResultTile extends StatelessWidget {
       emojiBuilder: EmojiPreview.highlighting(query),
     );
     final isComment = item.kind == QueueItemKind.comment;
-    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
 
     return InteractionTile(
       status: status,
@@ -78,36 +76,11 @@ class InteractionResultTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium,
             ),
-      // One line of text with the avatar inline, so it ellipsizes instead
-      // of overflowing when narrow.
-      subtitle: Text.rich(
-        TextSpan(
-          children: [
-            const TextSpan(text: 'on '),
-            if (channelThumbnailUrl case final url?)
-              WidgetSpan(
-                alignment: PlaceholderAlignment.middle,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 4),
-                  child: ClipOval(
-                    child: Image.network(
-                      url,
-                      width: 14,
-                      height: 14,
-                      fit: BoxFit.cover,
-                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                      // A picture that won't load is left out.
-                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-              ),
-            TextSpan(text: '$channelName · ${formatDateTime(item.createdAt)}'),
-          ],
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: subtitleStyle,
+      subtitle: ChannelMetaLine(
+        prefix: 'on ',
+        channelName: channelName,
+        thumbnailUrl: channelThumbnailUrl,
+        detail: formatDateTime(item.createdAt),
       ),
       trailing: trailing ?? const Icon(Icons.chevron_right),
       isSelected: isSelected,

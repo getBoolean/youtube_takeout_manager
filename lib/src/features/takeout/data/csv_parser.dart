@@ -9,7 +9,7 @@ import 'package:youtube_takeout_manager/src/features/interactions/domain/comment
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
 import '../domain/own_channel.dart';
 import '../domain/subscription.dart';
-import '../domain/takeout_import_plan.dart';
+import 'csv_header.dart';
 
 /// Result of parsing a CSV file, including diagnostic counts.
 class CsvParseResult<T> {
@@ -107,7 +107,7 @@ class CsvParser {
   CsvParseResult<T> _parseRows<T>(
     Uint8List bytes,
     String file,
-    T? Function(List<dynamic> row) Function(_Header header) columns,
+    T? Function(List<dynamic> row) Function(CsvHeader header) columns,
   ) {
     final rows = _csv.decode(utf8.decode(bytes));
     if (rows.isEmpty) {
@@ -118,7 +118,7 @@ class CsvParser {
       );
     }
 
-    final read = columns(_Header(rows.first, file));
+    final read = columns(CsvHeader(rows.first, file));
     final minCols = rows.first.length;
     final dataRows = rows.skip(1).toList();
     final items = [
@@ -136,7 +136,7 @@ class CsvParser {
   List<Subscription> parseSubscriptionsCsv(Uint8List bytes) {
     final rows = _csv.decode(utf8.decode(bytes));
     if (rows.isEmpty) return [];
-    final header = _Header(rows.first, 'subscriptions');
+    final header = CsvHeader(rows.first, 'subscriptions');
     var (iId, iUrl, iTitle) = (
       header.optional('channel id'),
       header.optional('channel url'),
@@ -165,7 +165,7 @@ class CsvParser {
   List<OwnChannel> parseChannelsCsv(Uint8List bytes) {
     final rows = _csv.decode(utf8.decode(bytes));
     if (rows.isEmpty) return [];
-    final header = _Header(rows.first, 'channel');
+    final header = CsvHeader(rows.first, 'channel');
     final iId = header.optional('channel id');
     if (iId == null) return [];
     final iTitle = header.optional('channel title (original)', [
@@ -183,7 +183,7 @@ class CsvParser {
   Map<String, String> parseChannelUrlConfigsCsv(Uint8List bytes) {
     final rows = _csv.decode(utf8.decode(bytes));
     if (rows.isEmpty) return {};
-    final header = _Header(rows.first, 'channel URL configs');
+    final header = CsvHeader(rows.first, 'channel URL configs');
     final iId = header.optional('channel id');
     final iName = header.optional('channel vanity url 1 name');
     if (iId == null || iName == null) return {};
@@ -219,37 +219,4 @@ class CsvParser {
     if (value is int) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
-}
-
-/// A CSV file's header: where each column is, by name.
-class _Header {
-  /// Column index by lowercased, trimmed name.
-  final Map<String, int> _index;
-
-  /// What the file holds, for errors.
-  final String _file;
-
-  _Header(List<dynamic> row, this._file)
-    : _index = {
-        for (var i = 0; i < row.length; i++)
-          row[i].toString().toLowerCase().trim(): i,
-      };
-
-  /// The index of the column called [name] or one of [otherNames], or null
-  /// if there's none.
-  int? optional(String name, [List<String> otherNames = const []]) {
-    for (final n in [name, ...otherNames]) {
-      if (_index[n.toLowerCase()] case final i?) return i;
-    }
-    return null;
-  }
-
-  /// The index of [column], which the file can't be read without, also
-  /// trying [otherNames]. Throws when the header has none of them.
-  int required(String column, [List<String> otherNames = const []]) =>
-      optional(column, otherNames) ??
-      (throw TakeoutImportException(
-        "The takeout's $_file file has no \"$column\" column, so it "
-        "couldn't be read. Google may have changed the takeout's format.",
-      ));
 }

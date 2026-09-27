@@ -66,9 +66,7 @@ void main() {
     _expectAllOnScreen(tester, 300);
   });
 
-  testWidgets('drops the counts too when even they don\'t fit', (
-    tester,
-  ) async {
+  testWidgets('drops the counts too when even they don\'t fit', (tester) async {
     await _pumpTabs(tester, 150);
 
     for (final tab in _tabs) {

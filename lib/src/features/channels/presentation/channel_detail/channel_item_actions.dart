@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/actions_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_targets.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_actions.dart';
@@ -27,63 +28,44 @@ Future<ItemAction?> showItemActionsSheet(
     QueueItemKind.liveChat => 'live chats',
   };
 
-  return showModalBottomSheet<ItemAction>(
-    context: context,
-    builder: (context) {
-      Widget option(
-        ItemAction action,
-        IconData icon,
-        String title, [
-        String? subtitle,
-      ]) => ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: subtitle == null ? null : Text(subtitle),
-        onTap: () => Navigator.pop(context, action),
-      );
-
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (item.videoId != null)
-              option(
-                ItemAction.openOnYouTube,
-                Icons.open_in_new,
-                'Open on YouTube',
-              ),
-            if (status == InteractionStatus.failed)
-              option(
-                ItemAction.retry,
-                Icons.refresh,
-                'Retry',
-                'Re-queue for deletion',
-              ),
-            if (inQueue)
-              option(
-                ItemAction.removeFromQueue,
-                Icons.remove_circle_outline,
-                'Remove from queue',
-                'Cancel the pending deletion',
-              )
-            else ...[
-              option(
-                ItemAction.queue,
-                Icons.playlist_add,
-                'Add to deletion queue',
-                'Delete it from YouTube with the rest',
-              ),
-              option(
-                ItemAction.removeLocally,
-                Icons.delete_outline,
-                'Remove locally',
-                'For $kindName you already deleted outside the app',
-              ),
-            ],
-          ],
+  return showActionsSheet(
+    context,
+    options: [
+      if (item.videoId != null)
+        SheetOption(
+          ItemAction.openOnYouTube,
+          Icons.open_in_new,
+          'Open on YouTube',
         ),
-      );
-    },
+      if (status == InteractionStatus.failed)
+        SheetOption(
+          ItemAction.retry,
+          Icons.refresh,
+          'Retry',
+          'Re-queue for deletion',
+        ),
+      if (inQueue)
+        SheetOption(
+          ItemAction.removeFromQueue,
+          Icons.remove_circle_outline,
+          'Remove from queue',
+          'Cancel the pending deletion',
+        )
+      else ...[
+        SheetOption(
+          ItemAction.queue,
+          Icons.playlist_add,
+          'Add to deletion queue',
+          'Delete it from YouTube with the rest',
+        ),
+        SheetOption(
+          ItemAction.removeLocally,
+          Icons.delete_outline,
+          'Remove locally',
+          'For $kindName you already deleted outside the app',
+        ),
+      ],
+    ],
   );
 }
 
