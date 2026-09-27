@@ -14,5 +14,20 @@ void main() {
       expect(foldForSearch(thumbsUpMedium), thumbsUpMedium);
       expect(foldForSearch(technologist), technologist);
     });
+
+    test('ignores accents, written as one character or as two', () {
+      expect(foldForSearch('Café'), foldForSearch('cafe'));
+      expect(foldForSearch('Café'), foldForSearch('cafe'));
+      expect(foldForSearch('Ñandú Çà Øre'), foldForSearch('nandu ca ore'));
+    });
+
+    test('matches letters that stand for two', () {
+      expect(foldForSearch('Straße'), foldForSearch('strasse'));
+      expect(foldForSearch('Æsir'), foldForSearch('aesir'));
+    });
+
+    test('matches a dotted capital I', () {
+      expect(foldForSearch('İstanbul'), foldForSearch('istanbul'));
+    });
   });
 }

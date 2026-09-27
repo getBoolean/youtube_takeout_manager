@@ -133,6 +133,10 @@ void main() {
       expect(search('radio'), [titled.channelId]);
     });
 
+    test('matches the title whatever its accents', () {
+      expect(search('cafe'), [titled.channelId]);
+    });
+
     test('matches a channel without a title by its ID', () {
       expect(search('notitle'), [untitled.channelId]);
     });

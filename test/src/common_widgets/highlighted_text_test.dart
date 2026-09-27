@@ -41,6 +41,17 @@ void main() {
     expect(emojiMatches(tester), isEmpty);
   });
 
+  testWidgets('matches text whatever its accents', (tester) async {
+    await pumpText(tester, 'Café, café and cafe', 'CAFE');
+    expect(textMatches(tester), ['Café', 'café', 'cafe']);
+
+    await pumpText(tester, 'Straße 5', 'strasse');
+    expect(textMatches(tester), ['Straße']);
+
+    await pumpText(tester, 'İstanbul', 'istan');
+    expect(textMatches(tester), ['İstan']);
+  });
+
   testWidgets('marks matched emojis instead of styling them', (tester) async {
     await pumpText(tester, 'so lit $_fire', 'lit $_fire');
     expect(textMatches(tester), ['lit ']);

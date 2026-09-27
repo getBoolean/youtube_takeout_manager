@@ -40,6 +40,7 @@ final _groups = [
     _chat('text', '{"text":"he has a short"}'),
     _chat('heart', '{"text":"love it $_heart"}'),
     _chat('heart-emoji', '{"text":"love it $_heartEmoji"}'),
+    _chat('accented', '{"text":"see you at the Café"}'),
   ]),
 ];
 
@@ -82,6 +83,11 @@ void main() {
   test('❤️ and ❤ match each other', () {
     expect(matchIds(_heartEmoji), ['heart', 'heart-emoji']);
     expect(matchIds(_heart), ['heart', 'heart-emoji']);
+  });
+
+  test('matches text whatever its accents', () {
+    expect(matchIds('cafe'), ['accented']);
+    expect(matchIds('CAFÉ'), ['accented']);
   });
 
   _searchTests();

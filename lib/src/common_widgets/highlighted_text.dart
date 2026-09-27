@@ -8,8 +8,8 @@ import 'search_match_marker.dart';
 ///
 /// Use [HighlightedText] for plain strings and [HighlightedText.rich] when
 /// the source is already a list of [InlineSpan]s (e.g. comment spans with
-/// mixed text and emoji [WidgetSpan]s). Matching is case-insensitive and
-/// ignores U+FE0F, like search (see [foldForSearch]).
+/// mixed text and emoji [WidgetSpan]s). Matching ignores case, accents and
+/// U+FE0F, like search (see [foldForSearch]).
 class HighlightedText extends StatelessWidget {
   final String? text;
   final List<InlineSpan>? spans;
@@ -196,23 +196,7 @@ List<InlineSpan> _joinTextSpans(List<InlineSpan> spans) {
 List<(int, int)> _matchRanges(String text, String folded) {
   if (folded.isEmpty || text.isEmpty) return const [];
 
-  // The folded text, plus the offset in [text] of each of its code units
-  // (null while nothing was removed).
-  final List<int>? offsets;
-  final String haystack;
-  if (text.contains('\u{FE0F}')) {
-    offsets = [
-      for (var i = 0; i < text.length; i++)
-        if (text.codeUnitAt(i) != 0xFE0F) i,
-    ];
-    haystack = String.fromCharCodes(offsets.map(text.codeUnitAt)).toLowerCase();
-    if (haystack.length != offsets.length) return const [];
-  } else {
-    offsets = null;
-    haystack = text.toLowerCase();
-    // Lowercasing changed the length (e.g. 'İ'); offsets wouldn't line up.
-    if (haystack.length != text.length) return const [];
-  }
+  final (folded: haystack, :offsets) = foldForSearchWithOffsets(text);
 
   final ranges = <(int, int)>[];
   var from = 0;
@@ -221,11 +205,7 @@ List<(int, int)> _matchRanges(String text, String folded) {
     if (hit < 0) break;
     from = hit + folded.length;
     final last = hit + folded.length - 1;
-    final chars = CharacterRange.at(
-      text,
-      offsets?[hit] ?? hit,
-      (offsets?[last] ?? last) + 1,
-    );
+    final chars = CharacterRange.at(text, offsets[hit], offsets[last] + 1);
     final start = chars.stringBeforeLength;
     final end = text.length - chars.stringAfterLength;
     if (ranges.isNotEmpty && start <= ranges.last.$2) {
