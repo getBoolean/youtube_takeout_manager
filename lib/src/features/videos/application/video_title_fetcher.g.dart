@@ -59,4 +59,4 @@ final class VideoTitleFetcherProvider
   }
 }
 
-String _$videoTitleFetcherHash() => r'f9ae2d1ebacb570099f368fd298fe0c2bdf2cdae';
+String _$videoTitleFetcherHash() => r'dc940d85503f6360884eb84aa693dc35b7a5fab1';
