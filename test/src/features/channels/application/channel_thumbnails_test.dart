@@ -131,11 +131,11 @@ void main() {
       'UCa': 'https://yt3.example/UCa',
     };
     expect(c.read(channelThumbnailsProvider).value, pictures);
-    final prefs = await SharedPreferences.getInstance();
-    expect(
-      prefs.getString('cached_channel_thumbnails'),
-      '{"UCold":"https://saved/UCold","UCa":"https://yt3.example/UCa"}',
-    );
+
+    // A fresh start loads both from storage.
+    final reloaded = ProviderContainer();
+    addTearDown(reloaded.dispose);
+    expect(await reloaded.read(channelThumbnailsProvider.future), pictures);
   });
 
   test('loads nothing without a sign-in', () async {
@@ -161,18 +161,25 @@ void main() {
     expect(c.read(channelThumbnailsProvider).value, isEmpty);
   });
 
-  test('fetches pictures once 10 new channels show', () async {
+  test('fetches pictures once a batch of new channels shows', () async {
     final clients = _Clients();
     final c = container(clients: clients, signIns: _SignIns());
 
-    c.read(_shown.notifier).set([for (var i = 0; i < 9; i++) 'UC$i']);
+    c.read(_shown.notifier).set([
+      for (var i = 0; i < thumbnailBatchSize - 1; i++) 'UC$i',
+    ]);
     await pumpEventQueue();
     expect(clients.used, isEmpty);
 
-    c.read(_shown.notifier).set([for (var i = 0; i < 10; i++) 'UC$i']);
+    c.read(_shown.notifier).set([
+      for (var i = 0; i < thumbnailBatchSize; i++) 'UC$i',
+    ]);
     await pumpEventQueue();
     expect(clients.used, ['UCother']);
-    expect(c.read(channelThumbnailsProvider).value, hasLength(10));
+    expect(
+      c.read(channelThumbnailsProvider).value,
+      hasLength(thumbnailBatchSize),
+    );
   });
 
   test('fetches the rest once video titles are done', () async {

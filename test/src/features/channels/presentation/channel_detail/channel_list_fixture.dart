@@ -18,7 +18,7 @@ import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 /// Deterministic channel detail data shared by the channel list tests.
 ///
 /// Dates are local (not UTC) so `formatDateTime`'s `toLocal()` is a no-op and
-/// goldens don't depend on the machine's timezone.
+/// the shown dates don't depend on the machine's timezone.
 const channelId = 'ch';
 
 const _commentCounts = [

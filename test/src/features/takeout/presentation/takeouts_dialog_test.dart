@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_account_header.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
@@ -308,9 +309,19 @@ void main() {
   testWidgets("heads with the takeout's Google account", (tester) async {
     await pumpDialog(tester);
 
-    expect(find.text('Takeouts'), findsOneWidget);
-    expect(find.text('Ada'), findsOneWidget);
-    expect(find.text('ada@example.com'), findsOneWidget);
+    final header = find.byType(GoogleAccountHeader);
+    expect(
+      find.descendant(of: header, matching: find.textContaining('Ada')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: header,
+        matching: find.textContaining('ada@example.com'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(GoogleAccountHeader.notSignedInKey), findsNothing);
   });
 
   testWidgets('before any sign-in, heads with the main channel', (
@@ -318,14 +329,21 @@ void main() {
   ) async {
     await pumpDialog(tester, signIns: const {});
 
-    expect(find.text('Not signed in with Google'), findsOneWidget);
+    expect(find.byKey(GoogleAccountHeader.notSignedInKey), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(GoogleAccountHeader),
+        matching: find.textContaining(_main.displayName),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('without a takeout, offers to import one, with nothing else to '
       'expand', (tester) async {
     await pumpDialog(tester, channels: const [], signIns: const {});
 
-    expect(find.text('No takeout imported'), findsOneWidget);
+    expect(find.byKey(GoogleAccountHeader.noTakeoutKey), findsOneWidget);
     expect(find.text('Viewing'), findsNothing);
     expect(find.text('Import a takeout'), findsOneWidget);
     expect(find.byTooltip('Show other Google accounts'), findsNothing);

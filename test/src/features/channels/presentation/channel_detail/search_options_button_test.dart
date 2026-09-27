@@ -53,7 +53,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(MenuAnchor), findsNothing);
-    expect(find.text('Search options'), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('Show all comments in matched videos'), findsOneWidget);
     expect(find.text('Match video titles'), findsOneWidget);
   });
@@ -70,11 +70,11 @@ void main() {
     await tester.tap(find.byIcon(Icons.tune));
     await tester.pumpAndSettle();
 
-    final tiles = tester
-        .widgetList<CheckboxListTile>(find.byType(CheckboxListTile))
-        .toList();
-    expect(tiles[0].value, isTrue);
-    expect(tiles[1].value, isFalse);
+    bool? checked(String label) => tester
+        .widget<CheckboxListTile>(find.widgetWithText(CheckboxListTile, label))
+        .value;
+    expect(checked('Show all comments in matched videos'), isTrue);
+    expect(checked('Match video titles'), isFalse);
   });
 
   testWidgets('Done applies the changes', (tester) async {
@@ -90,7 +90,7 @@ void main() {
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Search options'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
     final options = container.read(searchOptionsProvider).value!;
     expect(options.expandMatchedVideos, isTrue);
     expect(options.matchGroupTitles, isFalse);
@@ -108,7 +108,7 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Search options'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
     final options = container.read(searchOptionsProvider).value!;
     expect(options.expandMatchedVideos, isFalse);
     expect(options.matchGroupTitles, isTrue);

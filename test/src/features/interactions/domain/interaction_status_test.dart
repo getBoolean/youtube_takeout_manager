@@ -34,9 +34,14 @@ void main() {
   });
 
   test('the status labels the text next to the item, except when active', () {
-    expect(InteractionStatus.deleted.labelled('May 1'), 'Deleted • May 1');
-    expect(InteractionStatus.failed.labelled('May 1'), 'Failed • May 1');
-    expect(InteractionStatus.queued.labelled('May 1'), 'Queued • May 1');
+    for (final status in InteractionStatus.values) {
+      if (status == InteractionStatus.active) continue;
+      expect(
+        status.labelled('May 1'),
+        allOf(contains(status.label!), contains('May 1')),
+        reason: status.name,
+      );
+    }
     expect(InteractionStatus.active.labelled('May 1'), 'May 1');
   });
 }

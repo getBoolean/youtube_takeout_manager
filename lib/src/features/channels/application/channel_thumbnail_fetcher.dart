@@ -12,8 +12,12 @@ import 'channel_providers.dart';
 
 part 'channel_thumbnail_fetcher.g.dart';
 
+/// How many channels' pictures one request fetches.
+const thumbnailBatchSize = 10;
+
 /// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of 10 as they appear, and the rest once video titles are done.
+/// batches of [thumbnailBatchSize] as they appear, and the rest once video
+/// titles are done.
 /// An effect: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
 class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
@@ -33,7 +37,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
   }
 
   /// Queues [channelIds] without a picture yet, fetching once there's a
-  /// batch of 10.
+  /// batch of [thumbnailBatchSize].
   void queueChannelIds(Set<String> channelIds) {
     final known = {...?ref.read(channelThumbnailsProvider).value?.keys};
     final uncached = channelIds.difference(known).difference(const {
@@ -41,7 +45,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     });
     if (uncached.isEmpty) return;
     _pendingIds.addAll(uncached);
-    if (_pendingIds.length >= 10 && !_fetchInProgress) {
+    if (_pendingIds.length >= thumbnailBatchSize && !_fetchInProgress) {
       _fetchPending();
     }
   }
@@ -65,7 +69,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
         .getAuthenticatedClient(sessionChannelId);
     try {
       while (_pendingIds.isNotEmpty) {
-        final batch = _pendingIds.take(10).toSet();
+        final batch = _pendingIds.take(thumbnailBatchSize).toSet();
         _pendingIds.removeAll(batch);
         final fetched = await ref
             .read(youtubeChannelRepositoryProvider)

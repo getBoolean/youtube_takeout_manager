@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/channel_list_screen.dart';
+import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/no_takeout_views.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/skeleton.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
@@ -161,8 +162,7 @@ void main() {
   ) async {
     await pumpScreen(tester);
 
-    expect(find.text('Import your Google Takeout data'), findsOneWidget);
-    expect(find.text('Select zip files'), findsOneWidget);
+    expect(find.byType(TakeoutImportPrompt), findsOneWidget);
     expect(find.byType(AccountButton), findsOneWidget);
   });
 
@@ -174,7 +174,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(takeout.committed, hasLength(1));
-    expect(find.text('Import your Google Takeout data'), findsNothing);
+    expect(find.byType(TakeoutImportPrompt), findsNothing);
     expect(find.text('A channel I commented on'), findsOneWidget);
   });
 
@@ -186,7 +186,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(Dialog), findsNothing);
-    expect(find.text('Import this takeout?'), findsOneWidget);
+    expect(find.byKey(const ValueKey('add-account-review')), findsOneWidget);
     expect(takeout.committed, isEmpty);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Import'));
@@ -201,12 +201,14 @@ void main() {
   ) async {
     await pumpScreen(tester, notifier: _Unreadable.new);
     // Loading still, while it retries briefly.
-    expect(find.text('Failed to load saved data'), findsNothing);
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump(const Duration(milliseconds: 400));
-    await tester.pump();
+    expect(find.byType(TakeoutLoadFailed), findsNothing);
+    // However long the retries take, within reason.
+    for (var i = 0; i < 50; i++) {
+      if (find.byType(TakeoutLoadFailed).evaluate().isNotEmpty) break;
+      await tester.pump(const Duration(milliseconds: 100));
+    }
 
-    expect(find.text('Failed to load saved data'), findsOneWidget);
+    expect(find.byType(TakeoutLoadFailed), findsOneWidget);
 
     await tester.tap(find.widgetWithText(FilledButton, 'Account'));
     await tester.pumpAndSettle();
@@ -219,13 +221,13 @@ void main() {
     final moving = Completer<void>();
     await pumpScreen(tester, migration: (ref) => moving.future);
 
-    expect(find.text('Import your Google Takeout data'), findsNothing);
+    expect(find.byType(TakeoutImportPrompt), findsNothing);
     expect(find.byType(SkeletonAvatar), findsWidgets);
 
     moving.complete();
     await tester.pumpAndSettle();
 
-    expect(find.text('Import your Google Takeout data'), findsOneWidget);
+    expect(find.byType(TakeoutImportPrompt), findsOneWidget);
   });
 
   testWidgets("data saved before per-account storage that can't be moved "
@@ -238,12 +240,12 @@ void main() {
       ),
     );
 
-    expect(find.text('Failed to load saved data'), findsOneWidget);
+    expect(find.byType(TakeoutLoadFailed), findsOneWidget);
     expect(
       find.textContaining("couldn't be matched to a YouTube channel"),
       findsOneWidget,
     );
-    expect(find.text('Import your Google Takeout data'), findsNothing);
+    expect(find.byType(TakeoutImportPrompt), findsNothing);
   });
 
   testWidgets('after data that failed to move, an imported takeout shows', (
@@ -263,7 +265,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(takeout.committed, hasLength(1));
-    expect(find.text('Failed to load saved data'), findsNothing);
+    expect(find.byType(TakeoutLoadFailed), findsNothing);
     expect(find.text('A channel I commented on'), findsOneWidget);
   });
 }

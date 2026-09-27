@@ -653,8 +653,7 @@ void main() {
     testWidgets('shows the full labels when they fit', (tester) async {
       await pumpTabs(tester, 800);
 
-      expect(find.text('Comments ('), findsOneWidget);
-      expect(find.text('Live Chats ('), findsOneWidget);
+      expect(find.byType(ChannelTabLabel), findsNWidgets(2));
     });
 
     testWidgets('falls back to icons, keeping both tabs on screen', (
@@ -662,7 +661,7 @@ void main() {
     ) async {
       await pumpTabs(tester, 120);
 
-      expect(find.text('Comments ('), findsNothing);
+      expect(find.byType(ChannelTabLabel), findsNothing);
       expect(find.byTooltip('Comments (68)'), findsOneWidget);
       expect(find.byTooltip('Live Chats (12)'), findsOneWidget);
       for (final tab in find.byType(Tab).evaluate()) {

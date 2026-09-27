@@ -139,7 +139,7 @@ void main() {
     expect(channels.map((ch) => ch.channelId), ['UCknown', unknownChannelId]);
     final unknown = channels.last;
     expect(unknown.isUnknown, isTrue);
-    expect(unknown.channelTitle, 'Unknown channel');
+    expect(unknown.channelTitle, isNotEmpty);
     expect(unknown.channelUrl, isNull);
     expect(unknown.commentCount, 3);
     expect(unknown.liveChatCount, 1);

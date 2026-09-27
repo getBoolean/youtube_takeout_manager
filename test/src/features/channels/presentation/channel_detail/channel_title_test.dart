@@ -3,6 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_detail/channel_app_bar.dart';
 
+Finder _dialogNaming(String name) => find.descendant(
+  of: find.byType(AlertDialog),
+  matching: find.textContaining(name),
+);
+
 void main() {
   Future<void> pumpTitle(WidgetTester tester, {double width = 800}) async {
     tester.view.physicalSize = Size(width, 600);
@@ -27,11 +32,11 @@ void main() {
 
     await tester.tap(find.text('Ada'));
     await tester.pumpAndSettle();
-    expect(find.text('Open Ada on YouTube?'), findsOneWidget);
+    expect(_dialogNaming('Ada'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(find.text('Open Ada on YouTube?'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
   });
 
   testWidgets('the globe beside the name asks too', (tester) async {
@@ -39,7 +44,7 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.language));
     await tester.pumpAndSettle();
-    expect(find.text('Open Ada on YouTube?'), findsOneWidget);
+    expect(_dialogNaming('Ada'), findsOneWidget);
   });
 
   testWidgets('leaves the globe out when narrow', (tester) async {

@@ -92,10 +92,7 @@ void main() {
   for (final (item, name) in [(_comment, 'comments'), (_chat, 'live chats')]) {
     testWidgets('removing locally says it is for $name', (tester) async {
       await openSheet(tester, item);
-      expect(
-        find.text('For $name you already deleted outside the app'),
-        findsOneWidget,
-      );
+      expect(find.textContaining(name), findsOneWidget);
     });
   }
 

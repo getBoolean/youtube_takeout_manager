@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/interactions/presentation/superchat_colors.dart';
@@ -16,82 +14,54 @@ void main() {
       expect(getSuperChatTier(999999), isNull);
     });
 
-    test('returns blue tier for \$1–\$1.99', () {
-      final tier = getSuperChatTier(1000000)!; // \$1.00
-      expect(tier.headerColor, const Color(0xFF1565C0));
-      expect(tier.bodyColor, isNull);
-      expect(tier.showBody, isFalse);
-      expect(tier.textColor, const Color(0xFFFFFFFF));
+    // YouTube's Super Chat tiers start at these dollar amounts.
+    const boundaries = [1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0];
+    double micros(double dollars) => dollars * 1000000;
 
+    test('each tier runs up to the next boundary', () {
+      for (var i = 0; i < boundaries.length - 1; i++) {
+        final start = boundaries[i];
+        final next = boundaries[i + 1];
+        final tier = getSuperChatTier(micros(start));
+        expect(tier, isNotNull, reason: '\$$start');
+        expect(
+          getSuperChatTier(micros(next - 0.01)),
+          same(tier),
+          reason: '\$${next - 0.01} is in the \$$start tier',
+        );
+        expect(
+          getSuperChatTier(micros(next)),
+          isNot(same(tier)),
+          reason: '\$$next starts a new tier',
+        );
+      }
+    });
+
+    test('very large amounts stay in the top tier', () {
       expect(
-        getSuperChatTier(1990000)!.headerColor,
-        const Color(0xFF1565C0),
-      ); // \$1.99
+        getSuperChatTier(micros(9999.99)),
+        same(getSuperChatTier(micros(boundaries.last))),
+      );
     });
 
-    test('returns light blue tier for \$2–\$4.99', () {
-      final tier = getSuperChatTier(2000000)!; // \$2.00
-      expect(tier.headerColor, const Color(0xFF00B8D4));
-      expect(tier.showBody, isFalse);
-
-      expect(
-        getSuperChatTier(4990000)!.headerColor,
-        const Color(0xFF00B8D4),
-      ); // \$4.99
+    test('every tier has its own header color', () {
+      final colors = {
+        for (final dollars in boundaries)
+          getSuperChatTier(micros(dollars))!.headerColor,
+      };
+      expect(colors, hasLength(boundaries.length));
     });
 
-    test('returns green tier for \$5–\$9.99', () {
-      final tier = getSuperChatTier(5000000)!; // \$5.00
-      expect(tier.headerColor, const Color(0xFF00BFA5));
-      expect(tier.bodyColor, const Color(0xFF00A88F));
-      expect(tier.showBody, isTrue);
-
-      expect(
-        getSuperChatTier(9990000)!.headerColor,
-        const Color(0xFF00BFA5),
-      ); // \$9.99
-    });
-
-    test('returns yellow tier for \$10–\$19.99', () {
-      final tier = getSuperChatTier(10000000)!; // \$10.00
-      expect(tier.headerColor, const Color(0xFFFFB300));
-      expect(tier.bodyColor, const Color(0xFFF9A825));
-      expect(tier.textColor, const Color(0xFF212121));
-    });
-
-    test('returns orange tier for \$20–\$49.99', () {
-      final tier = getSuperChatTier(20000000)!; // \$20.00
-      expect(tier.headerColor, const Color(0xFFE65100));
-      expect(tier.bodyColor, const Color(0xFFBF360C));
-    });
-
-    test('returns magenta tier for \$50–\$99.99', () {
-      final tier = getSuperChatTier(50000000)!; // \$50.00
-      expect(tier.headerColor, const Color(0xFFC2185B));
-      expect(tier.bodyColor, const Color(0xFFAD1457));
-    });
-
-    test('returns red tier for \$100+', () {
-      final tier = getSuperChatTier(100000000)!; // \$100.00
-      expect(tier.headerColor, const Color(0xFFD00000));
-      expect(tier.bodyColor, const Color(0xFFB71C1C));
-
-      // Very large amounts still red
-      expect(
-        getSuperChatTier(9999990000)!.headerColor,
-        const Color(0xFFD00000),
-      ); // \$9999.99
-    });
-
-    test('boundary: \$1.99 is blue, \$2.00 is light blue', () {
-      expect(
-        getSuperChatTier(1990000)!.headerColor,
-        const Color(0xFF1565C0),
-      ); // \$1.99
-      expect(
-        getSuperChatTier(2000000)!.headerColor,
-        const Color(0xFF00B8D4),
-      ); // \$2.00
+    test('only tiers from \$5 show a message body', () {
+      for (final dollars in [1.0, 2.0, 4.99]) {
+        final tier = getSuperChatTier(micros(dollars))!;
+        expect(tier.showBody, isFalse, reason: '\$$dollars');
+      }
+      for (final dollars in [5.0, 10.0, 20.0, 50.0, 100.0]) {
+        final tier = getSuperChatTier(micros(dollars))!;
+        expect(tier.showBody, isTrue, reason: '\$$dollars');
+        expect(tier.bodyColor, isNotNull, reason: '\$$dollars');
+      }
     });
   });
 

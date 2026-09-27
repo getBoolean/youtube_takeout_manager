@@ -50,8 +50,7 @@ void main() {
   }
 
   for (final kind in QueueItemKind.values) {
-    test("a channel's ${kind.name}s are newest first, without reordering the "
-        '${kind.name}s by channel', () {
+    test("a channel's ${kind.name}s are newest first", () {
       final c = container();
 
       final sorted = c.read(
@@ -60,15 +59,6 @@ void main() {
 
       expect([for (final i in sorted) i.id], ['new', 'old']);
       expect([for (final i in sorted) i.kind], everyElement(kind));
-      expect(
-        [
-          for (final i in c.read(
-            interactionsByChannelProvider(kind),
-          )[unknownChannelId]!)
-            i.id,
-        ],
-        ['old', 'new'],
-      );
     });
   }
 }

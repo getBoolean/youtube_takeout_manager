@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_status_style.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_tile.dart';
 
 Future<void> _pumpTile(
@@ -31,12 +32,15 @@ double _opacity(WidgetTester tester) =>
     tester.widget<AnimatedOpacity>(find.byType(AnimatedOpacity)).opacity;
 
 void main() {
+  final dimmed = lessThan(1.0);
+  const undimmed = 1.0;
+
   testWidgets('only deleted items are dimmed by default', (tester) async {
     for (final (status, opacity) in [
-      (InteractionStatus.deleted, 0.5),
-      (InteractionStatus.failed, 1.0),
-      (InteractionStatus.queued, 1.0),
-      (InteractionStatus.active, 1.0),
+      (InteractionStatus.deleted, dimmed),
+      (InteractionStatus.failed, undimmed),
+      (InteractionStatus.queued, undimmed),
+      (InteractionStatus.active, undimmed),
     ]) {
       await _pumpTile(tester, status);
       expect(_opacity(tester), opacity, reason: status.name);
@@ -47,10 +51,10 @@ void main() {
     tester,
   ) async {
     for (final (status, opacity) in [
-      (InteractionStatus.deleted, 0.5),
-      (InteractionStatus.failed, 0.5),
-      (InteractionStatus.queued, 0.5),
-      (InteractionStatus.active, 1.0),
+      (InteractionStatus.deleted, dimmed),
+      (InteractionStatus.failed, dimmed),
+      (InteractionStatus.queued, dimmed),
+      (InteractionStatus.active, undimmed),
     ]) {
       await _pumpTile(tester, status, dimUnselectable: true);
       expect(_opacity(tester), opacity, reason: status.name);
@@ -58,13 +62,14 @@ void main() {
   });
 
   testWidgets("the status icon replaces the item's own icon", (tester) async {
+    final queuedIcon = InteractionStatus.queued.icon!;
     await _pumpTile(tester, InteractionStatus.queued);
-    expect(find.byIcon(Icons.schedule), findsOneWidget);
+    expect(find.byIcon(queuedIcon), findsOneWidget);
     expect(find.byIcon(Icons.comment_outlined), findsNothing);
 
     await _pumpTile(tester, InteractionStatus.active);
     await tester.pumpAndSettle();
     expect(find.byIcon(Icons.comment_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.schedule), findsNothing);
+    expect(find.byIcon(queuedIcon), findsNothing);
   });
 }

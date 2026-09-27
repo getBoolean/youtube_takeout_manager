@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/delete
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_selection_controller.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction_status.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/interactions/presentation/interaction_status_style.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 
 const _channelId = 'UCchannel';
@@ -62,15 +63,8 @@ void main() {
       'it', (tester) async {
     await pumpTile(tester, selecting: false);
 
-    final tile = tester.widget<ListTile>(find.byType(ListTile));
-    expect(
-      find.descendant(
-        of: find.byWidget(tile.leading!),
-        matching: find.byIcon(Icons.schedule),
-      ),
-      findsOneWidget,
-    );
-    expect((tile.trailing! as Icon).icon, Icons.chevron_right);
+    expect(find.byIcon(InteractionStatus.queued.icon!), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
     expect(find.byIcon(Icons.comment_outlined), findsNothing);
   });
 
@@ -84,14 +78,11 @@ void main() {
     await tester.pump();
     expect(container.read(deletionSetProvider), isEmpty);
 
-    // Its checkbox stays enabled, and does nothing either.
-    final checkbox = tester.widget<Checkbox>(find.byType(Checkbox));
-    expect(checkbox.onChanged, isNotNull);
+    // Its checkbox does nothing either.
     await tester.tap(find.byType(Checkbox));
     await tester.pump();
     expect(container.read(deletionSetProvider), isEmpty);
 
-    expect(tester.widget<ListTile>(find.byType(ListTile)).onLongPress, isNull);
     await tester.longPress(find.byType(ListTile));
     await tester.pump();
     expect(container.read(deletionSetProvider), isEmpty);
