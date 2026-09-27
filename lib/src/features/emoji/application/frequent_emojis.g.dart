@@ -39,7 +39,7 @@ final class FrequentEmojisProvider
   FrequentEmojis create() => FrequentEmojis();
 }
 
-String _$frequentEmojisHash() => r'f453a2123fcdd10d4710da5660bf5906132652ac';
+String _$frequentEmojisHash() => r'f40e9ea94724f9841499f9872b3ba2ad1f98dcfb';
 
 /// Emojis the user inserted into a search, most used first (ties: most
 /// recent). Once full, the least recently used entry makes room for a new one.

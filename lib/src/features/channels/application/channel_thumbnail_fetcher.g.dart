@@ -9,19 +9,22 @@ part of 'channel_thumbnail_fetcher.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of 10 as they appear, and the rest once video titles are done.
+/// batches of [thumbnailBatchSize] as they appear, and the rest once video
+/// titles are done.
 /// An effect: nothing depends on it, so it can read any provider.
 
 @ProviderFor(ChannelThumbnailFetcher)
 final channelThumbnailFetcherProvider = ChannelThumbnailFetcherProvider._();
 
 /// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of 10 as they appear, and the rest once video titles are done.
+/// batches of [thumbnailBatchSize] as they appear, and the rest once video
+/// titles are done.
 /// An effect: nothing depends on it, so it can read any provider.
 final class ChannelThumbnailFetcherProvider
     extends $NotifierProvider<ChannelThumbnailFetcher, void> {
   /// Fetches pictures for the channels the viewed channel interacted with, in
-  /// batches of 10 as they appear, and the rest once video titles are done.
+  /// batches of [thumbnailBatchSize] as they appear, and the rest once video
+  /// titles are done.
   /// An effect: nothing depends on it, so it can read any provider.
   ChannelThumbnailFetcherProvider._()
     : super(
@@ -51,10 +54,11 @@ final class ChannelThumbnailFetcherProvider
 }
 
 String _$channelThumbnailFetcherHash() =>
-    r'7e47eaff2976135eadc6367f7e25496bc4e77440';
+    r'41e549691f80485b4cce60798ffa0a9bc0d894f3';
 
 /// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of 10 as they appear, and the rest once video titles are done.
+/// batches of [thumbnailBatchSize] as they appear, and the rest once video
+/// titles are done.
 /// An effect: nothing depends on it, so it can read any provider.
 
 abstract class _$ChannelThumbnailFetcher extends $Notifier<void> {
