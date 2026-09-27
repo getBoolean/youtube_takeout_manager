@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_parser.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_summary_parser.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -107,5 +108,33 @@ void main() {
     expect(data.skippedLiveChatRows, 3);
     expect(data.commentsSnapshot, isNull);
     expect(data.liveChatsSnapshot, isNull);
+  });
+
+  test('history saved by its first version still loads', () {
+    final history = parseSavedHistory({
+      '_history/watches.csv': _bytes(
+        'Time,Kind,Music,Title,URL,Channel Title,Channel URL,Removed At\r\n'
+        '2026-04-12T07:33:54.000Z,video,false,A video,'
+        'https://www.youtube.com/watch?v=abc,Shortcat,'
+        'https://www.youtube.com/channel/UCsc,\r\n'
+        '2026-04-11T00:00:00.000Z,video,true,,'
+        'https://music.youtube.com/watch?v=gone,,,2026-05-01T00:00:00.000Z\r\n',
+      ),
+      '_history/searches.csv': _bytes(
+        'Time,Music,Query,Removed At\r\n'
+        '2026-04-12T00:00:00.000Z,false,cats,\r\n',
+      ),
+      '_history/meta.csv': _bytes(
+        'Watches Exported At,Searches Exported At\r\n'
+        '2026-05-01T00:00:00.000Z,2026-04-20T00:00:00.000Z\r\n',
+      ),
+    });
+
+    expect(history.watches.map((w) => w.title), ['A video', null]);
+    expect(history.watches.last.music, isTrue);
+    expect(history.watches.last.removedAt, DateTime.utc(2026, 5));
+    expect(history.searches.single.query, 'cats');
+    expect(history.watchesSnapshot, DateTime.utc(2026, 5));
+    expect(history.searchesSnapshot, DateTime.utc(2026, 4, 20));
   });
 }
