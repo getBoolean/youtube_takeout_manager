@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -54,6 +55,31 @@ class _Lookups extends YoutubeEmojiNameRepository {
 EmojiNameCacheRepository _cache() =>
     EmojiNameCacheRepository(KvStorageService());
 
+/// A test whose timers run in fake time, so the resolver's pause between
+/// videos passes at once.
+void testInFakeTime(String description, Future<void> Function() body) {
+  test(description, () {
+    fakeAsync((async) {
+      var done = false;
+      Object? error;
+      StackTrace? stackTrace;
+      body().then(
+        (_) => done = true,
+        onError: (Object e, StackTrace s) {
+          (error, stackTrace, done) = (e, s, true);
+        },
+      );
+      for (var i = 0; !done && i < 600; i++) {
+        async.elapse(const Duration(seconds: 1));
+      }
+      if (error case final error?) {
+        Error.throwWithStackTrace(error, stackTrace!);
+      }
+      expect(done, isTrue, reason: 'The test never finished');
+    });
+  });
+}
+
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
@@ -93,7 +119,7 @@ void main() {
   bool paused(ProviderContainer c) =>
       c.read(emojiNamesProvider).requireValue.lookupUnavailable;
 
-  test('looks up names and remembers which videos it read', () async {
+  testInFakeTime('looks up names and remembers which videos it read', () async {
     final lookups = _Lookups(EmojiLookupStatus.ok);
     final c = await launch(lookups, ['v1']);
 
@@ -102,26 +128,32 @@ void main() {
     expect((await _cache().loadAttempts()).keys, ['v1']);
   });
 
-  test('pauses lookups when YouTube keeps answering in an unexpected format, '
-      'also on the next launch', () async {
-    final videos = [for (var i = 0; i < 10; i++) 'v$i'];
-    final lookups = _Lookups(EmojiLookupStatus.unexpectedFormat);
-    final c = await launch(lookups, videos);
+  testInFakeTime(
+    'pauses lookups when YouTube keeps answering in an unexpected format, '
+    'also on the next launch',
+    () async {
+      final videos = [for (var i = 0; i < 10; i++) 'v$i'];
+      final lookups = _Lookups(EmojiLookupStatus.unexpectedFormat);
+      final c = await launch(lookups, videos);
 
-    expect(lookups.videos.length, lessThan(videos.length));
-    expect(paused(c), isTrue);
-    expect(await _cache().loadPausedUntil(), isNotNull);
-    expect((await _cache().loadPausedUntil())!.isAfter(DateTime.now()), isTrue);
-    // Not counted as read, so they're retried once the pause ends.
-    expect(await _cache().loadAttempts(), isEmpty);
+      expect(lookups.videos.length, lessThan(videos.length));
+      expect(paused(c), isTrue);
+      expect(await _cache().loadPausedUntil(), isNotNull);
+      expect(
+        (await _cache().loadPausedUntil())!.isAfter(DateTime.now()),
+        isTrue,
+      );
+      // Not counted as read, so they're retried once the pause ends.
+      expect(await _cache().loadAttempts(), isEmpty);
 
-    final nextLaunch = _Lookups(EmojiLookupStatus.ok);
-    final next = await launch(nextLaunch, videos, looksUp: false);
-    expect(nextLaunch.videos, isEmpty);
-    expect(paused(next), isTrue);
-  });
+      final nextLaunch = _Lookups(EmojiLookupStatus.ok);
+      final next = await launch(nextLaunch, videos, looksUp: false);
+      expect(nextLaunch.videos, isEmpty);
+      expect(paused(next), isTrue);
+    },
+  );
 
-  test('looks up again once a pause has ended', () async {
+  testInFakeTime('looks up again once a pause has ended', () async {
     await _cache().savePausedUntil(
       DateTime.now().subtract(const Duration(minutes: 1)),
     );
@@ -132,31 +164,37 @@ void main() {
     expect(paused(c), isFalse);
   });
 
-  test('skips videos read recently, and reads them again much later', () async {
-    final now = DateTime.now();
-    await _cache().saveAttempts({
-      'recent': now.subtract(const Duration(hours: 1)),
-      'old': now.subtract(const Duration(days: 365)),
-    });
-    final lookups = _Lookups(EmojiLookupStatus.ok);
-    await launch(lookups, ['recent', 'old']);
+  testInFakeTime(
+    'skips videos read recently, and reads them again much later',
+    () async {
+      final now = DateTime.now();
+      await _cache().saveAttempts({
+        'recent': now.subtract(const Duration(hours: 1)),
+        'old': now.subtract(const Duration(days: 365)),
+      });
+      final lookups = _Lookups(EmojiLookupStatus.ok);
+      await launch(lookups, ['recent', 'old']);
 
-    expect(lookups.videos, ['old']);
-  });
+      expect(lookups.videos, ['old']);
+    },
+  );
 
-  test('gives up for now when YouTube keeps being unreachable, and tries '
-      'again next launch', () async {
-    final videos = [for (var i = 0; i < 10; i++) 'v$i'];
-    final lookups = _Lookups(EmojiLookupStatus.networkError);
-    final c = await launch(lookups, videos);
+  testInFakeTime(
+    'gives up for now when YouTube keeps being unreachable, and tries '
+    'again next launch',
+    () async {
+      final videos = [for (var i = 0; i < 10; i++) 'v$i'];
+      final lookups = _Lookups(EmojiLookupStatus.networkError);
+      final c = await launch(lookups, videos);
 
-    expect(lookups.videos.length, lessThan(videos.length));
-    expect(paused(c), isFalse);
-    expect(await _cache().loadAttempts(), isEmpty);
-    expect(await _cache().loadPausedUntil(), isNull);
+      expect(lookups.videos.length, lessThan(videos.length));
+      expect(paused(c), isFalse);
+      expect(await _cache().loadAttempts(), isEmpty);
+      expect(await _cache().loadPausedUntil(), isNull);
 
-    final nextLaunch = _Lookups(EmojiLookupStatus.ok);
-    await launch(nextLaunch, videos.take(1).toList());
-    expect(nextLaunch.videos, ['v0']);
-  });
+      final nextLaunch = _Lookups(EmojiLookupStatus.ok);
+      await launch(nextLaunch, videos.take(1).toList());
+      expect(nextLaunch.videos, ['v0']);
+    },
+  );
 }
