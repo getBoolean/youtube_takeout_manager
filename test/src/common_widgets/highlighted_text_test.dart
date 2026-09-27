@@ -50,6 +50,12 @@ void main() {
 
     await pumpText(tester, 'İstanbul', 'istan');
     expect(textMatches(tester), ['İstan']);
+
+    await pumpText(tester, 'Xin chào Việt Nam', 'viet');
+    expect(textMatches(tester), ['Việt']);
+
+    await pumpText(tester, 'قال مَرْحَبًا', 'مرحبا');
+    expect(textMatches(tester), ['مَرْحَبًا']);
   });
 
   testWidgets('marks matched emojis instead of styling them', (tester) async {

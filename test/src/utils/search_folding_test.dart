@@ -26,6 +26,31 @@ void main() {
       expect(foldForSearch('Æsir'), foldForSearch('aesir'));
     });
 
+    test('ignores accents in any Latin letter', () {
+      expect(foldForSearch('Tiếng Việt'), foldForSearch('tieng viet'));
+      expect(foldForSearch('ơn ưu Ǎ'), foldForSearch('on uu a'));
+      expect(foldForSearch('Ștefan Țara'), foldForSearch('stefan tara'));
+      expect(foldForSearch('Łódź Đà Ħ'), foldForSearch('lodz da h'));
+    });
+
+    test('ignores accents in Greek and Cyrillic', () {
+      expect(foldForSearch('Καλημέρα ώρα ΐ'), foldForSearch('καλημερα ωρα ι'));
+      expect(foldForSearch('λόγος'), foldForSearch('λογοσ'));
+      expect(foldForSearch('Ёлка'), foldForSearch('елка'));
+    });
+
+    test('ignores Hebrew and Arabic vowel marks', () {
+      expect(foldForSearch('שָׁלוֹם'), foldForSearch('שלום'));
+      expect(foldForSearch('مَرْحَبًا'), foldForSearch('مرحبا'));
+      expect(foldForSearch('أحمد إسلام آمن'), foldForSearch('احمد اسلام امن'));
+    });
+
+    test('keeps letters that only look accented apart', () {
+      // Voiced kana and Hangul syllables are letters of their own.
+      expect(foldForSearch('が'), isNot(foldForSearch('か')));
+      expect(foldForSearch('한국'), '한국');
+    });
+
     test('matches a dotted capital I', () {
       expect(foldForSearch('İstanbul'), foldForSearch('istanbul'));
     });
