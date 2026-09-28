@@ -19,6 +19,12 @@ DateTime quotaPeriodStart(DateTime now) {
       : standardMidnight;
 }
 
+/// The start of the quota period after the one starting at [periodStart],
+/// as UTC: the next midnight Pacific, which is 23 or 25 hours away on the
+/// days the clocks change.
+DateTime nextQuotaPeriodStart(DateTime periodStart) =>
+    quotaPeriodStart(periodStart.add(const Duration(hours: 25)));
+
 /// Whether US Pacific time is on daylight time at [utc].
 bool _isPacificDst(DateTime utc) {
   final year = utc.year;

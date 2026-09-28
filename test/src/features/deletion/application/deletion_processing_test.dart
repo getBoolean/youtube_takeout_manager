@@ -18,6 +18,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_it
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/data/quota_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
@@ -230,6 +231,18 @@ void main() {
       expect(items['af']!.status, DeletionItemStatus.failed);
       expect(quota.state.usageFor(QuotaOperation.deleteComment), 0);
       expect(c.read(deletionProcessingProvider), DeletionProcessingState.idle);
+    });
+
+    test('a delete refused for quota shows the quota used up', () async {
+      final c = await start(
+        [_item('a1')],
+        answers: {'a1': _Answer.quotaExceeded},
+      );
+
+      await process(c);
+
+      expect(quota.state.usedUp, isTrue);
+      expect(c.read(quotaProvider).requireValue.unitsRemaining, 0);
     });
 
     test(

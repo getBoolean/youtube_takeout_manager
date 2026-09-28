@@ -39,12 +39,20 @@ class QuotaStateMapper extends ClassMapperBase<QuotaState> {
     opt: true,
     def: dailyQuotaLimit,
   );
+  static bool _$usedUp(QuotaState v) => v.usedUp;
+  static const Field<QuotaState, bool> _f$usedUp = Field(
+    'usedUp',
+    _$usedUp,
+    opt: true,
+    def: false,
+  );
 
   @override
   final MappableFields<QuotaState> fields = const {
     #usageByOperation: _f$usageByOperation,
     #periodStart: _f$periodStart,
     #dailyLimit: _f$dailyLimit,
+    #usedUp: _f$usedUp,
   };
 
   @override
@@ -54,6 +62,7 @@ class QuotaStateMapper extends ClassMapperBase<QuotaState> {
       usageByOperation: data.dec(_f$usageByOperation),
       periodStart: data.dec(_f$periodStart),
       dailyLimit: data.dec(_f$dailyLimit),
+      usedUp: data.dec(_f$usedUp),
     );
   }
 
@@ -123,6 +132,7 @@ abstract class QuotaStateCopyWith<$R, $In extends QuotaState, $Out>
     Map<QuotaOperation, int>? usageByOperation,
     DateTime? periodStart,
     int? dailyLimit,
+    bool? usedUp,
   });
   QuotaStateCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
@@ -147,11 +157,13 @@ class _QuotaStateCopyWithImpl<$R, $Out>
     Map<QuotaOperation, int>? usageByOperation,
     DateTime? periodStart,
     int? dailyLimit,
+    bool? usedUp,
   }) => $apply(
     FieldCopyWithData({
       if (usageByOperation != null) #usageByOperation: usageByOperation,
       if (periodStart != null) #periodStart: periodStart,
       if (dailyLimit != null) #dailyLimit: dailyLimit,
+      if (usedUp != null) #usedUp: usedUp,
     }),
   );
   @override
@@ -159,6 +171,7 @@ class _QuotaStateCopyWithImpl<$R, $Out>
     usageByOperation: data.get(#usageByOperation, or: $value.usageByOperation),
     periodStart: data.get(#periodStart, or: $value.periodStart),
     dailyLimit: data.get(#dailyLimit, or: $value.dailyLimit),
+    usedUp: data.get(#usedUp, or: $value.usedUp),
   );
 
   @override

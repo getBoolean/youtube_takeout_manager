@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../data/video_cache_repository.dart';
@@ -26,7 +29,11 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   final sessionChannelId = ref.watch(readSessionChannelIdProvider);
   final takeout = ref.watch(viewedTakeoutProvider).value;
   final extraIds = ref.watch(extraVideoIdsProvider);
-  if (sessionChannelId == null || takeout == null) return;
+  // Nothing is asked for while YouTube says the quota is used up.
+  final usedUp = ref.watch(
+    quotaProvider.select((quota) => quota.value?.usedUp ?? false),
+  );
+  if (sessionChannelId == null || takeout == null || usedUp) return;
 
   final cache = ref.read(videoCacheRepositoryProvider);
   final videos = ref.read(videoMetadataProvider.notifier);
@@ -38,6 +45,8 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
     ...extraIds,
   };
   final notFoundIds = await cache.loadNotFoundIds();
+  // Still loading when first watched above.
+  if ((await ref.read(quotaProvider.future)).usedUp) return;
   final uncachedIds = videoIds
       .difference(cached.keys.toSet())
       .difference(notFoundIds);
@@ -75,6 +84,12 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
       yield null;
     }
   } catch (e) {
+    if (isQuotaExceeded(e)) {
+      // Keep what was fetched; the rest isn't gone, just not asked for
+      // until the quota is back.
+      await quota.markUsedUp();
+      return;
+    }
     if (!isSignInFailure(e)) rethrow;
     // Keep what was fetched, but don't take the rest to be gone: the
     // sign-in failed, not the videos.

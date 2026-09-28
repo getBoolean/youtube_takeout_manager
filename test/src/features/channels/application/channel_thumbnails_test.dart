@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:googleapis/youtube/v3.dart' show DetailedApiRequestError;
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +41,9 @@ class _Channels extends YoutubeChannelRepository {
   /// How many requests fail, as when offline, before they work.
   int failures;
 
+  /// Whether YouTube refuses requests, the day's quota used up.
+  bool quotaUsedUp = false;
+
   /// The channels each request asked for.
   final requests = <List<String>>[];
 
@@ -65,6 +69,9 @@ class _Channels extends YoutubeChannelRepository {
     if (failures > 0) {
       failures--;
       throw http.ClientException('offline');
+    }
+    if (quotaUsedUp) {
+      throw DetailedApiRequestError(403, 'You have exceeded your quota.');
     }
     if (signInFails) {
       throw ServerRequestFailedException(
@@ -418,6 +425,27 @@ void main() {
       await fetcher.fetchNow(ids);
 
       expect(channels.requests[1], channels.requests[0]);
+    });
+
+    test('a request refused for quota shows it used up, and nothing more is '
+        'asked for until it is back', () async {
+      final channels = _Channels()..quotaUsedUp = true;
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+
+      await fetcher.fetchNow(['UCa']);
+      expect((await c.read(quotaProvider.future)).usedUp, isTrue);
+      await fetcher.fetchNow(['UCa', 'UCb']);
+      expect(channels.requests, hasLength(1));
+
+      channels.quotaUsedUp = false;
+      await c.read(quotaProvider.notifier).resetUsage();
+      await fetcher.fetchNow(const []);
+      expect(c.read(channelThumbnailsProvider).value, hasLength(2));
     });
 
     test('asks again later for channels a failed request was for', () async {

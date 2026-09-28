@@ -31,10 +31,20 @@ class QuotaNotifier extends _$QuotaNotifier {
     await _repository.saveQuotaState(updated);
   }
 
+  /// Notes that YouTube refused a request because the quota is used up, so
+  /// none is left until the next period.
+  Future<void> markUsedUp() async {
+    final current = await future;
+    if (current.usedUp) return;
+    final updated = current.copyWith(usedUp: true);
+    state = AsyncData(updated);
+    await _repository.saveQuotaState(updated);
+  }
+
   /// Resets all quota usage to zero.
   Future<void> resetUsage() async {
     final current = await future;
-    final updated = current.copyWith(usageByOperation: {});
+    final updated = current.copyWith(usageByOperation: {}, usedUp: false);
     state = AsyncData(updated);
     await _repository.saveQuotaState(updated);
   }

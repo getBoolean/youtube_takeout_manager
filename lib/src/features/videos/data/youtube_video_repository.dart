@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 
 import '../domain/video.dart';
 
@@ -64,8 +65,9 @@ class YoutubeVideoRepository {
           );
         }
       } catch (e) {
-        // A sign-in that stopped working fails every batch; let it through.
-        if (isSignInFailure(e)) rethrow;
+        // A sign-in that stopped working, or a quota used up, fails every
+        // batch; let it through.
+        if (isSignInFailure(e) || isQuotaExceeded(e)) rethrow;
         // Continue with remaining batches on error
       }
 

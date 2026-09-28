@@ -13,14 +13,21 @@ class QuotaState with QuotaStateMappable {
   final DateTime periodStart;
   final int dailyLimit;
 
+  /// Whether YouTube refused a request because the quota is used up: then
+  /// none is left until the next period, whatever was counted here, as
+  /// other apps may share it.
+  final bool usedUp;
+
   const QuotaState({
     required this.usageByOperation,
     required this.periodStart,
     this.dailyLimit = dailyQuotaLimit,
+    this.usedUp = false,
   });
 
   int get unitsUsed => usageByOperation.values.fold(0, (a, b) => a + b);
-  int get unitsRemaining => (dailyLimit - unitsUsed).clamp(0, dailyLimit);
+  int get unitsRemaining =>
+      usedUp ? 0 : (dailyLimit - unitsUsed).clamp(0, dailyLimit);
 
   bool canAfford(int cost) => unitsRemaining >= cost;
   int affordableOperations(int costPerOp) => unitsRemaining ~/ costPerOp;

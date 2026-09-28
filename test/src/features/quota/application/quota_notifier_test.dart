@@ -90,4 +90,50 @@ void main() {
       QuotaOperation.deleteLiveChat.cost,
     );
   });
+
+  test('once YouTube says the quota is used up, none is left, even after a '
+      'restart', () async {
+    final c = container();
+    await c.read(quotaProvider.future);
+
+    await c.read(quotaProvider.notifier).markUsedUp();
+
+    for (final state in [
+      c.read(quotaProvider).requireValue,
+      await container().read(quotaProvider.future),
+    ]) {
+      expect(state.usedUp, isTrue);
+      expect(state.unitsRemaining, 0);
+      expect(state.canAfford(1), isFalse);
+    }
+  });
+
+  test('a quota YouTube said was used up is back in the next period', () async {
+    final c = container();
+    await c.read(quotaProvider.future);
+    await c.read(quotaProvider.notifier).markUsedUp();
+
+    final stored = c.read(quotaProvider).requireValue;
+    await c
+        .read(quotaRepositoryProvider)
+        .saveQuotaState(
+          stored.copyWith(
+            periodStart: stored.periodStart.subtract(const Duration(days: 1)),
+          ),
+        );
+    await c.read(quotaProvider.notifier).resetIfNewDay();
+
+    expect(c.read(quotaProvider).requireValue.usedUp, isFalse);
+    expect(c.read(quotaProvider).requireValue.unitsRemaining, dailyQuotaLimit);
+  });
+
+  test('resetting usage gives back a quota YouTube said was used up', () async {
+    final c = container();
+    await c.read(quotaProvider.future);
+    await c.read(quotaProvider.notifier).markUsedUp();
+
+    await c.read(quotaProvider.notifier).resetUsage();
+
+    expect(c.read(quotaProvider).requireValue.usedUp, isFalse);
+  });
 }

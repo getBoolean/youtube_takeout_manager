@@ -90,4 +90,27 @@ void main() {
       });
     });
   });
+
+  group('nextQuotaPeriodStart', () {
+    test('is the next midnight Pacific', () {
+      expect(
+        nextQuotaPeriodStart(DateTime.utc(2026, 1, 15, 8)),
+        DateTime.utc(2026, 1, 16, 8),
+      );
+    });
+
+    test('is midnight daylight time after the clocks go forward', () {
+      expect(
+        nextQuotaPeriodStart(DateTime.utc(2026, 3, 8, 8)),
+        DateTime.utc(2026, 3, 9, 7),
+      );
+    });
+
+    test('is midnight standard time after the clocks go back', () {
+      expect(
+        nextQuotaPeriodStart(DateTime.utc(2026, 11, 1, 7)),
+        DateTime.utc(2026, 11, 2, 8),
+      );
+    });
+  });
 }

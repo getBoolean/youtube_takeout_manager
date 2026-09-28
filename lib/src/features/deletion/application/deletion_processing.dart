@@ -149,6 +149,7 @@ class DeletionProcessing extends _$DeletionProcessing {
         await ref.read(signInServiceProvider.notifier).signInFailed(channelId);
         return false;
       case QuotaExceeded(:final message):
+        await ref.read(quotaProvider.notifier).markUsedUp();
         await queue.updateItem(
           item.id,
           item.copyWith(

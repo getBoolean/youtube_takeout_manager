@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../application/quota_notifier.dart';
 import '../domain/quota_operation.dart';
+import '../domain/quota_period.dart';
 
 const _progressMorphDuration = Duration(milliseconds: 450);
 const _colorMorphDuration = Duration(milliseconds: 250);
@@ -22,6 +23,9 @@ class QuotaStatusBar extends ConsumerWidget {
     this.compact = false,
   });
 
+  /// On the line saying YouTube has said today's quota is used up.
+  static const usedUpKey = ValueKey('quota-used-up');
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final quotaAsync = ref.watch(quotaProvider);
@@ -33,7 +37,15 @@ class QuotaStatusBar extends ConsumerWidget {
         final used = quota.unitsUsed;
         final total = quota.dailyLimit;
         final remaining = quota.unitsRemaining;
-        final progress = total > 0 ? used / total : 0.0;
+        // Full once YouTube says so, whatever was counted here.
+        final progress = quota.usedUp
+            ? 1.0
+            : total > 0
+            ? used / total
+            : 0.0;
+        final resets = DateFormat.jm().format(
+          nextQuotaPeriodStart(quota.periodStart).toLocal(),
+        );
         final deletesAffordable = quota.affordableOperations(
           QuotaOperation.deleteCost,
         );
@@ -85,12 +97,16 @@ class QuotaStatusBar extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  Intl.plural(
-                    deletesAffordable,
-                    one: 'YouTube API · ~1 delete left today',
-                    other:
-                        'YouTube API · ~$deletesAffordable deletes left today',
-                  ),
+                  key: quota.usedUp ? usedUpKey : null,
+                  quota.usedUp
+                      ? 'YouTube API · used up until $resets'
+                      : Intl.plural(
+                          deletesAffordable,
+                          one: 'YouTube API · ~1 delete left today',
+                          other:
+                              'YouTube API · ~$deletesAffordable deletes left '
+                              'today',
+                        ),
                   style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
@@ -119,16 +135,30 @@ class QuotaStatusBar extends ConsumerWidget {
                 alignment: WrapAlignment.spaceBetween,
                 spacing: 8,
                 children: [
-                  Text(
-                    '$used / $total units used today',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  Text(
-                    '$remaining remaining (~$deletesAffordable deletes)',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w500,
+                  if (quota.usedUp) ...[
+                    Text(
+                      "YouTube says today's quota is used up",
+                      key: usedUpKey,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  ),
+                    Text(
+                      'Resets at $resets',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '$used / $total units used today',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    Text(
+                      '$remaining remaining (~$deletesAffordable deletes)',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ],
               ),
               if (parts.isNotEmpty) ...[

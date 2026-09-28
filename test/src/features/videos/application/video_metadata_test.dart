@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
+import 'package:googleapis/youtube/v3.dart' show DetailedApiRequestError;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -42,10 +43,19 @@ class _Videos extends YoutubeVideoRepository {
   /// Keeps each fetch from asking for its second batch until completed.
   final Completer<void>? hold;
 
+  /// Whether YouTube refuses every request after the first, its quota used
+  /// up.
+  final bool quotaRunsOut;
+
   /// The IDs asked for, per fetch.
   final requested = <Set<String>>[];
 
-  _Videos({this.signInFails = false, this.existing, this.hold});
+  _Videos({
+    this.signInFails = false,
+    this.existing,
+    this.hold,
+    this.quotaRunsOut = false,
+  });
 
   @override
   Stream<Video> fetchVideoMetadataStream(
@@ -65,6 +75,9 @@ class _Videos extends YoutubeVideoRepository {
     final ids = videoIds.toList();
     for (var i = 0; i < ids.length; i += size) {
       if (i > 0) await hold?.future;
+      if (i > 0 && quotaRunsOut) {
+        throw DetailedApiRequestError(403, 'You have exceeded your quota.');
+      }
       onResponse?.call();
       for (final id in ids.skip(i).take(size)) {
         if ((existing ?? const {'v1'}).contains(id)) {
@@ -191,6 +204,34 @@ void main() {
         {'vNew'},
       ]);
     });
+
+    test('running out of quota shows it used up, keeping what was fetched, '
+        'and the rest for another day', () async {
+      final (c, _, _) = await load(
+        takeout: _takeoutOn(ids),
+        videos: _Videos(existing: existing, quotaRunsOut: true),
+      );
+
+      expect((await c.read(quotaProvider.future)).usedUp, isTrue);
+      final cache = c.read(videoCacheRepositoryProvider);
+      expect(await cache.loadCachedVideos(), isNotEmpty);
+      expect(await cache.loadNotFoundIds(), isEmpty);
+    });
+
+    test(
+      'while the quota is used up, no video details are asked for',
+      () async {
+        await load(
+          takeout: _takeoutOn(ids),
+          videos: _Videos(existing: existing, quotaRunsOut: true),
+        );
+
+        final again = _Videos(existing: existing);
+        await load(takeout: _takeoutOn(ids), videos: again);
+
+        expect(again.requested, isEmpty);
+      },
+    );
 
     test('extra videos, like those of a takeout being reviewed, are fetched '
         'too', () async {

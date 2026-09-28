@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 import '../domain/deletion_outcome.dart';
 
 part 'youtube_deletion_repository.g.dart';
@@ -29,17 +30,8 @@ class YoutubeDeletionRepository {
     } catch (e) {
       if (isSignInFailure(e)) return const SignInFailed();
       if (e is DetailedApiRequestError) {
-        final isQuota =
-            e.status == 403 &&
-            (e.message?.contains('quota') == true ||
-                e.errors.any(
-                      (err) =>
-                          err.reason == 'quotaExceeded' ||
-                          err.reason == 'dailyLimitExceeded',
-                    ) ==
-                    true);
         final message = e.message ?? 'API error ${e.status}';
-        return isQuota ? QuotaExceeded(message) : Failed(message);
+        return isQuotaExceeded(e) ? QuotaExceeded(message) : Failed(message);
       }
       return Failed(e.toString());
     }

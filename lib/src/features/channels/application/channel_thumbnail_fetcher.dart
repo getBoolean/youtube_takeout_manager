@@ -7,6 +7,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../data/channel_cache_repository.dart';
@@ -119,6 +120,9 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
   Future<void> _fetchAll() async {
     final sessionChannelId = ref.read(readSessionChannelIdProvider);
     if (sessionChannelId == null) return;
+    final quota = ref.read(quotaProvider.notifier);
+    // Nothing is asked for while YouTube says the quota is used up.
+    if ((await ref.read(quotaProvider.future)).usedUp) return;
 
     final cache = ref.read(channelCacheRepositoryProvider);
     final notFound = _notFoundIds ??= await cache.loadNotFoundIds();
@@ -127,7 +131,6 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     _firstIds.removeAll(notFound);
     if (_pendingIds.isEmpty) return;
     final thumbnails = ref.read(channelThumbnailsProvider.notifier);
-    final quota = ref.read(quotaProvider.notifier);
     final channels = ref.read(youtubeChannelRepositoryProvider);
     final client = ref
         .read(googleAuthRepositoryProvider)
@@ -152,6 +155,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
             fetched = await channels.fetchChannelThumbnails(client, batch);
           } on Exception catch (e) {
             if (isSignInFailure(e)) rethrow;
+            if (isQuotaExceeded(e)) await quota.markUsedUp();
             // Offline or refused: asked for again next time, first, not
             // taken to be gone.
             final rest = [..._pendingIds];
