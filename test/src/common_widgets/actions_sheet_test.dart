@@ -5,7 +5,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/actions_sheet.dart';
 
 void main() {
   /// Opens a sheet of two options from a button, and returns what it picked.
-  Future<Future<int?>> openSheet(WidgetTester tester) async {
+  Future<Future<int?>> openSheet(WidgetTester tester, {Widget? header}) async {
     late Future<int?> picked;
     await tester.pumpWidget(
       MaterialApp(
@@ -14,6 +14,7 @@ void main() {
             builder: (context) => TextButton(
               onPressed: () => picked = showActionsSheet(
                 context,
+                header: header,
                 options: const [
                   SheetOption(1, Icons.open_in_new, 'First'),
                   SheetOption(2, Icons.copy, 'Second', 'With a subtitle'),
@@ -38,6 +39,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(await picked, 2);
+  });
+
+  testWidgets('shows what the options are for above them', (tester) async {
+    await openSheet(tester, header: const Text('A video'));
+
+    expect(
+      tester.getTopLeft(find.text('A video')).dy,
+      lessThan(tester.getTopLeft(find.text('First')).dy),
+    );
   });
 
   testWidgets('dismissing it returns nothing', (tester) async {

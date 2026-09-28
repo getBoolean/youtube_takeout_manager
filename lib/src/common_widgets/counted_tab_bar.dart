@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/cue_motion.dart';
 
@@ -33,9 +34,10 @@ class CountedTabLabel extends StatelessWidget {
   }
 }
 
-/// Tabs with counts. Shows the full labels when they fit, then icons with
-/// counts, then just icons, so every tab always stays on screen. A scrolling
-/// tab bar would hide some, and can't be scrolled with a mouse.
+/// Tabs with counts. Shows the full labels when they fit, then the names
+/// alone, then icons with counts, then just icons, so every tab always stays
+/// on screen. A scrolling tab bar would hide some, and can't be scrolled
+/// with a mouse.
 class CountedTabBar extends StatelessWidget implements PreferredSizeWidget {
   final TabController controller;
   final List<CountedTab> tabs;
@@ -76,11 +78,15 @@ class CountedTabBar extends StatelessWidget implements PreferredSizeWidget {
         // Each tab gets an equal share of the bar, less its label padding.
         final room =
             constraints.maxWidth / tabs.length - kTabLabelPadding.horizontal;
+        String count(CountedTab t) =>
+            NumberFormat.decimalPattern().format(t.count);
         final labelsFit = tabs.every(
-          (t) => textWidth('${t.label} (${t.count})') <= room,
+          (t) => textWidth('${t.label} (${count(t)})') <= room,
         );
+        // A name says more than a count, so counts go first.
+        final namesFit = tabs.every((t) => textWidth(t.label) <= room);
         final countsFit = tabs.every(
-          (t) => _iconSize + _iconGap + textWidth('${t.count}') <= room,
+          (t) => _iconSize + _iconGap + textWidth(count(t)) <= room,
         );
 
         return TabBar(
@@ -93,17 +99,19 @@ class CountedTabBar extends StatelessWidget implements PreferredSizeWidget {
                 child: labelsFit
                     ? CountedTabLabel(prefix: tab.label, count: tab.count)
                     : Tooltip(
-                        message: '${tab.label} (${tab.count})',
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(tab.icon, size: _iconSize),
-                            if (countsFit) ...[
-                              const SizedBox(width: _iconGap),
-                              AnimatedCountText(tab.count),
-                            ],
-                          ],
-                        ),
+                        message: '${tab.label} (${count(tab)})',
+                        child: namesFit
+                            ? Text(tab.label, maxLines: 1)
+                            : Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(tab.icon, size: _iconSize),
+                                  if (countsFit) ...[
+                                    const SizedBox(width: _iconGap),
+                                    AnimatedCountText(tab.count),
+                                  ],
+                                ],
+                              ),
                       ),
               ),
           ],

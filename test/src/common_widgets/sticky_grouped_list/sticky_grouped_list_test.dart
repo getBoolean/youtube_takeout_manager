@@ -259,6 +259,21 @@ void main() {
     expect(tester.getTopLeft(find.text('g900-i50')).dy, _headerHeight + 12);
   });
 
+  testWidgets('tells which group is at the top, pinned or not', (tester) async {
+    final h = await _pump(tester, groups: _groups(100, 20));
+    expect(h.controller.topGroupKey, 'g0');
+
+    // Each group is 50 + 20 * 40 = 850px: g5's header right at the top.
+    h.scroll.jumpTo(5 * 850);
+    await tester.pump();
+    expect(h.controller.topGroupKey, 'g5');
+
+    h.scroll.jumpTo(5 * 850 + 300);
+    await tester.pump();
+    expect(h.controller.topGroupKey, 'g5');
+    expect(h.controller.pinnedGroupKey, 'g5');
+  });
+
   test('only depends on Flutter', () {
     final dir = Directory('lib/src/common_widgets/sticky_grouped_list');
     final imports = [

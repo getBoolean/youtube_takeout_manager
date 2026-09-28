@@ -122,6 +122,13 @@ class _StickyGroupedListViewState<G, I, S>
         : widget.groupKey(widget.groups[group]);
   }
 
+  Object? get _topGroupKey {
+    final group = facts.topGroup;
+    return group == null || group >= widget.groups.length
+        ? null
+        : widget.groupKey(widget.groups[group]);
+  }
+
   @override
   void initState() {
     super.initState();

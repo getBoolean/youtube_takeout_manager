@@ -10,6 +10,10 @@ void main() {
     expect(formatDay(afternoon), 'Sun, Apr 12, 2026');
   });
 
+  test('a date reads month, day and year', () {
+    expect(formatDate(afternoon), 'Apr 12, 2026');
+  });
+
   test('a time reads as hours and minutes', () {
     expect(formatTime(afternoon), '2:05 PM');
   });

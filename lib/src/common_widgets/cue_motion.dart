@@ -1,5 +1,6 @@
 import 'package:cue/cue.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 /// Premium motion preset used across animated widgets in the app.
 ///
@@ -15,7 +16,9 @@ CueMotion premiumSpring(BuildContext context) {
 
 /// A [Text] that slides+fades the new value down from the top each time [count]
 /// changes. Used for badge counts, chip counts, and tab counts so numeric
-/// updates feel like a morph rather than a hard swap.
+/// updates feel like a morph rather than a hard swap. Grouped by thousands,
+/// e.g. "69,193". Grouped by
+/// thousands, e.g. "69,193".
 class AnimatedCountText extends StatelessWidget {
   final int count;
   final TextStyle? style;
@@ -30,7 +33,7 @@ class AnimatedCountText extends StatelessWidget {
       motion: premiumSpring(context),
       acts: const [OpacityAct.fadeIn(), SlideAct.y(from: -0.4)],
       child: Text(
-        '$count',
+        NumberFormat.decimalPattern().format(count),
         key: ValueKey(count),
         style: style,
         textAlign: textAlign,

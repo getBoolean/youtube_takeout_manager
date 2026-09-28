@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_ta
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_scope_dialog.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
+import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import '../../application/cross_channel_search_providers.dart';
 import '../../application/selection_providers.dart';
 
@@ -79,16 +80,12 @@ class ChannelListHeader extends ConsumerWidget {
               Expanded(
                 child: Text(
                   searching
-                      ? Intl.plural(
+                      ? formatCount(
                           matchCount,
-                          one: '1 matching comment or live chat',
-                          other: '$matchCount matching comments and live chats',
+                          'matching comment or live chat',
+                          plural: 'matching comments and live chats',
                         )
-                      : Intl.plural(
-                          channelCount,
-                          one: '1 channel',
-                          other: '$channelCount channels',
-                        ),
+                      : formatCount(channelCount, 'channel'),
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

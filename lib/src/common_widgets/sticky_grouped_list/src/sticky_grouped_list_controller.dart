@@ -35,6 +35,9 @@ class StickyGroupedListController extends ChangeNotifier {
   /// Key of the group whose header is currently pinned, if any.
   Object? get pinnedGroupKey => _view?._pinnedGroupKey;
 
+  /// Key of the group at the top of the list, pinned or not, if any.
+  Object? get topGroupKey => _view?._topGroupKey;
+
   /// Re-sends every live header state's current status through
   /// `updateHeaderState`, for when something outside the list that the
   /// update depends on has changed.
