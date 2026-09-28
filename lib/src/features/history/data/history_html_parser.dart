@@ -164,7 +164,10 @@ String _unescape(String text) {
       final code = name[1] == 'x'
           ? int.tryParse(name.substring(2), radix: 16)
           : int.tryParse(name.substring(1));
-      return code == null ? m[0]! : String.fromCharCode(code);
+      // Past the last code point it's no character; left as it is.
+      return code == null || code > 0x10FFFF
+          ? m[0]!
+          : String.fromCharCode(code);
     }
     return _namedEntities[name] ?? m[0]!;
   });

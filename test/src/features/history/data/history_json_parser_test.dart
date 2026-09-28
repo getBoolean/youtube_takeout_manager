@@ -128,9 +128,63 @@ void main() {
       final watches = _watches([
         _watched('a', 'マリオカート', verb: '', suffix: ' を視聴しました'),
         _watched('b', 'ホロライブ', verb: '', suffix: ' を視聴しました'),
+        _watched('c', 'どうぶつ', verb: '', suffix: ' を視聴しました'),
       ]);
 
-      expect([for (final w in watches) w.title], ['マリオカート', 'ホロライブ']);
+      expect([for (final w in watches) w.title], ['マリオカート', 'ホロライブ', 'どうぶつ']);
+    });
+
+    test("each kind's localized verb is stripped, though they differ", () {
+      final watches = _watches([
+        _watched('a', 'Mario Kart', verb: 'Has visto '),
+        _watched('b', 'Minecraft', verb: 'Has visto '),
+        _watched('c', 'Música nueva', verb: 'Has visto '),
+        {
+          'header': 'YouTube',
+          'title': 'Has consultado Nuevo vídeo mañana',
+          'titleUrl': 'https://www.youtube.com/post/UgkxA',
+          'time': '2025-11-11T19:46:01Z',
+        },
+        {
+          'header': 'YouTube',
+          'title': 'Has consultado Gracias a todos',
+          'titleUrl': 'https://www.youtube.com/post/UgkxB',
+          'time': '2025-11-10T19:46:01Z',
+        },
+        {
+          'header': 'YouTube',
+          'title': 'Has consultado Sorteo',
+          'titleUrl': 'https://www.youtube.com/post/UgkxC',
+          'time': '2025-11-09T19:46:01Z',
+        },
+      ]);
+
+      expect(
+        [for (final w in watches) w.title],
+        [
+          'Mario Kart',
+          'Minecraft',
+          'Música nueva',
+          'Nuevo vídeo mañana',
+          'Gracias a todos',
+          'Sorteo',
+        ],
+      );
+    });
+
+    test('a verb joined to the title is learnt from removed videos', () {
+      const removed = 'https://www.youtube.com/watch?v=gone';
+      final watches = _watches([
+        _watched('a', 'マリオカート', verb: '', suffix: 'を視聴しました'),
+        {
+          'header': 'YouTube',
+          'title': '$removedを視聴しました',
+          'titleUrl': removed,
+          'time': '2026-04-10T19:53:00Z',
+        },
+      ]);
+
+      expect([for (final w in watches) w.title], ['マリオカート', null]);
     });
 
     test('ads and entries without a link are left out', () {

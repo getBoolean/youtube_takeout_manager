@@ -8,34 +8,46 @@ import 'history_links.dart';
 
 /// Reads a takeout's `history/watch-history.json`.
 ///
-/// Titles come with the export's verb ("Watched …"), which is stripped: the
-/// English ones by name, others as the words every title shares. Entries
+/// Titles come with the export's verb ("Watched …"), which is stripped for
+/// each kind (videos, posts, playables): see [_verbStripper]. Entries
 /// without a link and ads are left out.
 HistoryFileRead<WatchEntry> parseWatchHistoryJson(Uint8List bytes) {
   final (:objects, :skipped) = _readObjects(bytes);
-  final watches = <({Map<String, Object?> json, String url, WatchKind kind})>[];
+  final watches =
+      <
+        ({Map<String, Object?> json, String url, String title, WatchKind kind})
+      >[];
   for (final json in objects) {
     final url = json['titleUrl'];
     if (url is! String || _isAd(json)) continue;
     if (watchKindOf(url) case final kind?) {
-      watches.add((json: json, url: url, kind: kind));
+      final title = json['title'];
+      watches.add((
+        json: json,
+        url: url,
+        title: title is String ? title : url,
+        kind: kind,
+      ));
     }
   }
 
-  final stripVerb = _verbStripper([
-    for (final w in watches)
-      if (w.json['title'] case final String title when !title.endsWith(w.url))
-        title,
-  ]);
+  // Other kinds may have other verbs ("Watched", "Viewed", "Played").
+  final stripVerbOf = {
+    for (final kind in WatchKind.values)
+      kind: _verbStripper([
+        for (final w in watches)
+          if (w.kind == kind) (title: w.title, url: w.url),
+      ]),
+  };
   final entries = <WatchEntry>[];
   var unreadableTimes = 0;
-  for (final (:json, :url, :kind) in watches) {
+  for (final (:json, :url, title: fullTitle, :kind) in watches) {
     final time = _timeOf(json);
     if (time == null) {
       unreadableTimes++;
       continue;
     }
-    final title = stripVerb(json['title'] as String? ?? url);
+    final title = stripVerbOf[kind]!(fullTitle);
     final channel = _channelOf(json);
     entries.add(
       WatchEntry(
@@ -175,27 +187,51 @@ bool _isAd(Map<String, Object?> json) => switch (json['details']) {
 
 const _englishVerbs = ['Watched ', 'Viewed ', 'Played '];
 
-/// What takes the export's verb off a title, worked out from [titles]: the
-/// English verbs, or else the words at the start or end every title shares.
-String Function(String) _verbStripper(List<String> titles) {
-  if (titles.any((t) => _englishVerbs.any(t.startsWith)) || titles.length < 2) {
-    return (title) {
-      for (final verb in _englishVerbs) {
-        if (title.startsWith(verb)) return title.substring(verb.length);
-      }
-      return title;
-    };
+/// What takes the export's verb off the titles of one kind of [entries],
+/// learnt from them. Best from entries listed by their own link (removed
+/// videos, "Watched https://…"): what's around the link is exactly the verb,
+/// however it's joined. Else the English verbs, else the whole words every
+/// title starts or ends with.
+String Function(String) _verbStripper(
+  List<({String title, String url})> entries,
+) {
+  final templates = <(String, String), int>{};
+  for (final (:title, :url) in entries) {
+    final at = title.indexOf(url);
+    if (at == -1) continue;
+    final template = (title.substring(0, at), title.substring(at + url.length));
+    templates[template] = (templates[template] ?? 0) + 1;
   }
-  var prefix = titles.first;
-  var suffix = titles.first;
-  for (final title in titles.skip(1)) {
-    prefix = _sharedPrefix(prefix, title);
-    suffix = _sharedSuffix(suffix, title);
+  final String prefix, suffix;
+  if (templates.isNotEmpty) {
+    (prefix, suffix) = templates.entries
+        .reduce((a, b) => b.value > a.value ? b : a)
+        .key;
+  } else {
+    final titles = [for (final e in entries) e.title];
+    if (titles.any((t) => _englishVerbs.any(t.startsWith)) ||
+        titles.length < 3) {
+      return (title) {
+        for (final verb in _englishVerbs) {
+          if (title.startsWith(verb)) return title.substring(verb.length);
+        }
+        return title;
+      };
+    }
+    var shared = (titles.first, titles.first);
+    for (final title in titles.skip(1)) {
+      shared = (
+        _sharedPrefix(shared.$1, title),
+        _sharedSuffix(shared.$2, title),
+      );
+    }
+    // Only whole words: titles may happen to share their first letters too.
+    // (With fewer than three titles they may share whole words, so those
+    // aren't guessed at above.)
+    prefix = shared.$1.substring(0, shared.$1.lastIndexOf(' ') + 1);
+    final wordStart = shared.$2.indexOf(' ');
+    suffix = wordStart == -1 ? '' : shared.$2.substring(wordStart);
   }
-  // Only whole words: titles may happen to share their first letters too.
-  prefix = prefix.substring(0, prefix.lastIndexOf(' ') + 1);
-  final wordStart = suffix.indexOf(' ');
-  suffix = wordStart == -1 ? '' : suffix.substring(wordStart);
   return (title) {
     var stripped = title;
     if (prefix.isNotEmpty && stripped.startsWith(prefix)) {

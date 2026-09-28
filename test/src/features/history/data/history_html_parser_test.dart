@@ -174,6 +174,14 @@ void main() {
       expect(watch.channelTitle, 'Legal & Co');
     });
 
+    test('a character reference out of range is left as it is', () {
+      final watch = _watches([
+        _cell(_watched('v', 'Odd &#99999999; &#xFFFFFFF; title')),
+      ]).single;
+
+      expect(watch.title, 'Odd &#99999999; &#xFFFFFFF; title');
+    });
+
     test('the zone label converts to UTC', () {
       expect(
         _timeOf('Jan 5, 2025, 11:00:00\u202fPM EST'),
