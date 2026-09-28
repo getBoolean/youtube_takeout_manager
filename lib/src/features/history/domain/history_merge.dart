@@ -68,6 +68,15 @@ HistoryImport planHistoryImport({
     timeOf: (w) => w.time,
     removedAtOf: (w) => w.removedAt,
     withRemovedAt: (w, removedAt) => w.copyWith(removedAt: removedAt),
+    // A removed or private video is listed by its link alone; what another
+    // takeout knew about it is kept.
+    keepKnown: (newer, older) => newer.title != null
+        ? newer
+        : newer.copyWith(
+            title: older.title,
+            channelTitle: newer.channelTitle ?? older.channelTitle,
+            channelUrl: newer.channelUrl ?? older.channelUrl,
+          ),
   );
   final searches = _mergeKind<SearchEntry>(
     saved: saved?.searches ?? const [],
@@ -80,6 +89,7 @@ HistoryImport planHistoryImport({
     timeOf: (s) => s.time,
     removedAtOf: (s) => s.removedAt,
     withRemovedAt: (s, removedAt) => s.copyWith(removedAt: removedAt),
+    keepKnown: (newer, _) => newer,
   );
 
   final files = [
@@ -124,6 +134,7 @@ _MergedKind<T> _mergeKind<T>({
   required DateTime Function(T) timeOf,
   required DateTime? Function(T) removedAtOf,
   required T Function(T, DateTime? removedAt) withRemovedAt,
+  required T Function(T newer, T older) keepKnown,
 }) {
   if (picked.isEmpty) {
     return (
@@ -136,11 +147,14 @@ _MergedKind<T> _mergeKind<T>({
   }
 
   // Oldest first, the saved history before picked ones made at the same
-  // time, so newer sources overwrite older ones' entries.
+  // time, so newer sources overwrite older ones' entries. Saved history
+  // whose export time was lost dates from its newest entry, as late as it
+  // can be known to be from.
+  final savedAsOf = savedSnapshot ?? _newest(saved, timeOf);
   final sources =
       [
-        if (savedSnapshot != null)
-          (snapshot: savedSnapshot, read: HistoryFileRead(entries: saved)),
+        if (savedAsOf != null)
+          (snapshot: savedAsOf, read: HistoryFileRead(entries: saved)),
         ...picked,
       ].indexed.toList()..sort((a, b) {
         final byTime = a.$2.snapshot.compareTo(b.$2.snapshot);
@@ -152,15 +166,13 @@ _MergedKind<T> _mergeKind<T>({
   for (final (_, source) in sources) {
     for (final entry in source.read.entries) {
       final key = keyOf(entry);
+      final older = merged[key];
+      var next = older == null ? entry : keepKnown(entry, older);
       // An entry keeps when it was first missed until a source has it again.
-      merged[key] = withRemovedAt(
-        entry,
-        removedAtOf(entry) ??
-            switch (merged[key]) {
-              final older? => removedAtOf(older),
-              null => null,
-            },
-      );
+      final removedAt =
+          removedAtOf(entry) ?? (older == null ? null : removedAtOf(older));
+      if (removedAtOf(next) != removedAt) next = withRemovedAt(next, removedAt);
+      merged[key] = next;
     }
   }
 
@@ -168,6 +180,14 @@ _MergedKind<T> _mergeKind<T>({
   // history's still has what it hasn't marked removed.
   final newest = sources.last.$2;
   final checkSkipped = !newest.read.complete;
+  // The history is only known complete as of the newest source that could
+  // all be read.
+  final completeAsOf =
+      [
+        for (final (_, source) in sources)
+          if (source.read.complete) source.snapshot,
+      ].lastOrNull ??
+      savedAsOf;
   var newlyRemoved = 0;
   if (!checkSkipped) {
     final present = {
@@ -189,9 +209,17 @@ _MergedKind<T> _mergeKind<T>({
     ..sort((a, b) => timeOf(b).compareTo(timeOf(a)));
   return (
     entries: entries,
-    snapshot: newest.snapshot,
+    snapshot: completeAsOf,
     added: merged.keys.where((k) => !savedKeys.contains(k)).length,
     newlyRemoved: newlyRemoved,
     checkSkipped: checkSkipped,
   );
 }
+
+/// When the newest of [entries] was made, or null when there are none.
+DateTime? _newest<T>(List<T> entries, DateTime Function(T) timeOf) => entries
+    .map(timeOf)
+    .fold<DateTime?>(
+      null,
+      (newest, t) => newest == null || t.isAfter(newest) ? t : newest,
+    );

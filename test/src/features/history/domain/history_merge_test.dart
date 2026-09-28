@@ -254,4 +254,68 @@ void main() {
     expect(watches.firstWhere((w) => w.title == 'Video a').removedAt, isNull);
     expect(watches.firstWhere((w) => w.title == 'Video b').removedAt, _march);
   });
+
+  group("a removed video's title and channel", () {
+    // A takeout made after a video is deleted or made private lists it by
+    // its link only.
+    WatchEntry unavailable(String id, DateTime time) => WatchEntry(
+      time: time,
+      kind: WatchKind.video,
+      url: _watch(id, time).url,
+    );
+
+    test('survive a newer takeout that only has its link', () {
+      final plan = planHistoryImport(
+        saved: _saved(watches: [_watch('x', _a)], snapshot: _march),
+        picked: [
+          _picked(watches: [unavailable('x', _a)], exportedAt: _april),
+        ],
+      );
+
+      final watch = plan.merged!.watches.single;
+      expect(watch.title, 'Video x');
+      expect(watch.channelTitle, 'Channel');
+      expect(watch.channelId, 'UCchannel');
+    });
+
+    test('are filled in from an older takeout picked later', () {
+      final plan = planHistoryImport(
+        saved: _saved(watches: [unavailable('x', _a)], snapshot: _april),
+        picked: [
+          _picked(watches: [_watch('x', _a)], exportedAt: _march),
+        ],
+      );
+
+      expect(plan.merged!.watches.single.title, 'Video x');
+    });
+  });
+
+  test("an unreadable newest history doesn't date the saved history", () {
+    final plan = planHistoryImport(
+      saved: _saved(watches: [_watch('a', _a)], snapshot: _march),
+      picked: [
+        _picked(
+          watches: [_watch('b', _b)],
+          exportedAt: _april,
+          skippedWatchRows: 1,
+        ),
+      ],
+    );
+
+    expect(plan.merged!.watchesSnapshot, _march);
+  });
+
+  test('saved history whose export time was lost still takes part', () {
+    final plan = planHistoryImport(
+      saved: TakeoutHistory(watches: [_watch('a', _a)]),
+      picked: [
+        _picked(watches: [_watch('b', _b)], exportedAt: _april),
+      ],
+    );
+
+    expect(
+      [for (final w in plan.merged!.watches) w.title],
+      ['Video b', 'Video a'],
+    );
+  });
 }
