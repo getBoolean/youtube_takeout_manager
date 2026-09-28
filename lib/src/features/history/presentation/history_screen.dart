@@ -474,6 +474,8 @@ class _WatchedTab extends ConsumerWidget {
     final days = ref.watch(watchDaysProvider);
     final channel = ref.watch(historyChannelFilterProvider);
     final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
+    // Fetched only signed in.
+    final picturesExpected = ref.watch(readSessionChannelIdProvider) != null;
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final watches = loaded.history.watches;
 
@@ -483,6 +485,7 @@ class _WatchedTab extends ConsumerWidget {
         context,
         watch,
         channelPicture: pictures[watch.channelId],
+        picturesExpected: picturesExpected,
       );
       if (!context.mounted) return;
       switch (action) {
@@ -531,6 +534,7 @@ class _WatchedTab extends ConsumerWidget {
                         query: query,
                         thumbnailSize: thumbnail,
                         channelPicture: pictures[watches[index].channelId],
+                        picturesExpected: picturesExpected,
                         markRemoved: !removedOnly,
                         onTap: () => act(index),
                       ),

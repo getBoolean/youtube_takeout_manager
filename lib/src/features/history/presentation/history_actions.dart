@@ -20,6 +20,7 @@ Future<WatchAction?> showWatchActionsSheet(
   BuildContext context,
   WatchEntry watch, {
   String? channelPicture,
+  bool picturesExpected = false,
 }) {
   final channel = HistoryChannel.of(watch);
   final theme = Theme.of(context);
@@ -55,6 +56,7 @@ Future<WatchAction?> showWatchActionsSheet(
                   channelName: name,
                   thumbnailUrl: channelPicture,
                   detail: formatDateTime(watch.time),
+                  keepPictureSpace: picturesExpected && watch.channelId != null,
                 ),
             ],
           ),

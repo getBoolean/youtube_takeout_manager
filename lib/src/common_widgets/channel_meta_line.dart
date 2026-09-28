@@ -12,12 +12,17 @@ class ChannelMetaLine extends StatelessWidget {
   final String? thumbnailUrl;
   final String detail;
 
+  /// Whether the picture's place is kept while there's no [thumbnailUrl]
+  /// yet, for one still to come: then nothing moves when it does.
+  final bool keepPictureSpace;
+
   const ChannelMetaLine({
     super.key,
     this.prefix = '',
     this.channelName,
     this.thumbnailUrl,
     required this.detail,
+    this.keepPictureSpace = false,
   });
 
   static const _pictureSize = 14.0;
@@ -41,9 +46,10 @@ class ChannelMetaLine extends StatelessWidget {
           textDirection: Directionality.of(context),
           maxLines: 1,
         )..layout();
+        final url = thumbnailUrl;
+        final picture = url != null || keepPictureSpace;
         final width =
-            painter.width +
-            (thumbnailUrl == null ? 0 : _pictureSize + _pictureGap);
+            painter.width + (picture ? _pictureSize + _pictureGap : 0);
         painter.dispose();
         final fits = width <= constraints.maxWidth;
 
@@ -51,22 +57,24 @@ class ChannelMetaLine extends StatelessWidget {
           TextSpan(
             children: [
               if (prefix.isNotEmpty) TextSpan(text: prefix),
-              if (thumbnailUrl case final url?)
+              if (picture)
                 WidgetSpan(
                   alignment: PlaceholderAlignment.middle,
                   child: Padding(
                     padding: const EdgeInsets.only(right: _pictureGap),
-                    child: ClipOval(
-                      child: NetworkPicture(
-                        url: url,
-                        width: _pictureSize,
-                        height: _pictureSize,
-                        htmlElementOnWeb: true,
-                        // Until it loads, and when it won't, so the name
-                        // doesn't move.
-                        placeholder: _PictureDot(),
-                      ),
-                    ),
+                    child: url == null
+                        ? const _PictureDot()
+                        : ClipOval(
+                            child: NetworkPicture(
+                              url: url,
+                              width: _pictureSize,
+                              height: _pictureSize,
+                              htmlElementOnWeb: true,
+                              // Until it loads, and when it won't, so the
+                              // name doesn't move.
+                              placeholder: const _PictureDot(),
+                            ),
+                          ),
                   ),
                 ),
               TextSpan(text: fits ? '$channelName · $detail' : channelName),

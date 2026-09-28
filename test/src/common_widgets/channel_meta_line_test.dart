@@ -79,12 +79,54 @@ void main() {
 
     expect(nameStart(tester), before);
   });
+
+  testWidgets(
+    "with its space kept, a channel's picture arriving moves "
+    'nothing, however wide the line',
+    expectPictureArrivesInPlace,
+  );
+}
+
+/// Checks, across widths, that the line keeps its size and its name keeps
+/// its place when the channel's picture arrives, as it does when its space
+/// is kept for it.
+Future<void> expectPictureArrivesInPlace(WidgetTester tester) async {
+  for (var width = 100.0; width <= 260; width += 4) {
+    Widget line(String? url) => MaterialApp(
+      home: Scaffold(
+        body: Align(
+          alignment: Alignment.topLeft,
+          child: SizedBox(
+            width: width,
+            child: ChannelMetaLine(
+              channelName: 'Shortcat Gaming',
+              thumbnailUrl: url,
+              keepPictureSpace: true,
+              detail: '2:05 PM',
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpWidget(line(null));
+    final size = tester.getSize(find.byType(ChannelMetaLine));
+    final start = nameStart(tester, 'Shortcat');
+
+    await tester.pumpWidget(line('https://yt3.example/shortcat'));
+
+    expect(
+      tester.getSize(find.byType(ChannelMetaLine)),
+      size,
+      reason: '$width',
+    );
+    expect(nameStart(tester, 'Shortcat'), start, reason: '$width');
+  }
 }
 
 /// Where the channel's name starts, after its picture.
-double nameStart(WidgetTester tester) => tester
+double nameStart(WidgetTester tester, [String name = 'Shortcat']) => tester
     .renderObject<RenderParagraph>(
-      find.textContaining('Shortcat', findRichText: true),
+      find.textContaining(name, findRichText: true).first,
     )
     .getOffsetForCaret(const TextPosition(offset: 1), Rect.zero)
     .dx;

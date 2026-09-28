@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
@@ -119,6 +120,7 @@ Future<ProviderContainer> _open(
   bool noTakeout = false,
   double width = 800,
   Map<String, String> pictures = const {},
+  String? session,
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -131,6 +133,7 @@ Future<ProviderContainer> _open(
       ),
       channelThumbnailFetcherProvider.overrideWith(() => _fetcher = _Fetcher()),
       channelThumbnailsProvider.overrideWith(() => _Pictures(pictures)),
+      readSessionChannelIdProvider.overrideWithValue(session),
     ],
   );
   addTearDown(container.dispose);
@@ -400,6 +403,36 @@ void main() {
 
     // CAFE Channel's videos name no channel ID to ask for.
     expect(_fetcher.asked.last, ['UCx']);
+  });
+
+  testWidgets('signed in, rows keep room for channel pictures still to come', (
+    tester,
+  ) async {
+    await _open(tester, session: 'UCme');
+
+    bool keepsRoom(String channel) => tester
+        .widget<ChannelMetaLine>(
+          find
+              .byWidgetPredicate(
+                (w) => w is ChannelMetaLine && w.channelName == channel,
+              )
+              .first,
+        )
+        .keepPictureSpace;
+    expect(keepsRoom('X'), isTrue);
+    // Its videos name no channel ID, so no picture can come for it.
+    expect(keepsRoom('CAFE Channel'), isFalse);
+  });
+
+  testWidgets('signed out, rows keep no room for channel pictures', (
+    tester,
+  ) async {
+    await _open(tester);
+
+    expect(
+      find.byWidgetPredicate((w) => w is ChannelMetaLine && w.keepPictureSpace),
+      findsNothing,
+    );
   });
 
   testWidgets('channel pictures show in the rows, the channel chip and the '

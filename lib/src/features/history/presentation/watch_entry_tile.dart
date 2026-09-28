@@ -25,6 +25,10 @@ class WatchEntryTile extends StatelessWidget {
   /// The picture of its channel, when there is one.
   final String? channelPicture;
 
+  /// Whether channel pictures are on their way (they're fetched signed in):
+  /// then their place is kept, so the row doesn't move when one arrives.
+  final bool picturesExpected;
+
   /// Whether it's marked when removed from YouTube's history; not when
   /// only those are listed.
   final bool markRemoved;
@@ -36,6 +40,7 @@ class WatchEntryTile extends StatelessWidget {
     this.query = '',
     required this.thumbnailSize,
     this.channelPicture,
+    this.picturesExpected = false,
     this.markRemoved = true,
     required this.onTap,
   });
@@ -107,6 +112,9 @@ class WatchEntryTile extends StatelessWidget {
                     channelName: watch.channelTitle,
                     thumbnailUrl: channelPicture,
                     detail: formatTime(watch.time),
+                    // Without an ID, no picture can come for the channel.
+                    keepPictureSpace:
+                        picturesExpected && watch.channelId != null,
                   ),
                   if (badges.isNotEmpty || removedAt != null) ...[
                     const SizedBox(height: 4),
