@@ -51,7 +51,7 @@ final class DeviceCacheClearerProvider
 }
 
 String _$deviceCacheClearerHash() =>
-    r'e0649922bb8ef581f8deb849bca6be540e383cb7';
+    r'9fa6ee5c319b8d479991ed692c5eea177dbfcf04';
 
 /// Clears what's loaded from YouTube and kept on this device, so it's
 /// fetched again. A service: nothing depends on it, so it can read any

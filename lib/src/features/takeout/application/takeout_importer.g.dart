@@ -50,7 +50,7 @@ final class TakeoutImporterProvider
   }
 }
 
-String _$takeoutImporterHash() => r'8d474e440ed389c51870348c59cfb3d5e17ee894';
+String _$takeoutImporterHash() => r'ff3060715302a3c528f05728728f38b40952ed48';
 
 /// Imports takeouts: works out what picked zips would change, then saves
 /// them, marking what they found gone. A service: nothing depends on it, so
