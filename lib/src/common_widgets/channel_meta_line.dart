@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'fade_in_picture.dart';
+
 /// The line under a listed item: [prefix], the channel's picture and
 /// [channelName], then [detail] (e.g. when). The channel's name ellipsizes
 /// when narrow, but [detail] is never cut off: when both wouldn't fit on
@@ -55,14 +57,14 @@ class ChannelMetaLine extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.only(right: _pictureGap),
                     child: ClipOval(
-                      child: Image.network(
-                        url,
+                      child: NetworkPicture(
+                        url: url,
                         width: _pictureSize,
                         height: _pictureSize,
-                        fit: BoxFit.cover,
-                        webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                        // A picture that won't load is left out.
-                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        htmlElementOnWeb: true,
+                        // Until it loads, and when it won't, so the name
+                        // doesn't move.
+                        placeholder: _PictureDot(),
                       ),
                     ),
                   ),
@@ -86,4 +88,20 @@ class ChannelMetaLine extends StatelessWidget {
       },
     );
   }
+}
+
+/// Where a channel's picture goes, while there's none to show.
+class _PictureDot extends StatelessWidget {
+  const _PictureDot();
+
+  @override
+  Widget build(BuildContext context) => SizedBox.square(
+    dimension: ChannelMetaLine._pictureSize,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        shape: BoxShape.circle,
+      ),
+    ),
+  );
 }

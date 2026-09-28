@@ -21,8 +21,42 @@ void main() {
       ),
     );
 
-    final image = tester.widget<Image>(find.byType(Image));
-    expect((image.image as NetworkImage).url, 'https://yt3.example/boolean');
+    final image = tester.widget<Image>(find.byType(Image)).image;
+    final network = image is ResizeImage ? image.imageProvider : image;
+    expect((network as NetworkImage).url, 'https://yt3.example/boolean');
+  });
+
+  testWidgets("shows the channel's initial while its picture loads", (
+    tester,
+  ) async {
+    await pump(
+      tester,
+      const ChannelAvatar(
+        name: 'boolean',
+        thumbnailUrl: 'https://yt3.example/boolean',
+        radius: 20,
+      ),
+    );
+
+    expect(find.text('B'), findsOneWidget);
+  });
+
+  testWidgets('decodes its picture no bigger than it is shown', (tester) async {
+    await pump(
+      tester,
+      const ChannelAvatar(
+        name: 'Boolean',
+        thumbnailUrl: 'https://yt3.example/boolean',
+        radius: 20,
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image)).image;
+    expect(image, isA<ResizeImage>());
+    expect(
+      (image as ResizeImage).width,
+      (40 * tester.view.devicePixelRatio).ceil(),
+    );
   });
 
   testWidgets('without a picture, shows the initial', (tester) async {

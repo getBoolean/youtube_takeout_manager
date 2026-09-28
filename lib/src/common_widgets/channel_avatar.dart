@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// A channel's picture, or its initial when there's none or it won't load.
+import 'fade_in_picture.dart';
+
+/// A channel's picture, or its initial when there's none, while it loads,
+/// or when it won't load.
 class ChannelAvatar extends StatelessWidget {
   final String name;
   final String? thumbnailUrl;
@@ -38,13 +41,13 @@ class ChannelAvatar extends StatelessWidget {
           : url == null
           ? initial
           : ClipOval(
-              child: Image.network(
-                url,
+              child: NetworkPicture(
+                url: url,
                 width: radius * 2,
                 height: radius * 2,
-                fit: BoxFit.cover,
-                webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                errorBuilder: (_, _, _) => Center(child: initial),
+                htmlElementOnWeb: true,
+                // Until it loads, and when it won't.
+                placeholder: Center(child: initial),
               ),
             ),
     );

@@ -27,11 +27,10 @@ void main() {
     expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
   });
 
-  testWidgets("a thumbnail that won't load shows the placeholder", (
-    tester,
-  ) async {
+  testWidgets("a thumbnail shows the placeholder while it loads, and keeps "
+      "it when it won't load", (tester) async {
     await pump(tester, 'https://i.ytimg.com/vi/broken/mqdefault.jpg');
-    expect(find.byIcon(Icons.videocam_outlined), findsNothing);
+    expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
 
     // Test HTTP requests fail, so the picture never loads.
     await tester.runAsync(

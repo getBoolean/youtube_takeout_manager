@@ -58,4 +58,33 @@ void main() {
       expect(tester.getSize(shown).width, lessThanOrEqualTo(160));
     },
   );
+
+  testWidgets("a channel's picture that won't load keeps its space, so the "
+      'name stays put', (tester) async {
+    await pump(
+      tester,
+      const ChannelMetaLine(
+        channelName: 'Shortcat',
+        thumbnailUrl: 'https://yt3.example/broken',
+        detail: '2:05 PM',
+      ),
+    );
+    final before = nameStart(tester);
+
+    // Test HTTP requests fail, so the picture never loads.
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 100)),
+    );
+    await tester.pump();
+
+    expect(nameStart(tester), before);
+  });
 }
+
+/// Where the channel's name starts, after its picture.
+double nameStart(WidgetTester tester) => tester
+    .renderObject<RenderParagraph>(
+      find.textContaining('Shortcat', findRichText: true),
+    )
+    .getOffsetForCaret(const TextPosition(offset: 1), Rect.zero)
+    .dx;

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/fade_in_picture.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/image_url_menu.dart';
 
 /// A video's thumbnail with rounded corners, filling the size its parent
-/// gives it. Shows [placeholderIcon] when there's no [url] or the picture
-/// won't load. Its URL can be copied on right-click when [copyable].
+/// gives it. Shows [placeholderIcon] when there's no [url], while the
+/// picture loads, and when it won't load. Its URL can be copied on right-click when [copyable].
 class VideoThumbnail extends StatelessWidget {
   final String? url;
   final IconData placeholderIcon;
@@ -31,14 +32,11 @@ class VideoThumbnail extends StatelessWidget {
     if (url == null) return _Placeholder(placeholderIcon);
     final image = ClipRRect(
       borderRadius: BorderRadius.circular(8),
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        cacheWidth: switch (width) {
-          final w? => (w * MediaQuery.devicePixelRatioOf(context)).ceil(),
-          null => null,
-        },
-        errorBuilder: (_, _, _) => _Placeholder(placeholderIcon),
+      child: NetworkPicture(
+        url: url,
+        decodeWidth: width,
+        // Until it loads, and when it won't.
+        placeholder: _Placeholder(placeholderIcon),
       ),
     );
     if (!copyable) return image;
