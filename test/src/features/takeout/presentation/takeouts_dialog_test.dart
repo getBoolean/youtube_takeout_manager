@@ -26,6 +26,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_export.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -188,6 +189,14 @@ class _Takeout extends TakeoutImporter {
   }) async => (
     plan: _planFor(saved.isEmpty ? 'UCnew' : saved.first),
     csvFiles: const <String, Uint8List>{},
+    exports: const <TakeoutExport>[],
+  );
+
+  @override
+  Future<PreparedImport> prepareMerge(List<TakeoutExport> exports) async => (
+    plan: _planFor(saved.isEmpty ? 'UCnew' : saved.first),
+    csvFiles: const <String, Uint8List>{},
+    exports: exports,
   );
 
   @override

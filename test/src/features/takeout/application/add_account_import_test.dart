@@ -15,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_rep
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_export.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_request.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -92,7 +93,12 @@ class _Takeout extends TakeoutImporter {
   final Completer<void>? commitGate;
   final TakeoutImportPlan plan;
   Object? mergeError;
+
+  /// Whether each reading of zips was to merge.
   final prepared = <bool>[];
+
+  /// How many times takeouts already read were planned into the one shown.
+  var merged = 0;
   final committed = <TakeoutImportPlan>[];
 
   _Takeout({
@@ -113,7 +119,22 @@ class _Takeout extends TakeoutImporter {
     prepared.add(merge);
     if (importError case final error?) throw error;
     if (mergeError case final error? when merge) throw error;
-    return (plan: plan, csvFiles: const <String, Uint8List>{});
+    return (
+      plan: plan,
+      csvFiles: const <String, Uint8List>{},
+      exports: const <TakeoutExport>[],
+    );
+  }
+
+  @override
+  Future<PreparedImport> prepareMerge(List<TakeoutExport> exports) async {
+    merged++;
+    if (mergeError case final error?) throw error;
+    return (
+      plan: plan,
+      csvFiles: const <String, Uint8List>{},
+      exports: exports,
+    );
   }
 
   @override
@@ -235,14 +256,15 @@ void main() {
   });
 
   test('a takeout from an account already saved shows that account, then '
-      'reviews the merge', () async {
+      'reviews the merge, reading its zips once', () async {
     final c = container(picked: _picked, saved: {'UCnew'});
     final add = c.read(addAccountImportProvider.notifier);
 
     expect(await add.start(), isFalse);
 
     expect(selection.selected, ['UCnew']);
-    expect(takeout.prepared, [false, true]);
+    expect(takeout.prepared, [false]);
+    expect(takeout.merged, 1);
     expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
     expect(takeout.committed, isEmpty);
 

@@ -92,7 +92,10 @@ void main() {
   });
 
   testWidgets('reviews the takeout in place before adding it', (tester) async {
-    await pump(tester, const AddAccountReview((plan: _plan, csvFiles: {})));
+    await pump(
+      tester,
+      const AddAccountReview((plan: _plan, csvFiles: {}, exports: [])),
+    );
 
     expect(find.byType(Dialog), findsNothing);
     expect(
@@ -112,7 +115,11 @@ void main() {
   testWidgets("can't merge while deleting", (tester) async {
     await pump(
       tester,
-      const AddAccountMergeReview((plan: _mergePlan, csvFiles: {})),
+      const AddAccountMergeReview((
+        plan: _mergePlan,
+        csvFiles: {},
+        exports: [],
+      )),
       enabled: false,
     );
 
@@ -123,7 +130,11 @@ void main() {
   testWidgets('reviews the merge before saving it', (tester) async {
     await pump(
       tester,
-      const AddAccountMergeReview((plan: _mergePlan, csvFiles: {})),
+      const AddAccountMergeReview((
+        plan: _mergePlan,
+        csvFiles: {},
+        exports: [],
+      )),
     );
 
     expect(

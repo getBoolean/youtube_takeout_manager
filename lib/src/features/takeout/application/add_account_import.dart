@@ -2,7 +2,6 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/zip_picker_repository.dart';
 import '../domain/takeout_import_plan.dart';
-import '../domain/takeout_import_request.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'saved_takeouts.dart';
 import 'takeout_importer.dart';
@@ -74,7 +73,7 @@ class AddAccountImport extends _$AddAccountImport {
       final prepared = await takeouts.prepareImport(picked, merge: false);
       final plan = prepared.plan;
       if (await takeouts.hasSavedData(plan.accountId)) {
-        await _reviewMerge(picked, plan.accountId);
+        await _reviewMerge(prepared, plan.accountId);
         return false;
       }
       final first = (await ref.read(savedTakeoutsProvider.future)).isEmpty;
@@ -87,20 +86,20 @@ class AddAccountImport extends _$AddAccountImport {
     return false;
   }
 
-  /// Shows [takeoutId], the saved account [picked] is from, and reads
-  /// [picked] to merge into it.
-  Future<void> _reviewMerge(List<PickedZip> picked, String takeoutId) async {
+  /// Shows [takeoutId], the saved account [prepared]'s takeouts are from,
+  /// and works out merging them into it, without reading them again.
+  Future<void> _reviewMerge(PreparedImport prepared, String takeoutId) async {
     final selection = ref.read(takeoutSelectionProvider.notifier);
     final shown = (await ref.read(takeoutSelectionProvider.future))?.takeoutId;
     if (shown != takeoutId) await selection.select(takeoutId);
     await ref.read(takeoutProvider.future);
-    final prepared = await ref
+    final merge = await ref
         .read(takeoutImporterProvider.notifier)
-        .prepareImport(picked, merge: true);
+        .prepareMerge(prepared.exports);
     if (!ref.mounted) return;
     // Named in the review once fetched.
-    ref.read(extraVideoIdsProvider.notifier).set(prepared.plan.newItemVideoIds);
-    state = AddAccountMergeReview(prepared);
+    ref.read(extraVideoIdsProvider.notifier).set(merge.plan.newItemVideoIds);
+    state = AddAccountMergeReview(merge);
   }
 
   /// Saves the reviewed takeout, as its own account or merged into its

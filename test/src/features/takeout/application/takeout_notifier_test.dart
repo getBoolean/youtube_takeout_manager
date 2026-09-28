@@ -192,7 +192,7 @@ void main() {
           }),
         );
 
-    final (:plan, csvFiles: _) = await c
+    final (:plan, csvFiles: _, exports: _) = await c
         .read(takeoutImporterProvider.notifier)
         .prepareImport(_newerTakeout(), merge: true);
 
@@ -481,6 +481,21 @@ void main() {
       expect(await commentIds(container()), ['C', 'B', 'A']);
     });
 
+    test('takeouts read once merge into the takeout shown when planned '
+        'again', () async {
+      final notifier = container().read(takeoutImporterProvider.notifier);
+      final read = await notifier.prepareImport(
+        takeoutWithHistory(),
+        merge: false,
+      );
+
+      await notifier.commitImport(await notifier.prepareMerge(read.exports));
+
+      expect(savedHistory().watches.single.videoId, 'v1');
+      // Merged, not replaced: the saved comments stay.
+      expect(await commentIds(container()), ['C', 'B', 'A']);
+    });
+
     test('a takeout with only history is added to the takeout shown', () async {
       final archive = Archive()
         ..addFile(
@@ -668,7 +683,7 @@ void main() {
       final c = withSignIns();
       await c.read(takeoutProvider.future);
 
-      final (:plan, csvFiles: _) = await c
+      final (:plan, csvFiles: _, exports: _) = await c
           .read(takeoutImporterProvider.notifier)
           .prepareImport(_newerTakeout(channel: 'UCalt'), merge: false);
 

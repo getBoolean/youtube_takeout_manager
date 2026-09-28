@@ -20,6 +20,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/zip_picker_repository.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_export.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/loaded_takeout.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_channel.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
@@ -83,7 +84,11 @@ class _Takeout extends TakeoutImporter {
   Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
-  }) async => (plan: plan, csvFiles: const <String, Uint8List>{});
+  }) async => (
+    plan: plan,
+    csvFiles: const <String, Uint8List>{},
+    exports: const <TakeoutExport>[],
+  );
 
   @override
   Future<bool> hasSavedData(String accountId) async => false;
