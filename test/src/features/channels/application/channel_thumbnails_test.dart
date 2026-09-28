@@ -339,6 +339,23 @@ void main() {
       expect(clients.used, hasLength(signInsUsed));
     });
 
+    test('asks first, next time, for the channels a failed request was '
+        'for', () async {
+      final channels = _Channels(failures: 1);
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+      final ids = [for (var i = 0; i < 120; i++) 'UC$i'];
+
+      await fetcher.fetchNow(ids);
+      await fetcher.fetchNow(ids);
+
+      expect(channels.requests[1], channels.requests[0]);
+    });
+
     test('asks again later for channels a failed request was for', () async {
       final channels = _Channels(failures: 1);
       final c = container(

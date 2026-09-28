@@ -129,9 +129,13 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
           fetched = await channels.fetchChannelThumbnails(client, batch);
         } on Exception catch (e) {
           if (isSignInFailure(e)) rethrow;
-          // Offline or refused: asked for again next time, not taken to be
-          // gone.
-          _pendingIds.addAll(batch);
+          // Offline or refused: asked for again next time, first, not taken
+          // to be gone.
+          final rest = [..._pendingIds];
+          _pendingIds
+            ..clear()
+            ..addAll(batch)
+            ..addAll(rest);
           break;
         }
         await quota.recordUsage(QuotaOperation.channelsList);
