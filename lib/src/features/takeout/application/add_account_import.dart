@@ -55,6 +55,10 @@ class AddAccountFailed extends AddAccountState {
 /// replaced.
 @riverpod
 class AddAccountImport extends _$AddAccountImport {
+  /// The takeout shown when [start] began, to tell whether another has
+  /// been shown since, to merge into it.
+  String? _shownAtStart;
+
   @override
   AddAccountState build() => const AddAccountIdle();
 
@@ -64,6 +68,7 @@ class AddAccountImport extends _$AddAccountImport {
   /// saved skips the review when there's nothing in it to look over.
   /// Returns whether it was saved.
   Future<bool> start() async {
+    _shownAtStart = ref.read(takeoutSelectionProvider).value?.takeoutId;
     try {
       // Straight from the click handler: see ZipPickerRepository.pickZips.
       final picked = await ref.read(zipPickerRepositoryProvider).pickZips();
@@ -127,8 +132,11 @@ class AddAccountImport extends _$AddAccountImport {
     }
   }
 
-  void dismiss() {
+  /// Ends the import, saved or not. Returns whether another takeout was
+  /// shown meanwhile, to merge into it, which stays shown.
+  bool dismiss() {
     ref.read(extraVideoIdsProvider.notifier).clear();
     state = const AddAccountIdle();
+    return ref.read(takeoutSelectionProvider).value?.takeoutId != _shownAtStart;
   }
 }

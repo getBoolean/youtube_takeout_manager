@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,6 +36,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_impo
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_selection.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/skipped_rows_banner.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
+import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 
 const _main = TakeoutChannel(
   channelId: 'UCme',
@@ -140,8 +142,12 @@ class _SignIns extends SavedSignIns {
 }
 
 class _Selection extends TakeoutSelectionNotifier {
+  /// Whether selecting a takeout shows it, rather than only being noted.
+  final bool shows;
   final channels = <String>[];
   final selected = <(String, String?)>[];
+
+  _Selection({this.shows = false});
 
   @override
   Future<TakeoutSelection?> build() async =>
@@ -151,8 +157,34 @@ class _Selection extends TakeoutSelectionNotifier {
   Future<void> selectChannel(String channelId) async => channels.add(channelId);
 
   @override
-  Future<void> select(String takeoutId, {String? channelId}) async =>
-      selected.add((takeoutId, channelId));
+  Future<void> select(String takeoutId, {String? channelId}) async {
+    selected.add((takeoutId, channelId));
+    if (shows) state = AsyncData(TakeoutSelection(takeoutId: takeoutId));
+  }
+}
+
+/// The channel list, and a channel's page with the account button, which
+/// opens the dialog.
+class _Pages extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => [
+    AutoRoute(
+      page: PageInfo(
+        ChannelListRoute.name,
+        builder: (_) => const Scaffold(body: Text('Channel list')),
+      ),
+      path: '/channels',
+      initial: true,
+    ),
+    AutoRoute(
+      page: PageInfo(
+        ChannelDetailRoute.name,
+        builder: (_) =>
+            Scaffold(appBar: AppBar(actions: const [AccountButton()])),
+      ),
+      path: '/channels/:channelId',
+    ),
+  ];
 }
 
 class _Saved extends SavedTakeouts {
@@ -256,6 +288,7 @@ void main() {
   late _Takeout takeout;
   late _Cache cache;
   late ProviderContainer container;
+  late _Pages pages;
 
   Future<void> pumpDialog(
     WidgetTester tester, {
@@ -267,10 +300,12 @@ void main() {
     Future<SignInOutcome> Function()? outcome,
     DeletionProcessingState processing = DeletionProcessingState.idle,
     LoadedTakeout? loaded,
+    bool fromChannelPage = false,
   }) async {
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
-    selection = _Selection();
+    selection = _Selection(shows: fromChannelPage);
+    pages = _Pages();
     takeout = _Takeout(saved: alreadySaved);
     cache = _Cache();
     tester.view.physicalSize = const Size(600, 1600);
@@ -303,10 +338,18 @@ void main() {
             () => _Processing(processing),
           ),
         ],
-        child: MaterialApp(home: const Scaffold(body: TakeoutsDialog())),
+        child: fromChannelPage
+            ? MaterialApp.router(routerConfig: pages.config())
+            : MaterialApp(home: const Scaffold(body: TakeoutsDialog())),
       ),
     );
     await tester.pumpAndSettle();
+    if (fromChannelPage) {
+      pages.push(ChannelDetailRoute(channelId: 'UCme')).ignore();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(AccountButton));
+      await tester.pumpAndSettle();
+    }
     container = ProviderScope.containerOf(
       tester.element(find.byType(TakeoutsDialog)),
     );
@@ -617,6 +660,55 @@ void main() {
       find.byKey(const ValueKey('add-account-merge-review')),
       findsNothing,
     );
+  });
+
+  group('merging into another account from a channel page', () {
+    Future<void> startMerge(WidgetTester tester) async {
+      await pumpDialog(
+        tester,
+        saved: [_viewedSummary, _workSummary],
+        alreadySaved: {'UCwork'},
+        fromChannelPage: true,
+      );
+      await tester.tap(find.text('Import a takeout'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('keeps the dialog and its review open while that account is '
+        'shown', (tester) async {
+      await startMerge(tester);
+
+      expect(
+        container.read(takeoutSelectionProvider).value?.takeoutId,
+        'UCwork',
+      );
+      expectNoPopups();
+      expect(
+        find.byKey(const ValueKey('add-account-merge-review')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets("leaves the channel's page once merged", (tester) async {
+      await startMerge(tester);
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+      await tester.pumpAndSettle();
+
+      expect(takeout.committed.single.accountId, 'UCwork');
+      expect(pages.isRouteActive(ChannelDetailRoute.name), isFalse);
+    });
+
+    testWidgets("leaves the channel's page when cancelled, since another "
+        'account is shown', (tester) async {
+      await startMerge(tester);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(takeout.committed, isEmpty);
+      expect(pages.isRouteActive(ChannelDetailRoute.name), isFalse);
+    });
   });
 
   testWidgets("shows today's quota usage", (tester) async {

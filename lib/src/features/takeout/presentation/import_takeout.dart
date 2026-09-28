@@ -41,12 +41,18 @@ class ImportTakeout extends ConsumerWidget {
       // one to merge shows the account it's for while it's reviewed.
       onStart: () => _whenShownChanges(context, ref, import.start),
       onConfirm: () => _whenShownChanges(context, ref, import.confirm),
-      onDismiss: import.dismiss,
+      onDismiss: () {
+        final router = StackRouterScope.of(context)?.controller;
+        if (import.dismiss()) leaveChannelScreens(router);
+      },
     );
   }
 
   /// Runs [step], and once it has saved a takeout or shown another one,
-  /// leaves screens tied to the channel shown before.
+  /// leaves screens tied to the channel shown before. Leaving closes a
+  /// dialog opened over them, so while the import still shows something,
+  /// such as a merge into the account shown for it, that waits for it to
+  /// be dismissed.
   Future<void> _whenShownChanges(
     BuildContext context,
     WidgetRef ref,
@@ -57,7 +63,8 @@ class ImportTakeout extends ConsumerWidget {
     final before = shown();
     final saved = await step();
     if (!context.mounted) return;
-    if (saved || shown() != before) leaveChannelScreens(router);
+    final showing = ref.read(addAccountImportProvider) is! AddAccountIdle;
+    if (saved || (shown() != before && !showing)) leaveChannelScreens(router);
     if (saved) onImported?.call();
   }
 }
