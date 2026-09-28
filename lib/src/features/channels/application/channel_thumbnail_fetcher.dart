@@ -42,6 +42,13 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
   /// Queued channels to ask for before the rest, the latest shown first:
   /// never more than a request's worth.
   var _firstIds = <String>{};
+
+  /// Channels a request is out for. The channels shown change as their
+  /// pictures arrive, so without these they'd be queued again.
+  final _askingIds = <String>{};
+
+  /// Channels YouTube has no picture for, once loaded from the device.
+  Set<String>? _notFoundIds;
   Future<void>? _running;
 
   @override
@@ -62,6 +69,10 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     _queue(channelIds);
     if (_pendingIds.length >= thumbnailBatchSize) unawaited(_fetchPending());
   }
+
+  /// Forgets which channels YouTube had no picture for, once the device's
+  /// pictures are cleared, so they're asked for again.
+  void forgetMissing() => _notFoundIds = null;
 
   /// Fetches whatever is still queued, and waits for it.
   Future<void> flushQueue() =>
@@ -89,8 +100,14 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
 
   void _queue(Iterable<String> channelIds) {
     final known = ref.read(channelThumbnailsProvider).value ?? const {};
+    final notFound = _notFoundIds ?? const {};
     for (final id in channelIds) {
-      if (id != unknownChannelId && !known.containsKey(id)) _pendingIds.add(id);
+      if (id != unknownChannelId &&
+          !known.containsKey(id) &&
+          !notFound.contains(id) &&
+          !_askingIds.contains(id)) {
+        _pendingIds.add(id);
+      }
     }
   }
 
@@ -104,7 +121,11 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     if (sessionChannelId == null) return;
 
     final cache = ref.read(channelCacheRepositoryProvider);
-    final notFound = await cache.loadNotFoundIds();
+    final notFound = _notFoundIds ??= await cache.loadNotFoundIds();
+    // Queued before these were known to have none.
+    _pendingIds.removeAll(notFound);
+    _firstIds.removeAll(notFound);
+    if (_pendingIds.isEmpty) return;
     final thumbnails = ref.read(channelThumbnailsProvider.notifier);
     final quota = ref.read(quotaProvider.notifier);
     final channels = ref.read(youtubeChannelRepositoryProvider);
@@ -124,29 +145,35 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
         batch.removeAll(notFound);
         if (batch.isEmpty) continue;
 
-        final Map<String, String> fetched;
+        _askingIds.addAll(batch);
         try {
-          fetched = await channels.fetchChannelThumbnails(client, batch);
-        } on Exception catch (e) {
-          if (isSignInFailure(e)) rethrow;
-          // Offline or refused: asked for again next time, first, not taken
-          // to be gone.
-          final rest = [..._pendingIds];
-          _pendingIds
-            ..clear()
-            ..addAll(batch)
-            ..addAll(rest);
-          break;
-        }
-        await quota.recordUsage(QuotaOperation.channelsList);
-        await thumbnails.add(fetched);
-        final missing = batch.difference(fetched.keys.toSet());
-        if (missing.isNotEmpty) {
-          notFound.addAll(missing);
-          foundMissing = true;
-        }
-        if (++requests % _requestsBetweenSaves == 0) {
-          await thumbnails.persist();
+          final Map<String, String> fetched;
+          try {
+            fetched = await channels.fetchChannelThumbnails(client, batch);
+          } on Exception catch (e) {
+            if (isSignInFailure(e)) rethrow;
+            // Offline or refused: asked for again next time, first, not
+            // taken to be gone.
+            final rest = [..._pendingIds];
+            _pendingIds
+              ..clear()
+              ..addAll(batch)
+              ..addAll(rest);
+            break;
+          }
+          await quota.recordUsage(QuotaOperation.channelsList);
+          await thumbnails.add(fetched);
+          final missing = batch.difference(fetched.keys.toSet());
+          if (missing.isNotEmpty) {
+            notFound.addAll(missing);
+            foundMissing = true;
+          }
+          if (++requests % _requestsBetweenSaves == 0) {
+            await thumbnails.persist();
+          }
+        } finally {
+          // Once they're pictured or known to have none.
+          _askingIds.removeAll(batch);
         }
       }
     } catch (e) {
@@ -157,7 +184,10 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     } finally {
       client.close();
       await thumbnails.persist();
-      if (foundMissing) await cache.saveNotFoundIds(notFound);
+      // Not when the device's pictures were cleared meanwhile.
+      if (foundMissing && identical(notFound, _notFoundIds)) {
+        await cache.saveNotFoundIds(notFound);
+      }
     }
   }
 }

@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -213,6 +214,69 @@ void main() {
       c.read(channelThumbnailsProvider).value,
       hasLength(thumbnailBatchSize),
     );
+  });
+
+  group('when the channels shown change, as switching accounts and pictures '
+      'arriving do', () {
+    final ids = [for (var i = 0; i < 30; i++) 'UC$i'];
+
+    test("channels whose request is out aren't asked for twice", () async {
+      final channels = _Channels()..hold = Completer();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final held = channels.hold!;
+
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+      expect(channels.requests, hasLength(1));
+
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+      held.complete();
+      await c.read(channelThumbnailFetcherProvider.notifier).flushQueue();
+
+      expect(channels.requests, hasLength(1));
+    });
+
+    test("channels YouTube has no picture for start nothing when they're "
+        'shown again', () async {
+      final clients = _Clients();
+      final c = container(
+        clients: clients,
+        signIns: _SignIns(),
+        channels: _Channels(missing: {...ids}),
+      );
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+      final signInsUsed = clients.used.length;
+
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+
+      expect(clients.used, hasLength(signInsUsed));
+    });
+
+    test("once the device's pictures are cleared, channels that had none "
+        'are asked for again', () async {
+      final channels = _Channels(missing: {...ids});
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+      expect(channels.requests, hasLength(1));
+
+      await c.read(deviceCacheClearerProvider.notifier).clear();
+      c.read(_shown.notifier).set(ids);
+      await pumpEventQueue();
+
+      expect(channels.requests, hasLength(2));
+    });
   });
 
   test('fetches the rest once video titles are done', () async {
