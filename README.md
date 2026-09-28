@@ -13,8 +13,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/hero-dark.png">
-    <img src="docs/screenshots/hero-light.png" alt="Three phone screens: a channel’s comments grouped by video, a search for “first” matching comments across channels, and a deletion queue of 11 comments from several channels">
+    <source media="(prefers-color-scheme: dark)" srcset="tool/screenshots/images/hero-dark.png">
+    <img src="tool/screenshots/images/hero-light.png" alt="Three phone screens: a channel’s comments grouped by video, a search for “first” matching comments across channels, and a deletion queue of 11 comments from several channels">
   </picture>
 </p>
 
@@ -23,19 +23,19 @@
 <br>
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/channels.png" width="240" alt="Channel list with each channel’s picture and how many comments and live chats you left there"><br><sub>Every channel you commented on</sub></td>
-    <td align="center"><img src="docs/screenshots/channel.png" width="240" alt="One channel’s comments, grouped under each video’s thumbnail and title"><br><sub>Comments grouped by video</sub></td>
-    <td align="center"><img src="docs/screenshots/search.png" width="240" alt="Search for “first” matching comments and live chats across several channels"><br><sub>Search every channel at once</sub></td>
+    <td align="center"><img src="tool/screenshots/images/channels.png" width="240" alt="Channel list with each channel’s picture and how many comments and live chats you left there"><br><sub>Every channel you commented on</sub></td>
+    <td align="center"><img src="tool/screenshots/images/channel.png" width="240" alt="One channel’s comments, grouped under each video’s thumbnail and title"><br><sub>Comments grouped by video</sub></td>
+    <td align="center"><img src="tool/screenshots/images/search.png" width="240" alt="Search for “first” matching comments and live chats across several channels"><br><sub>Search every channel at once</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/super-chats.png" width="240" alt="A stream’s live chats, with Super Chats in their tier colors and amounts"><br><sub>Live chats and Super Chats</sub></td>
-    <td align="center"><img src="docs/screenshots/select.png" width="240" alt="Selection mode with three comments picked and a button to queue them"><br><sub>Select what to delete</sub></td>
-    <td align="center"><img src="docs/screenshots/queue.png" width="240" alt="The deletion queue, grouped by channel, with each item pending"><br><sub>One queue for everything</sub></td>
+    <td align="center"><img src="tool/screenshots/images/super-chats.png" width="240" alt="A stream’s live chats, with Super Chats in their tier colors and amounts"><br><sub>Live chats and Super Chats</sub></td>
+    <td align="center"><img src="tool/screenshots/images/select.png" width="240" alt="Selection mode with three comments picked and a button to queue them"><br><sub>Select what to delete</sub></td>
+    <td align="center"><img src="tool/screenshots/images/queue.png" width="240" alt="The deletion queue, grouped by channel, with each item pending"><br><sub>One queue for everything</sub></td>
   </tr>
   <tr>
-    <td align="center"><img src="docs/screenshots/delete.png" width="240" alt="Choosing to delete through My Activity, with no daily limit, or through the YouTube API"><br><sub>Delete without API limits</sub></td>
-    <td align="center"><img src="docs/screenshots/history.png" width="240" alt="Watched videos grouped by day, with thumbnails and channel pictures"><br><sub>Watch and search history</sub></td>
-    <td align="center"><img src="docs/screenshots/takeouts.png" width="240" alt="The takeout’s account and channel, with today’s YouTube API quota"><br><sub>Your takeout and API quota</sub></td>
+    <td align="center"><img src="tool/screenshots/images/delete.png" width="240" alt="Choosing to delete through My Activity, with no daily limit, or through the YouTube API"><br><sub>Delete without API limits</sub></td>
+    <td align="center"><img src="tool/screenshots/images/history.png" width="240" alt="Watched videos grouped by day, with thumbnails and channel pictures"><br><sub>Watch and search history</sub></td>
+    <td align="center"><img src="tool/screenshots/images/takeouts.png" width="240" alt="The takeout’s account and channel, with today’s YouTube API quota"><br><sub>Your takeout and API quota</sub></td>
   </tr>
 </table>
 </details>
