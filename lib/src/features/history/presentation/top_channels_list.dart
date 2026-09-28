@@ -17,12 +17,16 @@ class TopChannelsList extends StatelessWidget {
   final String query;
   final ValueChanged<HistoryChannel> onPick;
 
+  /// Told the ID of each channel as its row is built.
+  final ValueChanged<String>? onChannelShown;
+
   const TopChannelsList({
     super.key,
     required this.channels,
     required this.pictures,
     required this.query,
     required this.onPick,
+    this.onChannelShown,
   });
 
   @override
@@ -32,6 +36,7 @@ class TopChannelsList extends StatelessWidget {
       itemBuilder: (context, i) {
         final watched = channels[i];
         final channel = watched.channel;
+        if (channel.channelId case final id?) onChannelShown?.call(id);
         final videos = formatCount(
           watched.count,
           watched.byTitle ? 'matching video' : 'video',

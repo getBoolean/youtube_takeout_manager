@@ -30,13 +30,18 @@ const _requestsBetweenSaves = 10;
 /// Fetches channel pictures: for the channels the viewed channel
 /// interacted with, once [thumbnailBatchSize] of them appear and the rest
 /// once video titles are done; and whole lists at once, such as history's
-/// channels, with [fetchNow]. Each request is counted against the quota;
-/// channels YouTube has no picture for are remembered and not asked for
-/// again. Signed out, nothing is fetched.
+/// channels, with [fetchNow], the channels on screen first ([fetchFirst]).
+/// Each request is counted against the quota; channels YouTube has no
+/// picture for are remembered and not asked for again. Signed out, nothing
+/// is fetched.
 /// An effect: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
 class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
   final _pendingIds = <String>{};
+
+  /// Queued channels to ask for before the rest, the latest shown first:
+  /// never more than a request's worth.
+  var _firstIds = <String>{};
   Future<void>? _running;
 
   @override
@@ -69,6 +74,19 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     return flushQueue();
   }
 
+  /// Asks for those of [channelIds] already queued before the rest, e.g.
+  /// the channels on screen, called as often as every frame. Starts
+  /// nothing: those with a picture, none to get, or already being asked
+  /// for aren't queued.
+  void fetchFirst(Iterable<String> channelIds) {
+    final first = {
+      for (final id in channelIds)
+        if (_pendingIds.contains(id)) id,
+    };
+    if (first.isEmpty) return;
+    _firstIds = {...first, ..._firstIds}.take(_requestSize).toSet();
+  }
+
   void _queue(Iterable<String> channelIds) {
     final known = ref.read(channelThumbnailsProvider).value ?? const {};
     for (final id in channelIds) {
@@ -97,8 +115,12 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     var foundMissing = false;
     try {
       while (_pendingIds.isNotEmpty) {
-        final batch = _pendingIds.take(_requestSize).toSet();
+        final batch = {
+          ..._firstIds.where(_pendingIds.contains),
+          ..._pendingIds.take(_requestSize),
+        }.take(_requestSize).toSet();
         _pendingIds.removeAll(batch);
+        _firstIds.removeAll(batch);
         batch.removeAll(notFound);
         if (batch.isEmpty) continue;
 

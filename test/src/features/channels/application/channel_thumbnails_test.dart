@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
@@ -40,6 +42,9 @@ class _Channels extends YoutubeChannelRepository {
   /// The channels each request asked for.
   final requests = <List<String>>[];
 
+  /// Holds the next request unanswered until completed.
+  Completer<void>? hold;
+
   _Channels({
     this.signInFails = false,
     this.missing = const {},
@@ -52,6 +57,10 @@ class _Channels extends YoutubeChannelRepository {
     Set<String> channelIds,
   ) async {
     requests.add(channelIds.toList());
+    if (hold case final held?) {
+      hold = null;
+      await held.future;
+    }
     if (failures > 0) {
       failures--;
       throw http.ClientException('offline');
@@ -265,6 +274,69 @@ void main() {
         'UCgone',
       ]);
       expect(channels.requests, hasLength(1));
+    });
+
+    test('asks first for the channels on screen, ahead of those queued, '
+        'without asking any twice', () async {
+      final channels = _Channels();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+      final ids = [for (var i = 0; i < 120; i++) 'UC$i'];
+
+      final run = fetcher.fetchNow(ids);
+      fetcher.fetchFirst(['UC100', 'UC101']);
+      await run;
+
+      expect(channels.requests.first.take(2), ['UC100', 'UC101']);
+      expect([for (final r in channels.requests) r.length], [50, 50, 20]);
+      expect({for (final r in channels.requests) ...r}, hasLength(120));
+    });
+
+    test('channels shown while a request is out go in the next one', () async {
+      final channels = _Channels()..hold = Completer();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+      final held = channels.hold!;
+
+      final run = fetcher.fetchNow([for (var i = 0; i < 120; i++) 'UC$i']);
+      await pumpEventQueue();
+      expect(channels.requests, hasLength(1));
+      fetcher.fetchFirst(['UC110']);
+      held.complete();
+      await run;
+
+      expect(channels.requests[1].first, 'UC110');
+    });
+
+    test('channels shown that have a picture, or have none to get, ask for '
+        'nothing', () async {
+      final clients = _Clients();
+      final channels = _Channels(missing: {'UCgone'});
+      final c = container(
+        clients: clients,
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+      await fetcher.fetchNow(['UCa', 'UCgone']);
+      final signInsUsed = clients.used.length;
+
+      // As every frame of scrolling past them does.
+      for (var frame = 0; frame < 3; frame++) {
+        fetcher.fetchFirst(['UCa', 'UCgone']);
+      }
+      await fetcher.flushQueue();
+
+      expect(channels.requests, hasLength(1));
+      expect(clients.used, hasLength(signInsUsed));
     });
 
     test('asks again later for channels a failed request was for', () async {

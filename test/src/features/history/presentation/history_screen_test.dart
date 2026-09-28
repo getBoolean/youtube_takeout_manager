@@ -17,6 +17,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/search_entry
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_day_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/removed_badge.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/top_channels_list.dart';
@@ -74,9 +75,11 @@ class _Fixed extends TakeoutHistoryNotifier {
       history == null ? null : LoadedHistory.of(history!);
 }
 
-/// Records the channels history asks for pictures of.
+/// Records the channels history asks for pictures of, and those it asks
+/// for first.
 class _Fetcher extends ChannelThumbnailFetcher {
   final asked = <List<String>>[];
+  final askedFirst = <List<String>>[];
 
   @override
   void build() {}
@@ -84,7 +87,33 @@ class _Fetcher extends ChannelThumbnailFetcher {
   @override
   Future<void> fetchNow(Iterable<String> channelIds) async =>
       asked.add(channelIds.toList());
+
+  @override
+  void fetchFirst(Iterable<String> channelIds) =>
+      askedFirst.add(channelIds.toList());
 }
+
+/// Twenty videos today, each from its own channel, then thirty from one
+/// channel long ago: the most watched channel is far down the list.
+final _longHistory = TakeoutHistory(
+  watches: [
+    for (var i = 0; i < 20; i++)
+      _watch(
+        'Recent $i',
+        DateTime(2026, 4, 12, 20).subtract(Duration(minutes: i)),
+        channelId: 'UCr$i',
+        channel: 'R$i',
+      ),
+    for (var i = 0; i < 30; i++)
+      _watch(
+        'Old $i',
+        DateTime(2025, 1, 1, 12).subtract(Duration(minutes: i)),
+        channelId: 'UCtop',
+        channel: 'Top',
+      ),
+  ],
+  searches: const [],
+);
 
 class _Pictures extends ChannelThumbnails {
   _Pictures(this.pictures);
@@ -397,12 +426,62 @@ void main() {
     expect(find.byType(DeletionQueueStrip), findsNothing);
   });
 
-  testWidgets("history asks for its channels' pictures, the most watched "
-      'first', (tester) async {
+  testWidgets("history asks for every channel's picture, the most recently "
+      'watched first', (tester) async {
+    await _open(tester, history: _longHistory);
+
+    expect(_fetcher.asked.last, [
+      for (var i = 0; i < 20; i++) 'UCr$i',
+      'UCtop',
+    ]);
+  });
+
+  testWidgets("videos without a channel ID ask for no channel's picture", (
+    tester,
+  ) async {
     await _open(tester);
 
     // CAFE Channel's videos name no channel ID to ask for.
     expect(_fetcher.asked.last, ['UCx']);
+  });
+
+  testWidgets('the channels on screen are asked for first, not the most '
+      'watched further down', (tester) async {
+    await _open(tester, history: _longHistory);
+
+    final first = {for (final ids in _fetcher.askedFirst) ...ids};
+    expect(first, contains('UCr0'));
+    expect(first, isNot(contains('UCtop')));
+  });
+
+  testWidgets('scrolling to older videos asks for their channels first', (
+    tester,
+  ) async {
+    await _open(tester, history: _longHistory);
+
+    await tester.drag(
+      find
+          .descendant(
+            of: find.byType(HistoryDayList),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      const Offset(0, -4000),
+    );
+    await tester.pumpAndSettle();
+
+    expect(_fetcher.askedFirst.last, contains('UCtop'));
+  });
+
+  testWidgets('the top channels are asked for first when shown', (
+    tester,
+  ) async {
+    await _open(tester, history: _longHistory);
+    final before = _fetcher.askedFirst.length;
+
+    await _openTab(tester, 2);
+
+    expect(_fetcher.askedFirst.skip(before).first.first, 'UCtop');
   });
 
   testWidgets('signed in, rows keep room for channel pictures still to come', (

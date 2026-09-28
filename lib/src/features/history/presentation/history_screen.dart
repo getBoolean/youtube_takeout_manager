@@ -24,6 +24,7 @@ import '../domain/loaded_history.dart';
 import '../domain/watched_channels.dart';
 import 'history_actions.dart';
 import 'history_day_list.dart';
+import 'on_screen_channels.dart';
 import 'search_entry_tile.dart';
 import 'top_channels_list.dart';
 import 'watch_entry_tile.dart';
@@ -198,13 +199,11 @@ class _HistoryBody extends HookConsumerWidget {
       toTop(searchScroll);
     });
 
-    // Every channel's picture, most watched first; signed out, none are
-    // fetched, so this runs again on signing in.
+    // Every channel's picture, in the order the watched videos are listed;
+    // signed out, none are fetched, so this runs again on signing in.
     final session = ref.watch(readSessionChannelIdProvider);
     useEffect(() {
-      final ids = [
-        for (final c in loaded.watchedChannels) ?c.channel.channelId,
-      ];
+      final ids = loaded.recentChannelIds;
       if (ids.isNotEmpty) {
         unawaited(
           ref.read(channelThumbnailFetcherProvider.notifier).fetchNow(ids),
@@ -212,6 +211,15 @@ class _HistoryBody extends HookConsumerWidget {
       }
       return null;
     }, [loaded, session]);
+
+    // The channels of the rows on screen go first, wherever that is.
+    final onScreen = useMemoized(
+      () => OnScreenChannels((ids) {
+        if (!context.mounted) return;
+        ref.read(channelThumbnailFetcherProvider.notifier).fetchFirst(ids);
+      }),
+    );
+    useEffect(() => onScreen.dispose, [onScreen]);
 
     final query = ref.watch(historySearchQueryProvider);
 
@@ -272,6 +280,7 @@ class _HistoryBody extends HookConsumerWidget {
                       controller: watchList,
                       scrollController: watchScroll,
                       highlighted: highlightedWatch,
+                      onChannelShown: onScreen.add,
                     ),
                     _SearchesTab(
                       loaded: loaded,
@@ -282,6 +291,7 @@ class _HistoryBody extends HookConsumerWidget {
                     ),
                     TopChannelsTab(
                       query: query,
+                      onChannelShown: onScreen.add,
                       onPick: (channel) {
                         ref
                             .read(historyChannelFilterProvider.notifier)
@@ -461,12 +471,16 @@ class _WatchedTab extends ConsumerWidget {
   final ScrollController scrollController;
   final ValueNotifier<int?> highlighted;
 
+  /// Told the channel of each row as it's built.
+  final ValueChanged<String?> onChannelShown;
+
   const _WatchedTab({
     required this.loaded,
     required this.query,
     required this.controller,
     required this.scrollController,
     required this.highlighted,
+    required this.onChannelShown,
   });
 
   @override
@@ -529,15 +543,18 @@ class _WatchedTab extends ConsumerWidget {
                       noun: 'video',
                       highlighted: highlighted.value,
                       onHighlightDone: () => highlighted.value = null,
-                      entryBuilder: (context, index) => WatchEntryTile(
-                        watch: watches[index],
-                        query: query,
-                        thumbnailSize: thumbnail,
-                        channelPicture: pictures[watches[index].channelId],
-                        picturesExpected: picturesExpected,
-                        markRemoved: !removedOnly,
-                        onTap: () => act(index),
-                      ),
+                      entryBuilder: (context, index) {
+                        onChannelShown(watches[index].channelId);
+                        return WatchEntryTile(
+                          watch: watches[index],
+                          query: query,
+                          thumbnailSize: thumbnail,
+                          channelPicture: pictures[watches[index].channelId],
+                          picturesExpected: picturesExpected,
+                          markRemoved: !removedOnly,
+                          onTap: () => act(index),
+                        );
+                      },
                     );
                   },
                 ),
@@ -621,7 +638,15 @@ class TopChannelsTab extends ConsumerWidget {
   final String query;
   final ValueChanged<HistoryChannel> onPick;
 
-  const TopChannelsTab({super.key, required this.query, required this.onPick});
+  /// Told the channel of each row as it's built.
+  final ValueChanged<String>? onChannelShown;
+
+  const TopChannelsTab({
+    super.key,
+    required this.query,
+    required this.onPick,
+    this.onChannelShown,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -639,6 +664,7 @@ class TopChannelsTab extends ConsumerWidget {
       pictures: ref.watch(channelThumbnailsProvider).value ?? const {},
       query: query,
       onPick: onPick,
+      onChannelShown: onChannelShown,
     );
   }
 }

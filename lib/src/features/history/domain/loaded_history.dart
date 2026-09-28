@@ -22,6 +22,10 @@ class LoadedHistory {
   /// Every channel videos were watched from, the most watched first.
   final List<WatchedChannel> watchedChannels;
 
+  /// The ID of every channel videos were watched from, the most recently
+  /// watched first: the order the watched videos are listed in.
+  final List<String> recentChannelIds;
+
   /// Where each channel is in [watchedChannels], by [HistoryChannel.key].
   final Map<Object, int> channelIndexByKey;
 
@@ -41,6 +45,7 @@ class LoadedHistory {
     required this.watchDays,
     required this.searchDays,
     required this.watchedChannels,
+    required this.recentChannelIds,
     required this.channelIndexByKey,
     required this.watchChannelIndex,
     required this.removedWatchCount,
@@ -70,6 +75,10 @@ class LoadedHistory {
         for (var i = 0; i < searchDayKeys.length; i++) i,
       ], searchDayKeys),
       watchedChannels: channels,
+      // The watches are newest first.
+      recentChannelIds: {
+        for (final watch in history.watches) ?watch.channelId,
+      }.toList(),
       channelIndexByKey: channelIndexByKey,
       watchChannelIndex: watchChannelIndex,
       removedWatchCount: history.watches
