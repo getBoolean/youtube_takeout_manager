@@ -179,6 +179,9 @@ class _Selection extends TakeoutSelectionNotifier {
   final String viewing;
   final selected = <String>[];
 
+  /// Holds a selection from being shown until completed.
+  Completer<void>? gate;
+
   _Selection(this.viewing);
 
   @override
@@ -188,6 +191,7 @@ class _Selection extends TakeoutSelectionNotifier {
   @override
   Future<void> select(String takeoutId, {String? channelId}) async {
     selected.add(takeoutId);
+    await gate?.future;
     state = AsyncData(TakeoutSelection(takeoutId: takeoutId));
   }
 }
@@ -302,6 +306,8 @@ void main() {
         saved: {'UCme', 'UCwork'},
         plan: _assumedPlan,
       );
+      // Loaded, as the takeout shown is before anything is imported.
+      await c.read(takeoutSelectionProvider.future);
       await c.read(addAccountImportProvider.notifier).start();
       expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
       return c;
@@ -357,6 +363,21 @@ void main() {
         expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
       },
     );
+
+    test('cancelled before the account picked is shown, says another '
+        'account is shown, as it soon is', () async {
+      final c = await reviewing();
+      final gate = selection.gate = Completer();
+      final add = c.read(addAccountImportProvider.notifier);
+
+      final choice = add.chooseAccount('UCwork');
+      await pumpEventQueue();
+
+      expect(add.dismiss(), isTrue);
+      gate.complete();
+      await choice;
+      expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+    });
 
     test("isn't merged while an account is being picked", () async {
       final c = await reviewing();

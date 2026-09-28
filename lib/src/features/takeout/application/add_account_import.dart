@@ -172,8 +172,15 @@ class AddAccountImport extends _$AddAccountImport {
   /// Ends the import, saved or not. Returns whether another takeout was
   /// shown meanwhile, to merge into it, which stays shown.
   bool dismiss() {
+    // One being picked is shown as soon as it's selected, if it isn't yet.
+    final choosing = switch (state) {
+      AddAccountMergeReview(:final choosing) => choosing,
+      _ => null,
+    };
     ref.read(extraVideoIdsProvider.notifier).clear();
     state = const AddAccountIdle();
-    return ref.read(takeoutSelectionProvider).value?.takeoutId != _shownAtStart;
+    final shown =
+        choosing ?? ref.read(takeoutSelectionProvider).value?.takeoutId;
+    return shown != _shownAtStart;
   }
 }
