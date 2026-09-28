@@ -274,14 +274,34 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byType(FilterChip));
+    expect(find.byKey(HistoryPage.removedChipKey), findsNothing);
+    await tester.tap(find.byKey(HistoryPage.removedToggleKey));
     await tester.pumpAndSettle();
     expect(_shown('Gone'), findsOneWidget);
     expect(_shown('Kept'), findsNothing);
+    // Every row listed was removed; the chip says so once.
+    expect(find.byType(RemovedBadge), findsNothing);
 
-    await tester.tap(find.byType(FilterChip));
+    // Its chip turns it off again.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byKey(HistoryPage.removedChipKey),
+            matching: find.byType(Icon),
+          )
+          .last,
+    );
     await tester.pumpAndSettle();
+    expect(find.byKey(HistoryPage.removedChipKey), findsNothing);
     expect(_shown('Kept'), findsOneWidget);
+  });
+
+  testWidgets('history without removed entries has no Removed filter', (
+    tester,
+  ) async {
+    await _open(tester);
+
+    expect(find.byKey(HistoryPage.removedToggleKey), findsNothing);
   });
 
   testWidgets('the actions sheet names the video it is for', (tester) async {

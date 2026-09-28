@@ -61,6 +61,17 @@ void main() {
       );
     });
 
+    test('finds which day an entry is in, and where', () {
+      final days = groupByDay([0, 1, 3], dayKeys);
+
+      expect(dayAndPositionOf(days, 0), (0, 0));
+      expect(dayAndPositionOf(days, 1), (0, 1));
+      expect(dayAndPositionOf(days, 3), (1, 0));
+      expect(dayAndPositionOf(days, 2), isNull);
+      expect(dayAndPositionOf(days, 9), isNull);
+      expect(dayAndPositionOf(const [], 0), isNull);
+    });
+
     test('jumping to a day finds that day', () {
       final days = groupByDay([0, 1, 2, 3], dayKeys);
 

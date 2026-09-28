@@ -59,16 +59,39 @@ class WatchedChannel {
     required this.lastWatched,
     this.byTitle = false,
   }) : searchText = foldForSearch(channel.title);
+
+  WatchedChannel._found(
+    WatchedChannel all, {
+    required this.count,
+    required this.lastWatched,
+    required this.byTitle,
+  }) : channel = all.channel,
+       searchText = all.searchText;
+
+  /// This channel as a search found it: [count] of its videos, the newest
+  /// watched at [lastWatched]. Its name isn't folded again.
+  WatchedChannel found({
+    required int count,
+    required DateTime lastWatched,
+    required bool byTitle,
+  }) => WatchedChannel._found(
+    this,
+    count: count,
+    lastWatched: lastWatched,
+    byTitle: byTitle,
+  );
+}
+
+/// Orders channels the most watched first, then by name.
+int compareWatchedChannels(WatchedChannel a, WatchedChannel b) {
+  final byCount = b.count.compareTo(a.count);
+  return byCount != 0 ? byCount : a.channel.title.compareTo(b.channel.title);
 }
 
 /// The channels of the videos [watches] (newest first) were of, the most
-/// watched first, marked [WatchedChannel.byTitle] when [byTitle] says the
-/// videos were found by title. Videos with no channel, such as removed
-/// ones, are left out.
-List<WatchedChannel> countWatchedChannels(
-  List<WatchEntry> watches, {
-  bool byTitle = false,
-}) {
+/// watched first. Videos with no channel, such as removed ones, are left
+/// out.
+List<WatchedChannel> countWatchedChannels(List<WatchEntry> watches) {
   final counts = <Object, ({WatchEntry newest, int count})>{};
   for (final watch in watches) {
     final key = HistoryChannel.of(watch)?.key;
@@ -85,10 +108,6 @@ List<WatchedChannel> countWatchedChannels(
         channel: HistoryChannel.of(newest)!,
         count: count,
         lastWatched: newest.time,
-        byTitle: byTitle,
       ),
-  ]..sort((a, b) {
-    final byCount = b.count.compareTo(a.count);
-    return byCount != 0 ? byCount : a.channel.title.compareTo(b.channel.title);
-  });
+  ]..sort(compareWatchedChannels);
 }

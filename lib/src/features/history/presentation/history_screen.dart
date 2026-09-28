@@ -22,6 +22,7 @@ import 'history_day_list.dart';
 import 'search_entry_tile.dart';
 import 'top_channels_list.dart';
 import 'watch_entry_tile.dart';
+import 'removed_badge.dart';
 
 /// The selected takeout's watch and search history, as its own screen.
 /// Without a takeout there's none to show, so it goes back to the channels.
@@ -77,6 +78,11 @@ class HistoryPage extends HookConsumerWidget {
 
   /// Shown when the takeout has no history.
   static const noHistoryKey = ValueKey('history-none');
+
+  /// The toggle for, and the chip of, the filter for what was removed from
+  /// YouTube's history.
+  static const removedToggleKey = ValueKey('history-removed-toggle');
+  static const removedChipKey = ValueKey('history-removed-chip');
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -189,6 +195,16 @@ class _HistoryBody extends HookConsumerWidget {
 
     final query = ref.watch(historySearchQueryProvider);
 
+    // The lists come a frame after the rest of the screen, so opening it
+    // never builds everything in one frame.
+    final showLists = useState(false);
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) showLists.value = true;
+      });
+      return null;
+    }, const []);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -199,6 +215,7 @@ class _HistoryBody extends HookConsumerWidget {
             onQueryChanged: (q) =>
                 ref.read(historySearchQueryProvider.notifier).update(q),
             trailing: [
+              _RemovedToggle(loaded: loaded, tabController: tabController),
               _JumpToDateButton(
                 tabController: tabController,
                 lists: (watches: watchList, searches: searchList),
@@ -224,32 +241,36 @@ class _HistoryBody extends HookConsumerWidget {
           ),
         ),
         Expanded(
-          child: TabBarView(
-            controller: tabController,
-            children: [
-              _WatchedTab(
-                loaded: loaded,
-                query: query,
-                controller: watchList,
-                scrollController: watchScroll,
-                highlighted: highlightedWatch,
-              ),
-              _SearchesTab(
-                loaded: loaded,
-                query: query,
-                controller: searchList,
-                scrollController: searchScroll,
-                highlighted: highlightedSearch,
-              ),
-              TopChannelsTab(
-                query: query,
-                onPick: (channel) {
-                  ref.read(historyChannelFilterProvider.notifier).show(channel);
-                  tabController.animateTo(0);
-                },
-              ),
-            ],
-          ),
+          child: !showLists.value
+              ? const SizedBox.shrink()
+              : TabBarView(
+                  controller: tabController,
+                  children: [
+                    _WatchedTab(
+                      loaded: loaded,
+                      query: query,
+                      controller: watchList,
+                      scrollController: watchScroll,
+                      highlighted: highlightedWatch,
+                    ),
+                    _SearchesTab(
+                      loaded: loaded,
+                      query: query,
+                      controller: searchList,
+                      scrollController: searchScroll,
+                      highlighted: highlightedSearch,
+                    ),
+                    TopChannelsTab(
+                      query: query,
+                      onPick: (channel) {
+                        ref
+                            .read(historyChannelFilterProvider.notifier)
+                            .show(channel);
+                        tabController.animateTo(0);
+                      },
+                    ),
+                  ],
+                ),
         ),
       ],
     );
@@ -314,48 +335,96 @@ class _JumpToDateButton extends HookConsumerWidget {
   }
 }
 
-/// The filters above a list: only entries removed from YouTube's history,
-/// shown when there are some, and the channel watched videos are narrowed
-/// to.
-class _Filters extends ConsumerWidget {
-  final bool anyRemoved;
+/// The filters on above a list, each a chip that removes it: only entries
+/// removed from YouTube's history, and the channel watched videos are
+/// narrowed to. Nothing while none are on.
+class _ActiveFilters extends ConsumerWidget {
   final HistoryChannel? channel;
 
-  const _Filters({required this.anyRemoved, this.channel});
+  const _ActiveFilters({this.channel});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final channel = this.channel;
-    if (!anyRemoved && !removedOnly && channel == null) {
+    return AnimatedSize(
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: !removedOnly && channel == null
+          ? const SizedBox(width: double.infinity)
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (removedOnly)
+                    InputChip(
+                      key: HistoryPage.removedChipKey,
+                      avatar: const Icon(removedIcon, size: 18),
+                      label: const Tooltip(
+                        message: 'Only what was removed from YouTube history',
+                        child: Text('Removed'),
+                      ),
+                      deleteButtonTooltipMessage: 'Show everything',
+                      onDeleted: () => ref
+                          .read(historyRemovedFilterProvider.notifier)
+                          .set(false),
+                    ),
+                  if (channel != null)
+                    InputChip(
+                      avatar: ChannelAvatar(name: channel.title, radius: 12),
+                      label: Text(
+                        channel.title,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      deleteButtonTooltipMessage: 'Show every channel',
+                      onDeleted: () => ref
+                          .read(historyChannelFilterProvider.notifier)
+                          .clear(),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+/// Shows only what was removed from YouTube's history, in the watched
+/// videos or searches. Only there when the history has some.
+class _RemovedToggle extends HookConsumerWidget {
+  final LoadedHistory loaded;
+  final TabController tabController;
+
+  const _RemovedToggle({required this.loaded, required this.tabController});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    useListenable(tabController);
+    if (loaded.removedWatchCount + loaded.removedSearchCount == 0) {
       return const SizedBox.shrink();
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          if (anyRemoved || removedOnly)
-            FilterChip(
-              avatar: const Icon(Icons.history_toggle_off, size: 18),
-              label: const Text('Removed'),
-              tooltip: 'Only what was removed from your YouTube history',
-              selected: removedOnly,
-              showCheckmark: false,
-              onSelected: (on) =>
-                  ref.read(historyRemovedFilterProvider.notifier).set(on),
-            ),
-          if (channel != null)
-            InputChip(
-              avatar: ChannelAvatar(name: channel.title, radius: 12),
-              label: Text(channel.title, overflow: TextOverflow.ellipsis),
-              deleteButtonTooltipMessage: 'Show every channel',
-              onDeleted: () =>
-                  ref.read(historyChannelFilterProvider.notifier).clear(),
-            ),
-        ],
-      ),
+    final applies = switch (tabController.index) {
+      0 => loaded.removedWatchCount > 0,
+      1 => loaded.removedSearchCount > 0,
+      _ => false,
+    };
+    final on = ref.watch(historyRemovedFilterProvider);
+    return IconButton(
+      key: HistoryPage.removedToggleKey,
+      isSelected: on,
+      icon: const Icon(Icons.auto_delete_outlined),
+      selectedIcon: const Icon(removedIcon),
+      tooltip: on
+          ? 'Show everything'
+          : 'Show only what was removed from YouTube history',
+      // Always turns it off, even where nothing was removed.
+      onPressed: applies || on
+          ? () => ref.read(historyRemovedFilterProvider.notifier).set(!on)
+          : null,
     );
   }
 }
@@ -379,6 +448,7 @@ class _WatchedTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final days = ref.watch(watchDaysProvider);
     final channel = ref.watch(historyChannelFilterProvider);
+    final removedOnly = ref.watch(historyRemovedFilterProvider);
     final watches = loaded.history.watches;
 
     Future<void> act(int index) async {
@@ -404,7 +474,7 @@ class _WatchedTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Filters(anyRemoved: loaded.removedWatchCount > 0, channel: channel),
+        _ActiveFilters(channel: channel),
         Expanded(
           child: days.isEmpty
               ? EmptyState(
@@ -413,18 +483,28 @@ class _WatchedTab extends ConsumerWidget {
                       ? 'This takeout has no watch history.'
                       : 'No watched videos match.',
                 )
-              : HistoryDayList(
-                  days: days,
-                  controller: controller,
-                  scrollController: scrollController,
-                  noun: 'video',
-                  highlighted: highlighted.value,
-                  onHighlightDone: () => highlighted.value = null,
-                  entryBuilder: (context, index) => WatchEntryTile(
-                    watch: watches[index],
-                    query: query,
-                    onTap: () => act(index),
-                  ),
+              : LayoutBuilder(
+                  // Every row is as wide, so it's measured once, not per row.
+                  builder: (context, constraints) {
+                    final thumbnail = WatchEntryTile.thumbnailSizeFor(
+                      constraints.maxWidth,
+                    );
+                    return HistoryDayList(
+                      days: days,
+                      controller: controller,
+                      scrollController: scrollController,
+                      noun: 'video',
+                      highlighted: highlighted.value,
+                      onHighlightDone: () => highlighted.value = null,
+                      entryBuilder: (context, index) => WatchEntryTile(
+                        watch: watches[index],
+                        query: query,
+                        thumbnailSize: thumbnail,
+                        markRemoved: !removedOnly,
+                        onTap: () => act(index),
+                      ),
+                    );
+                  },
                 ),
         ),
       ],
@@ -450,6 +530,7 @@ class _SearchesTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final days = ref.watch(searchDaysProvider);
+    final removedOnly = ref.watch(historyRemovedFilterProvider);
     final searches = loaded.history.searches;
 
     Future<void> act(int index) async {
@@ -469,7 +550,7 @@ class _SearchesTab extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _Filters(anyRemoved: loaded.removedSearchCount > 0),
+        const _ActiveFilters(),
         Expanded(
           child: days.isEmpty
               ? EmptyState(
@@ -489,6 +570,7 @@ class _SearchesTab extends ConsumerWidget {
                   entryBuilder: (context, index) => SearchEntryTile(
                     search: searches[index],
                     query: query,
+                    markRemoved: !removedOnly,
                     onTap: () => act(index),
                   ),
                 ),

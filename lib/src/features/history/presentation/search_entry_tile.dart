@@ -12,19 +12,24 @@ class SearchEntryTile extends StatelessWidget {
 
   /// Highlighted in the query; empty for none.
   final String query;
+
+  /// Whether it's marked when removed from YouTube's history; not when
+  /// only those are listed.
+  final bool markRemoved;
   final VoidCallback onTap;
 
   const SearchEntryTile({
     super.key,
     required this.search,
     this.query = '',
+    this.markRemoved = true,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final removedAt = search.removedAt;
+    final removedAt = markRemoved ? search.removedAt : null;
     return ListTile(
       onTap: onTap,
       leading: Icon(search.music ? Icons.music_note_outlined : Icons.search),

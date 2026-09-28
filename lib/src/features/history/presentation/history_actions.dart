@@ -27,6 +27,7 @@ Future<WatchAction?> showWatchActionsSheet(
           width: 64,
           height: 36,
           child: VideoThumbnail(
+            width: 64,
             url: switch (watch.videoId) {
               final id? => 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
               null => null,

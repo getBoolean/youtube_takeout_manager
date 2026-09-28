@@ -37,3 +37,35 @@ HistoryDay? dayGroupFor(List<HistoryDay> days, DateTime date) {
   }
   return days.last;
 }
+
+/// Which of [days] has the entry at [index], and where in it, or null when
+/// none does. Days hold ascending indices, as [groupByDay] makes them, so
+/// both are binary searches.
+(int, int)? dayAndPositionOf(List<HistoryDay> days, int index) {
+  var low = 0;
+  var high = days.length - 1;
+  // The last day whose first entry is at or before [index].
+  while (low < high) {
+    final mid = (low + high + 1) >> 1;
+    if (days[mid].indices.first <= index) {
+      low = mid;
+    } else {
+      high = mid - 1;
+    }
+  }
+  if (days.isEmpty || days[low].indices.first > index) return null;
+  final indices = days[low].indices;
+  var start = 0;
+  var end = indices.length - 1;
+  while (start <= end) {
+    final mid = (start + end) >> 1;
+    final at = indices[mid];
+    if (at == index) return (low, mid);
+    if (at < index) {
+      start = mid + 1;
+    } else {
+      end = mid - 1;
+    }
+  }
+  return null;
+}

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/scroll_target_highlight.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/sticky_grouped_list/sticky_grouped_list.dart';
-import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/section_header.dart';
 import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/history_days.dart';
@@ -46,6 +45,9 @@ class HistoryDayList extends StatelessWidget {
       groupKey: (day) => day.dayKey,
       itemsOf: (day) => day.indices,
       itemKey: (index) => index,
+      // Found by binary search, rather than mapping every entry when the
+      // days change.
+      locateItem: (key) => key is int ? dayAndPositionOf(days, key) : null,
       controller: controller,
       scrollController: scrollController,
       // Keeps its place while another tab is open.
@@ -53,10 +55,9 @@ class HistoryDayList extends StatelessWidget {
       createHeaderState: (_, _, _) => _noState,
       updateHeaderState: (_, _, _) {},
       disposeHeaderState: (_) {},
-      headerBuilder: (context, day, _, _) => SectionHeader(
-        label:
-            '${formatDay(day.day)} · '
-            '${formatCount(day.indices.length, noun, plural: plural)}',
+      headerBuilder: (context, day, _, _) => _DayHeader(
+        day: formatDay(day.day),
+        count: formatCount(day.indices.length, noun, plural: plural),
       ),
       itemBuilder: (context, day, index, _) {
         final entry = entryBuilder(context, index);
@@ -68,6 +69,48 @@ class HistoryDayList extends StatelessWidget {
         );
       },
       trailing: const SliverToBoxAdapter(child: SizedBox(height: 24)),
+    );
+  }
+}
+
+/// A day's header: the day, and how many entries it has on the far side.
+/// Opaque, since its pinned copy is drawn over the rows.
+class _DayHeader extends StatelessWidget {
+  final String day;
+  final String count;
+
+  const _DayHeader({required this.day, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        // Day and count at either side; the count under the day when both
+        // don't fit.
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 2,
+          children: [
+            Text(day, style: theme.textTheme.titleSmall),
+            Text(
+              count,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -69,6 +69,10 @@ class _Fixed extends TakeoutHistoryNotifier {
       history == null ? null : LoadedHistory.of(history!);
 }
 
+/// Waits for the search the filters just changed to finish.
+Future<void> _settle(ProviderContainer c) =>
+    c.read(historySearchProvider.future);
+
 void main() {
   late MemoryTakeoutRepository repository;
 
@@ -95,6 +99,8 @@ void main() {
       ],
     );
     addTearDown(c.dispose);
+    // Keeps the search alive, as the screen does.
+    c.listen(historyResultsProvider, (_, _) {});
     return c;
   }
 
@@ -159,6 +165,7 @@ void main() {
       final c = await loaded();
 
       c.read(historySearchQueryProvider.notifier).update('cafe');
+      await _settle(c);
 
       expect(watchTitles(c), ['Café tour', 'Other']);
     },
@@ -170,6 +177,7 @@ void main() {
     c
         .read(historyChannelFilterProvider.notifier)
         .show(const HistoryChannel(channelId: 'UCx', title: 'X'));
+    await _settle(c);
 
     expect(watchTitles(c), ['Café tour', 'Unrelated', 'Last']);
   });
@@ -182,10 +190,13 @@ void main() {
       c
           .read(historyChannelFilterProvider.notifier)
           .show(const HistoryChannel(channelId: 'UCx', title: 'X'));
+      await _settle(c);
       c.read(historySearchQueryProvider.notifier).update('cafe');
+      await _settle(c);
       expect(watchTitles(c), ['Café tour']);
 
       c.read(historyChannelFilterProvider.notifier).clear();
+      await _settle(c);
       expect(watchTitles(c), ['Café tour', 'Other']);
     },
   );
@@ -199,6 +210,7 @@ void main() {
 
     expect(c.read(searchDaysProvider), hasLength(2));
     c.read(historySearchQueryProvider.notifier).update('creme');
+    await _settle(c);
 
     expect(queries(), ['crème brûlée']);
   });
@@ -260,6 +272,7 @@ void main() {
     await c.read(takeoutHistoryProvider.future);
 
     c.read(historySearchQueryProvider.notifier).update('mario kart');
+    await _settle(c);
     final channels = c.read(filteredWatchedChannelsProvider);
 
     // By name with every video; by title with the videos that match.
@@ -299,6 +312,7 @@ void main() {
       final loaded = (await c.read(takeoutHistoryProvider.future))!.history;
 
       c.read(historyRemovedFilterProvider.notifier).set(true);
+      await _settle(c);
 
       expect(
         [
@@ -316,6 +330,7 @@ void main() {
       );
 
       c.read(historyRemovedFilterProvider.notifier).set(false);
+      await _settle(c);
       expect(c.read(watchDaysProvider).expand((d) => d.indices), hasLength(2));
     },
   );
