@@ -85,6 +85,40 @@ void main() {
     'nothing, however wide the line',
     expectPictureArrivesInPlace,
   );
+
+  testWidgets('with larger text, the detail is still never cut off beside '
+      "the channel's picture", (tester) async {
+    // Past where the line fits once, with square test glyphs.
+    for (var width = 380.0; width <= 460; width += 2) {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.3)),
+            child: Scaffold(
+              body: Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  width: width,
+                  child: const ChannelMetaLine(
+                    channelName: 'Shortcat Gaming',
+                    keepPictureSpace: true,
+                    detail: '2:05 PM',
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final withDetail = find.textContaining('2:05 PM', findRichText: true);
+      expect(
+        tester.renderObject<RenderParagraph>(withDetail).didExceedMaxLines,
+        isFalse,
+        reason: '$width',
+      );
+    }
+  });
 }
 
 /// Checks, across widths, that the line keeps its size and its name keeps

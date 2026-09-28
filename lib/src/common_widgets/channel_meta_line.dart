@@ -40,16 +40,21 @@ class ChannelMetaLine extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final oneLine = '$prefix$channelName · $detail';
+        final textScaler = MediaQuery.textScalerOf(context);
         final painter = TextPainter(
           text: TextSpan(text: oneLine, style: style),
-          textScaler: MediaQuery.textScalerOf(context),
+          textScaler: textScaler,
           textDirection: Directionality.of(context),
           maxLines: 1,
         )..layout();
         final url = thumbnailUrl;
         final picture = url != null || keepPictureSpace;
+        // A picture in a line of text grows with the text.
+        final fontSize = style?.fontSize ?? kDefaultFontSize;
+        final pictureScale = textScaler.scale(fontSize) / fontSize;
         final width =
-            painter.width + (picture ? _pictureSize + _pictureGap : 0);
+            painter.width +
+            (picture ? (_pictureSize + _pictureGap) * pictureScale : 0);
         painter.dispose();
         final fits = width <= constraints.maxWidth;
 
