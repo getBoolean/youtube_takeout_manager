@@ -10,6 +10,9 @@ import '../domain/watched_channels.dart';
 class TopChannelsList extends StatelessWidget {
   final List<WatchedChannel> channels;
 
+  /// Channel pictures by channel ID.
+  final Map<String, String> pictures;
+
   /// Highlighted in the names; empty for none.
   final String query;
   final ValueChanged<HistoryChannel> onPick;
@@ -17,6 +20,7 @@ class TopChannelsList extends StatelessWidget {
   const TopChannelsList({
     super.key,
     required this.channels,
+    required this.pictures,
     required this.query,
     required this.onPick,
   });
@@ -33,7 +37,11 @@ class TopChannelsList extends StatelessWidget {
           watched.byTitle ? 'matching video' : 'video',
         );
         return ListTile(
-          leading: ChannelAvatar(name: channel.title, radius: 20),
+          leading: ChannelAvatar(
+            name: channel.title,
+            thumbnailUrl: pictures[channel.channelId],
+            radius: 20,
+          ),
           title: HighlightedText(
             channel.title,
             // Found by the titles of its videos, its name doesn't match.

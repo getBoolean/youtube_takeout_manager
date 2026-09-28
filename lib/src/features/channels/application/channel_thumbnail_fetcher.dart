@@ -78,9 +78,8 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
 
   /// Fetches everything queued, including what's queued meanwhile; while
   /// it runs, calls get the same run.
-  Future<void> _fetchPending() => _running ??= _fetchAll().whenComplete(
-    () => _running = null,
-  );
+  Future<void> _fetchPending() =>
+      _running ??= _fetchAll().whenComplete(() => _running = null);
 
   Future<void> _fetchAll() async {
     final sessionChannelId = ref.read(readSessionChannelIdProvider);

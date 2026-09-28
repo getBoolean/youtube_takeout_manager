@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
@@ -69,6 +73,29 @@ class _Fixed extends TakeoutHistoryNotifier {
       history == null ? null : LoadedHistory.of(history!);
 }
 
+/// Records the channels history asks for pictures of.
+class _Fetcher extends ChannelThumbnailFetcher {
+  final asked = <List<String>>[];
+
+  @override
+  void build() {}
+
+  @override
+  Future<void> fetchNow(Iterable<String> channelIds) async =>
+      asked.add(channelIds.toList());
+}
+
+class _Pictures extends ChannelThumbnails {
+  _Pictures(this.pictures);
+
+  final Map<String, String> pictures;
+
+  @override
+  Future<Map<String, String>> build() async => pictures;
+}
+
+late _Fetcher _fetcher;
+
 /// The channel list, with only its History button, and history.
 class _Router extends RootStackRouter {
   @override
@@ -91,6 +118,7 @@ Future<ProviderContainer> _open(
   TakeoutHistory? history,
   bool noTakeout = false,
   double width = 800,
+  Map<String, String> pictures = const {},
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -101,6 +129,8 @@ Future<ProviderContainer> _open(
       takeoutHistoryProvider.overrideWith(
         () => _Fixed(noTakeout ? null : history ?? _history),
       ),
+      channelThumbnailFetcherProvider.overrideWith(() => _fetcher = _Fetcher()),
+      channelThumbnailsProvider.overrideWith(() => _Pictures(pictures)),
     ],
   );
   addTearDown(container.dispose);
@@ -362,6 +392,55 @@ void main() {
 
     expect(find.byType(DeletionQueuePane), findsNothing);
     expect(find.byType(DeletionQueueStrip), findsNothing);
+  });
+
+  testWidgets("history asks for its channels' pictures, the most watched "
+      'first', (tester) async {
+    await _open(tester);
+
+    // CAFE Channel's videos name no channel ID to ask for.
+    expect(_fetcher.asked.last, ['UCx']);
+  });
+
+  testWidgets('channel pictures show in the rows, the channel chip and the '
+      'top channels', (tester) async {
+    const picture = 'https://yt3.example/x';
+    await _open(tester, pictures: {'UCx': picture});
+
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ChannelMetaLine && w.thumbnailUrl == picture,
+      ),
+      findsWidgets,
+    );
+
+    await _openTab(tester, 2);
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is ChannelAvatar && w.thumbnailUrl == picture,
+      ),
+      findsOneWidget,
+    );
+
+    // Picking it shows its chip, with its picture too.
+    await tester.tap(
+      find
+          .descendant(
+            of: find.byType(TopChannelsList),
+            matching: find.byType(ListTile),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(InputChip),
+        matching: find.byWidgetPredicate(
+          (w) => w is ChannelAvatar && w.thumbnailUrl == picture,
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a takeout without history explains how to add it', (

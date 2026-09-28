@@ -2,7 +2,6 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-
 part 'youtube_channel_repository.g.dart';
 
 @Riverpod(keepAlive: true)

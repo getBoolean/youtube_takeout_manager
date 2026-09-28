@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
@@ -193,6 +198,21 @@ class _HistoryBody extends HookConsumerWidget {
       toTop(searchScroll);
     });
 
+    // Every channel's picture, most watched first; signed out, none are
+    // fetched, so this runs again on signing in.
+    final session = ref.watch(readSessionChannelIdProvider);
+    useEffect(() {
+      final ids = [
+        for (final c in loaded.watchedChannels) ?c.channel.channelId,
+      ];
+      if (ids.isNotEmpty) {
+        unawaited(
+          ref.read(channelThumbnailFetcherProvider.notifier).fetchNow(ids),
+        );
+      }
+      return null;
+    }, [loaded, session]);
+
     final query = ref.watch(historySearchQueryProvider);
 
     // The lists come a frame after the rest of the screen, so opening it
@@ -347,6 +367,7 @@ class _ActiveFilters extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final channel = this.channel;
+    final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
     return AnimatedSize(
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
@@ -376,7 +397,11 @@ class _ActiveFilters extends ConsumerWidget {
                     ),
                   if (channel != null)
                     InputChip(
-                      avatar: ChannelAvatar(name: channel.title, radius: 12),
+                      avatar: ChannelAvatar(
+                        name: channel.title,
+                        thumbnailUrl: pictures[channel.channelId],
+                        radius: 12,
+                      ),
                       label: Text(
                         channel.title,
                         overflow: TextOverflow.ellipsis,
@@ -448,12 +473,17 @@ class _WatchedTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final days = ref.watch(watchDaysProvider);
     final channel = ref.watch(historyChannelFilterProvider);
+    final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final watches = loaded.history.watches;
 
     Future<void> act(int index) async {
       final watch = watches[index];
-      final action = await showWatchActionsSheet(context, watch);
+      final action = await showWatchActionsSheet(
+        context,
+        watch,
+        channelPicture: pictures[watch.channelId],
+      );
       if (!context.mounted) return;
       switch (action) {
         case WatchAction.open:
@@ -500,6 +530,7 @@ class _WatchedTab extends ConsumerWidget {
                         watch: watches[index],
                         query: query,
                         thumbnailSize: thumbnail,
+                        channelPicture: pictures[watches[index].channelId],
                         markRemoved: !removedOnly,
                         onTap: () => act(index),
                       ),
@@ -599,6 +630,11 @@ class TopChannelsTab extends ConsumerWidget {
             : 'No channels match.',
       );
     }
-    return TopChannelsList(channels: channels, query: query, onPick: onPick);
+    return TopChannelsList(
+      channels: channels,
+      pictures: ref.watch(channelThumbnailsProvider).value ?? const {},
+      query: query,
+      onPick: onPick,
+    );
   }
 }

@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/actions_sheet.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/video_thumbnail.dart';
+import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/search_entry.dart';
 import '../domain/watch_entry.dart';
 import '../domain/watched_channels.dart';
@@ -12,11 +14,13 @@ import '../domain/watched_channels.dart';
 enum WatchAction { open, showChannel, openChannel, copyLink }
 
 /// Offers what can be done with [watch], under its thumbnail, title and
-/// channel. Returns the pick, or null if the sheet was dismissed.
+/// channel, with the channel's [channelPicture] when there is one. Returns
+/// the pick, or null if the sheet was dismissed.
 Future<WatchAction?> showWatchActionsSheet(
   BuildContext context,
-  WatchEntry watch,
-) {
+  WatchEntry watch, {
+  String? channelPicture,
+}) {
   final channel = HistoryChannel.of(watch);
   final theme = Theme.of(context);
   return showActionsSheet(
@@ -47,13 +51,10 @@ Future<WatchAction?> showWatchActionsSheet(
                 overflow: TextOverflow.ellipsis,
               ),
               if (watch.channelTitle case final name?)
-                Text(
-                  name,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                ChannelMetaLine(
+                  channelName: name,
+                  thumbnailUrl: channelPicture,
+                  detail: formatDateTime(watch.time),
                 ),
             ],
           ),

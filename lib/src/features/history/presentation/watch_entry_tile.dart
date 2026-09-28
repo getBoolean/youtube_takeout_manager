@@ -22,6 +22,9 @@ class WatchEntryTile extends StatelessWidget {
   /// From [thumbnailSizeFor]; null for none.
   final Size? thumbnailSize;
 
+  /// The picture of its channel, when there is one.
+  final String? channelPicture;
+
   /// Whether it's marked when removed from YouTube's history; not when
   /// only those are listed.
   final bool markRemoved;
@@ -32,6 +35,7 @@ class WatchEntryTile extends StatelessWidget {
     required this.watch,
     this.query = '',
     required this.thumbnailSize,
+    this.channelPicture,
     this.markRemoved = true,
     required this.onTap,
   });
@@ -101,6 +105,7 @@ class WatchEntryTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   ChannelMetaLine(
                     channelName: watch.channelTitle,
+                    thumbnailUrl: channelPicture,
                     detail: formatTime(watch.time),
                   ),
                   if (badges.isNotEmpty || removedAt != null) ...[
