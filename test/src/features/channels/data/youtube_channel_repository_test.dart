@@ -59,4 +59,16 @@ void main() {
       );
     });
   });
+
+  group('fetchChannelThumbnails', () {
+    test("lets a failed request through, so its channels aren't taken to "
+        'be gone', () {
+      final client = MockClient((_) async => http.Response('', 500));
+
+      expect(
+        YoutubeChannelRepository().fetchChannelThumbnails(client, {'UCa'}),
+        throwsA(anything),
+      );
+    });
+  });
 }

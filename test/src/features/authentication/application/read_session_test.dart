@@ -119,6 +119,12 @@ class _NoCache implements ChannelCacheRepository {
   Future<void> saveThumbnails(Map<String, String> thumbnails) async {}
 
   @override
+  Future<Set<String>> loadNotFoundIds() async => {};
+
+  @override
+  Future<void> saveNotFoundIds(Set<String> ids) async {}
+
+  @override
   Future<void> clearThumbnails() async {}
 }
 

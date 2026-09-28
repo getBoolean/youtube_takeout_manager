@@ -8,23 +8,32 @@ part of 'channel_thumbnail_fetcher.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of [thumbnailBatchSize] as they appear, and the rest once video
-/// titles are done.
+/// Fetches channel pictures: for the channels the viewed channel
+/// interacted with, once [thumbnailBatchSize] of them appear and the rest
+/// once video titles are done; and whole lists at once, such as history's
+/// channels, with [fetchNow]. Each request is counted against the quota;
+/// channels YouTube has no picture for are remembered and not asked for
+/// again. Signed out, nothing is fetched.
 /// An effect: nothing depends on it, so it can read any provider.
 
 @ProviderFor(ChannelThumbnailFetcher)
 final channelThumbnailFetcherProvider = ChannelThumbnailFetcherProvider._();
 
-/// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of [thumbnailBatchSize] as they appear, and the rest once video
-/// titles are done.
+/// Fetches channel pictures: for the channels the viewed channel
+/// interacted with, once [thumbnailBatchSize] of them appear and the rest
+/// once video titles are done; and whole lists at once, such as history's
+/// channels, with [fetchNow]. Each request is counted against the quota;
+/// channels YouTube has no picture for are remembered and not asked for
+/// again. Signed out, nothing is fetched.
 /// An effect: nothing depends on it, so it can read any provider.
 final class ChannelThumbnailFetcherProvider
     extends $NotifierProvider<ChannelThumbnailFetcher, void> {
-  /// Fetches pictures for the channels the viewed channel interacted with, in
-  /// batches of [thumbnailBatchSize] as they appear, and the rest once video
-  /// titles are done.
+  /// Fetches channel pictures: for the channels the viewed channel
+  /// interacted with, once [thumbnailBatchSize] of them appear and the rest
+  /// once video titles are done; and whole lists at once, such as history's
+  /// channels, with [fetchNow]. Each request is counted against the quota;
+  /// channels YouTube has no picture for are remembered and not asked for
+  /// again. Signed out, nothing is fetched.
   /// An effect: nothing depends on it, so it can read any provider.
   ChannelThumbnailFetcherProvider._()
     : super(
@@ -54,11 +63,14 @@ final class ChannelThumbnailFetcherProvider
 }
 
 String _$channelThumbnailFetcherHash() =>
-    r'41e549691f80485b4cce60798ffa0a9bc0d894f3';
+    r'a936af75ef63c67f57f3e08df630cc3e80ca910d';
 
-/// Fetches pictures for the channels the viewed channel interacted with, in
-/// batches of [thumbnailBatchSize] as they appear, and the rest once video
-/// titles are done.
+/// Fetches channel pictures: for the channels the viewed channel
+/// interacted with, once [thumbnailBatchSize] of them appear and the rest
+/// once video titles are done; and whole lists at once, such as history's
+/// channels, with [fetchNow]. Each request is counted against the quota;
+/// channels YouTube has no picture for are remembered and not asked for
+/// again. Signed out, nothing is fetched.
 /// An effect: nothing depends on it, so it can read any provider.
 
 abstract class _$ChannelThumbnailFetcher extends $Notifier<void> {

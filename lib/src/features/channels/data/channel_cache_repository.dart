@@ -11,6 +11,7 @@ ChannelCacheRepository channelCacheRepository(Ref ref) =>
     ChannelCacheRepository(ref.watch(kvStorageServiceProvider));
 
 const _cachedThumbnailsKey = 'cached_channel_thumbnails';
+const _notFoundKey = 'channel_thumbnails_not_found';
 
 /// Persists channel thumbnail URLs to local storage
 /// so they survive app restarts and avoid redundant API calls.
@@ -31,7 +32,20 @@ class ChannelCacheRepository {
     await _kv.setString(_cachedThumbnailsKey, jsonEncode(thumbnails));
   }
 
+  /// Channels YouTube had no picture for, e.g. since deleted, so they
+  /// aren't asked for again.
+  Future<Set<String>> loadNotFoundIds() async {
+    final jsonStr = await _kv.getString(_notFoundKey);
+    if (jsonStr == null) return {};
+    return {...(jsonDecode(jsonStr) as List<dynamic>).cast<String>()};
+  }
+
+  Future<void> saveNotFoundIds(Set<String> ids) =>
+      _kv.setString(_notFoundKey, jsonEncode(ids.toList()));
+
+  /// Forgets the pictures and the channels that had none.
   Future<void> clearThumbnails() async {
     await _kv.remove(_cachedThumbnailsKey);
+    await _kv.remove(_notFoundKey);
   }
 }

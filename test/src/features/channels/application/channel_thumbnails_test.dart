@@ -11,6 +11,8 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 
 class _Clients extends GoogleAuthRepository {
@@ -29,13 +31,31 @@ class _Clients extends GoogleAuthRepository {
 class _Channels extends YoutubeChannelRepository {
   final bool signInFails;
 
-  _Channels({this.signInFails = false});
+  /// Channels YouTube doesn't have.
+  final Set<String> missing;
+
+  /// How many requests fail, as when offline, before they work.
+  int failures;
+
+  /// The channels each request asked for.
+  final requests = <List<String>>[];
+
+  _Channels({
+    this.signInFails = false,
+    this.missing = const {},
+    this.failures = 0,
+  });
 
   @override
   Future<Map<String, String>> fetchChannelThumbnails(
     http.Client authClient,
     Set<String> channelIds,
   ) async {
+    requests.add(channelIds.toList());
+    if (failures > 0) {
+      failures--;
+      throw http.ClientException('offline');
+    }
     if (signInFails) {
       throw ServerRequestFailedException(
         'invalid_grant',
@@ -43,7 +63,10 @@ class _Channels extends YoutubeChannelRepository {
         responseContent: {'error': 'invalid_grant'},
       );
     }
-    return {for (final id in channelIds) id: 'https://yt3.example/$id'};
+    return {
+      for (final id in channelIds)
+        if (!missing.contains(id)) id: 'https://yt3.example/$id',
+    };
   }
 }
 
@@ -79,13 +102,14 @@ void main() {
     required _SignIns signIns,
     String? session = 'UCother',
     bool signInFails = false,
+    _Channels? channels,
   }) {
     final c = ProviderContainer(
       overrides: [
         readSessionChannelIdProvider.overrideWithValue(session),
         googleAuthRepositoryProvider.overrideWithValue(clients),
         youtubeChannelRepositoryProvider.overrideWithValue(
-          _Channels(signInFails: signInFails),
+          channels ?? _Channels(signInFails: signInFails),
         ),
         signInServiceProvider.overrideWith(() => signIns),
         channelsProvider.overrideWith((ref) => ref.watch(_shown)),
@@ -195,6 +219,69 @@ void main() {
     await pumpEventQueue();
     expect(c.read(channelThumbnailsProvider).value, {
       'UCa': 'https://yt3.example/UCa',
+    });
+  });
+
+  group('fetching a whole list, as history does', () {
+    test('asks for 50 channels a request, in the order given, counting '
+        'each request', () async {
+      final channels = _Channels();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final ids = [for (var i = 0; i < 120; i++) 'UC$i'];
+
+      await c.read(channelThumbnailFetcherProvider.notifier).fetchNow(ids);
+
+      expect([for (final r in channels.requests) r.length], [50, 50, 20]);
+      expect(channels.requests.first.first, 'UC0');
+      expect(c.read(channelThumbnailsProvider).value, hasLength(120));
+      final quota = await c.read(quotaProvider.future);
+      expect(quota.usageFor(QuotaOperation.channelsList), 3);
+    });
+
+    test("asks only once for channels YouTube doesn't have, even after a "
+        'restart', () async {
+      final channels = _Channels(missing: {'UCgone'});
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+
+      await fetcher.fetchNow(['UCa', 'UCgone']);
+      await fetcher.fetchNow(['UCgone']);
+      expect(channels.requests, hasLength(1));
+
+      final restarted = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      await restarted.read(channelThumbnailFetcherProvider.notifier).fetchNow([
+        'UCgone',
+      ]);
+      expect(channels.requests, hasLength(1));
+    });
+
+    test('asks again later for channels a failed request was for', () async {
+      final channels = _Channels(failures: 1);
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+
+      await fetcher.fetchNow(['UCa']);
+      expect(c.read(channelThumbnailsProvider).value, isEmpty);
+
+      await fetcher.fetchNow(['UCa']);
+      expect(channels.requests, hasLength(2));
+      expect(c.read(channelThumbnailsProvider).value, contains('UCa'));
     });
   });
 }

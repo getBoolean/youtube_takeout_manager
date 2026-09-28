@@ -2,7 +2,6 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
 
 part 'youtube_channel_repository.g.dart';
 
@@ -38,6 +37,8 @@ class YoutubeChannelRepository {
   /// Fetches channel thumbnails for the given [channelIds].
   ///
   /// Returns a map of channelId → thumbnail URL for channels that were found.
+  /// A request that fails is thrown, so its channels aren't taken to be
+  /// gone.
   Future<Map<String, String>> fetchChannelThumbnails(
     http.Client authClient,
     Set<String> channelIds,
@@ -49,20 +50,13 @@ class YoutubeChannelRepository {
     for (var i = 0; i < idList.length; i += _batchSize) {
       final batch = idList.sublist(i, (i + _batchSize).clamp(0, idList.length));
 
-      try {
-        final response = await youtube.channels.list(['snippet'], id: batch);
-
-        for (final item in response.items ?? <yt.Channel>[]) {
-          if (item.id == null || item.snippet == null) continue;
-          final url = item.snippet!.thumbnails?.default_?.url;
-          if (url != null) {
-            results[item.id!] = url;
-          }
+      final response = await youtube.channels.list(['snippet'], id: batch);
+      for (final item in response.items ?? <yt.Channel>[]) {
+        if (item.id == null || item.snippet == null) continue;
+        final url = item.snippet!.thumbnails?.default_?.url;
+        if (url != null) {
+          results[item.id!] = url;
         }
-      } catch (e) {
-        // A sign-in that stopped working fails every batch; let it through.
-        if (isSignInFailure(e)) rethrow;
-        // Continue with remaining batches on error
       }
 
       if (i + _batchSize < idList.length) {
