@@ -49,6 +49,7 @@ class _Harness {
 Future<_Harness> _pump(
   WidgetTester tester, {
   required List<_Group> groups,
+  (int, int)? Function(Object itemKey)? locateItem,
 }) async {
   tester.view.physicalSize = const Size(400, 600);
   tester.view.devicePixelRatio = 1;
@@ -56,55 +57,60 @@ Future<_Harness> _pump(
   final h = _Harness();
   addTearDown(h.dispose);
 
-  await tester.pumpWidget(
-    MaterialApp(
-      home: Scaffold(
-        body: StickyGroupedListView<_Group, String, _HeaderState>(
-          groups: groups,
-          groupKey: (group) => group.key,
-          itemsOf: (group) => group.items,
-          itemKey: (item) {
-            h.itemKeyLookups++;
-            return item;
-          },
-          controller: h.controller,
-          scrollController: h.scroll,
-          createHeaderState: (group, status, vsync) =>
-              h.created[group.key] = _HeaderState(status),
-          updateHeaderState: (group, state, status) {
-            state
-              ..status = status
-              ..updates.add(status)
-              ..updatePhases.add(SchedulerBinding.instance.schedulerPhase);
-          },
-          disposeHeaderState: (state) {
-            state.disposed = true;
-            h.disposed.add(
-              h.created.entries.firstWhere((e) => e.value == state).key,
-            );
-          },
-          headerBuilder: (context, group, state, status) {
-            h.headerBuilds.add(group.key);
-            h.statesSeen.putIfAbsent(group.key, () => {}).add(state);
-            return GestureDetector(
-              onTap: () => h.controller.toggle(group.key),
-              child: Container(
-                height: _headerHeight,
-                color: Colors.blue,
-                child: Text('header ${group.key}'),
-              ),
-            );
-          },
-          itemBuilder: (context, group, item, index) {
-            h.itemBuilds.add(item);
-            return SizedBox(height: _itemHeight, child: Text(item));
-          },
-        ),
-      ),
-    ),
-  );
+  await tester.pumpWidget(_app(h, groups, locateItem: locateItem));
   return h;
 }
+
+Widget _app(
+  _Harness h,
+  List<_Group> groups, {
+  (int, int)? Function(Object itemKey)? locateItem,
+}) => MaterialApp(
+  home: Scaffold(
+    body: StickyGroupedListView<_Group, String, _HeaderState>(
+      groups: groups,
+      groupKey: (group) => group.key,
+      itemsOf: (group) => group.items,
+      itemKey: (item) {
+        h.itemKeyLookups++;
+        return item;
+      },
+      locateItem: locateItem,
+      controller: h.controller,
+      scrollController: h.scroll,
+      createHeaderState: (group, status, vsync) =>
+          h.created[group.key] = _HeaderState(status),
+      updateHeaderState: (group, state, status) {
+        state
+          ..status = status
+          ..updates.add(status)
+          ..updatePhases.add(SchedulerBinding.instance.schedulerPhase);
+      },
+      disposeHeaderState: (state) {
+        state.disposed = true;
+        h.disposed.add(
+          h.created.entries.firstWhere((e) => e.value == state).key,
+        );
+      },
+      headerBuilder: (context, group, state, status) {
+        h.headerBuilds.add(group.key);
+        h.statesSeen.putIfAbsent(group.key, () => {}).add(state);
+        return GestureDetector(
+          onTap: () => h.controller.toggle(group.key),
+          child: Container(
+            height: _headerHeight,
+            color: Colors.blue,
+            child: Text('header ${group.key}'),
+          ),
+        );
+      },
+      itemBuilder: (context, group, item, index) {
+        h.itemBuilds.add(item);
+        return SizedBox(height: _itemHeight, child: Text(item));
+      },
+    ),
+  ),
+);
 
 Finder _header(String key) => find.text('header $key').hitTestable();
 
@@ -273,6 +279,29 @@ void main() {
     expect(h.controller.topGroupKey, 'g5');
     expect(h.controller.pinnedGroupKey, 'g5');
   });
+
+  testWidgets(
+    'given where items are, new groups find their rows without walking '
+    'every item',
+    (tester) async {
+      final groups = _groups(1000, 100);
+      (int, int)? locate(Object key) {
+        final [g, i] = (key as String).substring(1).split('-i');
+        return (int.parse(g), int.parse(i));
+      }
+
+      final h = await _pump(tester, groups: groups, locateItem: locate);
+      h.scroll.jumpTo(700 * 4050);
+      await tester.pump();
+      h.itemKeyLookups = 0;
+
+      // The same groups in a new list, as a new search result would be.
+      await tester.pumpWidget(_app(h, [...groups], locateItem: locate));
+
+      expect(h.itemKeyLookups, lessThan(2000));
+      expect(find.text('g700-i10'), findsOneWidget);
+    },
+  );
 
   test('only depends on Flutter', () {
     final dir = Directory('lib/src/common_widgets/sticky_grouped_list');

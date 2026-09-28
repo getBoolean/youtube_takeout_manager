@@ -33,6 +33,7 @@ class StickyGroupedListView<G, I, S> extends StatefulWidget {
     required this.groupKey,
     required this.itemsOf,
     required this.itemKey,
+    this.locateItem,
     required this.headerBuilder,
     required this.itemBuilder,
     required this.createHeaderState,
@@ -49,6 +50,12 @@ class StickyGroupedListView<G, I, S> extends StatefulWidget {
   final Object Function(G group) groupKey;
   final List<I> Function(G group) itemsOf;
   final Object Function(I item) itemKey;
+
+  /// Where the item with a key is: its group's index and its own in the
+  /// group, or null when there's none. Without it the list maps every
+  /// item's key when it first needs one, which for tens of thousands of
+  /// items takes longer than a frame.
+  final (int, int)? Function(Object itemKey)? locateItem;
   final StickyHeaderBuilder<G, S> headerBuilder;
   final StickyItemBuilder<G, I> itemBuilder;
   final CreateHeaderState<G, S> createHeaderState;
@@ -182,6 +189,13 @@ class _StickyGroupedListViewState<G, I, S>
     ], (g) => widget.controller.isExpanded(widget.groupKey(groups[g])));
   }
 
+  /// Where the item with [key] is, from [StickyGroupedListView.locateItem]
+  /// when given.
+  (int, int)? _positionOf(Object key) => switch (widget.locateItem) {
+    final locate? => locate(key),
+    null => _itemPositions[key],
+  };
+
   Map<Object, (int, int)> get _itemPositions => _itemPositionByKey ??= {
     for (var g = 0; g < widget.groups.length; g++)
       for (final (i, item) in widget.itemsOf(widget.groups[g]).indexed)
@@ -245,7 +259,7 @@ class _StickyGroupedListViewState<G, I, S>
       final group = _groupIndexByKey[value];
       return group == null ? null : _rows.headerRowOf(group);
     }
-    final position = _itemPositions[value];
+    final position = _positionOf(value);
     return position == null ? null : _rows.rowOfItem(position.$1, position.$2);
   }
 
@@ -495,7 +509,7 @@ class _StickyGroupedListViewState<G, I, S>
     required Duration duration,
     required Curve curve,
   }) async {
-    final position = _itemPositions[itemKey];
+    final position = _positionOf(itemKey);
     if (position == null) return false;
     final (group, item) = position;
     final row = _rows.rowOfItem(group, item);
