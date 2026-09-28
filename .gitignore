@@ -45,3 +45,6 @@ app.*.map.json
 /android/app/release
 
 .env
+
+# Real Google Takeout exports kept for local testing
+/takeout/
