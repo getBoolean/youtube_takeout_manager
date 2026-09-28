@@ -58,6 +58,11 @@ class TakeoutImportPlan {
   /// What it does to the account's watch and search history.
   final HistoryImport history;
 
+  /// Nothing in the picked takeouts named a channel of their account (they
+  /// held only subscriptions or history, say), so they go into [accountId],
+  /// the takeout shown. The review names it, and is never skipped.
+  final bool accountAssumed;
+
   /// The takeout selected when this was worked out. Committing is refused
   /// if another one is selected by then, since this was worked out against
   /// it.
@@ -76,12 +81,14 @@ class TakeoutImportPlan {
     this.commentCheckSkipped,
     this.liveChatCheckSkipped,
     this.history = HistoryImport.none,
+    this.accountAssumed = false,
     this.baseTakeoutId,
   });
 
   /// Whether there's something to look over before it's saved even as a
   /// first import: items found deleted, a deletion check skipped, or rows
-  /// or history that couldn't be read.
+  /// or history that couldn't be read, or takeouts that only the takeout
+  /// shown says whose they are.
   bool get needsReview =>
       newlyDeletedCommentCount > 0 ||
       newlyDeletedLiveChatCount > 0 ||
@@ -89,7 +96,8 @@ class TakeoutImportPlan {
       liveChatCheckSkipped != null ||
       mergedData.skippedCommentRows > 0 ||
       mergedData.skippedLiveChatRows > 0 ||
-      history.needsReview;
+      history.needsReview ||
+      accountAssumed;
 }
 
 /// A problem with the picked zips that stops the import before anything is

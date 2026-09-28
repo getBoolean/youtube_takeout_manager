@@ -44,6 +44,7 @@ TakeoutImportPlan _plan({
   DeletionCheckSkipReason? liveChatCheckSkipped,
   int skippedLiveChatRows = 0,
   HistoryImport history = HistoryImport.none,
+  bool accountAssumed = false,
 }) {
   Set<String> ids(String prefix, int count) => {
     for (var i = 0; i < count; i++) '$prefix $i',
@@ -81,6 +82,7 @@ TakeoutImportPlan _plan({
     commentCheckSkipped: commentCheckSkipped,
     liveChatCheckSkipped: liveChatCheckSkipped,
     history: history,
+    accountAssumed: accountAssumed,
   );
 }
 
@@ -306,6 +308,24 @@ void main() {
 
       expect(find.byKey(_watches), findsNothing);
       expect(find.byKey(_searches), findsNothing);
+    });
+
+    testWidgets('history alone names the takeout it goes into, without '
+        'comments or live chats', (tester) async {
+      await _pump(
+        tester,
+        _plan(
+          accountAssumed: true,
+          history: HistoryImport(merged: history, newWatchCount: 3),
+        ),
+      );
+
+      const into = ValueKey('import-account-assumed');
+      expect(find.byKey(into), findsOneWidget);
+      expect(_textIn(into, 'Somebody Else'), findsOneWidget);
+      expect(find.byKey(_newComments), findsNothing);
+      expect(find.byKey(_newLiveChats), findsNothing);
+      expect(_textIn(_watches, '3'), findsOneWidget);
     });
 
     testWidgets("warns when history couldn't be read", (tester) async {

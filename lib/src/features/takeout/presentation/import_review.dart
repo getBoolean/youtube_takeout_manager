@@ -51,7 +51,30 @@ class ImportReview extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (plan.channels.length > 1 ||
+        if (plan.accountAssumed) ...[
+          // Nothing in it says whose it is: name where it goes, to confirm.
+          Column(
+            key: const ValueKey('import-account-assumed'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Nothing in this takeout says which account it's from: it has "
+                'no comments, live chats or channel list. It will be added '
+                'to:',
+                style: theme.textTheme.bodyMedium,
+              ),
+              if (plan.channels.firstOrNull case final main?)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: ChannelIdentity(
+                    channelId: main.channelId,
+                    title: main.title,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ] else if (plan.channels.length > 1 ||
             (!merge && plan.channels.isNotEmpty)) ...[
           Text(
             'Channels in this takeout',
@@ -68,7 +91,8 @@ class ImportReview extends StatelessWidget {
             ),
           const SizedBox(height: 16),
         ],
-        if (merge) ...[
+        // Nothing in it names a channel, so it has no comments or live chats.
+        if (!plan.accountAssumed && merge) ...[
           counted(
             commentsIn(plan.newCommentIds),
             Icons.comment_outlined,
@@ -81,7 +105,7 @@ class ImportReview extends StatelessWidget {
             formatCount(plan.newLiveChatCount, 'new live chat'),
             key: 'import-new-live-chats',
           ),
-        ] else ...[
+        ] else if (!plan.accountAssumed) ...[
           _Line(
             Icons.comment_outlined,
             formatCount(data.comments.length, 'comment'),

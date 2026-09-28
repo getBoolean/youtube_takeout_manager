@@ -169,6 +169,68 @@ void main() {
     );
   });
 
+  group('a zip part that names no channel', () {
+    const subscriptions = {
+      '$_dir/subscriptions/subscriptions.csv':
+          'Channel Id,Channel Url,Channel Title\r\n'
+          'UCsub,http://www.youtube.com/channel/UCsub,A channel\r\n',
+      // Parts also hold what the app doesn't read.
+      '$_dir/videos/a video.mp4': 'not a CSV',
+    };
+
+    TakeoutImportContext context({String? shown, bool merge = false}) => (
+      saved: merge ? _savedAbc : null,
+      merge: merge,
+      deletedCommentIds: const {},
+      deletedLiveChatIds: const {},
+      savedChannelSets: const {},
+      activeTakeoutId: shown,
+    );
+
+    test('goes with the account the other parts are from', () {
+      final plan = planTakeoutImport(
+        readTakeoutExports([
+          _zip('takeout-20260301T000000Z-001.zip', {
+            _comments: _commentsCsv([_c('A', '2026-01-01T00:00:00Z')]),
+          }),
+          _zip('takeout-20260301T000000Z-002.zip', subscriptions),
+        ]),
+        context(shown: 'UCsomeoneElse'),
+      );
+
+      expect(plan.accountId, 'UCme');
+      expect(plan.accountAssumed, isFalse);
+      expect(plan.mergedData.subscriptionsByChannelId, contains('UCsub'));
+    });
+
+    test('on its own goes into the takeout shown, to be confirmed', () {
+      final plan = planTakeoutImport(
+        readTakeoutExports([
+          _zip('takeout-20260301T000000Z-002.zip', subscriptions),
+        ]),
+        context(shown: 'UCme', merge: true),
+      );
+
+      expect(plan.accountId, 'UCme');
+      expect(plan.accountAssumed, isTrue);
+      expect(plan.needsReview, isTrue);
+      expect(plan.mergedData.subscriptionsByChannelId, contains('UCsub'));
+      expect(plan.goneCommentIds, isEmpty);
+    });
+
+    test("is refused when there's no takeout to add it to", () {
+      expect(
+        () => planTakeoutImport(
+          readTakeoutExports([
+            _zip('takeout-20260301T000000Z-002.zip', subscriptions),
+          ]),
+          context(),
+        ),
+        throwsA(isA<TakeoutImportException>()),
+      );
+    });
+  });
+
   test('a takeout from another account is refused, naming both', () {
     expect(
       () => _import([
@@ -227,15 +289,17 @@ void main() {
     TakeoutImportPlan importWithHistory(
       Map<String, String> files, {
       TakeoutHistory? savedHistory,
+      String? shown,
+      bool merge = true,
     }) => planTakeoutImport(
       readTakeoutExports([_zip('takeout-20260301T000000Z-001.zip', files)]),
       (
-        saved: _savedAbc,
-        merge: true,
+        saved: merge ? _savedAbc : null,
+        merge: merge,
         deletedCommentIds: const {},
         deletedLiveChatIds: const {},
         savedChannelSets: const {},
-        activeTakeoutId: null,
+        activeTakeoutId: shown,
       ),
       savedHistory: savedHistory,
     );
@@ -262,23 +326,73 @@ void main() {
       expect(history.searches!.entries.single.query, 'cats');
     });
 
-    test(
-      "a takeout with only history is refused: its account can't be told",
-      () {
-        expect(
-          () => importWithHistory({
+    test('a takeout with only history goes into the takeout shown, to be '
+        'confirmed', () {
+      final plan = importWithHistory({
+        watchHtml: watchHistory([('v1', 'Feb 1, 2026, 1:00:00 PM UTC')]),
+      }, shown: 'UCme');
+
+      expect(plan.accountId, 'UCme');
+      expect(plan.accountAssumed, isTrue);
+      expect(plan.needsReview, isTrue);
+      expect(plan.history.newWatchCount, 1);
+      // Having no comments, it can't say any are gone.
+      expect(plan.goneCommentIds, isEmpty);
+      expect(
+        plan.mergedData.comments.map((c) => c.commentId),
+        unorderedEquals(['A', 'B', 'C']),
+      );
+    });
+
+    test('a takeout with only history, read before merging, names the '
+        'takeout shown', () {
+      final plan = importWithHistory(
+        {
+          watchHtml: watchHistory([('v1', 'Feb 1, 2026, 1:00:00 PM UTC')]),
+        },
+        shown: 'UCme',
+        merge: false,
+      );
+
+      expect(plan.accountId, 'UCme');
+      expect(plan.accountAssumed, isTrue);
+    });
+
+    test("a takeout with only history is refused when there's no takeout to "
+        'add it to', () {
+      expect(
+        () => importWithHistory({
+          watchHtml: watchHistory([('v1', 'Feb 1, 2026, 1:00:00 PM UTC')]),
+        }, merge: false),
+        throwsA(isA<TakeoutImportException>()),
+      );
+    });
+
+    test('a part with only history goes with the account the other parts '
+        'are from', () {
+      final plan = planTakeoutImport(
+        readTakeoutExports([
+          _zip('takeout-20260301T000000Z-001.zip', {
+            _comments: _commentsCsv([_c('A', '2026-01-01T00:00:00Z')]),
+          }),
+          _zip('takeout-20260401T000000Z-001.zip', {
             watchHtml: watchHistory([('v1', 'Feb 1, 2026, 1:00:00 PM UTC')]),
           }),
-          throwsA(
-            isA<TakeoutImportException>().having(
-              (e) => e.message,
-              'message',
-              contains('account'),
-            ),
-          ),
-        );
-      },
-    );
+        ]),
+        (
+          saved: null,
+          merge: false,
+          deletedCommentIds: const {},
+          deletedLiveChatIds: const {},
+          savedChannelSets: const {},
+          activeTakeoutId: 'UCsomeoneElse',
+        ),
+      );
+
+      expect(plan.accountId, 'UCme');
+      expect(plan.accountAssumed, isFalse);
+      expect(plan.history.newWatchCount, 1);
+    });
 
     test('merging a takeout without history keeps the saved history', () {
       final plan = importWithHistory(

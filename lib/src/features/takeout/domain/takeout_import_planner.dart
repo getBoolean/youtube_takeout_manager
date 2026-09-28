@@ -31,7 +31,7 @@ TakeoutImportPlan planTakeoutImport(
   }
   final base = context.merge ? context.saved : null;
   final picked = [for (final e in exports) _Source.export(e)];
-  final accountId = _resolveTakeout(picked, context);
+  final (id: accountId, :accountAssumed) = _resolveTakeout(picked, context);
 
   final sources = [if (base != null) _Source.saved(base), ...picked]
     ..sort((a, b) => _compareSnapshots(a.snapshot, a, b.snapshot, b));
@@ -107,6 +107,7 @@ TakeoutImportPlan planTakeoutImport(
       saved: context.merge ? savedHistory : null,
       picked: [for (final e in exports) ?e.history],
     ),
+    accountAssumed: accountAssumed,
     baseTakeoutId: context.activeTakeoutId,
   );
 }
@@ -126,6 +127,10 @@ class _Source {
   /// When this data was exported from YouTube.
   final DateTime snapshot;
   final bool isSaved;
+
+  /// Whether nothing in it names a channel of its account: a zip part with
+  /// only subscriptions or history, say.
+  bool get unidentified => channels.isEmpty;
 
   /// The channels it has: listed in its channel.csv, or writing its items.
   Set<String> get channels => {
@@ -251,7 +256,30 @@ _Newest? _newestWith(List<_Source> sources, _Kind Function(_Source) kindOf) {
 /// wrote most). Throws when they share channels with two saved takeouts, or
 /// when merging them into a takeout other than the one selected. Replacing
 /// with another takeout is allowed.
-String _resolveTakeout(List<_Source> exports, TakeoutImportContext context) {
+///
+/// Takeouts are split into zips of whatever they hold, and some parts name
+/// no channel (only subscriptions or history, say). Those go with the other
+/// exports; with nothing else, into the takeout selected, flagged
+/// [TakeoutImportPlan.accountAssumed] for the review to name it.
+({String id, bool accountAssumed}) _resolveTakeout(
+  List<_Source> picked,
+  TakeoutImportContext context,
+) {
+  final exports = [
+    for (final export in picked)
+      if (!export.unidentified) export,
+  ];
+  if (exports.isEmpty) {
+    final selected = context.activeTakeoutId;
+    if (selected == null) {
+      throw const TakeoutImportException(
+        "Nothing in the selected takeout says which YouTube account it's "
+        'from: it has no comments, live chats or channel list. Import one of '
+        "the account's takeouts with those first, then add this one to it.",
+      );
+    }
+    return (id: selected, accountAssumed: true);
+  }
   final titles = {
     for (final data in [
       for (final export in exports) export.data,
@@ -263,13 +291,6 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportContext context) {
   String? main;
   for (final export in exports) {
     final channels = export.channels;
-    if (channels.isEmpty) {
-      throw const TakeoutImportException(
-        'The selected takeout has no comments, live chats or channel list, so '
-        "its YouTube account can't be determined. Watch and search history "
-        'can only be imported along with one of them.',
-      );
-    }
     for (final id in channels) {
       if (!isChannelId(id)) {
         throw TakeoutImportException(
@@ -331,7 +352,7 @@ String _resolveTakeout(List<_Source> exports, TakeoutImportContext context) {
       channels.first;
 
   if (!context.merge || activeId == null || takeoutId == activeId) {
-    return takeoutId;
+    return (id: takeoutId, accountAssumed: false);
   }
   throw TakeoutAccountMismatchException(
     'This takeout is from a different YouTube account than your current '

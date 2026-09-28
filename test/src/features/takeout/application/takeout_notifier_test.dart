@@ -481,6 +481,28 @@ void main() {
       expect(await commentIds(container()), ['C', 'B', 'A']);
     });
 
+    test('a takeout with only history is added to the takeout shown', () async {
+      final archive = Archive()
+        ..addFile(
+          ArchiveFile.string(
+            'Takeout/YouTube and YouTube Music/history/watch-history.json',
+            '[{"header": "YouTube", "title": "Watched A video", '
+                '"titleUrl": "https://www.youtube.com/watch?v=v1", '
+                '"time": "2026-02-01T00:00:00Z"}]',
+          ),
+        );
+
+      await import([
+        PickedZip.bytes(
+          'takeout-20260301T000000Z-001.zip',
+          ZipEncoder().encodeBytes(archive),
+        ),
+      ]);
+
+      expect(savedHistory().watches.single.videoId, 'v1');
+      expect(await commentIds(container()), ['C', 'B', 'A']);
+    });
+
     test('a later import without history keeps the saved history', () async {
       await import(takeoutWithHistory());
 
