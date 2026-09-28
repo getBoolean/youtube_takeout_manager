@@ -22,9 +22,15 @@ class AddAccountSection extends StatelessWidget {
   /// the YouTube API.
   final bool enabled;
 
+  /// The saved accounts a takeout that names none can go into.
+  final List<ImportAccount> accounts;
+
   final VoidCallback onStart;
   final VoidCallback onConfirm;
   final VoidCallback onDismiss;
+
+  /// Puts a takeout that names no account into another saved account.
+  final ValueChanged<String>? onChooseAccount;
 
   const AddAccountSection({
     super.key,
@@ -32,9 +38,11 @@ class AddAccountSection extends StatelessWidget {
     this.idleLabel,
     this.prominent = false,
     required this.enabled,
+    this.accounts = const [],
     required this.onStart,
     required this.onConfirm,
     required this.onDismiss,
+    this.onChooseAccount,
   });
 
   @override
@@ -94,7 +102,7 @@ class AddAccountSection extends StatelessWidget {
         ],
         children: [ImportReview(plan: plan, merge: false)],
       ),
-      AddAccountMergeReview(:final plan) => NoticeBanner(
+      AddAccountMergeReview(:final plan, :final choosing) => NoticeBanner(
         key: const ValueKey('add-account-merge-review'),
         title: 'Merge this takeout?',
         error: false,
@@ -104,11 +112,23 @@ class AddAccountSection extends StatelessWidget {
             child: const Text('Cancel', textAlign: TextAlign.center),
           ),
           FilledButton(
-            onPressed: enabled ? onConfirm : null,
+            // Not before the account being picked is worked out.
+            onPressed: enabled && choosing == null ? onConfirm : null,
             child: const Text('Merge', textAlign: TextAlign.center),
           ),
         ],
-        children: [ImportReview(plan: plan, merge: true)],
+        children: [
+          ImportReview(
+            plan: plan,
+            merge: true,
+            accounts: accounts,
+            choosingAccount: choosing,
+            // Switching accounts waits for deletion, and for the last pick.
+            onChooseAccount: enabled && choosing == null
+                ? onChooseAccount
+                : null,
+          ),
+        ],
       ),
       AddAccountFailed(:final error) => NoticeBanner(
         key: const ValueKey('add-account-failed'),

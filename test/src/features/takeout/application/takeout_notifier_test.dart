@@ -67,6 +67,25 @@ final _savedAbc = TakeoutData(
 );
 
 /// A takeout exported 2026-03-01 where B is gone and D is new.
+/// A takeout part with only a watch history: it names no account.
+List<PickedZip> _historyOnly() {
+  final archive = Archive()
+    ..addFile(
+      ArchiveFile.string(
+        'Takeout/YouTube and YouTube Music/history/watch-history.json',
+        '[{"header": "YouTube", "title": "Watched A video", '
+            '"titleUrl": "https://www.youtube.com/watch?v=v1", '
+            '"time": "2026-02-01T00:00:00Z"}]',
+      ),
+    );
+  return [
+    PickedZip.bytes(
+      'takeout-20260301T000000Z-001.zip',
+      ZipEncoder().encodeBytes(archive),
+    ),
+  ];
+}
+
 List<PickedZip> _newerTakeout({String channel = 'UCme'}) {
   String row(String id, String createdAt) =>
       '$id,$channel,$createdAt,0,,,vid1,"{""text"":""$id""}",';
@@ -604,6 +623,27 @@ void main() {
     }
 
     setUp(() => repository.accounts['UCother'] = encodeTakeoutCsvs(other));
+
+    test('a takeout that names no account can go into another one, once '
+        "that's shown", () async {
+      final c = withSignIns();
+      await c.read(takeoutProvider.future);
+      final importer = c.read(takeoutImporterProvider.notifier);
+      final read = await importer.prepareImport(_historyOnly(), merge: false);
+      expect(read.plan.accountId, 'UCme');
+
+      await c.read(takeoutSelectionProvider.notifier).select('UCother');
+      await c.read(takeoutProvider.future);
+      final into = await importer.prepareMerge(read.exports);
+      await importer.commitImport(into);
+
+      expect(into.plan.accountId, 'UCother');
+      expect(
+        repository.accounts['UCother']!.keys.where(isHistoryPath),
+        isNotEmpty,
+      );
+      expect(repository.accounts['UCme']!.keys.where(isHistoryPath), isEmpty);
+    });
 
     test('are listed with their channels, newest export first', () async {
       final c = withSignIns();

@@ -6,6 +6,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_chan
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_review.dart';
 
 const _plan = TakeoutImportPlan(
   accountId: 'UCnew',
@@ -45,8 +46,39 @@ const _mergePlan = TakeoutImportPlan(
   newLiveChatIds: {},
 );
 
+/// A takeout that names no account, planned into the one shown.
+const _assumedPlan = TakeoutImportPlan(
+  accountId: 'UCme',
+  channels: [
+    TakeoutChannel(
+      channelId: 'UCme',
+      title: 'Boolean',
+      isMain: true,
+      listed: true,
+    ),
+  ],
+  mergedData: TakeoutData(
+    comments: [],
+    liveChats: [],
+    subscriptionsByChannelId: {},
+  ),
+  goneCommentIds: {},
+  goneLiveChatIds: {},
+  newlyDeletedCommentIds: {},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {},
+  newLiveChatIds: {},
+  accountAssumed: true,
+);
+
+const _accounts = <ImportAccount>[
+  (takeoutId: 'UCme', name: 'Ada', pictureUrl: null, details: ''),
+  (takeoutId: 'UCwork', name: 'Work', pictureUrl: null, details: ''),
+];
+
 void main() {
   late int starts, confirms, dismisses;
+  late List<String> chosen;
 
   Future<void> pump(
     WidgetTester tester,
@@ -54,6 +86,7 @@ void main() {
     bool enabled = true,
   }) {
     starts = confirms = dismisses = 0;
+    chosen = [];
     return tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
@@ -61,15 +94,58 @@ void main() {
             child: AddAccountSection(
               state: state,
               enabled: enabled,
+              accounts: _accounts,
               onStart: () => starts++,
               onConfirm: () => confirms++,
               onDismiss: () => dismisses++,
+              onChooseAccount: chosen.add,
             ),
           ),
         ),
       ),
     );
   }
+
+  group('a takeout that names no account', () {
+    const review = AddAccountMergeReview((
+      plan: _assumedPlan,
+      csvFiles: {},
+      exports: [],
+    ));
+
+    testWidgets('can be put into another account', (tester) async {
+      await pump(tester, review);
+
+      await tester.tap(find.byKey(const ValueKey('import-account-UCwork')));
+      expect(chosen, ['UCwork']);
+    });
+
+    testWidgets("can't be put into another account while deleting", (
+      tester,
+    ) async {
+      await pump(tester, review, enabled: false);
+
+      await tester.tap(find.byKey(const ValueKey('import-account-UCwork')));
+      expect(chosen, isEmpty);
+    });
+
+    testWidgets("can't be merged, or put elsewhere, while an account is being "
+        'picked', (tester) async {
+      await pump(
+        tester,
+        const AddAccountMergeReview((
+          plan: _assumedPlan,
+          csvFiles: {},
+          exports: [],
+        ), choosing: 'UCwork'),
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+      await tester.tap(find.byKey(const ValueKey('import-account-UCme')));
+      expect(confirms, 0);
+      expect(chosen, isEmpty);
+    });
+  });
 
   testWidgets('offers to add another account', (tester) async {
     await pump(tester, const AddAccountIdle());

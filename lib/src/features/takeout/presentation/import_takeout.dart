@@ -2,11 +2,18 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/account_profile.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import '../application/add_account_import.dart';
+import '../application/saved_takeouts.dart';
 import '../application/takeout_selection_notifier.dart';
+import '../domain/takeout_channel.dart';
 import 'add_account_section.dart';
+import 'import_review.dart';
 import 'leave_channel_screens.dart';
+import 'takeout_details.dart';
 
 /// [AddAccountSection] wired to [addAccountImportProvider]: imports a
 /// takeout in place, as its own account or merged into its saved one, and
@@ -31,7 +38,13 @@ class ImportTakeout extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final import = ref.read(addAccountImportProvider.notifier);
+    final profiles = ref.watch(savedSignInsProvider).value ?? const {};
     return AddAccountSection(
+      accounts: [
+        for (final summary in ref.watch(savedTakeoutsProvider).value ?? [])
+          _accountOf(summary, accountProfileFor(summary.channels, profiles)),
+      ],
+      onChooseAccount: import.chooseAccount,
       state: ref.watch(addAccountImportProvider),
       enabled:
           ref.watch(deletionProcessingProvider) == DeletionProcessingState.idle,
@@ -47,6 +60,16 @@ class ImportTakeout extends ConsumerWidget {
       },
     );
   }
+
+  static ImportAccount _accountOf(
+    TakeoutSummary summary,
+    SignInProfile? profile,
+  ) => (
+    takeoutId: summary.id,
+    name: accountName(summary, profile),
+    pictureUrl: accountPicture(summary, profile),
+    details: describeTakeout(summary),
+  );
 
   /// Runs [step], and once it has saved a takeout or shown another one,
   /// leaves screens tied to the channel shown before. Leaving closes a

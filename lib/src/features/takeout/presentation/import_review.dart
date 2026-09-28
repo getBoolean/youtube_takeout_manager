@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import '../domain/takeout_import_plan.dart';
 import 'import_items_dialog.dart';
+
+/// A saved account a takeout that names none can go into, as the review
+/// lists it.
+typedef ImportAccount = ({
+  String takeoutId,
+  String name,
+  String? pictureUrl,
+  String details,
+});
 
 /// What importing [plan] will change, for looking over before it's saved.
 /// Each count of new or deleted items opens a list of them.
@@ -15,7 +26,24 @@ class ImportReview extends StatelessWidget {
   /// than saved as a new account, whose channels are always named.
   final bool merge;
 
-  const ImportReview({super.key, required this.plan, required this.merge});
+  /// The saved accounts a takeout that names none can go into.
+  final List<ImportAccount> accounts;
+
+  /// Puts a takeout that names no account into another of [accounts]; null
+  /// while it can't be.
+  final ValueChanged<String>? onChooseAccount;
+
+  /// The account being picked for it, while that's worked out.
+  final String? choosingAccount;
+
+  const ImportReview({
+    super.key,
+    required this.plan,
+    required this.merge,
+    this.accounts = const [],
+    this.onChooseAccount,
+    this.choosingAccount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -59,18 +87,20 @@ class ImportReview extends StatelessWidget {
             children: [
               Text(
                 "Nothing in this takeout says which account it's from: it has "
-                'no comments, live chats or channel list. It will be added '
-                'to:',
+                'no comments, live chats or channel list. '
+                '${accounts.length > 1 ? 'Pick the account to add it to:' : 'It will be added to:'}',
                 style: theme.textTheme.bodyMedium,
               ),
-              if (plan.channels.firstOrNull case final main?)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: ChannelIdentity(
-                    channelId: main.channelId,
-                    title: main.title,
-                  ),
-                ),
+              const SizedBox(height: 8),
+              if (accounts.isNotEmpty)
+                _AccountChoices(
+                  accounts: accounts,
+                  picked: choosingAccount ?? plan.accountId,
+                  choosing: choosingAccount != null,
+                  onChoose: onChooseAccount,
+                )
+              else if (plan.channels.firstOrNull case final main?)
+                ChannelIdentity(channelId: main.channelId, title: main.title),
             ],
           ),
           const SizedBox(height: 16),
@@ -256,6 +286,83 @@ class ImportReview extends StatelessWidget {
           "couldn't be read$notMarked.";
     }
     return null;
+  }
+}
+
+/// The saved accounts a takeout that names none can go into, [picked]
+/// marked. With one, there's nothing to choose.
+class _AccountChoices extends StatelessWidget {
+  final List<ImportAccount> accounts;
+  final String picked;
+
+  /// Whether merging into [picked] is still being worked out.
+  final bool choosing;
+  final ValueChanged<String>? onChoose;
+
+  const _AccountChoices({
+    required this.accounts,
+    required this.picked,
+    required this.choosing,
+    required this.onChoose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final showAvatar = !isTinyWidth(context);
+    final choice = accounts.length > 1;
+    return Column(
+      children: [
+        for (final account in accounts)
+          Semantics(
+            inMutuallyExclusiveGroup: choice,
+            child: _row(
+              account,
+              colors,
+              showAvatar: showAvatar,
+              choice: choice,
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _row(
+    ImportAccount account,
+    ColorScheme colors, {
+    required bool showAvatar,
+    required bool choice,
+  }) {
+    final isPicked = account.takeoutId == picked;
+    final onChoose = this.onChoose;
+    return ListTile(
+      key: ValueKey('import-account-${account.takeoutId}'),
+      selected: isPicked,
+      selectedColor: colors.onSecondaryContainer,
+      selectedTileColor: colors.secondaryContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      leading: showAvatar
+          ? ChannelAvatar(
+              name: account.name,
+              thumbnailUrl: account.pictureUrl,
+              radius: 16,
+            )
+          : null,
+      title: Text(account.name),
+      subtitle: account.details.isEmpty ? null : Text(account.details),
+      trailing: !choice || !isPicked
+          ? null
+          : choosing
+          ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.check_circle),
+      onTap: !choice || isPicked || onChoose == null
+          ? null
+          : () => onChoose(account.takeoutId),
+    );
   }
 }
 

@@ -87,6 +87,23 @@ class _Picker implements ZipPickerRepository {
       error != null ? throw error! : result;
 }
 
+/// A takeout that names no account, planned into the one shown.
+const _assumedPlan = TakeoutImportPlan(
+  accountId: 'UCme',
+  mergedData: TakeoutData(
+    comments: [],
+    liveChats: [],
+    subscriptionsByChannelId: {},
+  ),
+  goneCommentIds: {},
+  goneLiveChatIds: {},
+  newlyDeletedCommentIds: {},
+  newlyDeletedLiveChatIds: {},
+  newCommentIds: {},
+  newLiveChatIds: {},
+  accountAssumed: true,
+);
+
 class _Takeout extends TakeoutImporter {
   final Object? importError;
   final Set<String> saved;
@@ -99,6 +116,9 @@ class _Takeout extends TakeoutImporter {
 
   /// How many times takeouts already read were planned into the one shown.
   var merged = 0;
+
+  /// Holds planning them until completed.
+  Completer<void>? mergeGate;
   final committed = <TakeoutImportPlan>[];
 
   _Takeout({
@@ -129,6 +149,7 @@ class _Takeout extends TakeoutImporter {
   @override
   Future<PreparedImport> prepareMerge(List<TakeoutExport> exports) async {
     merged++;
+    await mergeGate?.future;
     if (mergeError case final error?) throw error;
     return (
       plan: plan,
@@ -271,6 +292,85 @@ void main() {
     expect(await add.confirm(), isTrue);
     expect(takeout.committed, [same(_plan)]);
     expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+  });
+
+  group('a takeout that names no account', () {
+    /// Reviewing it as a merge into the takeout shown, 'UCme'.
+    Future<ProviderContainer> reviewing() async {
+      final c = container(
+        picked: _picked,
+        saved: {'UCme', 'UCwork'},
+        plan: _assumedPlan,
+      );
+      await c.read(addAccountImportProvider.notifier).start();
+      expect(c.read(addAccountImportProvider), isA<AddAccountMergeReview>());
+      return c;
+    }
+
+    String? choosing(ProviderContainer c) =>
+        switch (c.read(addAccountImportProvider)) {
+          AddAccountMergeReview(:final choosing) => choosing,
+          final other => fail('not in review: $other'),
+        };
+
+    test('goes into another account once picked, which is shown, without '
+        'its zips being read again', () async {
+      final c = await reviewing();
+
+      await c.read(addAccountImportProvider.notifier).chooseAccount('UCwork');
+
+      expect(selection.selected.last, 'UCwork');
+      expect(takeout.prepared, [false]);
+      expect(takeout.merged, 2);
+      expect(choosing(c), isNull);
+    });
+
+    test('stays in review, showing the account being picked, while that '
+        'is worked out', () async {
+      final c = await reviewing();
+      final gate = takeout.mergeGate = Completer();
+
+      final choice = c
+          .read(addAccountImportProvider.notifier)
+          .chooseAccount('UCwork');
+      await pumpEventQueue();
+      expect(choosing(c), 'UCwork');
+
+      gate.complete();
+      await choice;
+      expect(choosing(c), isNull);
+    });
+
+    test(
+      'cancelled while an account is being picked, stays cancelled',
+      () async {
+        final c = await reviewing();
+        final gate = takeout.mergeGate = Completer();
+        final add = c.read(addAccountImportProvider.notifier);
+
+        final choice = add.chooseAccount('UCwork');
+        await pumpEventQueue();
+        add.dismiss();
+        gate.complete();
+        await choice;
+
+        expect(c.read(addAccountImportProvider), isA<AddAccountIdle>());
+      },
+    );
+
+    test("isn't merged while an account is being picked", () async {
+      final c = await reviewing();
+      final gate = takeout.mergeGate = Completer();
+      final add = c.read(addAccountImportProvider.notifier);
+
+      final choice = add.chooseAccount('UCwork');
+      await pumpEventQueue();
+      expect(await add.confirm(), isFalse);
+      gate.complete();
+      await choice;
+
+      expect(takeout.committed, isEmpty);
+    });
   });
 
   test(

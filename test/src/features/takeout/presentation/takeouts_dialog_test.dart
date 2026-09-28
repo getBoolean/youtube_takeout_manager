@@ -84,28 +84,30 @@ final _workSummary = TakeoutSummary(
 
 final _picked = [PickedZip.bytes('takeout-001.zip', Uint8List(1))];
 
-TakeoutImportPlan _planFor(String accountId) => TakeoutImportPlan(
-  accountId: accountId,
-  channels: [
-    TakeoutChannel(
-      channelId: accountId,
-      title: 'Somebody Else',
-      isMain: true,
-      listed: true,
-    ),
-  ],
-  mergedData: const TakeoutData(
-    comments: [],
-    liveChats: [],
-    subscriptionsByChannelId: {},
-  ),
-  goneCommentIds: const {},
-  goneLiveChatIds: const {},
-  newlyDeletedCommentIds: const {},
-  newlyDeletedLiveChatIds: const {},
-  newCommentIds: const {},
-  newLiveChatIds: const {},
-);
+TakeoutImportPlan _planFor(String accountId, {bool accountAssumed = false}) =>
+    TakeoutImportPlan(
+      accountId: accountId,
+      accountAssumed: accountAssumed,
+      channels: [
+        TakeoutChannel(
+          channelId: accountId,
+          title: 'Somebody Else',
+          isMain: true,
+          listed: true,
+        ),
+      ],
+      mergedData: const TakeoutData(
+        comments: [],
+        liveChats: [],
+        subscriptionsByChannelId: {},
+      ),
+      goneCommentIds: const {},
+      goneLiveChatIds: const {},
+      newlyDeletedCommentIds: const {},
+      newlyDeletedLiveChatIds: const {},
+      newCommentIds: const {},
+      newLiveChatIds: const {},
+    );
 
 class _NotSignedIn extends AuthNotifier {
   @override
@@ -207,26 +209,37 @@ class _Loaded extends TakeoutNotifier {
 
 class _Takeout extends TakeoutImporter {
   final Set<String> saved;
+
+  /// Whether the takeout names no account, so it's planned into the one
+  /// shown.
+  final bool namesNoAccount;
   final committed = <TakeoutImportPlan>[];
 
-  _Takeout({this.saved = const {}});
+  _Takeout({this.saved = const {}, this.namesNoAccount = false});
 
   @override
   void build() {}
+
+  /// Its plan: into the takeout shown when it names no account.
+  Future<TakeoutImportPlan> _plan() async {
+    if (!namesNoAccount) return _planFor(saved.isEmpty ? 'UCnew' : saved.first);
+    final shown = (await ref.read(takeoutSelectionProvider.future))!.takeoutId;
+    return _planFor(shown, accountAssumed: true);
+  }
 
   @override
   Future<PreparedImport> prepareImport(
     List<PickedZip> zips, {
     required bool merge,
   }) async => (
-    plan: _planFor(saved.isEmpty ? 'UCnew' : saved.first),
+    plan: await _plan(),
     csvFiles: const <String, Uint8List>{},
     exports: const <TakeoutExport>[],
   );
 
   @override
   Future<PreparedImport> prepareMerge(List<TakeoutExport> exports) async => (
-    plan: _planFor(saved.isEmpty ? 'UCnew' : saved.first),
+    plan: await _plan(),
     csvFiles: const <String, Uint8List>{},
     exports: exports,
   );
@@ -301,12 +314,13 @@ void main() {
     DeletionProcessingState processing = DeletionProcessingState.idle,
     LoadedTakeout? loaded,
     bool fromChannelPage = false,
+    bool namesNoAccount = false,
   }) async {
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
-    selection = _Selection(shows: fromChannelPage);
+    selection = _Selection(shows: fromChannelPage || namesNoAccount);
     pages = _Pages();
-    takeout = _Takeout(saved: alreadySaved);
+    takeout = _Takeout(saved: alreadySaved, namesNoAccount: namesNoAccount);
     cache = _Cache();
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
@@ -660,6 +674,30 @@ void main() {
       find.byKey(const ValueKey('add-account-merge-review')),
       findsNothing,
     );
+  });
+
+  testWidgets('a takeout that names no account is put into another account '
+      'in place', (tester) async {
+    await pumpDialog(
+      tester,
+      saved: [_viewedSummary, _workSummary],
+      alreadySaved: {'UCme', 'UCwork'},
+      namesNoAccount: true,
+    );
+    await tester.tap(find.text('Import a takeout'));
+    await tester.pumpAndSettle();
+
+    const work = ValueKey('import-account-UCwork');
+    await tester.tap(find.byKey(work));
+    await tester.pumpAndSettle();
+
+    expectNoPopups();
+    expect(selection.selected.last.$1, 'UCwork');
+    expect(tester.widget<ListTile>(find.byKey(work)).selected, isTrue);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Merge'));
+    await tester.pumpAndSettle();
+    expect(takeout.committed.single.accountId, 'UCwork');
   });
 
   group('merging into another account from a channel page', () {

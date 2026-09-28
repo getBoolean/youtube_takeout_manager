@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/history_merge.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
@@ -104,19 +105,53 @@ class _NoVideos extends VideoMetadata {
   Stream<Map<String, Video>> build() => Stream.value(const {});
 }
 
-Future<void> _pump(WidgetTester tester, TakeoutImportPlan plan) =>
-    tester.pumpWidget(
-      ProviderScope(
-        overrides: [videoMetadataProvider.overrideWith(_NoVideos.new)],
-        child: MaterialApp(
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: ImportReview(plan: plan, merge: true),
-            ),
+Future<void> _pump(
+  WidgetTester tester,
+  TakeoutImportPlan plan, {
+  List<ImportAccount> accounts = const [],
+  ValueChanged<String>? onChooseAccount,
+  String? choosingAccount,
+}) => tester.pumpWidget(
+  ProviderScope(
+    overrides: [videoMetadataProvider.overrideWith(_NoVideos.new)],
+    child: MaterialApp(
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: ImportReview(
+            plan: plan,
+            merge: true,
+            accounts: accounts,
+            onChooseAccount: onChooseAccount,
+            choosingAccount: choosingAccount,
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
+
+/// The saved accounts a takeout that names none can go into: the one it's
+/// planned into (see [_plan]) and another.
+const _accounts = <ImportAccount>[
+  (
+    takeoutId: 'UCnew',
+    name: 'Somebody Else',
+    pictureUrl: 'https://yt3.example/new',
+    details: '12 comments',
+  ),
+  (
+    takeoutId: 'UCwork',
+    name: 'Work',
+    pictureUrl: 'https://yt3.example/work',
+    details: '3 comments',
+  ),
+];
+
+Finder _account(String takeoutId) =>
+    find.byKey(ValueKey('import-account-$takeoutId'));
+
+bool _picked(WidgetTester tester, String takeoutId) =>
+    tester.widget<ListTile>(_account(takeoutId)).selected;
 
 Finder _textIn(Key key, String text) =>
     find.descendant(of: find.byKey(key), matching: find.textContaining(text));
@@ -326,6 +361,97 @@ void main() {
       expect(find.byKey(_newComments), findsNothing);
       expect(find.byKey(_newLiveChats), findsNothing);
       expect(_textIn(_watches, '3'), findsOneWidget);
+    });
+
+    group('from a takeout that names no account', () {
+      TakeoutImportPlan assumed() => _plan(
+        accountAssumed: true,
+        history: HistoryImport(merged: history, newWatchCount: 3),
+      );
+
+      testWidgets('lists the saved accounts with their pictures, the one '
+          'it goes into picked', (tester) async {
+        await _pump(
+          tester,
+          assumed(),
+          accounts: _accounts,
+          onChooseAccount: (_) {},
+        );
+
+        for (final account in _accounts) {
+          expect(
+            find.descendant(
+              of: _account(account.takeoutId),
+              matching: find.byWidgetPredicate(
+                (w) =>
+                    w is ChannelAvatar && w.thumbnailUrl == account.pictureUrl,
+              ),
+            ),
+            findsOneWidget,
+          );
+        }
+        expect(_picked(tester, 'UCnew'), isTrue);
+        expect(_picked(tester, 'UCwork'), isFalse);
+      });
+
+      testWidgets('tapping another account asks for it', (tester) async {
+        final chosen = <String>[];
+        await _pump(
+          tester,
+          assumed(),
+          accounts: _accounts,
+          onChooseAccount: chosen.add,
+        );
+
+        await tester.tap(_account('UCnew'));
+        await tester.tap(_account('UCwork'));
+
+        expect(chosen, ['UCwork']);
+      });
+
+      testWidgets('shows the account being picked as picked, working', (
+        tester,
+      ) async {
+        await _pump(
+          tester,
+          assumed(),
+          accounts: _accounts,
+          choosingAccount: 'UCwork',
+        );
+
+        expect(_picked(tester, 'UCwork'), isTrue);
+        expect(_picked(tester, 'UCnew'), isFalse);
+        expect(
+          find.descendant(
+            of: _account('UCwork'),
+            matching: find.byType(CircularProgressIndicator),
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('with one saved account, names it with its picture, with '
+          'nothing to choose', (tester) async {
+        final chosen = <String>[];
+        await _pump(
+          tester,
+          assumed(),
+          accounts: _accounts.take(1).toList(),
+          onChooseAccount: chosen.add,
+        );
+
+        expect(
+          find.descendant(
+            of: _account('UCnew'),
+            matching: find.byWidgetPredicate(
+              (w) => w is ChannelAvatar && w.thumbnailUrl != null,
+            ),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(_account('UCnew'));
+        expect(chosen, isEmpty);
+      });
     });
 
     testWidgets("warns when history couldn't be read", (tester) async {

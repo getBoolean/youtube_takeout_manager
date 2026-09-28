@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_identity.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/account_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import '../domain/takeout_channel.dart';
 import '../domain/takeout_removal.dart';
@@ -245,8 +246,7 @@ class _OtherAccountRowState extends State<_OtherAccountRow> {
     final theme = Theme.of(context);
     final summary = widget.account.summary;
     final profile = widget.account.profile;
-    final name =
-        profile?.displayName ?? profile?.email ?? summary.main.displayName;
+    final name = accountName(summary, profile);
     final email = profile?.displayName != null ? profile?.email : null;
     final details = describeTakeout(summary);
     final secondary = theme.textTheme.bodySmall?.copyWith(
@@ -267,8 +267,7 @@ class _OtherAccountRowState extends State<_OtherAccountRow> {
                 if (showAvatar) ...[
                   ChannelAvatar(
                     name: name,
-                    thumbnailUrl:
-                        profile?.photoUrl ?? summary.main.thumbnailUrl,
+                    thumbnailUrl: accountPicture(summary, profile),
                     radius: 18,
                   ),
                   const SizedBox(width: 12),

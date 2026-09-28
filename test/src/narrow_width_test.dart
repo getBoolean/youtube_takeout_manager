@@ -72,6 +72,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_import_plan.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_removal.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_account_section.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_review.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -231,16 +232,21 @@ final _longPlan = TakeoutImportPlan(
   commentCheckSkipped: DeletionCheckSkipReason.unparsedRows,
 );
 
-Widget _addAccount(AddAccountState state, {bool prominent = false}) =>
-    AddAccountSection(
-      state: state,
-      idleLabel: prominent ? 'Select zip files' : null,
-      prominent: prominent,
-      enabled: true,
-      onStart: () {},
-      onConfirm: () {},
-      onDismiss: () {},
-    );
+Widget _addAccount(
+  AddAccountState state, {
+  bool prominent = false,
+  List<ImportAccount> accounts = const [],
+}) => AddAccountSection(
+  state: state,
+  idleLabel: prominent ? 'Select zip files' : null,
+  prominent: prominent,
+  enabled: true,
+  accounts: accounts,
+  onStart: () {},
+  onConfirm: () {},
+  onDismiss: () {},
+  onChooseAccount: (_) {},
+);
 
 const _notices = <String, SignInNotice>{
   'UCme': OtherChannelChosen(
@@ -626,6 +632,53 @@ void main() {
               ),
             ),
           ),
+        ],
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'a takeout that names no account, with the accounts it can go into',
+    () => Scaffold(
+      body: ListView(
+        children: [
+          for (final choosing in [null, 'UCaVeryLongChannelIdentifier12'])
+            _addAccount(
+              AddAccountMergeReview((
+                plan: const TakeoutImportPlan(
+                  accountId: 'UCaVeryLongChannelIdentifier12',
+                  mergedData: TakeoutData(
+                    comments: [],
+                    liveChats: [],
+                    subscriptionsByChannelId: {},
+                  ),
+                  goneCommentIds: {},
+                  goneLiveChatIds: {},
+                  newlyDeletedCommentIds: {},
+                  newlyDeletedLiveChatIds: {},
+                  newCommentIds: {},
+                  newLiveChatIds: {},
+                  accountAssumed: true,
+                ),
+                csvFiles: const {},
+                exports: const [],
+              ), choosing: choosing),
+              accounts: const [
+                (
+                  takeoutId: 'UCaVeryLongChannelIdentifier12',
+                  name: 'An account holder with a fairly long name',
+                  pictureUrl: null,
+                  details:
+                      '2 channels · 1,234 comments · 56 live chats · '
+                      'exported Apr 12, 2026',
+                ),
+                (
+                  takeoutId: 'UCanotherLongChannelIdentifier',
+                  name: 'Another account with a long name',
+                  pictureUrl: null,
+                  details: '12 comments · exported Mar 1, 2026',
+                ),
+              ],
+            ),
         ],
       ),
     ),

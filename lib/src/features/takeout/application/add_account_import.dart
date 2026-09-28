@@ -38,7 +38,11 @@ class AddAccountReview extends AddAccountState {
 class AddAccountMergeReview extends AddAccountState {
   final PreparedImport prepared;
 
-  const AddAccountMergeReview(this.prepared);
+  /// For a takeout that names no account, the account picked for it
+  /// instead, while that's shown and merging into it is worked out.
+  final String? choosing;
+
+  const AddAccountMergeReview(this.prepared, {this.choosing});
 
   TakeoutImportPlan get plan => prepared.plan;
 }
@@ -112,11 +116,44 @@ class AddAccountImport extends _$AddAccountImport {
   Future<bool> confirm() async {
     final prepared = switch (state) {
       AddAccountReview(:final prepared) ||
-      AddAccountMergeReview(:final prepared) => prepared,
+      AddAccountMergeReview(:final prepared, choosing: null) => prepared,
       _ => null,
     };
     if (prepared == null) return false;
     return _save(prepared);
+  }
+
+  /// Puts the takeout in review, one that names no account, into
+  /// [takeoutId]'s account instead: shows that account, since merging works
+  /// on the takeout shown, then works out merging into it without reading
+  /// the zips again. Dismissing the review meanwhile ends it.
+  Future<void> chooseAccount(String takeoutId) async {
+    if (state case AddAccountMergeReview(:final prepared, choosing: null)) {
+      state = AddAccountMergeReview(prepared, choosing: takeoutId);
+      bool stillChoosing() =>
+          ref.mounted &&
+          switch (state) {
+            AddAccountMergeReview(:final choosing) => choosing == takeoutId,
+            _ => false,
+          };
+      try {
+        await ref.read(takeoutSelectionProvider.notifier).select(takeoutId);
+        if (!stillChoosing()) return;
+        await ref.read(takeoutProvider.future);
+        if (!stillChoosing()) return;
+        final merge = await ref
+            .read(takeoutImporterProvider.notifier)
+            .prepareMerge(prepared.exports);
+        if (!stillChoosing()) return;
+        // Named in the review once fetched.
+        ref
+            .read(extraVideoIdsProvider.notifier)
+            .set(merge.plan.newItemVideoIds);
+        state = AddAccountMergeReview(merge);
+      } catch (e) {
+        if (stillChoosing()) state = AddAccountFailed(e);
+      }
+    }
   }
 
   Future<bool> _save(PreparedImport prepared) async {
