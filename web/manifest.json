@@ -1,6 +1,6 @@
 {
-    "name": "youtube_takeout_manager",
-    "short_name": "youtube_takeout_manager",
+    "name": "Takeout Manager for YouTube",
+    "short_name": "Takeout Manager for YouTube",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

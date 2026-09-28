@@ -1,6 +1,6 @@
-# YouTube Takeout Manager
+# Takeout Manager for YouTube
 
-Google Takeout exports your YouTube comment history but gives you no way to browse, search, or delete it. **YouTube Takeout Manager** imports the export and lets you do all three, individually or in bulk. It also lets you browse and search the watch and search history in the same export.
+Google Takeout exports your YouTube comment history but gives you no way to browse, search, or delete it. **Takeout Manager for YouTube** imports the export and lets you do all three, individually or in bulk. It also lets you browse and search the watch and search history in the same export.
 
 Runs on Windows, macOS, Linux, Web, Android, and iOS.
 

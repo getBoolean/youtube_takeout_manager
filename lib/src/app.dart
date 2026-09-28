@@ -36,7 +36,7 @@ class App extends ConsumerWidget {
     });
 
     return MaterialApp.router(
-      title: 'YouTube Takeout Manager',
+      title: 'Takeout Manager for YouTube',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
