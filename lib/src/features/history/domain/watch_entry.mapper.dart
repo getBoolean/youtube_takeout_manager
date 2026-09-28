@@ -110,10 +110,22 @@ class WatchEntryMapper extends ClassMapperBase<WatchEntry> {
     _$removedAt,
     opt: true,
   );
-  static String _$searchText(WatchEntry v) => v.searchText;
-  static const Field<WatchEntry, String> _f$searchText = Field(
-    'searchText',
-    _$searchText,
+  static String? _$channelId(WatchEntry v) => v.channelId;
+  static const Field<WatchEntry, String> _f$channelId = Field(
+    'channelId',
+    _$channelId,
+    mode: FieldMode.member,
+  );
+  static String _$titleSearchText(WatchEntry v) => v.titleSearchText;
+  static const Field<WatchEntry, String> _f$titleSearchText = Field(
+    'titleSearchText',
+    _$titleSearchText,
+    mode: FieldMode.member,
+  );
+  static String _$channelSearchText(WatchEntry v) => v.channelSearchText;
+  static const Field<WatchEntry, String> _f$channelSearchText = Field(
+    'channelSearchText',
+    _$channelSearchText,
     mode: FieldMode.member,
   );
 
@@ -127,7 +139,9 @@ class WatchEntryMapper extends ClassMapperBase<WatchEntry> {
     #channelTitle: _f$channelTitle,
     #channelUrl: _f$channelUrl,
     #removedAt: _f$removedAt,
-    #searchText: _f$searchText,
+    #channelId: _f$channelId,
+    #titleSearchText: _f$titleSearchText,
+    #channelSearchText: _f$channelSearchText,
   };
 
   static WatchEntry _instantiate(DecodingData data) {

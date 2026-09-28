@@ -5,7 +5,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
 import '../data/history_csv_codec.dart';
 import '../data/history_files.dart';
-import '../domain/takeout_history.dart';
+import '../domain/loaded_history.dart';
 
 part 'takeout_history_notifier.g.dart';
 
@@ -20,14 +20,15 @@ Duration? _retryLoadBriefly(int retryCount, Object error) =>
 @Riverpod(keepAlive: true, retry: _retryLoadBriefly)
 class TakeoutHistoryNotifier extends _$TakeoutHistoryNotifier {
   @override
-  Future<TakeoutHistory?> build() async {
+  Future<LoadedHistory?> build() async {
     final repository = ref.watch(takeoutRepositoryProvider);
     final takeoutId = await ref.watch(
       takeoutSelectionProvider.selectAsync((s) => s?.takeoutId),
     );
     if (takeoutId == null) return null;
     final files = await repository.loadCsvs(takeoutId, only: isHistoryPath);
-    if (files == null || files.isEmpty) return TakeoutHistory.empty;
-    return compute(parseSavedHistory, files);
+    if (files == null || files.isEmpty) return LoadedHistory.empty;
+    // With what showing it needs worked out off the UI thread, too.
+    return compute(loadSavedHistory, files);
   }
 }

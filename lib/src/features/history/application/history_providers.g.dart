@@ -16,8 +16,8 @@ final loadedHistoryProvider = LoadedHistoryProvider._();
 /// The loaded history, or none while it loads.
 
 final class LoadedHistoryProvider
-    extends $FunctionalProvider<TakeoutHistory, TakeoutHistory, TakeoutHistory>
-    with $Provider<TakeoutHistory> {
+    extends $FunctionalProvider<LoadedHistory, LoadedHistory, LoadedHistory>
+    with $Provider<LoadedHistory> {
   /// The loaded history, or none while it loads.
   LoadedHistoryProvider._()
     : super(
@@ -35,125 +35,33 @@ final class LoadedHistoryProvider
 
   @$internal
   @override
-  $ProviderElement<TakeoutHistory> $createElement($ProviderPointer pointer) =>
+  $ProviderElement<LoadedHistory> $createElement($ProviderPointer pointer) =>
       $ProviderElement(pointer);
 
   @override
-  TakeoutHistory create(Ref ref) {
+  LoadedHistory create(Ref ref) {
     return loadedHistory(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(TakeoutHistory value) {
+  Override overrideWithValue(LoadedHistory value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<TakeoutHistory>(value),
+      providerOverride: $SyncValueProvider<LoadedHistory>(value),
     );
   }
 }
 
-String _$loadedHistoryHash() => r'5fe0ef80116bfa60b83f6c3a7123542129dd19da';
+String _$loadedHistoryHash() => r'51ea5a423648bc55fd76f67dca8e3fe8636f8b3a';
 
-/// The local day of each watch, worked out once per history.
-
-@ProviderFor(watchDayKeys)
-final watchDayKeysProvider = WatchDayKeysProvider._();
-
-/// The local day of each watch, worked out once per history.
-
-final class WatchDayKeysProvider
-    extends $FunctionalProvider<List<int>, List<int>, List<int>>
-    with $Provider<List<int>> {
-  /// The local day of each watch, worked out once per history.
-  WatchDayKeysProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'watchDayKeysProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$watchDayKeysHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<int>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<int> create(Ref ref) {
-    return watchDayKeys(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<int> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<int>>(value),
-    );
-  }
-}
-
-String _$watchDayKeysHash() => r'894e53cc914c6c145de600ce3da2e45cb3191565';
-
-/// The local day of each search, worked out once per history.
-
-@ProviderFor(searchDayKeys)
-final searchDayKeysProvider = SearchDayKeysProvider._();
-
-/// The local day of each search, worked out once per history.
-
-final class SearchDayKeysProvider
-    extends $FunctionalProvider<List<int>, List<int>, List<int>>
-    with $Provider<List<int>> {
-  /// The local day of each search, worked out once per history.
-  SearchDayKeysProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'searchDayKeysProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$searchDayKeysHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<int>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
-
-  @override
-  List<int> create(Ref ref) {
-    return searchDayKeys(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<int> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<int>>(value),
-    );
-  }
-}
-
-String _$searchDayKeysHash() => r'1c049be54eed4737d569849fcf524f52dffe40b6';
-
-/// The watches that match the search and channel filter, by day, newest
-/// first. Entries are indices into the history's watches.
+/// The watched videos that match the search and filters, by day,
+/// newest first. Entries are indices into the history's watched videos.
 
 @ProviderFor(watchDays)
 final watchDaysProvider = WatchDaysProvider._();
 
-/// The watches that match the search and channel filter, by day, newest
-/// first. Entries are indices into the history's watches.
+/// The watched videos that match the search and filters, by day,
+/// newest first. Entries are indices into the history's watched videos.
 
 final class WatchDaysProvider
     extends
@@ -163,8 +71,8 @@ final class WatchDaysProvider
           List<HistoryDay>
         >
     with $Provider<List<HistoryDay>> {
-  /// The watches that match the search and channel filter, by day, newest
-  /// first. Entries are indices into the history's watches.
+  /// The watched videos that match the search and filters, by day,
+  /// newest first. Entries are indices into the history's watched videos.
   WatchDaysProvider._()
     : super(
         from: null,
@@ -198,16 +106,16 @@ final class WatchDaysProvider
   }
 }
 
-String _$watchDaysHash() => r'ac8717b51e39f5a48df173e13c5fd59d436585a5';
+String _$watchDaysHash() => r'213717175a1434775901ae1e3cdffa5a778acfd9';
 
-/// The searches that match the search, by day, newest first. Entries are
-/// indices into the history's searches.
+/// The searches that match the search and the Removed filter, by day,
+/// newest first. Entries are indices into the history's searches.
 
 @ProviderFor(searchDays)
 final searchDaysProvider = SearchDaysProvider._();
 
-/// The searches that match the search, by day, newest first. Entries are
-/// indices into the history's searches.
+/// The searches that match the search and the Removed filter, by day,
+/// newest first. Entries are indices into the history's searches.
 
 final class SearchDaysProvider
     extends
@@ -217,8 +125,8 @@ final class SearchDaysProvider
           List<HistoryDay>
         >
     with $Provider<List<HistoryDay>> {
-  /// The searches that match the search, by day, newest first. Entries are
-  /// indices into the history's searches.
+  /// The searches that match the search and the Removed filter, by day,
+  /// newest first. Entries are indices into the history's searches.
   SearchDaysProvider._()
     : super(
         from: null,
@@ -252,66 +160,18 @@ final class SearchDaysProvider
   }
 }
 
-String _$searchDaysHash() => r'fc9197cbb5d8db0e3ac8f163523942bfda9d278f';
+String _$searchDaysHash() => r'5e82223c9087a5eb1ddf2a6ba5b4f8737eac7b8e';
 
-/// Every channel videos were watched from, the most watched first.
-
-@ProviderFor(watchedChannels)
-final watchedChannelsProvider = WatchedChannelsProvider._();
-
-/// Every channel videos were watched from, the most watched first.
-
-final class WatchedChannelsProvider
-    extends
-        $FunctionalProvider<
-          List<WatchedChannel>,
-          List<WatchedChannel>,
-          List<WatchedChannel>
-        >
-    with $Provider<List<WatchedChannel>> {
-  /// Every channel videos were watched from, the most watched first.
-  WatchedChannelsProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'watchedChannelsProvider',
-        isAutoDispose: true,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$watchedChannelsHash();
-
-  @$internal
-  @override
-  $ProviderElement<List<WatchedChannel>> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
-
-  @override
-  List<WatchedChannel> create(Ref ref) {
-    return watchedChannels(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<WatchedChannel> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<WatchedChannel>>(value),
-    );
-  }
-}
-
-String _$watchedChannelsHash() => r'4dbb5a34b3099f3dc41cea75c51983469798ebe5';
-
-/// The [watchedChannelsProvider] whose names match the search.
+/// The channels videos were watched from, the most watched first. A search
+/// finds channels by name first, then those with videos whose titles match,
+/// counting only those.
 
 @ProviderFor(filteredWatchedChannels)
 final filteredWatchedChannelsProvider = FilteredWatchedChannelsProvider._();
 
-/// The [watchedChannelsProvider] whose names match the search.
+/// The channels videos were watched from, the most watched first. A search
+/// finds channels by name first, then those with videos whose titles match,
+/// counting only those.
 
 final class FilteredWatchedChannelsProvider
     extends
@@ -321,7 +181,9 @@ final class FilteredWatchedChannelsProvider
           List<WatchedChannel>
         >
     with $Provider<List<WatchedChannel>> {
-  /// The [watchedChannelsProvider] whose names match the search.
+  /// The channels videos were watched from, the most watched first. A search
+  /// finds channels by name first, then those with videos whose titles match,
+  /// counting only those.
   FilteredWatchedChannelsProvider._()
     : super(
         from: null,
@@ -357,4 +219,4 @@ final class FilteredWatchedChannelsProvider
 }
 
 String _$filteredWatchedChannelsHash() =>
-    r'b0439444dbaa9870e8c38b627a071e7191cd97b6';
+    r'10516aa2216ecf54595f71f31f3f8a0497f93e7b';

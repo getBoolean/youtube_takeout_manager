@@ -492,7 +492,10 @@ void main() {
 
     test('an import reloads the history shown', () async {
       final c = container();
-      expect((await c.read(takeoutHistoryProvider.future))!.isEmpty, isTrue);
+      expect(
+        (await c.read(takeoutHistoryProvider.future))!.history.isEmpty,
+        isTrue,
+      );
       final notifier = c.read(takeoutImporterProvider.notifier);
 
       await notifier.commitImport(
@@ -500,7 +503,7 @@ void main() {
       );
 
       final history = await c.read(takeoutHistoryProvider.future);
-      expect(history!.watches.single.videoId, 'v1');
+      expect(history!.history.watches.single.videoId, 'v1');
     });
 
     test("loading a takeout doesn't read its history", () async {

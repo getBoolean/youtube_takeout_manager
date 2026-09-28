@@ -2,9 +2,10 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import '../domain/history_days.dart';
-import '../domain/takeout_history.dart';
+import '../domain/loaded_history.dart';
 import '../domain/watched_channels.dart';
 import 'history_channel_filter.dart';
+import 'history_removed_filter.dart';
 import 'history_search_query.dart';
 import 'takeout_history_notifier.dart';
 
@@ -12,61 +13,63 @@ part 'history_providers.g.dart';
 
 /// The loaded history, or none while it loads.
 @riverpod
-TakeoutHistory loadedHistory(Ref ref) =>
-    ref.watch(takeoutHistoryProvider).value ?? TakeoutHistory.empty;
+LoadedHistory loadedHistory(Ref ref) =>
+    ref.watch(takeoutHistoryProvider).value ?? LoadedHistory.empty;
 
-/// The local day of each watch, worked out once per history.
-@riverpod
-List<int> watchDayKeys(Ref ref) => [
-  for (final w in ref.watch(loadedHistoryProvider).watches) dayKeyOf(w.time),
-];
-
-/// The local day of each search, worked out once per history.
-@riverpod
-List<int> searchDayKeys(Ref ref) => [
-  for (final s in ref.watch(loadedHistoryProvider).searches) dayKeyOf(s.time),
-];
-
-/// The watches that match the search and channel filter, by day, newest
-/// first. Entries are indices into the history's watches.
+/// The watched videos that match the search and filters, by day,
+/// newest first. Entries are indices into the history's watched videos.
 @riverpod
 List<HistoryDay> watchDays(Ref ref) {
-  final watches = ref.watch(loadedHistoryProvider).watches;
+  final loaded = ref.watch(loadedHistoryProvider);
+  final watches = loaded.history.watches;
   final query = foldForSearch(ref.watch(historySearchQueryProvider));
   final channel = ref.watch(historyChannelFilterProvider);
+  final removedOnly = ref.watch(historyRemovedFilterProvider);
   return groupByDay([
     for (var i = 0; i < watches.length; i++)
-      if ((channel?.matches(watches[i]) ?? true) &&
-          watches[i].searchText.contains(query))
+      if ((!removedOnly || watches[i].removedAt != null) &&
+          (channel?.matches(watches[i]) ?? true) &&
+          watches[i].matches(query))
         i,
-  ], ref.watch(watchDayKeysProvider));
+  ], loaded.watchDayKeys);
 }
 
-/// The searches that match the search, by day, newest first. Entries are
-/// indices into the history's searches.
+/// The searches that match the search and the Removed filter, by day,
+/// newest first. Entries are indices into the history's searches.
 @riverpod
 List<HistoryDay> searchDays(Ref ref) {
-  final searches = ref.watch(loadedHistoryProvider).searches;
+  final loaded = ref.watch(loadedHistoryProvider);
+  final searches = loaded.history.searches;
   final query = foldForSearch(ref.watch(historySearchQueryProvider));
+  final removedOnly = ref.watch(historyRemovedFilterProvider);
   return groupByDay([
     for (var i = 0; i < searches.length; i++)
-      if (searches[i].searchText.contains(query)) i,
-  ], ref.watch(searchDayKeysProvider));
+      if ((!removedOnly || searches[i].removedAt != null) &&
+          searches[i].searchText.contains(query))
+        i,
+  ], loaded.searchDayKeys);
 }
 
-/// Every channel videos were watched from, the most watched first.
-@riverpod
-List<WatchedChannel> watchedChannels(Ref ref) =>
-    countWatchedChannels(ref.watch(loadedHistoryProvider).watches);
-
-/// The [watchedChannelsProvider] whose names match the search.
+/// The channels videos were watched from, the most watched first. A search
+/// finds channels by name first, then those with videos whose titles match,
+/// counting only those.
 @riverpod
 List<WatchedChannel> filteredWatchedChannels(Ref ref) {
-  final channels = ref.watch(watchedChannelsProvider);
+  final loaded = ref.watch(loadedHistoryProvider);
   final query = foldForSearch(ref.watch(historySearchQueryProvider));
-  if (query.isEmpty) return channels;
-  return [
-    for (final c in channels)
+  if (query.isEmpty) return loaded.watchedChannels;
+  final byName = [
+    for (final c in loaded.watchedChannels)
       if (c.searchText.contains(query)) c,
+  ];
+  final named = {for (final c in byName) c.channel.key};
+  final byTitle = countWatchedChannels([
+    for (final w in loaded.history.watches)
+      if (w.titleSearchText.contains(query)) w,
+  ], byTitle: true);
+  return [
+    ...byName,
+    for (final c in byTitle)
+      if (!named.contains(c.channel.key)) c,
   ];
 }

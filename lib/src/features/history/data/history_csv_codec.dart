@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:csv/csv.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/data/csv_header.dart';
+import '../domain/loaded_history.dart';
 import '../domain/search_entry.dart';
 import '../domain/takeout_history.dart';
 import '../domain/watch_entry.dart';
@@ -167,3 +168,8 @@ String _optionalTimestamp(DateTime? t) => t == null ? '' : _timestamp(t);
 
 Uint8List _encode(List<List<Object>> rows) =>
     Uint8List.fromList(utf8.encode(_csv.encode(rows)));
+
+/// Reads saved history [files] as [parseSavedHistory] does, and works out
+/// what showing it needs. Top-level so it can run in an isolate.
+LoadedHistory loadSavedHistory(Map<String, Uint8List> files) =>
+    LoadedHistory.of(parseSavedHistory(files));

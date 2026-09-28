@@ -170,20 +170,26 @@ void main() {
     expect(find.byType(AccountButton), findsOneWidget);
   });
 
-  testWidgets('history can be opened once there is a takeout', (tester) async {
+  testWidgets('history can be opened only once there is a takeout', (
+    tester,
+  ) async {
+    bool canOpenHistory() =>
+        tester
+            .widget<IconButton>(
+              find.descendant(
+                of: find.byType(HistoryButton),
+                matching: find.byType(IconButton),
+              ),
+            )
+            .onPressed !=
+        null;
     await pumpScreen(tester);
-    expect(find.byType(HistoryButton), findsNothing);
+    expect(canOpenHistory(), isFalse);
 
     await tester.tap(find.text('Select zip files'));
     await tester.pumpAndSettle();
 
-    final button = tester.widget<IconButton>(
-      find.descendant(
-        of: find.byType(HistoryButton),
-        matching: find.byType(IconButton),
-      ),
-    );
-    expect(button.onPressed, isNotNull);
+    expect(canOpenHistory(), isTrue);
   });
 
   testWidgets('a clean first takeout is saved straight away and its channels '

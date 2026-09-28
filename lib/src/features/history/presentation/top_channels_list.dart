@@ -28,19 +28,21 @@ class TopChannelsList extends StatelessWidget {
       itemBuilder: (context, i) {
         final watched = channels[i];
         final channel = watched.channel;
+        final videos = formatCount(
+          watched.count,
+          watched.byTitle ? 'matching video' : 'video',
+        );
         return ListTile(
           leading: ChannelAvatar(name: channel.title, radius: 20),
           title: HighlightedText(
             channel.title,
-            query: query,
+            // Found by the titles of its videos, its name doesn't match.
+            query: watched.byTitle ? '' : query,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${formatCount(watched.count, 'video')} · last '
-            '${formatDay(watched.lastWatched)}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            '$videos · last watched ${formatDate(watched.lastWatched)}',
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => onPick(channel),

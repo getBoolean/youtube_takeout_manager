@@ -43,7 +43,8 @@ class ChannelListScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Channels'),
-        actions: const [AccountButton()],
+        // History needs a takeout to show.
+        actions: const [HistoryButton(enabled: false), AccountButton()],
       ),
       body: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(

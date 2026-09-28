@@ -4,9 +4,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/history/application/history_channel_filter.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_removed_filter.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
@@ -60,10 +62,11 @@ final _history = TakeoutHistory(
 class _Fixed extends TakeoutHistoryNotifier {
   _Fixed(this.history);
 
-  final TakeoutHistory history;
+  final TakeoutHistory? history;
 
   @override
-  Future<TakeoutHistory?> build() async => history;
+  Future<LoadedHistory?> build() async =>
+      history == null ? null : LoadedHistory.of(history!);
 }
 
 void main() {
@@ -113,19 +116,22 @@ void main() {
 
       final history = await container().read(takeoutHistoryProvider.future);
 
-      expect(history!.watches.map((w) => w.title), [
+      expect(history!.history.watches.map((w) => w.title), [
         'Café tour',
         'Other',
         'Unrelated',
         'Last',
       ]);
-      expect(history.searches.map((s) => s.query), ['crème brûlée', 'cats']);
+      expect(history.history.searches.map((s) => s.query), [
+        'crème brûlée',
+        'cats',
+      ]);
     });
 
     test('a takeout saved without history has none', () async {
       final history = await container().read(takeoutHistoryProvider.future);
 
-      expect(history!.isEmpty, isTrue);
+      expect(history!.history.isEmpty, isTrue);
     });
 
     test('nothing selected means no history', () async {
@@ -198,18 +204,119 @@ void main() {
   });
 
   test(
-    'top channels are ordered by watch count and filtered by the query',
+    'top channels are ordered by how many videos were watched from each',
     () async {
       final c = await loaded();
-      List<(String, int)> channels() => [
-        for (final c in c.read(filteredWatchedChannelsProvider))
-          (c.channel.title, c.count),
-      ];
 
-      expect(channels(), [('X', 3), ('CAFE Channel', 1)]);
-      c.read(historySearchQueryProvider.notifier).update('café');
+      expect(
+        [
+          for (final c in c.read(filteredWatchedChannelsProvider))
+            (c.channel.title, c.count),
+        ],
+        [('X', 3), ('CAFE Channel', 1)],
+      );
+    },
+  );
 
-      expect(channels(), [('CAFE Channel', 1)]);
+  test('searching channels finds them by name first, then by the titles of '
+      'videos watched from them', () async {
+    final c = container(
+      history: TakeoutHistory(
+        watches: [
+          _watch(
+            'Something else',
+            DateTime(2026, 4, 12),
+            channel: 'Mario Kart Fans',
+          ),
+          _watch(
+            'Mario Kart record',
+            DateTime(2026, 4, 11),
+            channel: 'MKWorld',
+          ),
+          _watch(
+            'Another Mario Kart record',
+            DateTime(2026, 4, 10),
+            channel: 'MKWorld',
+          ),
+          _watch(
+            'Shortcat plays Mario Kart',
+            DateTime(2026, 4, 9),
+            channel: 'Shortcat',
+          ),
+          _watch(
+            'Shortcat plays Tetris',
+            DateTime(2026, 4, 8),
+            channel: 'Shortcat',
+          ),
+          _watch(
+            'Shortcat plays Zelda',
+            DateTime(2026, 4, 7),
+            channel: 'Shortcat',
+          ),
+          _watch('Unrelated', DateTime(2026, 4, 6), channel: 'Nobody'),
+        ],
+      ),
+    );
+    await c.read(takeoutHistoryProvider.future);
+
+    c.read(historySearchQueryProvider.notifier).update('mario kart');
+    final channels = c.read(filteredWatchedChannelsProvider);
+
+    // By name with every video; by title with the videos that match.
+    expect(
+      [for (final c in channels) (c.channel.title, c.count, c.byTitle)],
+      [
+        ('Mario Kart Fans', 1, false),
+        ('MKWorld', 2, true),
+        ('Shortcat', 1, true),
+      ],
+    );
+  });
+
+  test(
+    'the Removed filter keeps only entries no longer in YouTube history',
+    () async {
+      final removed = DateTime.utc(2026, 5);
+      final c = container(
+        history: TakeoutHistory(
+          watches: [
+            _watch('Kept', DateTime(2026, 4, 12, 9)),
+            _watch(
+              'Gone',
+              DateTime(2026, 4, 11, 9),
+            ).copyWith(removedAt: removed),
+          ],
+          searches: [
+            SearchEntry(time: DateTime(2026, 4, 12).toUtc(), query: 'kept'),
+            SearchEntry(
+              time: DateTime(2026, 4, 11).toUtc(),
+              query: 'gone',
+              removedAt: removed,
+            ),
+          ],
+        ),
+      );
+      final loaded = (await c.read(takeoutHistoryProvider.future))!.history;
+
+      c.read(historyRemovedFilterProvider.notifier).set(true);
+
+      expect(
+        [
+          for (final day in c.read(watchDaysProvider))
+            for (final i in day.indices) loaded.watches[i].title,
+        ],
+        ['Gone'],
+      );
+      expect(
+        [
+          for (final day in c.read(searchDaysProvider))
+            for (final i in day.indices) loaded.searches[i].query,
+        ],
+        ['gone'],
+      );
+
+      c.read(historyRemovedFilterProvider.notifier).set(false);
+      expect(c.read(watchDaysProvider).expand((d) => d.indices), hasLength(2));
     },
   );
 

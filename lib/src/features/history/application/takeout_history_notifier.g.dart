@@ -19,7 +19,7 @@ final takeoutHistoryProvider = TakeoutHistoryNotifierProvider._();
 /// takeout is selected. Loaded apart from the takeout, when first looked
 /// at; an import that saves new history invalidates it.
 final class TakeoutHistoryNotifierProvider
-    extends $AsyncNotifierProvider<TakeoutHistoryNotifier, TakeoutHistory?> {
+    extends $AsyncNotifierProvider<TakeoutHistoryNotifier, LoadedHistory?> {
   /// The selected takeout's watch and search history, or null when no
   /// takeout is selected. Loaded apart from the takeout, when first looked
   /// at; an import that saves new history invalidates it.
@@ -43,24 +43,23 @@ final class TakeoutHistoryNotifierProvider
 }
 
 String _$takeoutHistoryNotifierHash() =>
-    r'e1e068315912b752e431c06a7ae085aadea301af';
+    r'57ccb551a76e317fd4c3135240c1f55d1c6cf325';
 
 /// The selected takeout's watch and search history, or null when no
 /// takeout is selected. Loaded apart from the takeout, when first looked
 /// at; an import that saves new history invalidates it.
 
-abstract class _$TakeoutHistoryNotifier
-    extends $AsyncNotifier<TakeoutHistory?> {
-  FutureOr<TakeoutHistory?> build();
+abstract class _$TakeoutHistoryNotifier extends $AsyncNotifier<LoadedHistory?> {
+  FutureOr<LoadedHistory?> build();
   @$mustCallSuper
   @override
   void runBuild() {
-    final ref = this.ref as $Ref<AsyncValue<TakeoutHistory?>, TakeoutHistory?>;
+    final ref = this.ref as $Ref<AsyncValue<LoadedHistory?>, LoadedHistory?>;
     final element =
         ref.element
             as $ClassProviderElement<
-              AnyNotifier<AsyncValue<TakeoutHistory?>, TakeoutHistory?>,
-              AsyncValue<TakeoutHistory?>,
+              AnyNotifier<AsyncValue<LoadedHistory?>, LoadedHistory?>,
+              AsyncValue<LoadedHistory?>,
               Object?,
               Object?
             >;

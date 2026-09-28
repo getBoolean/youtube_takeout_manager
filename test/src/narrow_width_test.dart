@@ -49,6 +49,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_c
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_channel_filter.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
@@ -753,35 +754,37 @@ void main() {
 /// History with long titles and names, and every badge.
 class _History extends TakeoutHistoryNotifier {
   @override
-  Future<TakeoutHistory?> build() async => TakeoutHistory(
-    watches: [
-      WatchEntry(
-        time: DateTime(2026, 4, 12, 20),
-        kind: WatchKind.video,
-        music: true,
-        title:
-            'A video with a very long title that goes on and on well past '
-            'the edge of any narrow window',
-        url: 'https://music.youtube.com/watch?v=long',
-        channelTitle: 'A channel with a very long name indeed, it goes on',
-        channelUrl: 'https://www.youtube.com/channel/UClong',
-        removedAt: DateTime.utc(2026, 5),
-      ),
-      WatchEntry(
-        time: DateTime(2026, 4, 11, 9),
-        kind: WatchKind.post,
-        title: 'A post',
-        url: 'https://www.youtube.com/post/Ugkx',
-        channelTitle: 'Short',
-      ),
-    ],
-    searches: [
-      SearchEntry(
-        time: DateTime(2026, 4, 12, 8),
-        music: true,
-        query: 'a search for something with a great many words in it indeed',
-        removedAt: DateTime.utc(2026, 5),
-      ),
-    ],
+  Future<LoadedHistory?> build() async => LoadedHistory.of(
+    TakeoutHistory(
+      watches: [
+        WatchEntry(
+          time: DateTime(2026, 4, 12, 20),
+          kind: WatchKind.video,
+          music: true,
+          title:
+              'A video with a very long title that goes on and on well past '
+              'the edge of any narrow window',
+          url: 'https://music.youtube.com/watch?v=long',
+          channelTitle: 'A channel with a very long name indeed, it goes on',
+          channelUrl: 'https://www.youtube.com/channel/UClong',
+          removedAt: DateTime.utc(2026, 5),
+        ),
+        WatchEntry(
+          time: DateTime(2026, 4, 11, 9),
+          kind: WatchKind.post,
+          title: 'A post',
+          url: 'https://www.youtube.com/post/Ugkx',
+          channelTitle: 'Short',
+        ),
+      ],
+      searches: [
+        SearchEntry(
+          time: DateTime(2026, 4, 12, 8),
+          music: true,
+          query: 'a search for something with a great many words in it indeed',
+          removedAt: DateTime.utc(2026, 5),
+        ),
+      ],
+    ),
   );
 }

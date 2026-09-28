@@ -26,6 +26,9 @@ class HistoryChannel with HistoryChannelMappable {
     null => null,
   };
 
+  /// Tells it apart from other channels: its ID, or its name without one.
+  Object get key => channelId ?? 'name:$title';
+
   /// Whether [watch] is of a video of this channel: by channel ID when it
   /// has one, else by name.
   bool matches(WatchEntry watch) => channelId != null
@@ -37,8 +40,15 @@ class HistoryChannel with HistoryChannelMappable {
 class WatchedChannel {
   /// Named as it was when a video of it was last watched.
   final HistoryChannel channel;
+
+  /// How many videos were watched from it; when it was found by [byTitle],
+  /// how many of those whose titles matched.
   final int count;
   final DateTime lastWatched;
+
+  /// Found by a search for the titles of videos watched from it, not its
+  /// name.
+  final bool byTitle;
 
   /// Its name folded for search, worked out once.
   final String searchText;
@@ -47,17 +57,22 @@ class WatchedChannel {
     required this.channel,
     required this.count,
     required this.lastWatched,
+    this.byTitle = false,
   }) : searchText = foldForSearch(channel.title);
 }
 
-/// The channels [watches] (newest first) are of, the most watched first.
-/// Watches with no channel, such as removed videos, are left out.
-List<WatchedChannel> countWatchedChannels(List<WatchEntry> watches) {
-  final counts = <String, ({WatchEntry newest, int count})>{};
+/// The channels of the videos [watches] (newest first) were of, the most
+/// watched first, marked [WatchedChannel.byTitle] when [byTitle] says the
+/// videos were found by title. Videos with no channel, such as removed
+/// ones, are left out.
+List<WatchedChannel> countWatchedChannels(
+  List<WatchEntry> watches, {
+  bool byTitle = false,
+}) {
+  final counts = <Object, ({WatchEntry newest, int count})>{};
   for (final watch in watches) {
-    final title = watch.channelTitle;
-    if (title == null) continue;
-    final key = watch.channelId ?? 'name:$title';
+    final key = HistoryChannel.of(watch)?.key;
+    if (key == null) continue;
     final seen = counts[key];
     counts[key] = (
       newest: seen?.newest ?? watch,
@@ -70,6 +85,7 @@ List<WatchedChannel> countWatchedChannels(List<WatchEntry> watches) {
         channel: HistoryChannel.of(newest)!,
         count: count,
         lastWatched: newest.time,
+        byTitle: byTitle,
       ),
   ]..sort((a, b) {
     final byCount = b.count.compareTo(a.count);

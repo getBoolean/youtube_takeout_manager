@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
@@ -60,10 +62,11 @@ final _history = TakeoutHistory(
 class _Fixed extends TakeoutHistoryNotifier {
   _Fixed(this.history);
 
-  final TakeoutHistory history;
+  final TakeoutHistory? history;
 
   @override
-  Future<TakeoutHistory?> build() async => history;
+  Future<LoadedHistory?> build() async =>
+      history == null ? null : LoadedHistory.of(history!);
 }
 
 /// The channel list, with only its History button, and history.
@@ -86,14 +89,18 @@ class _Router extends RootStackRouter {
 Future<ProviderContainer> _open(
   WidgetTester tester, {
   TakeoutHistory? history,
+  bool noTakeout = false,
+  double width = 800,
 }) async {
   SharedPreferences.setMockInitialValues({});
-  tester.view.physicalSize = const Size(800, 900);
+  tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = ProviderContainer(
     overrides: [
-      takeoutHistoryProvider.overrideWith(() => _Fixed(history ?? _history)),
+      takeoutHistoryProvider.overrideWith(
+        () => _Fixed(noTakeout ? null : history ?? _history),
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -146,9 +153,20 @@ void main() {
     expect(_shown('Other'), findsOneWidget);
     expect(_shown('Unrelated'), findsNothing);
 
+    // Channels named for it, then those with videos titled for it.
     await _openTab(tester, 2);
-    expect(_shown('CAFE Channel'), findsOneWidget);
-    expect(find.text('X', findRichText: true).hitTestable(), findsNothing);
+    final channels = find.descendant(
+      of: find.byType(TopChannelsList),
+      matching: find.byType(ListTile),
+    );
+    expect(channels, findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: channels.first,
+        matching: find.textContaining('CAFE Channel', findRichText: true),
+      ),
+      findsOneWidget,
+    );
 
     c.read(historySearchQueryProvider.notifier).update('creme');
     await _openTab(tester, 1);
@@ -238,6 +256,92 @@ void main() {
 
     expect(_shown('Gone'), findsOneWidget);
     expect(find.byType(RemovedBadge), findsOneWidget);
+  });
+
+  testWidgets('the Removed filter shows only entries no longer in YouTube '
+      'history', (tester) async {
+    await _open(
+      tester,
+      history: TakeoutHistory(
+        watches: [
+          _watch('Kept', DateTime(2026, 4, 12, 9)),
+          _watch(
+            'Gone',
+            DateTime(2026, 4, 11, 9),
+            removedAt: DateTime.utc(2026, 5),
+          ),
+        ],
+      ),
+    );
+
+    await tester.tap(find.byType(FilterChip));
+    await tester.pumpAndSettle();
+    expect(_shown('Gone'), findsOneWidget);
+    expect(_shown('Kept'), findsNothing);
+
+    await tester.tap(find.byType(FilterChip));
+    await tester.pumpAndSettle();
+    expect(_shown('Kept'), findsOneWidget);
+  });
+
+  testWidgets('the actions sheet names the video it is for', (tester) async {
+    await _open(tester);
+
+    await tester.tap(_shown('Unrelated'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.textContaining('Unrelated', findRichText: true),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('the calendar opens on the day shown and offers only days with '
+      'history', (tester) async {
+    final watches = [
+      for (var day = 30; day >= 1; day--)
+        if (day != 15)
+          for (var i = 0; i < 20; i++)
+            _watch('Day $day video $i', DateTime(2026, 4, day, 23 - i)),
+    ];
+    await _open(tester, history: TakeoutHistory(watches: watches));
+    Future<DatePickerDialog> openCalendar() async {
+      await tester.tap(find.byIcon(Icons.event));
+      await tester.pumpAndSettle();
+      return tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
+    }
+
+    final first = await openCalendar();
+    expect(first.initialDate, DateTime(2026, 4, 30));
+    expect(first.selectableDayPredicate!(DateTime(2026, 4, 15)), isFalse);
+    expect(first.selectableDayPredicate!(DateTime(2026, 4, 14)), isTrue);
+    await tester.tap(find.text('3').hitTestable());
+    await tester.tap(find.widgetWithText(TextButton, 'OK'));
+    await tester.pumpAndSettle();
+
+    final again = await openCalendar();
+    expect(again.initialDate, DateTime(2026, 4, 3));
+  });
+
+  testWidgets('without a takeout, history goes back to the channels', (
+    tester,
+  ) async {
+    await _open(tester, noTakeout: true);
+
+    expect(find.byType(HistoryScreen), findsNothing);
+    expect(find.byType(HistoryButton), findsOneWidget);
+  });
+
+  testWidgets('the deletion queue stays with the channels, not history', (
+    tester,
+  ) async {
+    await _open(tester, width: 1300);
+
+    expect(find.byType(DeletionQueuePane), findsNothing);
+    expect(find.byType(DeletionQueueStrip), findsNothing);
   });
 
   testWidgets('a takeout without history explains how to add it', (

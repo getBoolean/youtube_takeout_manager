@@ -42,21 +42,32 @@ class WatchEntry with WatchEntryMappable {
     this.channelTitle,
     this.channelUrl,
     this.removedAt,
-  }) : searchText = foldForSearch('${title ?? url}\n${channelTitle ?? ''}');
+  }) : titleSearchText = foldForSearch(title ?? url),
+       channelSearchText = foldForSearch(channelTitle ?? ''),
+       channelId = switch (channelUrl) {
+         final url? => _channelIdPattern.firstMatch(url)?.group(1),
+         null => null,
+       };
 
   /// The video's ID, when it's a video.
   String? get videoId => kind == WatchKind.video
       ? _videoIdPattern.firstMatch(url)?.group(1)
       : null;
 
-  /// The uploader's channel ID, when its link has one.
-  String? get channelId => switch (channelUrl) {
-    final url? => _channelIdPattern.firstMatch(url)?.group(1),
-    null => null,
-  };
+  /// The uploader's channel ID, when its link has one. Worked out once:
+  /// channel filters compare it for every entry.
+  final String? channelId;
 
-  /// Title and channel folded for search, worked out once.
-  final String searchText;
+  /// The title (or, without one, the link) and the channel's name, folded
+  /// for search, worked out once.
+  final String titleSearchText;
+  final String channelSearchText;
+
+  /// Whether [foldedQuery] (from `foldForSearch`) is in its title or its
+  /// channel's name.
+  bool matches(String foldedQuery) =>
+      titleSearchText.contains(foldedQuery) ||
+      channelSearchText.contains(foldedQuery);
 
   static final _videoIdPattern = RegExp(r'(?:[?&]v=|/shorts/)([\w-]+)');
   static final _channelIdPattern = RegExp(r'/channel/([\w-]+)');

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/actions_sheet.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/video_thumbnail.dart';
 import '../domain/search_entry.dart';
 import '../domain/watch_entry.dart';
 import '../domain/watched_channels.dart';
@@ -10,15 +11,54 @@ import '../domain/watched_channels.dart';
 /// What can be done with a watched video from its actions sheet.
 enum WatchAction { open, showChannel, openChannel, copyLink }
 
-/// Offers what can be done with [watch]. Returns the pick, or null if the
-/// sheet was dismissed.
+/// Offers what can be done with [watch], under its thumbnail, title and
+/// channel. Returns the pick, or null if the sheet was dismissed.
 Future<WatchAction?> showWatchActionsSheet(
   BuildContext context,
   WatchEntry watch,
 ) {
   final channel = HistoryChannel.of(watch);
+  final theme = Theme.of(context);
   return showActionsSheet(
     context,
+    header: Row(
+      children: [
+        SizedBox(
+          width: 64,
+          height: 36,
+          child: VideoThumbnail(
+            url: switch (watch.videoId) {
+              final id? => 'https://i.ytimg.com/vi/$id/mqdefault.jpg',
+              null => null,
+            },
+            placeholderIcon: Icons.videocam_outlined,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                watch.title ?? watch.url,
+                style: theme.textTheme.titleSmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (watch.channelTitle case final name?)
+                Text(
+                  name,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
     options: [
       SheetOption(
         WatchAction.open,
@@ -47,13 +87,19 @@ Future<WatchAction?> showWatchActionsSheet(
 /// What can be done with a search from its actions sheet.
 enum SearchAction { search, copy }
 
-/// Offers what can be done with [search]. Returns the pick, or null if the
-/// sheet was dismissed.
+/// Offers what can be done with [search], under what was searched for.
+/// Returns the pick, or null if the sheet was dismissed.
 Future<SearchAction?> showSearchActionsSheet(
   BuildContext context,
   SearchEntry search,
 ) => showActionsSheet(
   context,
+  header: Text(
+    search.query,
+    style: Theme.of(context).textTheme.titleSmall,
+    maxLines: 3,
+    overflow: TextOverflow.ellipsis,
+  ),
   options: [
     SheetOption(
       SearchAction.search,
