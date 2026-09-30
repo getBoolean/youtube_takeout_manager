@@ -1,0 +1,143 @@
+name: Build
+
+# Checks and tests the app, then builds it for every platform and uploads
+# each build as an artifact named after its platform. Called by CI and
+# Release.
+#
+# Builds carry no Google Cloud client: each user sets up their own in the
+# app, so nobody shares a daily YouTube API quota.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: What the packages are named after, e.g. v1.2.0.
+        type: string
+        required: true
+      release:
+        description: >-
+          Whether version is a release tag (vX.Y.Z), which then becomes the
+          app's own version instead of pubspec.yaml's.
+        type: boolean
+        default: false
+
+env:
+  FLUTTER_VERSION: 3.47.5
+
+jobs:
+  test:
+    name: Analyze and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test tool
+      - run: flutter analyze
+      - run: flutter test
+      # `dart test`, not `flutter test --platform chrome`: see the README.
+      - name: Test web storage in Chrome
+        run: dart test -p chrome test_browser
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: android, os: ubuntu-latest }
+          - { platform: web, os: ubuntu-latest }
+          - { platform: linux, os: ubuntu-latest }
+          - { platform: windows, os: windows-latest }
+          - { platform: macos, os: macos-latest }
+          - { platform: ios, os: macos-latest }
+    defaults:
+      run:
+        shell: bash
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      PACKAGE: takeout-manager-${{ inputs.version }}-${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install the Linux toolchain
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev liblzma-dev libstdc++-12-dev libsecret-1-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Build
+        env:
+          VERSION: ${{ inputs.version }}
+          RELEASE: ${{ inputs.release }}
+        run: |
+          args=(--release)
+          if [ "$RELEASE" = true ]; then
+            args+=(--build-name="${VERSION#v}" --build-number="$GITHUB_RUN_NUMBER")
+          fi
+          case "$PLATFORM" in
+            android) flutter build apk "${args[@]}" ;;
+            # Unsigned: installing it takes a sideloading tool that signs it.
+            ios) flutter build ios --no-codesign "${args[@]}" ;;
+            *) flutter build "$PLATFORM" "${args[@]}" ;;
+          esac
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          case "$PLATFORM" in
+            android)
+              cp build/app/outputs/flutter-apk/app-release.apk "dist/$PACKAGE.apk"
+              ;;
+            web)
+              (cd build/web && zip -qr "$GITHUB_WORKSPACE/dist/$PACKAGE.zip" .)
+              ;;
+            linux)
+              tar -czf "dist/$PACKAGE.tar.gz" -C build/linux/x64/release \
+                --transform "s,^bundle,$PACKAGE," bundle
+              ;;
+            windows)
+              7z a -tzip "dist/$PACKAGE.zip" ./build/windows/x64/runner/Release/*
+              ;;
+            macos)
+              ditto -c -k --sequesterRsrc --keepParent \
+                "build/macos/Build/Products/Release/Takeout Manager for YouTube.app" \
+                "dist/$PACKAGE.zip"
+              ;;
+            ios)
+              mkdir Payload
+              cp -R build/ios/iphoneos/Runner.app Payload/
+              zip -qr "dist/$PACKAGE-unsigned.ipa" Payload
+              ;;
+          esac
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14

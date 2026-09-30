@@ -297,6 +297,10 @@ dart test -p chrome test_browser    # web storage (IndexedDB), in Chrome
 
 The web storage tests use `dart test`, not `flutter test --platform chrome`: the Flutter browser test host crashes before running any test (its page lacks the `#play` element the `test` runner expects).
 
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) checks formatting, analyzes, runs both test suites, and builds every platform on each push to `main` and each pull request. The builds are downloadable from the run's page.
+
+To release, push a tag like `v1.2.0`. [release.yml](.github/workflows/release.yml) runs the same checks, builds every platform at that version, and publishes a GitHub release with the Android APK, the web, Windows, macOS and Linux archives, and an unsigned iOS IPA. A tag with a suffix, like `v1.2.0-beta.1`, becomes a pre-release. Release builds carry no Google Cloud client, so each user sets up their own. The macOS app isn't notarized, and the IPA needs a sideloading tool that signs it.
+
 ## License
 
 [MIT](LICENSE)
