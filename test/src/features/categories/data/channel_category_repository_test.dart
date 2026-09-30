@@ -1,16 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/data/channel_category_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
-import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  late MemoryEntryStore store;
+  setUp(() => store = MemoryEntryStore());
 
-  ChannelCategoryRepository repository() =>
-      ChannelCategoryRepository(KvStorageService());
+  ChannelCategoryRepository repository() => ChannelCategoryRepository(store);
 
   final category = ChannelCategory(
     path: const CategoryPath('Gaming', 'Speedruns'),
@@ -28,11 +27,7 @@ void main() {
 
   test('a category that cannot be read is skipped, not the rest', () async {
     await repository().saveCategories({'UCa': category});
-    final saved = await KvStorageService().getString('channel_categories');
-    await KvStorageService().setString(
-      'channel_categories',
-      saved!.replaceFirst('{', '{"UCbad":"nonsense",'),
-    );
+    store.boxes[EntryBoxes.channelCategories]!['UCbad'] = '"nonsense"';
 
     expect((await repository().loadCategories()).keys, ['UCa']);
   });

@@ -1,11 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:googleapis/youtube/v3.dart' as yt;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/videos/data/video_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
-import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 
 const _base = 'https://i.ytimg.com/vi/abc';
 
@@ -30,8 +29,7 @@ void main() {
   });
 
   test('upgrades cached default thumbnails to medium', () async {
-    SharedPreferences.setMockInitialValues({});
-    final cache = VideoCacheRepository(KvStorageService());
+    final cache = VideoCacheRepository(MemoryEntryStore());
     Video video(String id, String? thumbnail) =>
         Video(videoId: id, channelId: 'c', thumbnailUrl: thumbnail);
     await cache.saveVideos({

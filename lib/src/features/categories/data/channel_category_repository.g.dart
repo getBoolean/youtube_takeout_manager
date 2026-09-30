@@ -55,4 +55,4 @@ final class ChannelCategoryRepositoryProvider
 }
 
 String _$channelCategoryRepositoryHash() =>
-    r'644d2ad5b859a77eeb57084167c2fe89bb0a7e0f';
+    r'83b92135e5480e97633bde68644e13a9137d04c8';

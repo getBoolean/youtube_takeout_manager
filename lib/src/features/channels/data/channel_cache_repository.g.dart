@@ -55,4 +55,4 @@ final class ChannelCacheRepositoryProvider
 }
 
 String _$channelCacheRepositoryHash() =>
-    r'81c38de32ed9f7985693910a2693a097c7ed2102';
+    r'5e80f49ead27d373bbabdd30564ec96b38448ed4';

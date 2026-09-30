@@ -1,15 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/videos/data/video_format_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.dart';
-import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  late Map<String, Map<String, String>> boxes;
+  setUp(() => boxes = {});
 
   VideoFormatCacheRepository repository() =>
-      VideoFormatCacheRepository(KvStorageService());
+      VideoFormatCacheRepository(MemoryEntryStore(boxes));
 
   test('formats and videos YouTube lacks are kept and read back', () async {
     await repository().saveFormats({
@@ -30,9 +30,7 @@ void main() {
   });
 
   test('an entry that cannot be read is skipped, not the rest', () async {
-    SharedPreferences.setMockInitialValues({
-      'flutter.video_formats': '{"a":[40,2],"b":"nonsense"}',
-    });
+    boxes[EntryBoxes.videoFormats] = {'a': '[40,2]', 'b': '"nonsense"'};
 
     expect((await repository().loadFormats()).keys, ['a']);
   });

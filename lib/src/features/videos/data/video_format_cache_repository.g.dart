@@ -56,4 +56,4 @@ final class VideoFormatCacheRepositoryProvider
 }
 
 String _$videoFormatCacheRepositoryHash() =>
-    r'527d28cd4398ca042f5f4bba6babeaca752e1741';
+    r'1a0a0ebb0cbdcbba974c3757aa6edd974ef4bc5d';

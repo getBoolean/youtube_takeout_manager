@@ -19,6 +19,8 @@ import 'package:youtube_takeout_manager/src/features/device_cache/application/de
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
+import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 
 class _Clients extends GoogleAuthRepository {
   final used = <String>[];
@@ -166,9 +168,11 @@ void main() {
   });
 
   test('keeps saved pictures and saves fetched ones with them', () async {
-    SharedPreferences.setMockInitialValues({
-      'flutter.cached_channel_thumbnails': '{"UCold":"https://saved/UCold"}',
-    });
+    setMockStorage(
+      entries: {
+        EntryBoxes.channelPictures: {'UCold': '"https://saved/UCold"'},
+      },
+    );
     final c = container(clients: _Clients(), signIns: _SignIns());
     await pumpEventQueue();
 
@@ -329,10 +333,11 @@ void main() {
     test(
       "are fetched for channels that have a picture but none, once",
       () async {
-        SharedPreferences.setMockInitialValues({
-          'flutter.cached_channel_thumbnails':
-              '{"UCold":"https://saved/UCold"}',
-        });
+        setMockStorage(
+          entries: {
+            EntryBoxes.channelPictures: {'UCold': '"https://saved/UCold"'},
+          },
+        );
         final channels = _Channels();
         final c = container(
           clients: _Clients(),
@@ -352,9 +357,11 @@ void main() {
     );
 
     test('pictures alone still skip channels with a picture', () async {
-      SharedPreferences.setMockInitialValues({
-        'flutter.cached_channel_thumbnails': '{"UCold":"https://saved/UCold"}',
-      });
+      setMockStorage(
+        entries: {
+          EntryBoxes.channelPictures: {'UCold': '"https://saved/UCold"'},
+        },
+      );
       final channels = _Channels();
       final c = container(
         clients: _Clients(),
