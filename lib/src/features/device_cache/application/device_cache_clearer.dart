@@ -20,11 +20,13 @@ class DeviceCacheClearer extends _$DeviceCacheClearer {
   void build() {}
 
   /// Clears the video details, the watched videos' lengths and shapes,
-  /// channel pictures and not-found video IDs kept on this device.
+  /// channel pictures and topics, and not-found IDs kept on this device.
+  /// Channels' categories are kept: AI ones cost money to make again.
   Future<void> clear() async {
     await ref.read(videoCacheRepositoryProvider).clearCache();
     await ref.read(videoFormatCacheRepositoryProvider).clear();
     await ref.read(channelThumbnailsProvider.notifier).clear();
+    await ref.read(channelDetailsProvider.notifier).clear();
     ref.read(channelThumbnailFetcherProvider.notifier).forgetMissing();
 
     ref.invalidate(videoMetadataProvider);

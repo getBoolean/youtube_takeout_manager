@@ -206,6 +206,74 @@ abstract class _$ChannelThumbnails extends $AsyncNotifier<Map<String, String>> {
   }
 }
 
+/// Channels' topics and descriptions, by channel ID, kept on this device.
+/// Fetched with their pictures by `ChannelThumbnailFetcher`.
+
+@ProviderFor(ChannelDetailsNotifier)
+final channelDetailsProvider = ChannelDetailsNotifierProvider._();
+
+/// Channels' topics and descriptions, by channel ID, kept on this device.
+/// Fetched with their pictures by `ChannelThumbnailFetcher`.
+final class ChannelDetailsNotifierProvider
+    extends
+        $AsyncNotifierProvider<
+          ChannelDetailsNotifier,
+          Map<String, ChannelDetails>
+        > {
+  /// Channels' topics and descriptions, by channel ID, kept on this device.
+  /// Fetched with their pictures by `ChannelThumbnailFetcher`.
+  ChannelDetailsNotifierProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'channelDetailsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$channelDetailsNotifierHash();
+
+  @$internal
+  @override
+  ChannelDetailsNotifier create() => ChannelDetailsNotifier();
+}
+
+String _$channelDetailsNotifierHash() =>
+    r'0dd1f4e9026fbf403acb5ae47231ab94d544f174';
+
+/// Channels' topics and descriptions, by channel ID, kept on this device.
+/// Fetched with their pictures by `ChannelThumbnailFetcher`.
+
+abstract class _$ChannelDetailsNotifier
+    extends $AsyncNotifier<Map<String, ChannelDetails>> {
+  FutureOr<Map<String, ChannelDetails>> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref
+            as $Ref<
+              AsyncValue<Map<String, ChannelDetails>>,
+              Map<String, ChannelDetails>
+            >;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<
+                AsyncValue<Map<String, ChannelDetails>>,
+                Map<String, ChannelDetails>
+              >,
+              AsyncValue<Map<String, ChannelDetails>>,
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}
+
 @ProviderFor(channels)
 final channelsProvider = ChannelsProvider._();
 

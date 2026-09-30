@@ -12,6 +12,7 @@ import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operatio
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import '../data/channel_cache_repository.dart';
 import '../data/youtube_channel_repository.dart';
+import '../domain/channel_details.dart';
 import 'channel_providers.dart';
 
 part 'channel_thumbnail_fetcher.g.dart';
@@ -28,13 +29,15 @@ const _requestSize = 50;
 /// cut short.
 const _requestsBetweenSaves = 10;
 
-/// Fetches channel pictures: for the channels the viewed channel
+/// Fetches channel pictures, and with them each channel's topics and
+/// description, at no extra cost: for the channels the viewed channel
 /// interacted with, once [thumbnailBatchSize] of them appear and the rest
-/// once video titles are done; and whole lists at once, such as history's
-/// channels, with [fetchNow], the channels on screen first ([fetchFirst]).
-/// Each request is counted against the quota; channels YouTube has no
-/// picture for are remembered and not asked for again. Signed out, nothing
-/// is fetched.
+/// once video titles are done; whole lists at once, such as history's
+/// channels, with [fetchNow], the channels on screen first ([fetchFirst]);
+/// and, with [fetchDetails], channels whose details are wanted though they
+/// have a picture. Each request is counted against the quota; channels
+/// YouTube has no picture for are remembered and not asked for again.
+/// Signed out, nothing is fetched.
 /// An effect: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
 class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
@@ -86,6 +89,17 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     return flushQueue();
   }
 
+  /// Fetches the topics and description of those of [channelIds] without
+  /// them yet, pictured or not, in the order given.
+  Future<void> fetchDetails(Iterable<String> channelIds) async {
+    // Queued once what's known is in, so nothing known is asked for.
+    await ref
+        .read(channelDetailsProvider.future)
+        .catchError((Object _) => const <String, ChannelDetails>{});
+    _queue(channelIds, forDetails: true);
+    return flushQueue();
+  }
+
   /// Asks for those of [channelIds] already queued before the rest, e.g.
   /// the channels on screen, called as often as every frame. Starts
   /// nothing: those with a picture, none to get, or already being asked
@@ -99,8 +113,12 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     _firstIds = {...first, ..._firstIds}.take(_requestSize).toSet();
   }
 
-  void _queue(Iterable<String> channelIds) {
-    final known = ref.read(channelThumbnailsProvider).value ?? const {};
+  /// Queues those of [channelIds] without a picture, or, [forDetails],
+  /// without details.
+  void _queue(Iterable<String> channelIds, {bool forDetails = false}) {
+    final Map<String, Object> known = forDetails
+        ? ref.read(channelDetailsProvider).value ?? const {}
+        : ref.read(channelThumbnailsProvider).value ?? const {};
     final notFound = _notFoundIds ?? const {};
     for (final id in channelIds) {
       if (id != unknownChannelId &&
@@ -131,6 +149,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     _firstIds.removeAll(notFound);
     if (_pendingIds.isEmpty) return;
     final thumbnails = ref.read(channelThumbnailsProvider.notifier);
+    final details = ref.read(channelDetailsProvider.notifier);
     final channels = ref.read(youtubeChannelRepositoryProvider);
     final client = ref
         .read(googleAuthRepositoryProvider)
@@ -150,9 +169,9 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
 
         _askingIds.addAll(batch);
         try {
-          final Map<String, String> fetched;
+          final Map<String, ChannelSnippet> fetched;
           try {
-            fetched = await channels.fetchChannelThumbnails(client, batch);
+            fetched = await channels.fetchChannelSnippets(client, batch);
           } on Exception catch (e) {
             if (isSignInFailure(e)) rethrow;
             if (isQuotaExceeded(e)) await quota.markUsedUp();
@@ -166,14 +185,23 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
             break;
           }
           await quota.recordUsage(QuotaOperation.channelsList);
-          await thumbnails.add(fetched);
-          final missing = batch.difference(fetched.keys.toSet());
+          final pictures = {
+            for (final MapEntry(:key, :value) in fetched.entries)
+              key: ?value.thumbnailUrl,
+          };
+          await thumbnails.add(pictures);
+          await details.add({
+            for (final MapEntry(:key, :value) in fetched.entries)
+              key: value.details,
+          });
+          final missing = batch.difference(pictures.keys.toSet());
           if (missing.isNotEmpty) {
             notFound.addAll(missing);
             foundMissing = true;
           }
           if (++requests % _requestsBetweenSaves == 0) {
             await thumbnails.persist();
+            await details.persist();
           }
         } finally {
           // Once they're pictured or known to have none.
@@ -188,6 +216,7 @@ class ChannelThumbnailFetcher extends _$ChannelThumbnailFetcher {
     } finally {
       client.close();
       await thumbnails.persist();
+      if (requests > 0) await details.persist();
       // Not when the device's pictures were cleared meanwhile.
       if (foundMissing && identical(notFound, _notFoundIds)) {
         await cache.saveNotFoundIds(notFound);

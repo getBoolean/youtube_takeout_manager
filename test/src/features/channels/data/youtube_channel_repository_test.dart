@@ -60,13 +60,56 @@ void main() {
     });
   });
 
-  group('fetchChannelThumbnails', () {
+  group('fetchChannelSnippets', () {
+    test("asks for each channel's picture and topics in one request, and "
+        'reads them', () async {
+      late Uri requested;
+      final client = MockClient((request) async {
+        requested = request.url;
+        return _json({
+          'items': [
+            {
+              'id': 'UCa',
+              'snippet': {
+                'description': 'Speedruns every week.',
+                'thumbnails': {
+                  'default': {'url': 'https://yt3.example/UCa'},
+                },
+              },
+              'topicDetails': {
+                'topicCategories': [
+                  'https://en.wikipedia.org/wiki/Video_game_culture',
+                  'https://en.wikipedia.org/wiki/Action_game',
+                ],
+              },
+            },
+            {
+              'id': 'UCb',
+              'snippet': {'title': 'No picture, no topics'},
+            },
+          ],
+        });
+      });
+
+      final snippets = await YoutubeChannelRepository().fetchChannelSnippets(
+        client,
+        {'UCa', 'UCb'},
+      );
+
+      expect(requested.queryParametersAll['part'], ['snippet', 'topicDetails']);
+      expect(snippets['UCa']?.thumbnailUrl, 'https://yt3.example/UCa');
+      expect(snippets['UCa']?.details.topicUrls, hasLength(2));
+      expect(snippets['UCa']?.details.description, 'Speedruns every week.');
+      expect(snippets['UCb']?.thumbnailUrl, isNull);
+      expect(snippets['UCb']?.details.topicUrls, isEmpty);
+    });
+
     test("lets a failed request through, so its channels aren't taken to "
         'be gone', () {
       final client = MockClient((_) async => http.Response('', 500));
 
       expect(
-        YoutubeChannelRepository().fetchChannelThumbnails(client, {'UCa'}),
+        YoutubeChannelRepository().fetchChannelSnippets(client, {'UCa'}),
         throwsA(anything),
       );
     });

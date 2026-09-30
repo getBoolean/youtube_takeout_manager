@@ -8,6 +8,8 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import '../data/channel_cache_repository.dart';
+import '../data/channel_details_repository.dart';
+import '../domain/channel_details.dart';
 import '../domain/channel.dart';
 
 part 'channel_providers.g.dart';
@@ -71,6 +73,36 @@ class ChannelThumbnails extends _$ChannelThumbnails {
   Future<void> clear() async {
     await future.catchError((Object _) => const <String, String>{});
     await _cacheRepository.clearThumbnails();
+    state = const AsyncData({});
+  }
+}
+
+/// Channels' topics and descriptions, by channel ID, kept on this device.
+/// Fetched with their pictures by `ChannelThumbnailFetcher`.
+@Riverpod(keepAlive: true)
+class ChannelDetailsNotifier extends _$ChannelDetailsNotifier {
+  ChannelDetailsRepository get _repository =>
+      ref.read(channelDetailsRepositoryProvider);
+
+  @override
+  Future<Map<String, ChannelDetails>> build() =>
+      ref.watch(channelDetailsRepositoryProvider).load();
+
+  /// Adds fetched details, once the saved ones are in so they don't replace
+  /// these. Unreadable saved ones count as none.
+  Future<void> add(Map<String, ChannelDetails> details) async {
+    if (details.isEmpty) return;
+    await future.catchError((Object _) => const <String, ChannelDetails>{});
+    state = AsyncData({...?state.value, ...details});
+  }
+
+  /// Keeps the details on this device.
+  Future<void> persist() => _repository.save(state.value ?? const {});
+
+  /// Forgets every channel's details, here and on this device.
+  Future<void> clear() async {
+    await future.catchError((Object _) => const <String, ChannelDetails>{});
+    await _repository.clear();
     state = const AsyncData({});
   }
 }

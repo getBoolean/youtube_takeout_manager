@@ -2,7 +2,12 @@ import 'package:googleapis/youtube/v3.dart' as yt;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../domain/channel_details.dart';
+
 part 'youtube_channel_repository.g.dart';
+
+/// A channel's picture, if it has one, and what it says about itself.
+typedef ChannelSnippet = ({String? thumbnailUrl, ChannelDetails details});
 
 @Riverpod(keepAlive: true)
 YoutubeChannelRepository youtubeChannelRepository(Ref ref) =>
@@ -33,29 +38,36 @@ class YoutubeChannelRepository {
     );
   }
 
-  /// Fetches channel thumbnails for the given [channelIds].
+  /// Fetches each of [channelIds]' picture, topics and description, in
+  /// one request per 50 channels: topics cost nothing more than pictures.
   ///
-  /// Returns a map of channelId → thumbnail URL for channels that were found.
-  /// A request that fails is thrown, so its channels aren't taken to be
-  /// gone.
-  Future<Map<String, String>> fetchChannelThumbnails(
+  /// Returns the channels that were found. A request that fails is thrown,
+  /// so its channels aren't taken to be gone.
+  Future<Map<String, ChannelSnippet>> fetchChannelSnippets(
     http.Client authClient,
     Set<String> channelIds,
   ) async {
     final youtube = yt.YouTubeApi(authClient);
-    final results = <String, String>{};
+    final results = <String, ChannelSnippet>{};
     final idList = channelIds.toList();
 
     for (var i = 0; i < idList.length; i += _batchSize) {
       final batch = idList.sublist(i, (i + _batchSize).clamp(0, idList.length));
 
-      final response = await youtube.channels.list(['snippet'], id: batch);
+      final response = await youtube.channels.list([
+        'snippet',
+        'topicDetails',
+      ], id: batch);
       for (final item in response.items ?? <yt.Channel>[]) {
-        if (item.id == null || item.snippet == null) continue;
-        final url = item.snippet!.thumbnails?.default_?.url;
-        if (url != null) {
-          results[item.id!] = url;
-        }
+        final id = item.id;
+        if (id == null) continue;
+        results[id] = (
+          thumbnailUrl: item.snippet?.thumbnails?.default_?.url,
+          details: ChannelDetails.fromApi(
+            topicCategories: item.topicDetails?.topicCategories,
+            description: item.snippet?.description,
+          ),
+        );
       }
 
       if (i + _batchSize < idList.length) {

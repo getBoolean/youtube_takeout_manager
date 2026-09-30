@@ -51,7 +51,7 @@ void main() {
 
   test('channel pictures stop when the quota is used up', () async {
     await expectLater(
-      YoutubeChannelRepository().fetchChannelThumbnails(_quotaUsedUp, {'UCa'}),
+      YoutubeChannelRepository().fetchChannelSnippets(_quotaUsedUp, {'UCa'}),
       throwsA(predicate(isQuotaExceeded)),
     );
   });
@@ -162,7 +162,7 @@ void main() {
 
   test('channel avatars stop when the sign-in stops working', () async {
     await expectLater(
-      YoutubeChannelRepository().fetchChannelThumbnails(_rejected, {'UCa'}),
+      YoutubeChannelRepository().fetchChannelSnippets(_rejected, {'UCa'}),
       throwsA(predicate(isSignInFailure)),
     );
   });

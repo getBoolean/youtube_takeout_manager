@@ -14,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
@@ -57,7 +58,7 @@ class _Channels extends YoutubeChannelRepository {
   });
 
   @override
-  Future<Map<String, String>> fetchChannelThumbnails(
+  Future<Map<String, ChannelSnippet>> fetchChannelSnippets(
     http.Client authClient,
     Set<String> channelIds,
   ) async {
@@ -82,7 +83,13 @@ class _Channels extends YoutubeChannelRepository {
     }
     return {
       for (final id in channelIds)
-        if (!missing.contains(id)) id: 'https://yt3.example/$id',
+        if (!missing.contains(id))
+          id: (
+            thumbnailUrl: 'https://yt3.example/$id',
+            details: ChannelDetails(
+              topicUrls: ['https://en.wikipedia.org/wiki/Topic_of_$id'],
+            ),
+          ),
     };
   }
 }
@@ -299,6 +306,84 @@ void main() {
     await pumpEventQueue();
     expect(c.read(channelThumbnailsProvider).value, {
       'UCa': 'https://yt3.example/UCa',
+    });
+  });
+
+  group('details', () {
+    test('come with the pictures, and are kept after a restart', () async {
+      final c = container(clients: _Clients(), signIns: _SignIns());
+
+      await fetch(c, {'UCa'});
+
+      expect(c.read(channelDetailsProvider).value?['UCa']?.topicUrls, [
+        'https://en.wikipedia.org/wiki/Topic_of_UCa',
+      ]);
+      final reloaded = ProviderContainer();
+      addTearDown(reloaded.dispose);
+      expect(
+        (await reloaded.read(channelDetailsProvider.future))['UCa']?.topicUrls,
+        hasLength(1),
+      );
+    });
+
+    test(
+      "are fetched for channels that have a picture but none, once",
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'flutter.cached_channel_thumbnails':
+              '{"UCold":"https://saved/UCold"}',
+        });
+        final channels = _Channels();
+        final c = container(
+          clients: _Clients(),
+          signIns: _SignIns(),
+          channels: channels,
+        );
+        final fetcher = c.read(channelThumbnailFetcherProvider.notifier);
+
+        await fetcher.fetchDetails(['UCold']);
+        await fetcher.fetchDetails(['UCold']);
+
+        expect(channels.requests, [
+          ['UCold'],
+        ]);
+        expect(c.read(channelDetailsProvider).value?['UCold'], isNotNull);
+      },
+    );
+
+    test('pictures alone still skip channels with a picture', () async {
+      SharedPreferences.setMockInitialValues({
+        'flutter.cached_channel_thumbnails': '{"UCold":"https://saved/UCold"}',
+      });
+      final channels = _Channels();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        channels: channels,
+      );
+      await pumpEventQueue();
+
+      await c.read(channelThumbnailFetcherProvider.notifier).fetchNow([
+        'UCold',
+      ]);
+
+      expect(channels.requests, isEmpty);
+    });
+
+    test('signed out, none are fetched', () async {
+      final channels = _Channels();
+      final c = container(
+        clients: _Clients(),
+        signIns: _SignIns(),
+        session: null,
+        channels: channels,
+      );
+
+      await c.read(channelThumbnailFetcherProvider.notifier).fetchDetails([
+        'UCa',
+      ]);
+
+      expect(channels.requests, isEmpty);
     });
   });
 

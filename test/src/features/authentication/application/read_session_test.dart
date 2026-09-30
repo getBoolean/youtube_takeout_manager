@@ -12,6 +12,7 @@ import 'package:youtube_takeout_manager/src/features/channels/application/channe
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
@@ -101,13 +102,19 @@ class _Channels extends YoutubeChannelRepository {
   final fetched = <String>{};
 
   @override
-  Future<Map<String, String>> fetchChannelThumbnails(
+  Future<Map<String, ChannelSnippet>> fetchChannelSnippets(
     http.Client authClient,
     Set<String> channelIds,
   ) async {
     sessions.add((authClient as _SessionClient).channelId);
     fetched.addAll(channelIds);
-    return {for (final id in channelIds) id: 'https://yt3.ggpht.com/$id'};
+    return {
+      for (final id in channelIds)
+        id: (
+          thumbnailUrl: 'https://yt3.ggpht.com/$id',
+          details: const ChannelDetails(),
+        ),
+    };
   }
 }
 

@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/channel_cache_repository.dart';
+import 'package:youtube_takeout_manager/src/features/channels/data/channel_details_repository.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -43,6 +45,22 @@ class _FormatCache implements VideoFormatCacheRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Channels' topics kept on the device, in memory.
+class _DetailsCache implements ChannelDetailsRepository {
+  var details = <String, ChannelDetails>{
+    'UCold': const ChannelDetails(topicUrls: ['https://en.wikipedia.org/wiki/Music']),
+  };
+
+  @override
+  Future<Map<String, ChannelDetails>> load() async => details;
+
+  @override
+  Future<void> clear() async => details = {};
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 /// Channel pictures kept on the device, in memory.
 class _ChannelCache implements ChannelCacheRepository {
   var thumbnails = <String, String>{'UCold': 'https://saved/UCold'};
@@ -61,16 +79,19 @@ void main() {
   late _VideoCache videoCache;
   late _ChannelCache channelCache;
   late _FormatCache formatCache;
+  late _DetailsCache detailsCache;
 
   ProviderContainer container() {
     videoCache = _VideoCache();
     channelCache = _ChannelCache();
     formatCache = _FormatCache();
+    detailsCache = _DetailsCache();
     final c = ProviderContainer(
       overrides: [
         videoCacheRepositoryProvider.overrideWithValue(videoCache),
         channelCacheRepositoryProvider.overrideWithValue(channelCache),
         videoFormatCacheRepositoryProvider.overrideWithValue(formatCache),
+        channelDetailsRepositoryProvider.overrideWithValue(detailsCache),
       ],
     );
     addTearDown(c.dispose);
@@ -99,6 +120,17 @@ void main() {
 
     expect(formatCache.formats, isEmpty);
     expect(await c.read(videoFormatsProvider.future), isEmpty);
+  });
+
+  test("clears channels' topics, so they're fetched again", () async {
+    final c = container();
+    c.listen(channelDetailsProvider, (_, _) {});
+    expect(await c.read(channelDetailsProvider.future), isNotEmpty);
+
+    await c.read(deviceCacheClearerProvider.notifier).clear();
+
+    expect(detailsCache.details, isEmpty);
+    expect(c.read(channelDetailsProvider).value, isEmpty);
   });
 
   test('shows no channel pictures as soon as they are cleared', () async {
