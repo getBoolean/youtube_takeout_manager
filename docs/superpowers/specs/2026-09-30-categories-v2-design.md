@@ -175,11 +175,22 @@ Jev's and Claude's prompts both get, for each channel:
   - your decisions (accepted, denied, chosen or typed);
   - tags you edited;
   - a suggestion you accepted from Ask AI, which is your decision.
-- **A model change is a prompt change.** The fingerprint also covers the model:
-  - the model name set for the step: Claude's `ANTHROPIC_MODEL` (or the default), and Jev's `jev-latest`;
-  - the exact version the service answers with: Claude's id from the Models API (such as `claude-haiku-4-5-20251001`), and Jev's `model` field in each answer (such as `jev-1.13.0`).
+- **Model changes don't count.** Changing `ANTHROPIC_MODEL`, or a service moving its alias to a new version, redoes nothing on its own; it would redo everything too often. To redo after changing models, use Clear AI results.
 
-  So changing `ANTHROPIC_MODEL` redoes Claude's outputs. A service moving its alias to a new version redoes that step's outputs too, and the progress line says the model changed. For Jev, the version is learned from the run's first answer, and outputs made with an older one are redone in that run.
+### Clearing AI results
+
+- **Where:** a **Clear AI results** action in Takeouts › AI categories. It asks for confirmation in place, as Clear cache does. It's available with or without keys.
+- **What it clears:**
+  - Channels whose category Jev or Claude chose go back to YouTube's category, or to Uncategorized, with no AI step counted as tried.
+  - Jev's agreement is removed from YouTube's categories.
+  - AI-named tags are removed.
+  - AI-made sub-categories that no channel still uses are removed.
+- **What it keeps:**
+  - your decisions (accepted, denied, chosen or typed), including suggestions you accepted from Ask AI;
+  - tags you edited;
+  - AI-made sub-categories those still use;
+  - categories from YouTube's topics alone.
+- **Afterwards:** with keys, channels are categorized again the next time History is opened. The confirmation says this costs money, and roughly how much for the number of channels.
 
 ### Tags
 
@@ -427,7 +438,8 @@ Behaviour tests throughout: no exact copy, no goldens, round-trip saves.
   - Ask AI on Uncategorized;
   - the signed-out wording;
   - the evidence including up to 5 recent videos' cleaned, cut descriptions, with missing ones fetched first when signed in and cache-only when signed out;
-  - a prompt's fingerprint changing when its wording, evidence, model name or model version changes, and staying the same otherwise;
+  - a prompt's fingerprint changing when its wording or evidence changes, and staying the same otherwise (including when the model changes);
+  - Clear AI results removing AI categories, agreements, AI tags and unused AI-made sub-categories, while keeping your decisions, edited tags and YouTube's categories;
   - an output with an old fingerprint redone, while a user decision or edited tags with an old fingerprint are kept.
 - **History:**
   - nested groups' shape and order;
