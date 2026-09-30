@@ -108,4 +108,21 @@ void main() {
       expect(await store.loadLegacy(), isNull);
     },
   );
+
+  test('deleting everything removes every sign-in, even unreadable and '
+      'legacy ones, and nothing else', () async {
+    FlutterSecureStorage.setMockInitialValues({
+      'something_else': 'x',
+      'google_auth_credentials:UCbroken': 'not json',
+      CredentialStore.legacyKey: 'old',
+    });
+    final store = CredentialStore(const FlutterSecureStorage());
+    await store.save(_a, _credentials('ta'));
+
+    await store.deleteAll();
+
+    expect(await const FlutterSecureStorage().readAll(), {
+      'something_else': 'x',
+    });
+  });
 }

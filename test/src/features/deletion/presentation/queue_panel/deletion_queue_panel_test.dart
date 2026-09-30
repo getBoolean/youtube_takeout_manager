@@ -5,6 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/option_card.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/google_cloud_client_setup.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/oauth_client_repository.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/oauth_client.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_client_form.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel.dart';
@@ -15,6 +21,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/application/queue_
 import 'package:youtube_takeout_manager/src/features/deletion/application/script_deletion_ids.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_item_status.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/domain/deletion_queue_item.dart';
+import 'package:youtube_takeout_manager/src/features/deletion/presentation/deletion_method_picker.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/possible_membership_events_notice.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_filter_chips.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_panel.dart';
@@ -28,6 +35,7 @@ import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.da
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_status_bar.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 
 DeletionQueueItem _item(String itemId, DeletionItemStatus status) =>
@@ -108,6 +116,13 @@ class _FakeQuota extends QuotaNotifier {
   );
 }
 
+class _ClientSetup extends GoogleCloudClientSetup {
+  final saved = <OAuthClient>[];
+
+  @override
+  Future<void> save(OAuthClient client) async => saved.add(client);
+}
+
 /// The panel on a page of its own, and a stand-in for the script screen it
 /// opens.
 class _Router extends RootStackRouter {
@@ -132,15 +147,20 @@ class _Router extends RootStackRouter {
 
 void main() {
   late _FakeQueue queue;
+  late _Router router;
+  late _ClientSetup clientSetup;
 
   Future<void> pumpPanel(
     WidgetTester tester, {
     List<DeletionQueueItem>? items,
     bool signedIn = false,
+    bool oauthConfigured = true,
     DeletionProcessingState processing = DeletionProcessingState.idle,
     List<LiveChat> liveChats = const [],
   }) async {
     queue = _FakeQueue(items ?? _items);
+    router = _Router();
+    clientSetup = _ClientSetup();
     tester.view.physicalSize = const Size(400, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -179,6 +199,9 @@ void main() {
             ),
           ),
           quotaProvider.overrideWith(_FakeQuota.new),
+          oauthConfiguredProvider.overrideWithValue(oauthConfigured),
+          oauthClientProvider.overrideWith((ref) async => null),
+          googleCloudClientSetupProvider.overrideWith(() => clientSetup),
           viewedTakeoutProvider.overrideWithValue(
             AsyncData(
               TakeoutData(
@@ -189,7 +212,7 @@ void main() {
             ),
           ),
         ],
-        child: MaterialApp.router(routerConfig: _Router().config()),
+        child: MaterialApp.router(routerConfig: router.config()),
       ),
     );
     await tester.pumpAndSettle();
@@ -239,23 +262,95 @@ void main() {
     expect(find.text('text b1'), findsNothing);
   });
 
-  testWidgets('Delete asks how, with the API needing sign-in', (tester) async {
+  testWidgets('Delete asks how, for the waiting items', (tester) async {
     await pumpPanel(tester);
 
     await openDeleteDialog(tester);
 
     expect(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byType(DeletionMethodDialog),
         matching: find.textContaining('2'),
       ),
       findsOneWidget,
     );
     expect(find.text('Via My Activity'), findsOneWidget);
-    final api = tester.widget<OptionCard>(
-      find.widgetWithText(OptionCard, 'Via YouTube API'),
+    expect(find.text('Via YouTube API'), findsOneWidget);
+  });
+
+  testWidgets('signed out, choosing the API opens sign-in, and closing it '
+      'returns to deleting', (tester) async {
+    await pumpPanel(tester);
+
+    await openDeleteDialog(tester);
+    await tester.tap(find.text('Via YouTube API'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
+    expect(find.widgetWithText(OptionCard, 'Via YouTube API'), findsNothing);
+    expect(queue.calls, isNot(contains(startsWith('deleteViaApi'))));
+
+    await tester.tap(find.byType(CloseButton));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TakeoutsDialog), findsNothing);
+    expect(find.widgetWithText(OptionCard, 'Via YouTube API'), findsOne);
+  });
+
+  Future<void> chooseApiWithoutClient(WidgetTester tester) async {
+    await pumpPanel(tester, oauthConfigured: false);
+    await openDeleteDialog(tester);
+    await tester.tap(find.text('Via YouTube API'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('without a Google Cloud client, choosing the API sets one up '
+      'in the same dialog, and Back returns to deleting', (tester) async {
+    await chooseApiWithoutClient(tester);
+
+    expect(find.byType(DeletionMethodDialog), findsNothing);
+    expect(find.byKey(GoogleCloudSetupPages.nextKey), findsOneWidget);
+    expect(queue.calls, isNot(contains(startsWith('deleteViaApi'))));
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DeletionMethodDialog), findsOneWidget);
+  });
+
+  testWidgets('saving the client set up while deleting returns to deleting', (
+    tester,
+  ) async {
+    await chooseApiWithoutClient(tester);
+    while (find.byKey(GoogleCloudSetupPages.nextKey).evaluate().isNotEmpty) {
+      await tester.tap(find.byKey(GoogleCloudSetupPages.nextKey));
+      await tester.pumpAndSettle();
+    }
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(GoogleCloudClientForm.idFieldKey),
+        matching: find.byType(TextField),
+      ),
+      '123-abc.apps.googleusercontent.com',
     );
-    expect(api.onTap, isNull);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(GoogleCloudClientForm.secretFieldKey),
+        matching: find.byType(TextField),
+      ),
+      'GOCSPX-abc',
+    );
+    await tester.tap(find.byKey(GoogleCloudClientForm.saveKey));
+    await tester.pumpAndSettle();
+
+    expect(clientSetup.saved, [
+      const OAuthClient(
+        id: '123-abc.apps.googleusercontent.com',
+        secret: 'GOCSPX-abc',
+      ),
+    ]);
+    expect(find.byType(DeletionMethodDialog), findsOneWidget);
   });
 
   testWidgets('Delete warns about live chats with no text in the takeout', (
@@ -310,7 +405,7 @@ void main() {
     await tester.tap(find.text('Via YouTube API'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(DeletionMethodDialog), findsNothing);
     expect(queue.calls, contains('deleteViaApi UCme'));
   });
 
@@ -331,14 +426,14 @@ void main() {
     expect(queue.calls, isNot(contains('deleteViaApi UCme')));
   });
 
-  testWidgets('cancelling the Delete dialog starts nothing', (tester) async {
+  testWidgets('closing the Delete dialog starts nothing', (tester) async {
     await pumpPanel(tester, signedIn: true);
 
     await openDeleteDialog(tester);
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.byType(CloseButton));
     await tester.pumpAndSettle();
 
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(DeletionMethodDialog), findsNothing);
     expect(queue.calls, isEmpty);
     expect(containerOf(tester).read(scriptDeletionIdsProvider).isEmpty, isTrue);
   });

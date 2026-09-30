@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:googleapis_auth/googleapis_auth.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
@@ -99,6 +100,20 @@ void main() {
     final notice = c.read(signInNoticesProvider)['UCalt'];
     expect(notice, isA<SignInFailed>());
     expect((notice! as SignInFailed).message, contains('offline'));
+  });
+
+  test("notes a Google Cloud client Google doesn't accept", () async {
+    final c = container(
+      () async => throw ServerRequestFailedException(
+        'Failed to obtain access credentials.',
+        statusCode: 401,
+        responseContent: {'error': 'invalid_client'},
+      ),
+    );
+
+    await c.read(signInNoticesProvider.notifier).signIn('UCalt');
+
+    expect(c.read(signInNoticesProvider)['UCalt'], isA<ClientRejected>());
   });
 
   test('signing in again clears the last notice first', () async {

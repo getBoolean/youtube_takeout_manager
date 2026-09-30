@@ -75,6 +75,13 @@ void main() {
     expect(find.textContaining('offline'), findsOneWidget);
   });
 
+  testWidgets('says to check the Google Cloud client when Google refuses '
+      'it', (tester) async {
+    await pump(tester, const ClientRejected());
+
+    expect(find.byKey(SignInNoticeBanner.clientRejectedKey), findsOneWidget);
+  });
+
   testWidgets('says a sign-in stopped working', (tester) async {
     await pump(tester, const SignInStoppedWorking());
 

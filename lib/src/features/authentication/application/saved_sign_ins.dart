@@ -5,8 +5,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/credential_store.dart';
 import '../data/google_auth_repository.dart';
+import '../data/oauth_client_repository.dart';
 import '../domain/sign_in_profile.dart';
-import 'oauth_configured.dart';
 
 part 'saved_sign_ins.g.dart';
 
@@ -23,7 +23,7 @@ class SavedSignIns extends _$SavedSignIns {
   Future<Map<String, SignInProfile>> build() async {
     // Without a client, sessions couldn't refresh and would look revoked, so
     // leave saved sign-ins alone for a build that has one.
-    if (!ref.watch(oauthConfiguredProvider)) return const {};
+    if (await ref.watch(oauthClientProvider.future) == null) return const {};
     final store = ref.watch(credentialStoreProvider);
     final repository = ref.watch(googleAuthRepositoryProvider);
 

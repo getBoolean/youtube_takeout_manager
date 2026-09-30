@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
@@ -7,10 +8,13 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/oauth_client_repository.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/account_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_channels_section.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_account_header.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_section.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/presentation/cache_section.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_section.dart';
@@ -25,12 +29,37 @@ import 'leave_channel_screens.dart';
 import 'other_accounts_section.dart';
 import 'skipped_rows_banner.dart';
 
+/// The Takeouts dialog, a modal sheet whose later pages set up a Google
+/// Cloud client, then come back to it.
 Future<void> showTakeoutsDialog(BuildContext context) =>
-    showDialog<void>(context: context, builder: (_) => const TakeoutsDialog());
+    WoltModalSheet.show<void>(
+      context: context,
+      pageListBuilder: (_) => [
+        WoltModalSheetPage(
+          topBarTitle: Semantics(
+            header: true,
+            child: Text(
+              'Takeouts',
+              style: Theme.of(context).textTheme.titleLarge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          isTopBarLayerAlwaysVisible: true,
+          trailingNavBarWidget: const Padding(
+            padding: EdgeInsetsDirectional.only(end: 8),
+            child: CloseButton(),
+          ),
+          child: const TakeoutsDialog(),
+        ),
+        ...GoogleCloudSetupPages.build(),
+      ],
+    );
 
-/// The Google account the viewed takeout is from, with its channels to view
-/// and sign in, importing a takeout, and the other saved accounts to switch
-/// to, then the app's YouTube API quota and on-device cache. Errors show in
+/// The Takeouts dialog's first page: the Google account the viewed takeout
+/// is from, with its channels to view and sign in, importing a takeout, and
+/// the other saved accounts to switch to, then the Google Cloud client users
+/// bring, the app's YouTube API quota and on-device cache. Errors show in
 /// place, never in another popup.
 class TakeoutsDialog extends StatelessWidget {
   const TakeoutsDialog({super.key});
@@ -38,61 +67,52 @@ class TakeoutsDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tiny = isTinyWidth(context);
-    return Dialog(
-      insetPadding: isCompactWidth(context) ? compactDialogInsets : null,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(tiny ? 4 : 16, 8, tiny ? 4 : 8, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(start: tiny ? 4 : 8),
-                      child: Semantics(
-                        header: true,
-                        child: Text(
-                          'Takeouts',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const CloseButton(),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Padding(
-                padding: EdgeInsetsDirectional.only(end: tiny ? 0 : 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const _AccountTile(),
-                    const SizedBox(height: 16),
-                    const Divider(),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 8),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          QuotaSection(),
-                          SizedBox(height: 24),
-                          CacheSection(),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(tiny ? 4 : 16, 8, tiny ? 4 : 16, 24),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _AccountTile(),
+          SizedBox(height: 16),
+          Divider(),
+          SizedBox(height: 16),
+          Padding(
+            padding: EdgeInsetsDirectional.only(start: 8),
+            child: _Settings(),
           ),
-        ),
+        ],
       ),
+    );
+  }
+}
+
+/// The Google Cloud client users bring, the quota once there's a client to
+/// use it, and the on-device cache.
+class _Settings extends ConsumerWidget {
+  const _Settings();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (ref.watch(oauthClientRepositoryProvider).canChange) ...[
+          GoogleCloudSection(
+            deletionRunning:
+                ref.watch(deletionProcessingProvider) !=
+                DeletionProcessingState.idle,
+            onSetUp: () => showGoogleCloudSetup(context),
+            onChange: () => showGoogleCloudSetup(context, change: true),
+          ),
+          const SizedBox(height: 24),
+        ],
+        if (ref.watch(oauthConfiguredProvider)) ...[
+          const QuotaSection(),
+          const SizedBox(height: 24),
+        ],
+        const CacheSection(),
+      ],
     );
   }
 }
@@ -174,9 +194,9 @@ class _AccountTileState extends ConsumerState<_AccountTile> {
               ),
               if (!ref.watch(oauthConfiguredProvider))
                 Padding(
-                  padding: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsetsDirectional.only(start: 8, top: 4),
                   child: Text(
-                    "Sign-in isn't configured",
+                    'Signing in needs a Google Cloud client first.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -218,12 +238,12 @@ class _Channels extends ConsumerWidget {
     final saved = ref.watch(savedTakeoutsProvider).value ?? const [];
     final notices = ref.read(signInNoticesProvider.notifier);
     final selection = ref.read(takeoutSelectionProvider.notifier);
+    final configured = ref.watch(oauthConfiguredProvider);
 
     return AccountChannelsSection(
       channels: channels,
       viewedChannelId: ref.watch(viewedChannelIdProvider),
       signedInChannelIds: profiles.keys.toSet(),
-      signInEnabled: ref.watch(oauthConfiguredProvider),
       deletionRunning: deletionRunning,
       notices: ref.watch(signInNoticesProvider),
       savedChannelIds: {for (final t in saved) ...t.channelIds},
@@ -231,7 +251,11 @@ class _Channels extends ConsumerWidget {
       // channel shown before.
       onView: (id) =>
           leaveChannelScreensAfter(context, () => selection.selectChannel(id)),
-      onSignIn: notices.signIn,
+      // Without a client, Sign in looks unavailable and sets one up.
+      signInAvailable: configured,
+      onSignIn: configured
+          ? notices.signIn
+          : (_) => showGoogleCloudSetup(context),
       onSignOut: (id) =>
           ref.read(signInServiceProvider.notifier).signOut(channelId: id),
       onDismissNotice: notices.dismiss,

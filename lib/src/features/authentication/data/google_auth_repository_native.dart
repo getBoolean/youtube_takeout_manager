@@ -4,10 +4,14 @@ import 'package:googleapis_auth/auth_io.dart' as auth_io;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
+import '../domain/oauth_client.dart';
 import 'google_auth_repository.dart';
 
 class GoogleAuthRepositoryImpl extends GoogleAuthRepository {
+  final OAuthClient? _client;
+
+  GoogleAuthRepositoryImpl(this._client);
+
   final _sessions =
       <
         String,
@@ -17,8 +21,10 @@ class GoogleAuthRepositoryImpl extends GoogleAuthRepository {
         })
       >{};
 
-  static auth_io.ClientId get _clientId =>
-      auth_io.ClientId(googleClientId, googleClientSecret);
+  auth_io.ClientId get _clientId => switch (_client) {
+    final client? => auth_io.ClientId(client.id, client.secret),
+    null => throw StateError('No Google Cloud client to sign in with'),
+  };
 
   @override
   Future<auth_io.AccessCredentials?> requestCredentials() async {

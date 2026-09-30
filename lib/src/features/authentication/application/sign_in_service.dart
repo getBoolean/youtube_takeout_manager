@@ -10,10 +10,10 @@ import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operatio
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
 import '../data/credential_store.dart';
 import '../data/google_auth_repository.dart';
+import '../data/oauth_client_repository.dart';
 import '../domain/sign_in_outcome.dart';
 import '../domain/sign_in_profile.dart';
 import 'lost_sign_in.dart';
-import 'oauth_configured.dart';
 import 'saved_sign_ins.dart';
 
 part 'sign_in_service.g.dart';
@@ -39,6 +39,8 @@ class SignInService extends _$SignInService {
   /// the channel viewed when sign-in finishes.
   Future<SignInOutcome> signIn({String? targetChannelId}) async {
     final generation = ++_generation;
+    // So a client that was just set up signs in.
+    await ref.read(oauthClientProvider.future);
     final credentials = await _repository.requestCredentials();
     if (credentials == null) return const SignInCancelled();
 
@@ -96,7 +98,7 @@ class SignInService extends _$SignInService {
   /// channel.
   Future<void> moveLegacySignIn() async {
     // Without a client, sessions couldn't refresh and would look revoked.
-    if (!ref.read(oauthConfiguredProvider)) return;
+    if (await ref.read(oauthClientProvider.future) == null) return;
     // After the saved sign-ins, so this one joins them.
     await ref.read(savedSignInsProvider.future);
     final store = ref.read(credentialStoreProvider);

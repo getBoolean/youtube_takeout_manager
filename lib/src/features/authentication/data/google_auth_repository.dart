@@ -1,10 +1,14 @@
 import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:googleapis/youtube/v3.dart' show DetailedApiRequestError;
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../domain/oauth_client.dart';
+import 'oauth_client_repository.dart';
 import 'google_auth_repository_stub.dart'
     if (dart.library.io) 'google_auth_repository_native.dart'
     if (dart.library.js_interop) 'google_auth_repository_web.dart'
@@ -12,16 +16,19 @@ import 'google_auth_repository_stub.dart'
 
 part 'google_auth_repository.g.dart';
 
+/// Sign-ins through the Google Cloud client, made anew when it changes.
+/// Every channel is signed out before it does, so no session is left
+/// behind.
 @Riverpod(keepAlive: true)
 GoogleAuthRepository googleAuthRepository(Ref ref) =>
-    GoogleAuthRepository.platform();
+    GoogleAuthRepository.platform(
+      ref.watch(oauthClientProvider.select((client) => client.value)),
+    );
 
-const scopes = [
-  'https://www.googleapis.com/auth/youtube.force-ssl',
-  'openid',
-  'email',
-  'profile',
-];
+/// Reading and deleting the channel's comments and live chats.
+const youtubeScope = 'https://www.googleapis.com/auth/youtube.force-ssl';
+
+const scopes = [youtubeScope, 'openid', 'email', 'profile'];
 
 /// Whether [error] means a sign-in stopped working: Google refused to
 /// refresh it (access revoked, account deleted) or the API rejected its
@@ -39,6 +46,16 @@ bool isSignInFailure(Object error) => switch (error) {
   _ => false,
 };
 
+/// Whether [error] means Google refused the Google Cloud client itself: a
+/// wrong client ID or secret, or a deleted client.
+bool isClientRejected(Object error) => switch (error) {
+  ServerRequestFailedException(
+    responseContent: {'error': 'invalid_client' || 'deleted_client'},
+  ) =>
+    true,
+  _ => false,
+};
+
 /// Google OAuth2 sign-ins, one session per YouTube channel.
 ///
 /// Platform-specific implementations handle the actual sign-in flow:
@@ -47,12 +64,14 @@ bool isSignInFailure(Object error) => switch (error) {
 abstract class GoogleAuthRepository {
   GoogleAuthRepository();
 
-  /// This platform's implementation. Named, so implementations and fakes
-  /// can extend this class and share [fetchUserInfo].
-  factory GoogleAuthRepository.platform() = platform.GoogleAuthRepositoryImpl;
+  /// This platform's implementation, signing in through [client]. Named, so
+  /// implementations and fakes can extend this class and share
+  /// [fetchUserInfo].
+  factory GoogleAuthRepository.platform(OAuthClient? client) =
+      platform.GoogleAuthRepositoryImpl;
 
   /// Asks the user to sign in, choosing an account and channel. Null if they
-  /// cancel or refuse.
+  /// cancel or refuse. Only with a client.
   Future<AccessCredentials?> requestCredentials();
 
   /// Whether saved [credentials] can still be used: on native, whether they

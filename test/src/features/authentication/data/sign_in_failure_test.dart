@@ -42,4 +42,25 @@ void main() {
     expect(isSignInFailure(const SocketException('offline')), isFalse);
     expect(isSignInFailure(DetailedApiRequestError(500, 'Backend')), isFalse);
   });
+
+  test('Google refusing the client ID or secret, or a deleted client, is a '
+      'rejected client', () {
+    expect(
+      isClientRejected(_refresh(401, {'error': 'invalid_client'})),
+      isTrue,
+    );
+    expect(
+      isClientRejected(_refresh(401, {'error': 'deleted_client'})),
+      isTrue,
+    );
+  });
+
+  test('a lost sign-in or a bad connection is not a rejected client', () {
+    expect(
+      isClientRejected(_refresh(400, {'error': 'invalid_grant'})),
+      isFalse,
+    );
+    expect(isClientRejected(_refresh(null, '<html>Log in</html>')), isFalse);
+    expect(isClientRejected(const SocketException('offline')), isFalse);
+  });
 }

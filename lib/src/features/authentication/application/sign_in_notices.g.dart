@@ -115,7 +115,7 @@ final class SignInNoticesProvider
   }
 }
 
-String _$signInNoticesHash() => r'a2d30064ea161d3200a5f74597a531f90123a702';
+String _$signInNoticesHash() => r'3fc9718fb8c89534e37bc17503ee94674e9e0a0a';
 
 /// Each channel's notice for its row in the Takeouts dialog, by channel ID:
 /// why signing it in from there didn't work, or that its saved sign-in

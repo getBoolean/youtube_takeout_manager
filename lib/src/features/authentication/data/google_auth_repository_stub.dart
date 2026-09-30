@@ -1,7 +1,8 @@
+import '../domain/oauth_client.dart';
 import 'google_auth_repository.dart';
 
 class GoogleAuthRepositoryImpl implements GoogleAuthRepository {
-  GoogleAuthRepositoryImpl() {
+  GoogleAuthRepositoryImpl(OAuthClient? client) {
     throw UnsupportedError(
       'No platform implementation for GoogleAuthRepository',
     );

@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/google_cloud_client_setup.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
@@ -16,12 +17,19 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/google_auth_repository.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/oauth_client_repository.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/oauth_client.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/viewed_takeout_providers.dart';
+
+const _client = OAuthClient(
+  id: '123-abc.apps.googleusercontent.com',
+  secret: 'GOCSPX-abc',
+);
 
 /// Credentials whose access token names the channel they're for.
 AccessCredentials _credentials(String token) => AccessCredentials(
@@ -144,15 +152,16 @@ void main() {
   late _FakeAuthRepository repository;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      'flutter.oauth_client': _client.toJson(),
+    });
     FlutterSecureStorage.setMockInitialValues({});
     repository = _FakeAuthRepository();
   });
 
-  ProviderContainer container({bool configured = true}) {
+  ProviderContainer container() {
     final c = ProviderContainer(
       overrides: [
-        oauthConfiguredProvider.overrideWithValue(configured),
         googleAuthRepositoryProvider.overrideWithValue(repository),
         youtubeChannelRepositoryProvider.overrideWithValue(_FakeChannels()),
         viewedChannelIdProvider.overrideWith((ref) => ref.watch(_viewed)),
@@ -437,17 +446,118 @@ void main() {
     });
   });
 
-  test('without sign-in configured, saved sign-ins are left alone', () async {
+  test('without a client, saved sign-ins are left alone', () async {
+    SharedPreferences.setMockInitialValues({});
     FlutterSecureStorage.setMockInitialValues({
       'google_auth_credentials:UCa': _saved('UCa'),
       'google_auth_credentials': _legacy('UCa'),
     });
-    final c = container(configured: false);
+    final c = container();
     await c.read(legacySignInMigrationProvider.future);
 
     expect(await c.read(savedSignInsProvider.future), isEmpty);
+    expect(c.read(oauthConfiguredProvider), isFalse);
     expect(repository.sessions, isEmpty);
     expect(await storedChannels(), {'UCa'});
     expect(await store().loadLegacy(), isNotNull);
+  });
+
+  group('setting up a Google Cloud client', () {
+    const other = OAuthClient(
+      id: '999-other.apps.googleusercontent.com',
+      secret: 'GOCSPX-other',
+    );
+
+    GoogleCloudClientSetup setup(ProviderContainer c) =>
+        c.read(googleCloudClientSetupProvider.notifier);
+
+    Future<void> useQuota(ProviderContainer c) => c
+        .read(quotaProvider.notifier)
+        .recordUsage(QuotaOperation.deleteComment);
+
+    test('lets channels sign in', () async {
+      SharedPreferences.setMockInitialValues({});
+      final c = container();
+      await c.read(savedSignInsProvider.future);
+      expect(c.read(oauthConfiguredProvider), isFalse);
+
+      await setup(c).save(_client);
+      repository.next = _credentials('UCa');
+      final outcome = await c.read(signInServiceProvider.notifier).signIn();
+
+      expect(c.read(oauthConfiguredProvider), isTrue);
+      expect(outcome, isA<SignedIn>());
+      expect(await container().read(oauthClientProvider.future), _client);
+    });
+
+    test('drops sign-ins saved without it, as they came from another '
+        'client', () async {
+      SharedPreferences.setMockInitialValues({});
+      FlutterSecureStorage.setMockInitialValues({
+        'google_auth_credentials:UCa': _saved('UCa'),
+        'google_auth_credentials': _legacy('UCb'),
+      });
+      final c = container();
+
+      await setup(c).save(_client);
+
+      expect(await c.read(savedSignInsProvider.future), isEmpty);
+      expect(repository.sessions, isEmpty);
+      expect(await storedChannels(), isEmpty);
+      expect(await store().loadLegacy(), isNull);
+    });
+
+    test('changing it signs every channel out and starts the quota '
+        'afresh', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'google_auth_credentials:UCa': _saved('UCa'),
+        'google_auth_credentials:UCb': _saved('UCb'),
+      });
+      final c = container();
+      expect((await c.read(savedSignInsProvider.future)).keys, hasLength(2));
+      await useQuota(c);
+
+      await setup(c).save(other);
+
+      expect(await c.read(savedSignInsProvider.future), isEmpty);
+      expect(repository.sessions, isEmpty);
+      expect(repository.closed, containsAll([('UCa', true), ('UCb', true)]));
+      expect(await storedChannels(), isEmpty);
+      expect((await c.read(quotaProvider.future)).unitsUsed, 0);
+      expect(await container().read(oauthClientProvider.future), other);
+    });
+
+    test('saving the same one again keeps everything', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'google_auth_credentials:UCa': _saved('UCa'),
+      });
+      final c = container();
+      await c.read(savedSignInsProvider.future);
+      await useQuota(c);
+
+      await setup(
+        c,
+      ).save(OAuthClient.fromInput(' ${_client.id} ', secret: _client.secret));
+
+      expect((await c.read(savedSignInsProvider.future)).keys, ['UCa']);
+      expect(repository.sessions, {'UCa'});
+      expect((await c.read(quotaProvider.future)).unitsUsed, isPositive);
+    });
+
+    test('removing it signs every channel out and turns sign-in off', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'google_auth_credentials:UCa': _saved('UCa'),
+      });
+      final c = container();
+      await c.read(savedSignInsProvider.future);
+
+      await setup(c).remove();
+
+      expect(c.read(oauthConfiguredProvider), isFalse);
+      expect(await c.read(savedSignInsProvider.future), isEmpty);
+      expect(repository.sessions, isEmpty);
+      expect(await storedChannels(), isEmpty);
+      expect(await container().read(oauthClientProvider.future), isNull);
+    });
   });
 }

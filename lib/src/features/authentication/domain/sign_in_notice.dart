@@ -25,6 +25,12 @@ class SignInFailed extends SignInNotice {
   const SignInFailed(this.message);
 }
 
+/// Google refused the Google Cloud client: a wrong ID or secret, or a
+/// deleted client.
+class ClientRejected extends SignInNotice {
+  const ClientRejected();
+}
+
 /// The channel's saved sign-in stopped working and was removed.
 class SignInStoppedWorking extends SignInNotice {
   const SignInStoppedWorking();

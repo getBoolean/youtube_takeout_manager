@@ -16,8 +16,9 @@ class AccountChannelsSection extends StatelessWidget {
   final String? viewedChannelId;
   final Set<String> signedInChannelIds;
 
-  /// Whether signing in can be offered, i.e. sign-in is configured.
-  final bool signInEnabled;
+  /// Whether signing in can work, i.e. there's a Google Cloud client. When
+  /// it can't, Sign in looks unavailable, and [onSignIn] sets one up.
+  final bool signInAvailable;
 
   /// Whether the YouTube API is deleting, so channels can be neither viewed
   /// nor signed out until it stops.
@@ -42,10 +43,10 @@ class AccountChannelsSection extends StatelessWidget {
     required this.channels,
     required this.viewedChannelId,
     required this.signedInChannelIds,
-    required this.signInEnabled,
     required this.onView,
     required this.onSignIn,
     required this.onSignOut,
+    this.signInAvailable = true,
     this.deletionRunning = false,
     this.notices = const {},
     this.savedChannelIds = const {},
@@ -70,7 +71,7 @@ class AccountChannelsSection extends StatelessWidget {
                 channel: channel,
                 viewing: channel.channelId == viewedChannelId,
                 signedIn: signedInChannelIds.contains(channel.channelId),
-                signInEnabled: signInEnabled,
+                signInAvailable: signInAvailable,
                 locked: deletionRunning,
                 notice: notices[channel.channelId],
                 canViewChosen: switch (notices[channel.channelId]) {
@@ -96,7 +97,7 @@ class _ChannelRow extends StatelessWidget {
   final TakeoutChannel channel;
   final bool viewing;
   final bool signedIn;
-  final bool signInEnabled;
+  final bool signInAvailable;
   final bool locked;
   final SignInNotice? notice;
   final bool canViewChosen;
@@ -110,7 +111,7 @@ class _ChannelRow extends StatelessWidget {
     required this.channel,
     required this.viewing,
     required this.signedIn,
-    required this.signInEnabled,
+    required this.signInAvailable,
     required this.locked,
     required this.notice,
     required this.canViewChosen,
@@ -185,11 +186,34 @@ class _ChannelRow extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                       )
-                    : TextButton(
-                        onPressed: signInEnabled ? onSignIn : null,
+                    : signInAvailable
+                    ? TextButton(
+                        onPressed: onSignIn,
                         child: const Text(
                           'Sign in',
                           textAlign: TextAlign.center,
+                        ),
+                      )
+                    : Tooltip(
+                        message:
+                            'Needs a Google Cloud client. Tap to set one '
+                            'up.',
+                        // Muted and locked, as it can't sign in yet, yet
+                        // readable, since tapping it still sets one up.
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: onSignIn,
+                          icon: isTinyWidth(context)
+                              ? null
+                              : const Icon(Icons.lock_outline),
+                          label: const Text(
+                            'Sign in',
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
               ),

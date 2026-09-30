@@ -8,9 +8,16 @@ part of 'google_auth_repository.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Sign-ins through the Google Cloud client, made anew when it changes.
+/// Every channel is signed out before it does, so no session is left
+/// behind.
 
 @ProviderFor(googleAuthRepository)
 final googleAuthRepositoryProvider = GoogleAuthRepositoryProvider._();
+
+/// Sign-ins through the Google Cloud client, made anew when it changes.
+/// Every channel is signed out before it does, so no session is left
+/// behind.
 
 final class GoogleAuthRepositoryProvider
     extends
@@ -20,6 +27,9 @@ final class GoogleAuthRepositoryProvider
           GoogleAuthRepository
         >
     with $Provider<GoogleAuthRepository> {
+  /// Sign-ins through the Google Cloud client, made anew when it changes.
+  /// Every channel is signed out before it does, so no session is left
+  /// behind.
   GoogleAuthRepositoryProvider._()
     : super(
         from: null,
@@ -55,4 +65,4 @@ final class GoogleAuthRepositoryProvider
 }
 
 String _$googleAuthRepositoryHash() =>
-    r'e2db603cfbb33e4db29f065791d29254515ef25c';
+    r'920ef32f4d51741422c4844a09e3eccb5b2922f3';

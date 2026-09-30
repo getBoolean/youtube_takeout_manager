@@ -126,7 +126,6 @@ void main() {
 
     Future<void> pumpSection(
       WidgetTester tester, {
-      bool signInEnabled = true,
       bool deletionRunning = false,
       Map<String, SignInNotice> notices = const {},
       Set<String> savedChannelIds = const {},
@@ -142,7 +141,6 @@ void main() {
           channels: const [_main, _alt],
           viewedChannelId: 'UCme',
           signedInChannelIds: const {'UCme'},
-          signInEnabled: signInEnabled,
           deletionRunning: deletionRunning,
           notices: notices,
           savedChannelIds: savedChannelIds,
@@ -180,18 +178,6 @@ void main() {
       await tester.tap(find.text('Sign out'));
       expect(signedIn, ['UCalt']);
       expect(signedOut, ['UCme']);
-    });
-
-    testWidgets("signing in waits for it to be configured", (tester) async {
-      await pumpSection(tester, signInEnabled: false);
-
-      final button = tester.widget<ButtonStyleButton>(
-        find.ancestor(
-          of: find.text('Sign in'),
-          matching: find.bySubtype<ButtonStyleButton>(),
-        ),
-      );
-      expect(button.onPressed, isNull);
     });
 
     testWidgets("shows a sign-in notice on its channel's row", (tester) async {

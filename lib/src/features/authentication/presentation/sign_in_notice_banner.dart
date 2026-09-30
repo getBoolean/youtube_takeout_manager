@@ -19,6 +19,7 @@ class SignInNoticeBanner extends StatelessWidget {
   static const otherChannelChosenKey = ValueKey('sign-in-notice-other-channel');
   static const noYouTubeChannelKey = ValueKey('sign-in-notice-no-channel');
   static const signInFailedKey = ValueKey('sign-in-notice-failed');
+  static const clientRejectedKey = ValueKey('sign-in-notice-client-rejected');
   static const stoppedWorkingKey = ValueKey('sign-in-notice-stopped-working');
 
   const SignInNoticeBanner({
@@ -88,6 +89,18 @@ class SignInNoticeBanner extends StatelessWidget {
         title: 'Sign-in failed',
         onDismiss: onDismiss,
         children: [Text(message)],
+      ),
+      ClientRejected() => NoticeBanner(
+        key: clientRejectedKey,
+        title: "Google didn't accept the client",
+        onDismiss: onDismiss,
+        children: const [
+          Text(
+            "Google doesn't recognize the client ID or secret, or the client "
+            'was deleted. Check them under Google Cloud client, or set the '
+            'client up again.',
+          ),
+        ],
       ),
       SignInStoppedWorking() => NoticeBanner(
         key: stoppedWorkingKey,

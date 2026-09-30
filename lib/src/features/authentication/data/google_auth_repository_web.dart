@@ -1,7 +1,7 @@
 import 'package:googleapis_auth/auth_browser.dart';
 import 'package:http/http.dart' as http;
 
-import 'package:youtube_takeout_manager/src/config/oauth_config.dart';
+import '../domain/oauth_client.dart';
 import 'google_auth_repository.dart';
 
 /// On web there are no refresh tokens: a sign-in lasts as long as its access
@@ -9,14 +9,22 @@ import 'google_auth_repository.dart';
 class GoogleAuthRepositoryImpl extends GoogleAuthRepository {
   static const _expiryBuffer = Duration(minutes: 5);
 
+  final OAuthClient? _client;
+
+  GoogleAuthRepositoryImpl(this._client);
+
   final _sessions = <String, ({http.Client client, String accessToken})>{};
 
   @override
   Future<AccessCredentials?> requestCredentials() async {
+    final client = _client;
+    if (client == null) {
+      throw StateError('No Google Cloud client to sign in with');
+    }
     try {
       // Google asks which account to use by default.
       return await requestAccessCredentials(
-        clientId: googleWebClientId,
+        clientId: client.id,
         scopes: scopes,
       );
     } on UserConsentException {

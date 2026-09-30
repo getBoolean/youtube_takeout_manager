@@ -70,14 +70,14 @@ flutter run -d windows --dart-define-from-file=.env   # or macos, linux, chrome
 
 ## Quick Start
 
-You need the [Flutter SDK](https://docs.flutter.dev/get-started/install). No Google Cloud setup is needed to start: without it you can browse, search, export, and delete with the script. [Sign-in](#set-up-google-sign-in-optional) adds API deletion and video titles whenever you want them.
+You need the [Flutter SDK](https://docs.flutter.dev/get-started/install). No Google Cloud setup is needed to start: without it you can browse, search, export, and delete with the script. [Sign-in](#set-up-google-sign-in-optional) adds API deletion and video titles whenever you want them, and the app walks you through setting it up.
 
 ```sh
 # 1. Get the code
 git clone https://github.com/getBoolean/youtube_takeout_manager.git
 cd youtube_takeout_manager
 
-# 2. Create an empty config (sign-in stays off until you fill it in)
+# 2. Create an empty config (sign-in is then set up inside the app)
 cp .env.example .env
 
 # 3. Run it
@@ -143,7 +143,7 @@ The script path takes four steps, and the app walks you through each one: open [
 - Your takeout is read and saved locally: in the app's data folder on desktop and mobile, in browser storage on web. There's no server behind this app.
 - No analytics or telemetry.
 - The app only goes online for what you ask of YouTube: sign-in, deletions, and — once you've signed in — video titles, thumbnails, and channel pictures. It also reads YouTube's public live chat replays to name custom emoji the takeout leaves unnamed (desktop and mobile only).
-- Sign-in tokens are kept in the OS's secure storage.
+- Sign-in tokens are kept in the OS's secure storage. A Google Cloud client you set up in the app is saved on your device with its other settings.
 - Quota use is counted as it happens, so you always see what's left today.
 
 ## Why not just use…?
@@ -166,7 +166,7 @@ The script path takes four steps, and the app walks you through each one: open [
 | No prebuilt downloads yet | [Quick Start](#quick-start) builds and runs it with one command |
 | API deletion tops out around 200 a day | Use the script path |
 | The script relies on My Activity's internals; a Google change can break it | The API path still works; [open an issue](https://github.com/getBoolean/youtube_takeout_manager/issues) |
-| Sign-in needs your own Google Cloud OAuth client | Everything but API deletion and video titles works without it |
+| Sign-in needs your own Google Cloud OAuth client | The app walks you through making one; everything but API deletion and video titles works without it |
 | Video titles, thumbnails, and channel pictures need sign-in | Every comment still links to its video |
 | Watch and search history is read-only | Delete it on [My Activity](https://myactivity.google.com/) |
 | Custom emoji names aren't looked up on web (browser CORS rules) | Use a desktop or mobile build |
@@ -226,7 +226,11 @@ On web, keep `--web-port` equal to the port you registered for sign-in. The VS C
 
 ## Set up Google sign-in (optional)
 
-Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. It needs a Google Cloud OAuth client, which is free.
+Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. It needs a Google Cloud OAuth client, which is free. The YouTube API quota belongs to the client's project, so everyone using the same client shares one daily quota.
+
+**In the app:** open **Takeouts** with the account button, then choose **Set up** under **Google Cloud client**. The app walks you through the steps below and saves the client on that device. Change or remove it there too; switching clients signs your channels out, since their sign-ins only work with the client that made them.
+
+**In a build:** to ship a client with the app, fill in `.env` before building (step 5 below). That build always uses its own client, and its users share its quota.
 
 <details>
 <summary><b>Step-by-step Google Cloud setup</b></summary>
@@ -238,9 +242,9 @@ Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. I
    - **Audience** — choose **External** and add your Google account as a test user. Without this, sign-in fails with 403 while the app is in "Testing".
    - **Data Access** — add the scopes `openid`, `email`, `profile`, and `https://www.googleapis.com/auth/youtube.force-ssl`.
 4. **Create OAuth clients** under **Clients**:
-   - **Desktop app** — copy the **Client ID** and **Client Secret**.
+   - **Desktop app** (desktop and mobile) — copy the **Client ID** and **Client Secret**. Google shows the secret only once.
    - **Web application** — add your run URL (e.g. `http://localhost:9000`) to **Authorized JavaScript origins** and copy the **Client ID**. No secret is needed.
-5. Fill in `.env` in the project root (it's gitignored):
+5. Paste the client into the app's setup. Or, for a build that ships its own client, fill in `.env` in the project root (it's gitignored):
 
    ```properties
    GOOGLE_CLIENT_ID=your-desktop-client-id
@@ -248,7 +252,7 @@ Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. I
    GOOGLE_WEB_CLIENT_ID=your-web-client-id
    ```
 
-6. Restart the app.
+6. After changing `.env`, restart the app.
 
 </details>
 
@@ -262,6 +266,9 @@ Your Google account isn't a test user. Add it under **Google Auth Platform > Aud
 
 **Web sign-in redirect fails**
 The port in your URL must match **Authorized JavaScript origins** exactly.
+
+**"Google didn't accept the client" on sign-in**
+The client ID or secret is wrong, or the client was deleted. Check them under **Takeouts > Google Cloud client > Change**. If a Desktop client's secret is lost, add a new secret on the client's page in Google Cloud.
 
 **The script stops with "Could not find XSRF token" or "Could not discover delete rpcid"**
 Run it on [My Activity's YouTube comments page](https://myactivity.google.com/page?hl=en&page=youtube_comments), signed in, after the page has finished loading. If it still fails, Google may have changed the page; [open an issue](https://github.com/getBoolean/youtube_takeout_manager/issues).

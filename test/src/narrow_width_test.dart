@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/oauth_client_repository.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/oauth_client.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_client_form.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_notices.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_notice.dart';
@@ -75,6 +80,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/presentation/add_ac
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/import_review.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_accounts_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
+import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
@@ -258,7 +264,24 @@ const _notices = <String, SignInNotice>{
   'UCa': NoYouTubeChannel(),
   'UCb': SignInFailed('Exception: the connection was closed unexpectedly'),
   'UCc': SignInStoppedWorking(),
+  'UCd': ClientRejected(),
 };
+
+const _longClient = OAuthClient(
+  id:
+      '123456789012-abcdefghijklmnopqrstuvwxyz012345'
+      '.apps.googleusercontent.com',
+  secret: 'GOCSPX-abcdefghijklmnopqrstuvwxyz01',
+);
+
+/// Whether sign-in has [client], which users set up themselves.
+List<Override> _clientOverrides(OAuthClient? client) => [
+  oauthConfiguredProvider.overrideWithValue(client != null),
+  oauthClientProvider.overrideWith((ref) async => client),
+  oauthClientRepositoryProvider.overrideWithValue(
+    OAuthClientRepository(KvStorageService()),
+  ),
+];
 
 class _Notices extends SignInNotices {
   @override
@@ -380,11 +403,65 @@ Widget _channelPage({required bool liveChats}) {
   );
 }
 
-/// The Takeouts dialog with sign-in configured, and [overrides].
-Widget _takeoutsDialog([List<Override> overrides = const []]) => ProviderScope(
-  overrides: [oauthConfiguredProvider.overrideWithValue(true), ...overrides],
-  child: const Scaffold(body: TakeoutsDialog()),
+/// The Takeouts dialog with a Google Cloud client users set up, unless
+/// without [client], and [overrides].
+Widget _takeoutsDialog([
+  List<Override> overrides = const [],
+  OAuthClient? client = _longClient,
+]) => ProviderScope(
+  overrides: [..._clientOverrides(client), ...overrides],
+  child: const Scaffold(body: SingleChildScrollView(child: TakeoutsDialog())),
 );
+
+/// Opens Google Cloud setup's pages in a modal on the first frame, at
+/// [page].
+class _SetupModal extends StatefulWidget {
+  final bool web;
+  final int page;
+
+  const _SetupModal({this.web = false, this.page = 0});
+
+  @override
+  State<_SetupModal> createState() => _SetupModalState();
+}
+
+class _SetupModalState extends State<_SetupModal> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WoltModalSheet.show<void>(
+        context: context,
+        pageIndexNotifier: ValueNotifier(widget.page),
+        pageListBuilder: (_) => GoogleCloudSetupPages.build(
+          web: widget.web,
+          origin: widget.web
+              ? 'https://someone.github.io/takeout-manager'
+              : null,
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const Scaffold();
+}
+
+/// Goes through each page of the Google Cloud setup, then saves nothing, so
+/// every field shows why.
+Future<void> _throughGoogleCloudSetup(WidgetTester tester) async {
+  await tester.pumpAndSettle();
+  final modal = tester.state<WoltModalSheetState>(
+    find.byWidgetPredicate((w) => w is WoltModalSheet),
+  );
+  while (modal.showNext()) {
+    await tester.pumpAndSettle();
+  }
+  await tester.ensureVisible(find.byKey(GoogleCloudClientForm.saveKey));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(GoogleCloudClientForm.saveKey));
+  await tester.pumpAndSettle();
+}
 
 Widget _channelListParts() => Scaffold(
   body: ListView(
@@ -513,6 +590,32 @@ void main() {
   );
   fitsAtEveryWidth('the Takeouts dialog', _takeoutsDialog);
   fitsAtEveryWidth(
+    'the Takeouts dialog without a Google Cloud client',
+    () => _takeoutsDialog(const [], null),
+    then: (tester) async =>
+        expect(find.text('Sign in', skipOffstage: false), findsWidgets),
+  );
+  for (final web in [false, true]) {
+    fitsAtEveryWidth(
+      'Google Cloud setup${web ? ' on web' : ''}, every step',
+      () => _SetupModal(web: web),
+      overrides: [
+        ..._clientOverrides(null),
+        savedSignInsProvider.overrideWith(_SignIns.new),
+      ],
+      then: _throughGoogleCloudSetup,
+    );
+  }
+  fitsAtEveryWidth(
+    'Google Cloud setup changing a client',
+    () => const _SetupModal(page: 4),
+    then: (tester) => tester.pumpAndSettle(),
+    overrides: [
+      ..._clientOverrides(_longClient),
+      savedSignInsProvider.overrideWith(_SignIns.new),
+    ],
+  );
+  fitsAtEveryWidth(
     'the Takeouts dialog signed in',
     () => _takeoutsDialog([
       authProvider.overrideWith(_SignedIn.new),
@@ -535,15 +638,17 @@ void main() {
     ]),
   );
   fitsAtEveryWidth(
-    'the Takeouts dialog asking to reset quota usage and clear the cache',
+    'the Takeouts dialog asking to remove the client, reset quota usage and '
+    'clear the cache',
     _takeoutsDialog,
     then: (tester) async {
-      for (final action in ['Reset usage', 'Clear cache']) {
+      const actions = ['Remove client', 'Reset usage', 'Clear cache'];
+      for (final action in actions) {
         await tester.ensureVisible(find.text(action));
         await tester.tap(find.text(action));
         await tester.pump();
       }
-      expect(find.text('Cancel'), findsNWidgets(2));
+      expect(find.text('Cancel'), findsNWidgets(actions.length));
     },
   );
   fitsAtEveryWidth(
@@ -730,11 +835,27 @@ void main() {
   );
   fitsAtEveryWidth(
     'the delete dialog',
-    () => const DeletionMethodDialog(
-      itemCount: 12,
-      possibleMembershipEventCount: 3,
-      signedIn: true,
-      deletesLeft: 200,
+    () => const Scaffold(
+      body: SingleChildScrollView(
+        child: DeletionMethodDialog(
+          itemCount: 12,
+          possibleMembershipEventCount: 3,
+          signedIn: true,
+          deletesLeft: 200,
+        ),
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the delete dialog without a Google Cloud client',
+    () => const Scaffold(
+      body: SingleChildScrollView(
+        child: DeletionMethodDialog(
+          itemCount: 12,
+          signedIn: false,
+          oauthConfigured: false,
+        ),
+      ),
     ),
   );
   fitsAtEveryWidth(

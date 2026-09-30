@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../data/google_auth_repository.dart';
 import '../domain/sign_in_notice.dart';
 import '../domain/sign_in_outcome.dart';
 import 'lost_sign_in.dart';
@@ -55,7 +56,9 @@ class SignInNotices extends _$SignInNotices {
         SignedIn() || SignInCancelled() => null,
       };
     } catch (e) {
-      notice = SignInFailed('$e');
+      notice = isClientRejected(e)
+          ? const ClientRejected()
+          : SignInFailed('$e');
     }
     if (notice != null && ref.mounted) {
       ref.read(signInAttemptNoticesProvider.notifier).note(channelId, notice);

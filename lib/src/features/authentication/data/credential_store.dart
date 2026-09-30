@@ -83,6 +83,15 @@ class CredentialStore {
 
   Future<void> deleteLegacy() => _run(() => _storage.delete(key: legacyKey));
 
+  /// Deletes every sign-in, the legacy one and ones that can't be read too.
+  Future<void> deleteAll() => _run(() async {
+    for (final key in (await _storage.readAll()).keys.toList()) {
+      if (key.startsWith(_keyPrefix) || key == legacyKey) {
+        await _storage.delete(key: key);
+      }
+    }
+  });
+
   Future<T> _run<T>(Future<T> Function() operation) {
     final result = _last.then((_) => operation());
     _last = result.then((_) {}, onError: (_) {});

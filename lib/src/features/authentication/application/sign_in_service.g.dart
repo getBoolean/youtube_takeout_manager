@@ -50,7 +50,7 @@ final class SignInServiceProvider
   }
 }
 
-String _$signInServiceHash() => r'509f791d6da1d50c24053f06283c2f6358ddf063';
+String _$signInServiceHash() => r'6423c7d9eec578d9178db1ce71f0cdcdac915126';
 
 /// Signs channels in and out, looking each sign-in's channel up on YouTube,
 /// and drops sign-ins that stop working. Nothing depends on it, so it can

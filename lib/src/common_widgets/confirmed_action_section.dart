@@ -14,6 +14,10 @@ class ConfirmedActionSection extends StatefulWidget {
   final String question;
   final String confirmLabel;
 
+  /// Whether the action can't be undone, so [confirmLabel] is in the error
+  /// color.
+  final bool destructive;
+
   /// Shown once [onConfirm] is done.
   final String done;
 
@@ -31,6 +35,7 @@ class ConfirmedActionSection extends StatefulWidget {
     required this.actionLabel,
     required this.question,
     required this.confirmLabel,
+    this.destructive = false,
     required this.done,
     required this.failed,
     required this.onConfirm,
@@ -128,6 +133,12 @@ class _ConfirmedActionSectionState extends State<ConfirmedActionSection> {
                 child: const Text('Cancel', textAlign: TextAlign.center),
               ),
               FilledButton(
+                style: widget.destructive
+                    ? FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error,
+                        foregroundColor: theme.colorScheme.onError,
+                      )
+                    : null,
                 onPressed: running ? null : _confirm,
                 child: Text(widget.confirmLabel, textAlign: TextAlign.center),
               ),

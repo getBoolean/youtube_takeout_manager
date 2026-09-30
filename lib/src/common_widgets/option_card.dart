@@ -6,7 +6,9 @@ import 'breakpoints.dart';
 ///
 /// With [selected] set, it's one of a set of choices confirmed by a separate
 /// button and shows a radio indicator. Without it, tapping acts right away
-/// and it shows a chevron. A null [onTap] disables it.
+/// and it shows a chevron. A null [onTap] disables it; [unavailable] mutes it
+/// and locks its icon instead, for a choice that can't work yet but whose tap
+/// leads to what it needs. That stays readable, as it can still be tapped.
 class OptionCard extends StatelessWidget {
   final IconData icon;
 
@@ -16,6 +18,7 @@ class OptionCard extends StatelessWidget {
   final String? subtitle;
   final Widget? badge;
   final bool? selected;
+  final bool unavailable;
   final VoidCallback? onTap;
 
   const OptionCard({
@@ -26,6 +29,7 @@ class OptionCard extends StatelessWidget {
     this.subtitle,
     this.badge,
     this.selected,
+    this.unavailable = false,
     required this.onTap,
   });
 
@@ -33,10 +37,12 @@ class OptionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final enabled = onTap != null;
+    final enabled = onTap != null && !unavailable;
     final isSelected = selected ?? false;
     final foreground = enabled
         ? scheme.onSurface
+        : onTap != null
+        ? scheme.onSurfaceVariant
         : scheme.onSurface.withValues(alpha: 0.38);
     // In a very narrow window, drop the icons before the text runs out of
     // room. Goes by the window, not a LayoutBuilder, since dialogs size
@@ -47,7 +53,7 @@ class OptionCard extends StatelessWidget {
 
     return Semantics(
       button: true,
-      enabled: enabled,
+      enabled: onTap != null,
       selected: selected,
       child: Material(
         color: isSelected
@@ -68,8 +74,14 @@ class OptionCard extends StatelessWidget {
             child: Row(
               children: [
                 if (showIcon) ...[
-                  leading ??
-                      Icon(icon, color: enabled ? scheme.primary : foreground),
+                  if (unavailable)
+                    Icon(Icons.lock_outline, color: foreground)
+                  else
+                    leading ??
+                        Icon(
+                          icon,
+                          color: enabled ? scheme.primary : foreground,
+                        ),
                   const SizedBox(width: 16),
                 ],
                 Expanded(

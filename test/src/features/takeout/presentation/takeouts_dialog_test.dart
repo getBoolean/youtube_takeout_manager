@@ -4,23 +4,31 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/google_cloud_client_setup.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/saved_sign_ins.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/oauth_client_repository.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/domain/oauth_client.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_outcome.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/account_button.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_account_header.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_client_form.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_section.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_operation.dart';
 import 'package:youtube_takeout_manager/src/features/quota/domain/quota_state.dart';
+import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_section.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/saved_takeouts.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_importer.dart';
@@ -37,6 +45,12 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_sele
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/skipped_rows_banner.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
+import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+
+const _client = OAuthClient(
+  id: '123-abc.apps.googleusercontent.com',
+  secret: 'GOCSPX-abc',
+);
 
 const _main = TakeoutChannel(
   channelId: 'UCme',
@@ -267,6 +281,19 @@ class _Processing extends DeletionProcessing {
   DeletionProcessingState build() => initial;
 }
 
+class _ClientSetup extends GoogleCloudClientSetup {
+  var removes = 0;
+  final saved = <OAuthClient>[];
+
+  @override
+  Future<void> save(OAuthClient client) async => saved.add(client);
+
+  @override
+  Future<void> remove() async {
+    removes++;
+  }
+}
+
 class _FakeQuota extends QuotaNotifier {
   var resets = 0;
 
@@ -302,6 +329,7 @@ void main() {
   late _Cache cache;
   late ProviderContainer container;
   late _Pages pages;
+  late _ClientSetup clientSetup;
 
   Future<void> pumpDialog(
     WidgetTester tester, {
@@ -309,7 +337,8 @@ void main() {
     Map<String, SignInProfile> signIns = const {'UCme': _mainProfile},
     List<TakeoutSummary>? saved,
     Set<String> alreadySaved = const {},
-    bool oauthConfigured = true,
+    OAuthClient? client = _client,
+    bool clientFromBuild = false,
     Future<SignInOutcome> Function()? outcome,
     DeletionProcessingState processing = DeletionProcessingState.idle,
     LoadedTakeout? loaded,
@@ -322,6 +351,7 @@ void main() {
     pages = _Pages();
     takeout = _Takeout(saved: alreadySaved, namesNoAccount: namesNoAccount);
     cache = _Cache();
+    clientSetup = _ClientSetup();
     tester.view.physicalSize = const Size(600, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -329,7 +359,15 @@ void main() {
       ProviderScope(
         overrides: [
           authProvider.overrideWith(_NotSignedIn.new),
-          oauthConfiguredProvider.overrideWithValue(oauthConfigured),
+          oauthConfiguredProvider.overrideWithValue(client != null),
+          oauthClientProvider.overrideWith((ref) async => client),
+          oauthClientRepositoryProvider.overrideWithValue(
+            OAuthClientRepository(
+              KvStorageService(),
+              buildClient: clientFromBuild ? client : null,
+            ),
+          ),
+          googleCloudClientSetupProvider.overrideWith(() => clientSetup),
           signInServiceProvider.overrideWith(() => auth),
           quotaProvider.overrideWith(() => quota),
           deviceCacheClearerProvider.overrideWith(() => cache),
@@ -354,7 +392,11 @@ void main() {
         ],
         child: fromChannelPage
             ? MaterialApp.router(routerConfig: pages.config())
-            : MaterialApp(home: const Scaffold(body: TakeoutsDialog())),
+            : MaterialApp(
+                home: const Scaffold(
+                  body: SingleChildScrollView(child: TakeoutsDialog()),
+                ),
+              ),
       ),
     );
     await tester.pumpAndSettle();
@@ -371,7 +413,7 @@ void main() {
 
   /// No other popup opened over the account dialog.
   void expectNoPopups() {
-    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byType(Dialog), findsNothing);
     expect(find.byType(AlertDialog), findsNothing);
   }
 
@@ -593,17 +635,113 @@ void main() {
     expect(selection.channels, isEmpty);
   });
 
-  testWidgets("sign-in is disabled when it isn't configured", (tester) async {
-    await pumpDialog(tester, oauthConfigured: false);
+  testWidgets('without a Google Cloud client, the quota is hidden and '
+      'setting one up is offered', (tester) async {
+    await pumpDialog(tester, client: null);
 
-    final button = tester.widget<ButtonStyleButton>(
-      find.ancestor(
-        of: find.text('Sign in'),
-        matching: find.bySubtype<ButtonStyleButton>(),
-      ),
+    expect(find.byType(QuotaSection), findsNothing);
+    expect(find.byKey(GoogleCloudSection.setUpKey), findsOneWidget);
+  });
+
+  for (final (name, target) in [
+    ('its section', find.byKey(GoogleCloudSection.setUpKey)),
+    ("a channel's Sign in", find.text('Sign in').first),
+  ]) {
+    testWidgets('without a client, $name sets one up in the same dialog, '
+        'and Back comes back here', (tester) async {
+      await pumpDialog(tester, client: null, fromChannelPage: true);
+
+      await tester.ensureVisible(target);
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TakeoutsDialog), findsNothing);
+      expect(find.byKey(GoogleCloudSetupPages.nextKey), findsOneWidget);
+      expect(pages.current.name, ChannelDetailRoute.name);
+      expect(auth.signIns, isEmpty);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byWidgetPredicate((w) => w is WoltModalSheet),
+          matching: find.byTooltip('Back'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TakeoutsDialog), findsOneWidget);
+    });
+  }
+
+  testWidgets('changing the client opens it ready to edit, and saving comes '
+      'back here', (tester) async {
+    await pumpDialog(tester, fromChannelPage: true);
+
+    await tester.ensureVisible(find.byKey(GoogleCloudSection.changeKey));
+    await tester.tap(find.byKey(GoogleCloudSection.changeKey));
+    await tester.pumpAndSettle();
+
+    final idField = find.descendant(
+      of: find.byKey(GoogleCloudClientForm.idFieldKey),
+      matching: find.byType(TextField),
     );
-    expect(button.onPressed, isNull);
-    expect(find.text("Sign-in isn't configured"), findsOneWidget);
+    expect(tester.widget<TextField>(idField).controller?.text, _client.id);
+    const other = '999-other.apps.googleusercontent.com';
+    await tester.enterText(idField, other);
+    await tester.tap(find.byKey(GoogleCloudClientForm.saveKey));
+    await tester.pumpAndSettle();
+
+    expect(clientSetup.saved.single.id, other);
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
+  });
+
+  testWidgets('cancelling a change comes back here without saving', (
+    tester,
+  ) async {
+    await pumpDialog(tester, fromChannelPage: true);
+
+    await tester.ensureVisible(find.byKey(GoogleCloudSection.changeKey));
+    await tester.tap(find.byKey(GoogleCloudSection.changeKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(GoogleCloudSetupPages.cancelKey));
+    await tester.pumpAndSettle();
+
+    expect(clientSetup.saved, isEmpty);
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
+  });
+
+  testWidgets('a client users set up shows, and removing it asks first', (
+    tester,
+  ) async {
+    await pumpDialog(tester);
+
+    expect(find.textContaining(_client.id), findsOneWidget);
+    expect(find.byKey(GoogleCloudSection.changeKey), findsOneWidget);
+    expect(find.byType(QuotaSection), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Remove client'));
+    await tester.tap(find.text('Remove client'));
+    await tester.pumpAndSettle();
+    expect(clientSetup.removes, 0);
+    await tester.tap(find.text('Remove'));
+    await tester.pumpAndSettle();
+
+    expect(clientSetup.removes, 1);
+    expectNoPopups();
+  });
+
+  testWidgets("the build's own client can't be changed", (tester) async {
+    await pumpDialog(tester, clientFromBuild: true);
+
+    expect(find.byType(GoogleCloudSection), findsNothing);
+    expect(find.byType(QuotaSection), findsOneWidget);
+  });
+
+  testWidgets("the client can't be changed while deleting", (tester) async {
+    await pumpDialog(tester, processing: DeletionProcessingState.running);
+
+    expect(find.textContaining(_client.id), findsOneWidget);
+    expect(find.byKey(GoogleCloudSection.changeKey), findsNothing);
+    expect(find.byKey(GoogleCloudSection.pausedKey), findsOneWidget);
   });
 
   testWidgets("switches to another account's channel inside the tile", (
