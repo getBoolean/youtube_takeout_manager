@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue
 import 'package:youtube_takeout_manager/src/features/history/application/history_grouping.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_shown.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
@@ -431,6 +432,23 @@ void main() {
     expect(find.byKey(HistoryFilterSheet.shortsSectionKey), findsNothing);
     expect(find.byKey(HistoryFilterSheet.musicSectionKey), findsNothing);
     expect(find.byKey(HistoryFilterSheet.subscriptionSectionKey), findsNothing);
+  });
+
+  testWidgets('opening history lets the work waiting for it start', (
+    tester,
+  ) async {
+    final c = await _open(tester);
+
+    expect(c.read(historyShownProvider), isTrue);
+  });
+
+  testWidgets('signed in, Shorts are offered before any is known, as their '
+      'formats are checked', (tester) async {
+    await _open(tester, session: 'UCme');
+
+    await _openFilters(tester);
+
+    expect(find.byKey(HistoryFilterSheet.shortsSectionKey), findsOneWidget);
   });
 
   testWidgets('Shorts can be shown alone', (tester) async {

@@ -266,6 +266,101 @@ final class HistoryChannelMaskProvider
 String _$historyChannelMaskHash() =>
     r'f68812c6c6b0288703227f8576ccacd436975ea2';
 
+/// Which watched videos are Shorts: watched through a Shorts link, or
+/// short and tall by the format fetched for them.
+
+@ProviderFor(historyShortWatches)
+final historyShortWatchesProvider = HistoryShortWatchesProvider._();
+
+/// Which watched videos are Shorts: watched through a Shorts link, or
+/// short and tall by the format fetched for them.
+
+final class HistoryShortWatchesProvider
+    extends $FunctionalProvider<WatchMask, WatchMask, WatchMask>
+    with $Provider<WatchMask> {
+  /// Which watched videos are Shorts: watched through a Shorts link, or
+  /// short and tall by the format fetched for them.
+  HistoryShortWatchesProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyShortWatchesProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyShortWatchesHash();
+
+  @$internal
+  @override
+  $ProviderElement<WatchMask> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  WatchMask create(Ref ref) {
+    return historyShortWatches(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(WatchMask value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<WatchMask>(value),
+    );
+  }
+}
+
+String _$historyShortWatchesHash() =>
+    r'550b9e856f3b3d25db36b7afe941ff0ab8d124f8';
+
+/// How many watched videos are known to be Shorts.
+
+@ProviderFor(historyShortCount)
+final historyShortCountProvider = HistoryShortCountProvider._();
+
+/// How many watched videos are known to be Shorts.
+
+final class HistoryShortCountProvider extends $FunctionalProvider<int, int, int>
+    with $Provider<int> {
+  /// How many watched videos are known to be Shorts.
+  HistoryShortCountProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyShortCountProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyShortCountHash();
+
+  @$internal
+  @override
+  $ProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  int create(Ref ref) {
+    return historyShortCount(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(int value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<int>(value),
+    );
+  }
+}
+
+String _$historyShortCountHash() => r'12958f9dc169ed1d0d98b55a3b1d723e207468a2';
+
 /// What the history screen narrows the history to.
 
 @ProviderFor(historyFilters)
@@ -310,7 +405,7 @@ final class HistoryFiltersProvider
   }
 }
 
-String _$historyFiltersHash() => r'0fbd52fe6fec55d3f9277d9448369ccf1f897ac4';
+String _$historyFiltersHash() => r'0b04e407d7e4524b5567dccda39e3480f401fab5';
 
 /// The history narrowed to the filters, worked out a slice at a time
 /// between frames so the screen keeps moving; a newer search stops it.

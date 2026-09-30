@@ -28,15 +28,16 @@ const WatchFilterDraft noWatchFilters = (
 );
 
 /// Asks for the filters of the watched videos, starting from [initial]:
-/// subscriptions when [hasSubscriptions], Shorts when [hasShorts], YouTube
-/// Music when [hasMusic], and any of [channels]. Null when closed without
-/// showing or clearing.
+/// subscriptions when [hasSubscriptions], Shorts when [hasShorts] (with
+/// [shortsNote] under them), YouTube Music when [hasMusic], and any of
+/// [channels]. Null when closed without showing or clearing.
 Future<WatchFilterDraft?> showHistoryFilterSheet(
   BuildContext context, {
   required WatchFilterDraft initial,
   required List<FilterChannel> channels,
   required bool hasSubscriptions,
   required bool hasShorts,
+  String? shortsNote,
   required bool hasMusic,
 }) => WoltModalSheet.show<WatchFilterDraft>(
   context: context,
@@ -63,6 +64,7 @@ Future<WatchFilterDraft?> showHistoryFilterSheet(
           child: _Sections(
             hasSubscriptions: hasSubscriptions,
             hasShorts: hasShorts,
+            shortsNote: shortsNote,
             hasMusic: hasMusic,
           ),
         ),
@@ -116,11 +118,13 @@ class _Draft extends InheritedNotifier<ValueNotifier<WatchFilterDraft>> {
 class _Sections extends StatelessWidget {
   final bool hasSubscriptions;
   final bool hasShorts;
+  final String? shortsNote;
   final bool hasMusic;
 
   const _Sections({
     required this.hasSubscriptions,
     required this.hasShorts,
+    this.shortsNote,
     required this.hasMusic,
   });
 
@@ -164,6 +168,7 @@ class _Sections extends StatelessWidget {
             _Section(
               key: HistoryFilterSheet.shortsSectionKey,
               title: 'Shorts',
+              note: shortsNote,
               child: AdaptiveSegmentedButton<ShowFilter>(
                 segments: [
                   for (final (filter, label) in [
@@ -220,25 +225,43 @@ class _Sections extends StatelessWidget {
 
 class _Section extends StatelessWidget {
   final String title;
+  final String? note;
   final Widget child;
 
-  const _Section({super.key, required this.title, required this.child});
+  const _Section({
+    super.key,
+    required this.title,
+    this.note,
+    required this.child,
+  });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 20),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          header: true,
-          child: Text(title, style: Theme.of(context).textTheme.titleSmall),
-        ),
-        const SizedBox(height: 8),
-        child,
-      ],
-    ),
-  );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(title, style: theme.textTheme.titleSmall),
+          ),
+          const SizedBox(height: 8),
+          child,
+          if (note case final note?) ...[
+            const SizedBox(height: 6),
+            Text(
+              note,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 /// The channels to pick, searchable, each a row with a checkbox. Built

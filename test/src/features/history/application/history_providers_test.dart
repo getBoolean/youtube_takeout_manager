@@ -18,6 +18,8 @@ import 'package:youtube_takeout_manager/src/features/history/domain/watched_chan
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 
 import '../../takeout/memory_takeout_repository.dart';
@@ -70,6 +72,15 @@ class _Fixed extends TakeoutHistoryNotifier {
   @override
   Future<LoadedHistory?> build() async =>
       history == null ? null : LoadedHistory.of(history!);
+}
+
+class _Formats extends VideoFormats {
+  _Formats(this.formats);
+
+  final Map<String, VideoFormat> formats;
+
+  @override
+  Future<Map<String, VideoFormat>> build() async => formats;
 }
 
 /// Waits for the search the filters just changed to finish.
@@ -371,6 +382,48 @@ void main() {
         ['CAFE Channel', 'X', 'Cafe crawl'],
       );
     });
+  });
+
+  test('a video whose format says it is a Short counts as one', () async {
+    final c = ProviderContainer(
+      overrides: [
+        takeoutRepositoryProvider.overrideWithValue(repository),
+        takeoutHistoryProvider.overrideWith(
+          () => _Fixed(
+            TakeoutHistory(
+              watches: [
+                _watch('Tall', DateTime(2026, 4, 12, 9)),
+                _watch('Wide', DateTime(2026, 4, 11, 9)),
+              ],
+            ),
+          ),
+        ),
+        videoFormatsProvider.overrideWith(
+          () => _Formats({
+            '${'Tall'.hashCode}': const VideoFormat(
+              seconds: 40,
+              shape: VideoShape.tall,
+            ),
+          }),
+        ),
+      ],
+    );
+    addTearDown(c.dispose);
+    c.listen(historyResultsProvider, (_, _) {});
+    final loaded = (await c.read(takeoutHistoryProvider.future))!.history;
+    await c.read(videoFormatsProvider.future);
+
+    c.read(historyShortsFilterProvider.notifier).set(ShowFilter.only);
+    await _settle(c);
+
+    expect(
+      [
+        for (final day in c.read(watchDaysProvider))
+          for (final i in day.indices) loaded.watches[i].title,
+      ],
+      ['Tall'],
+    );
+    expect(c.read(historyShortCountProvider), 1);
   });
 
   test('videos watched on YouTube Music can be shown alone', () async {

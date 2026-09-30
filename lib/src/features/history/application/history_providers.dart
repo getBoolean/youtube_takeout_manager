@@ -1,9 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import '../domain/channel_groups.dart';
 import '../domain/history_days.dart';
@@ -68,15 +71,42 @@ ChannelMask? historyChannelMask(Ref ref) => buildChannelMask(
   selection: ref.watch(historyChannelSelectionProvider),
 );
 
+/// Which watched videos are Shorts: watched through a Shorts link, or
+/// short and tall by the format fetched for them.
+@riverpod
+WatchMask historyShortWatches(Ref ref) {
+  final watches = ref.watch(loadedHistoryProvider).history.watches;
+  final formats = ref.watch(videoFormatsProvider).value ?? const {};
+  final flags = Uint8List(watches.length);
+  for (final (i, watch) in watches.indexed) {
+    if (watch.isShort || (formats[watch.videoId]?.isShort ?? false)) {
+      flags[i] = 1;
+    }
+  }
+  return WatchMask(flags);
+}
+
+/// How many watched videos are known to be Shorts.
+@riverpod
+int historyShortCount(Ref ref) => ref.watch(historyShortWatchesProvider).count;
+
 /// What the history screen narrows the history to.
 @riverpod
-HistoryFilters historyFilters(Ref ref) => (
-  query: ref.watch(historySearchQueryProvider),
-  removedOnly: ref.watch(historyRemovedFilterProvider),
-  shorts: ref.watch(historyShortsFilterProvider),
-  music: ref.watch(historyMusicFilterProvider),
-  channels: ref.watch(historyChannelMaskProvider),
-);
+HistoryFilters historyFilters(Ref ref) {
+  final shorts = ref.watch(historyShortsFilterProvider);
+  return (
+    query: ref.watch(historySearchQueryProvider),
+    removedOnly: ref.watch(historyRemovedFilterProvider),
+    shorts: shorts,
+    // Only looked at while Shorts are filtered, so formats arriving don't
+    // search again otherwise.
+    shortWatches: shorts == ShowFilter.all
+        ? null
+        : ref.watch(historyShortWatchesProvider),
+    music: ref.watch(historyMusicFilterProvider),
+    channels: ref.watch(historyChannelMaskProvider),
+  );
+}
 
 /// The history narrowed to the filters, worked out a slice at a time
 /// between frames so the screen keeps moving; a newer search stops it.

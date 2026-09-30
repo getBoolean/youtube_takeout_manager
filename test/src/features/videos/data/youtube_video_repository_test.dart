@@ -75,6 +75,91 @@ void main() {
     );
   });
 
+  group('video formats', () {
+    test("ask only for each video's length and shape, and read them", () async {
+      final asked = <Uri>[];
+      final client = MockClient((request) async {
+        asked.add(request.url);
+        return http.Response(
+          jsonEncode({
+            'items': [
+              {
+                'id': 'short1',
+                'contentDetails': {'duration': 'PT45S'},
+                'player': {'embedWidth': '270', 'embedHeight': '480'},
+              },
+              {
+                'id': 'long1',
+                'contentDetails': {'duration': 'PT12M3S'},
+                'player': {'embedWidth': '480', 'embedHeight': '270'},
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final formats = await YoutubeVideoRepository().fetchVideoFormats(client, [
+        'short1',
+        'long1',
+        'gone',
+      ]).toList();
+
+      expect(
+        {for (final (id, f) in formats) id: f.isShort},
+        {'short1': true, 'long1': false},
+      );
+      final query = asked.single.queryParametersAll;
+      expect(query['part'], containsAll(['contentDetails', 'player']));
+      expect(query['id'], ['short1', 'long1', 'gone']);
+      // The shape only comes back for a player size asked for.
+      expect(query.keys, anyOf(contains('maxWidth'), contains('maxHeight')));
+    });
+
+    test(
+      'are asked for 50 videos at a time, and each answer counted',
+      () async {
+        var requests = 0;
+        var answers = 0;
+        final client = MockClient((request) async {
+          requests++;
+          expect(
+            request.url.queryParametersAll['id']!.length,
+            lessThanOrEqualTo(YoutubeVideoRepository.batchSize),
+          );
+          return http.Response(
+            jsonEncode({'items': []}),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        });
+
+        await YoutubeVideoRepository().fetchVideoFormats(client, [
+          for (var i = 0; i < YoutubeVideoRepository.batchSize + 1; i++) 'v$i',
+        ], onResponse: () => answers++).toList();
+
+        expect((requests, answers), (2, 2));
+      },
+    );
+
+    test('stop when the quota is used up', () async {
+      await expectLater(
+        YoutubeVideoRepository().fetchVideoFormats(_quotaUsedUp, [
+          'v1',
+        ]).toList(),
+        throwsA(predicate(isQuotaExceeded)),
+      );
+    });
+
+    test('stop when the sign-in stops working', () async {
+      await expectLater(
+        YoutubeVideoRepository().fetchVideoFormats(_rejected, ['v1']).toList(),
+        throwsA(predicate(isSignInFailure)),
+      );
+    });
+  });
+
   test('channel avatars stop when the sign-in stops working', () async {
     await expectLater(
       YoutubeChannelRepository().fetchChannelThumbnails(_rejected, {'UCa'}),

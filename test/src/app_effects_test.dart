@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_nam
 import 'package:youtube_takeout_manager/src/features/emoji/data/youtube_emoji_name_repository.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_lookup.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/resolved_emoji.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/watched_video_format_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
 import 'package:youtube_takeout_manager/src/features/live_chats/domain/live_chat.dart';
@@ -72,6 +73,9 @@ void main() {
         videoTitleFetcherProvider.overrideWith(
           (ref) => Stream.value(started.add('video titles')),
         ),
+        watchedVideoFormatFetcherProvider.overrideWith(
+          (ref) => Stream.value(started.add('video formats')),
+        ),
         emojiNameResolverProvider.overrideWith(() => _EmojiNames(started)),
         queueChannelAssignmentProvider.overrideWith(
           (ref) => started.add('queue channels'),
@@ -88,6 +92,7 @@ void main() {
       'legacy takeouts',
       'thumbnails',
       'video titles',
+      'video formats',
       'emoji names',
       'queue channels',
     });

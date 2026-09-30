@@ -57,6 +57,29 @@ class ChannelMask {
   int get hashCode => Object.hashAll(_shown);
 }
 
+/// Which of the history's watched videos have something, such as being a
+/// Short: one flag per video, in the history's order. Equal when they flag
+/// the same videos.
+@immutable
+class WatchMask {
+  final Uint8List _flags;
+
+  const WatchMask(this._flags);
+
+  bool allows(int watchIndex) =>
+      watchIndex < _flags.length && _flags[watchIndex] != 0;
+
+  /// How many are flagged.
+  int get count => _flags.fold(0, (sum, flag) => sum + (flag == 0 ? 0 : 1));
+
+  @override
+  bool operator ==(Object other) =>
+      other is WatchMask && listEquals(other._flags, _flags);
+
+  @override
+  int get hashCode => Object.hashAll(_flags);
+}
+
 /// Whether the channel [key] passes the channel filters, being [subscribed]
 /// or not: the subscription filter, and, when channels are picked, being one
 /// of them.

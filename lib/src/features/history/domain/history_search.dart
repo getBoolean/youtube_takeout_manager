@@ -9,10 +9,13 @@ import 'watch_filters.dart';
 /// entries removed from YouTube's history are shown, whether Shorts and
 /// videos watched on YouTube Music are shown, and the channels of the
 /// watched videos (null for every channel, and the videos without one).
+/// [shortWatches] says which watched videos are Shorts; without it, those
+/// watched through a Shorts link are.
 typedef HistoryFilters = ({
   String query,
   bool removedOnly,
   ShowFilter shorts,
+  WatchMask? shortWatches,
   ShowFilter music,
   ChannelMask? channels,
 });
@@ -65,9 +68,10 @@ Future<HistoryResults?> searchHistory(
   bool Function()? cancelled,
 }) async {
   final query = foldForSearch(filters.query);
-  final (:removedOnly, :shorts, :music, :channels) = (
+  final (:removedOnly, :shorts, :shortWatches, :music, :channels) = (
     removedOnly: filters.removedOnly,
     shorts: filters.shorts,
+    shortWatches: filters.shortWatches,
     music: filters.music,
     channels: filters.channels,
   );
@@ -96,7 +100,7 @@ Future<HistoryResults?> searchHistory(
     final watch = watches[i];
     if ((!removedOnly || watch.removedAt != null) &&
         (channels == null || channels.allows(channelOf[i])) &&
-        _shows(shorts, watch.isShort) &&
+        _shows(shorts, shortWatches?.allows(i) ?? watch.isShort) &&
         _shows(music, watch.music) &&
         watch.matches(query)) {
       watchIndices.add(i);

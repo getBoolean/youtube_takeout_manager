@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart'
 import 'package:youtube_takeout_manager/src/common_widgets/empty_state.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/sticky_grouped_list/sticky_grouped_list.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../application/history_channel_selection.dart';
@@ -20,6 +21,7 @@ import '../application/history_grouping.dart';
 import '../application/history_providers.dart';
 import '../application/history_removed_filter.dart';
 import '../application/history_search_query.dart';
+import '../application/history_shown.dart';
 import '../application/takeout_history_notifier.dart';
 import '../application/watch_filter_providers.dart';
 import '../domain/history_days.dart';
@@ -100,6 +102,15 @@ class HistoryPage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tabController = useTabController(initialLength: 2);
+    // Work waiting for history to be looked at can start.
+    useEffect(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          ref.read(historyShownProvider.notifier).markShown();
+        }
+      });
+      return null;
+    }, const []);
     final historyAsync = ref.watch(takeoutHistoryProvider);
     final loaded = historyAsync.value;
     final hasHistory = loaded != null && !loaded.history.isEmpty;
@@ -684,6 +695,8 @@ class _WatchedTab extends ConsumerWidget {
     }
 
     Future<void> openFilters() async {
+      final signedIn = ref.read(readSessionChannelIdProvider) != null;
+      final checking = ref.read(videoFormatProgressProvider);
       final draft = await showHistoryFilterSheet(
         context,
         initial: (
@@ -695,7 +708,16 @@ class _WatchedTab extends ConsumerWidget {
         channels: ref.read(historyFilterChannelsProvider),
         hasSubscriptions:
             ref.read(historySubscriptionsProvider).value?.isNotEmpty ?? false,
-        hasShorts: loaded.shortCount > 0,
+        // Signed in, Shorts are told apart by their format as it's
+        // fetched.
+        hasShorts: signedIn || ref.read(historyShortCountProvider) > 0,
+        shortsNote: !signedIn
+            ? 'Only videos watched through a Shorts link count. Sign in to '
+                  'tell the rest apart by their length and shape.'
+            : checking.running
+            ? 'Checked ${checking.done} of ${checking.total} videos so '
+                  'far; more Shorts show as the rest are checked.'
+            : null,
         hasMusic: loaded.musicCount > 0,
       );
       if (draft == null) return;

@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/watched_video_format_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/legacy_takeout_migration.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_title_fetcher.dart';
 
@@ -23,6 +24,7 @@ void appEffects(Ref ref) {
   ref.listen(legacyTakeoutMigrationProvider, (_, _) {});
   ref.listen(channelThumbnailFetcherProvider, (_, _) {});
   ref.listen(videoTitleFetcherProvider, (_, _) {});
+  ref.listen(watchedVideoFormatFetcherProvider, (_, _) {});
   ref.listen(emojiNameResolverProvider, (_, _) {});
   ref.listen(queueChannelAssignmentProvider, (_, _) {});
 }

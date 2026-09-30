@@ -38,12 +38,14 @@ HistoryFilters _filters({
   String query = '',
   bool removedOnly = false,
   ShowFilter shorts = ShowFilter.all,
+  WatchMask? shortWatches,
   ShowFilter music = ShowFilter.all,
   ChannelMask? channels,
 }) => (
   query: query,
   removedOnly: removedOnly,
   shorts: shorts,
+  shortWatches: shortWatches,
   music: music,
   channels: channels,
 );
@@ -125,6 +127,19 @@ void main() {
       'A song',
       null,
     ]);
+  });
+
+  test('Shorts told apart by their format count, as well as ones watched '
+      'through a Shorts link', () async {
+    // The song turned out to be a Short too.
+    final shorts = WatchMask(Uint8List.fromList([1, 1, 0]));
+
+    expect(
+      await _mixedTitles(
+        _filters(shorts: ShowFilter.only, shortWatches: shorts),
+      ),
+      ['A short', 'A song'],
+    );
   });
 
   test(

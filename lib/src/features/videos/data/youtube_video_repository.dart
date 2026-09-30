@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/data/google_
 import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 
 import '../domain/video.dart';
+import '../domain/video_format.dart';
 
 part 'youtube_video_repository.g.dart';
 
@@ -72,6 +73,56 @@ class YoutubeVideoRepository {
       }
 
       if (i + batchSize < idList.length) {
+        await Future.delayed(_delayBetweenRequests);
+      }
+    }
+  }
+
+  /// A player width to ask for: the player's size, and so the video's
+  /// shape, only comes back when one is asked for.
+  static const _playerWidth = 480;
+
+  /// Streams each video's length and shape as the API answers, in batches
+  /// of [batchSize], for telling Shorts apart. Videos YouTube no longer has
+  /// are left out. Calls [onResponse] as each request is answered, so its
+  /// quota can be counted as it's used.
+  Stream<(String, VideoFormat)> fetchVideoFormats(
+    http.Client authClient,
+    List<String> videoIds, {
+    void Function()? onResponse,
+  }) async* {
+    final youtube = yt.YouTubeApi(authClient);
+    for (var i = 0; i < videoIds.length; i += batchSize) {
+      final batch = videoIds.sublist(i, min(i + batchSize, videoIds.length));
+      try {
+        final response = await youtube.videos.list(
+          ['contentDetails', 'player'],
+          id: batch,
+          maxWidth: _playerWidth,
+          // Not the player's HTML, which is most of the answer.
+          $fields:
+              'items(id,contentDetails/duration,player(embedWidth,embedHeight))',
+        );
+        onResponse?.call();
+        for (final item in response.items ?? <yt.Video>[]) {
+          final id = item.id;
+          if (id == null) continue;
+          yield (
+            id,
+            VideoFormat.fromApi(
+              duration: item.contentDetails?.duration,
+              embedWidth: item.player?.embedWidth,
+              embedHeight: item.player?.embedHeight,
+            ),
+          );
+        }
+      } catch (e) {
+        // A sign-in that stopped working, or a quota used up, fails every
+        // batch; let it through.
+        if (isSignInFailure(e) || isQuotaExceeded(e)) rethrow;
+        // Continue with remaining batches on error.
+      }
+      if (i + batchSize < videoIds.length) {
         await Future.delayed(_delayBetweenRequests);
       }
     }

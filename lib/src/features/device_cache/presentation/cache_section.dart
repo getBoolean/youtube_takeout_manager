@@ -14,13 +14,14 @@ class CacheSection extends ConsumerWidget {
     return ConfirmedActionSection(
       title: 'Cache',
       description:
-          'Video titles and channel thumbnails loaded from YouTube are kept '
-          'on this device.',
+          'Video titles, the lengths and shapes of watched videos, and '
+          'channel thumbnails loaded from YouTube are kept on this device.',
       icon: Icons.cleaning_services_outlined,
       actionLabel: 'Clear cache',
       question:
-          'Clear cached video metadata, channel thumbnails and not-found IDs? '
-          "They're fetched from the YouTube API again on next use.",
+          "Clear cached video details, watched videos' lengths and shapes, "
+          "channel thumbnails and not-found IDs? They're fetched from the "
+          'YouTube API again on next use.',
       confirmLabel: 'Clear',
       done: 'Cache cleared.',
       failed: "Couldn't clear the cache",
