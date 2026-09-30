@@ -43,7 +43,7 @@ final class ChannelCategoriesProvider
   ChannelCategories create() => ChannelCategories();
 }
 
-String _$channelCategoriesHash() => r'2a177ea611054a14fafe4c02f2e1fffb8192eb5f';
+String _$channelCategoriesHash() => r'cbad5b8ef22b7c004a292023e66361f4b64ebba7';
 
 /// Channels' categories, by channel key, kept on this device. Made by
 /// `ChannelCategorizer`.

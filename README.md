@@ -224,6 +224,12 @@ Every command takes `--dart-define-from-file=.env` (shortened to `…` below). R
 
 On web, keep `--web-port` equal to the port you registered for sign-in. The VS Code launch configs in [.vscode/launch.json](.vscode/launch.json) pass `.env` for you. Sign-in tokens use [flutter_secure_storage](https://github.com/juliansteenbakker/flutter_secure_storage), which needs [extra setup](https://github.com/juliansteenbakker/flutter_secure_storage/blob/develop/README.md) on some platforms.
 
+The web app keeps its data in a Web Worker. Compile the workers before running or building for the web, and again after changing their code:
+
+```bash
+dart run tool/compile_workers.dart
+```
+
 ## Set up Google sign-in (optional)
 
 Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. It needs a Google Cloud OAuth client, which is free. The YouTube API quota belongs to the client's project, so everyone using the same client shares one daily quota.
