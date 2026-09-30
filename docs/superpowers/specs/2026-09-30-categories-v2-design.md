@@ -154,21 +154,30 @@ Jev's and Claude's prompts both get, for each channel:
 
 - its name and description (up to 500 characters);
 - YouTube's topics;
-- up to 30 titles of videos watched from it;
-- **the descriptions of the 5 videos watched from it most recently**, each cut to 300 characters, with links, hashtags and timestamps removed.
+- **up to 60 titles** of videos watched from it;
+- **the descriptions of 10 of those videos**, each cut to 300 characters, with links, hashtags and timestamps removed.
+
+**Picking the videos: spread over the whole history, not the last week.** From the distinct videos watched from the channel (a rewatch counts once):
+
+1. **Most rewatched:** the 10 most rewatched videos come first, since rewatching shows what you came for. Ties go to the more recent.
+2. **Spread over time:** the rest are spread evenly across everything watched from the channel, oldest to newest. They're picked at even steps through the channel's watched videos in time order, so a channel you've watched for years is represented across those years.
+3. **Descriptions:** the 10 are spread evenly across the picked titles in the same way.
+4. **Small channels:** with 60 or fewer distinct videos, all of them are included.
+
+The picks are deterministic, so the same history gives the same prompt. They're worked out in the History worker in one pass over the history.
 
 **Getting the descriptions:**
 
 - They come from the video details cache the app already keeps for commented videos (`videos.list` with `snippet`).
-- Signed in, the ones missing are fetched before a channel is categorized, as channel topics are. That costs 1 quota unit per 50 videos, recorded: about 200 units for 2,000 channels.
+- Signed in, the ones missing are fetched before a channel is categorized, as channel topics are. That costs 1 quota unit per 50 videos, recorded: about 400 units for 2,000 channels.
 - Signed out, only what's already cached is used.
 
-**Cost:** about 400 more input tokens per channel, around $0.40 more per 1,000 channels on Haiku. Jev's input cost is negligible.
+**Cost:** about 2,000 input tokens per channel in all, around $2 per 1,000 channels on Haiku, on top of the answer. Jev's input cost is negligible ($0.042 per million tokens). Jev's 32k-token state limit leaves plenty of room.
 
 ### Prompt fingerprints
 
 - **Fingerprinted steps:** every AI step's prompt has a fingerprint: Jev's check, Jev's pick, Jev's name check, Claude's category and tags, and Claude's tags only.
-- **Worked out automatically:** the fingerprint is a hash of the prompt and answer schema, built for a fixed sample channel against a fixed taxonomy. Any change to the wording, the schema, or what evidence goes in changes it, without anyone remembering to bump a number.
+- **Worked out automatically:** the fingerprint is a hash of the prompt and answer schema, built for a fixed sample channel against a fixed taxonomy. The sample channel has enough watched videos, including rewatches, over a long enough span, that a change to how videos are picked changes the fingerprint too. Any change to the wording, the schema, or what evidence goes in changes it, without anyone remembering to bump a number.
 - **Stored with each output:** each AI output keeps the fingerprint it was made with, whether Jev's agreement or pick, Claude's category, or the tags.
 - **Redone on the next run:** outputs whose fingerprint differs from the current one are redone, that step and the steps after it. The progress line says "Categorizing again with updated prompts".
 - **Never redone:**
@@ -437,7 +446,7 @@ Behaviour tests throughout: no exact copy, no goldens, round-trip saves.
   - Ask AI disabled while the channel is being categorized;
   - Ask AI on Uncategorized;
   - the signed-out wording;
-  - the evidence including up to 5 recent videos' cleaned, cut descriptions, with missing ones fetched first when signed in and cache-only when signed out;
+  - the evidence: up to 60 titles (the most rewatched, then spread evenly over the whole history, a rewatch counted once) and 10 cleaned, cut descriptions spread across them, with missing descriptions fetched first when signed in and cache-only when signed out;
   - a prompt's fingerprint changing when its wording or evidence changes, and staying the same otherwise (including when the model changes);
   - Clear AI results removing AI categories, agreements, AI tags and unused AI-made sub-categories, while keeping your decisions, edited tags and YouTube's categories;
   - an output with an old fingerprint redone, while a user decision or edited tags with an old fingerprint are kept.
