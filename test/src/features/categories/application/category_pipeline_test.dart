@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/application/category_pipeline.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
@@ -82,6 +83,34 @@ class _Jev extends TypeSafeRepository {
     );
   }
 }
+
+/// Claude, answering with [answer], and keeping what it was asked.
+class _Claude extends AnthropicRepository {
+  _Claude(this.answer);
+
+  final Map<String, Object?> answer;
+  final asked = <String>[];
+
+  @override
+  Future<Map<String, Object?>> structured({
+    required String apiKey,
+    required String model,
+    required String system,
+    required String user,
+    required Map<String, Object?> schema,
+  }) async {
+    asked.add(user);
+    return answer;
+  }
+}
+
+CategoryPipeline _withClaude(_Claude claude, {_Jev? jev}) => CategoryPipeline(
+  taxonomy: youtubeTaxonomy.withCustom({
+    'Gaming': ['Speedruns'],
+  }),
+  jev: jev == null ? null : (repository: jev, apiKey: 'jv_live_1'),
+  claude: (repository: claude, apiKey: 'sk-ant-1', model: 'claude-haiku-4-5'),
+);
 
 ChannelInput _input({List<String> topics = const []}) => (
   key: 'UCg',
@@ -219,5 +248,155 @@ void main() {
     expect(category.path, const CategoryPath('Gaming', 'Action'));
     expect(category.source, CategorySource.youtube);
     expect(category.jevAgreed, 0.3);
+  });
+
+  group('Claude', () {
+    test('names the category when Jev disagrees and is unsure of its own '
+        'pick, with its reason', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'speedruns',
+        'reason': 'Races through games',
+      });
+      final pipeline = _withClaude(
+        claude,
+        jev: _Jev(
+          fits: {'Gaming › Action': 0.2},
+          parent: {'Gaming': 0.5, 'Music': 0.5},
+          child: {'Speedruns': 0.5, 'Action': 0.5},
+        ),
+      );
+
+      final category = await pipeline.categorize(
+        _input(topics: [_topic('Action_game')]),
+      );
+
+      // The one there is, as it's spelled.
+      expect(category.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(category.source, CategorySource.claude);
+      expect(category.reason, 'Races through games');
+      expect(category.jevAgreed, 0.2);
+      expect(category.tried, containsAll(CategorizationTier.values));
+      expect(pipeline.takeLearned(), isEmpty);
+    });
+
+    test('is not asked when Jev agrees', () async {
+      final claude = _Claude({'parent': 'Music', 'child': null, 'reason': ''});
+
+      await _withClaude(
+        claude,
+        jev: _Jev(fits: {'Gaming › Action': 0.9}),
+      ).categorize(_input(topics: [_topic('Action_game')]));
+
+      expect(claude.asked, isEmpty);
+    });
+
+    test(
+      'without Jev, is not asked when YouTube gives a sub-category',
+      () async {
+        final claude = _Claude({
+          'parent': 'Music',
+          'child': null,
+          'reason': '',
+        });
+
+        final category = await _withClaude(
+          claude,
+        ).categorize(_input(topics: [_topic('Action_game')]));
+
+        expect(category.path, const CategoryPath('Gaming', 'Action'));
+        expect(claude.asked, isEmpty);
+      },
+    );
+
+    test('without Jev, names the category YouTube gives none for', () async {
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': 'Explains how things work',
+      });
+
+      final category = await _withClaude(claude).categorize(_input());
+
+      expect(category.path, const CategoryPath('Knowledge'));
+      expect(category.source, CategorySource.claude);
+    });
+
+    test('a new sub-category it names joins the categories', () async {
+      final pipeline = _withClaude(
+        _Claude({
+          'parent': 'Gaming',
+          'child': 'Retro game  speedruns ',
+          'reason': 'Old games, fast',
+        }),
+      );
+
+      final category = await pipeline.categorize(_input());
+
+      expect(
+        category.path,
+        const CategoryPath('Gaming', 'Retro game speedruns'),
+      );
+      expect(pipeline.takeLearned(), [category.path]);
+      expect(
+        pipeline.taxonomy.childrenOf('Gaming'),
+        contains('Retro game speedruns'),
+      );
+    });
+
+    test('a new name for a sub-category there is already, as Jev finds, '
+        'reuses that one', () async {
+      final pipeline = _withClaude(
+        _Claude({
+          'parent': 'Gaming',
+          'child': 'Speedrunning',
+          'reason': 'Races through games',
+        }),
+        jev: _Jev(
+          parent: {'Gaming': 0.5, 'Music': 0.5},
+          child: {'Speedruns': 0.9, 'Action': 0.1},
+        ),
+      );
+
+      final category = await pipeline.categorize(_input());
+
+      expect(category.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(pipeline.takeLearned(), isEmpty);
+    });
+
+    test('asked again, is told the category it had is wrong', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'Speedruns',
+        'reason': 'Races, not fights',
+      });
+
+      final suggestion = await _withClaude(claude).suggestInstead(
+        _input(topics: [_topic('Action_game')]),
+        const CategoryPath('Gaming', 'Action'),
+      );
+
+      expect(suggestion.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(suggestion.source, CategorySource.claude);
+      expect(claude.asked.single, contains('Gaming › Action'));
+    });
+  });
+
+  test('asked again with only Jev, Jev picks something other than the '
+      'category it had', () async {
+    final jev = _Jev(
+      parent: {'Gaming': 0.9, 'Music': 0.1},
+      child: {'Speedruns': 0.7, 'Racing': 0.3},
+    );
+
+    final suggestion = await _pipeline(jev).suggestInstead(
+      _input(topics: [_topic('Action_game')]),
+      const CategoryPath('Gaming', 'Action'),
+    );
+
+    expect(suggestion.path, const CategoryPath('Gaming', 'Speedruns'));
+    expect(suggestion.source, CategorySource.jev);
+    final childOptions = (jev.requests.last['child']! as JevChoice).options;
+    expect(childOptions.values, isNot(contains('Action')));
   });
 }

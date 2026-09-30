@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -46,6 +48,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/chan
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -967,6 +970,42 @@ void main() {
               'Role-playing video game',
               'Video game culture',
             ],
+          ),
+        ),
+      ),
+    );
+  }
+  for (final canAskAi in [true, false]) {
+    fitsAtEveryWidth(
+      'the explanation of a YouTube category, '
+      '${canAskAi ? 'to ask AI' : 'with asking AI locked'}',
+      () => Scaffold(
+        body: SingleChildScrollView(
+          child: CategorySheet(
+            category: _longCategory(source: CategorySource.youtube),
+            canAskAi: canAskAi,
+            onAskAi: () {},
+            onAddKeys: () {},
+          ),
+        ),
+      ),
+    );
+  }
+  for (final (state, answer) in <(String, Future<ChannelCategory> Function())>[
+    ('while asking', () => Completer<ChannelCategory>().future),
+    ('with a suggestion', () async => _longCategory()),
+    (
+      'after a failure',
+      () async => throw const AiTierFailure(AiService.claude, AiOverloaded()),
+    ),
+  ]) {
+    fitsAtEveryWidth(
+      'asking AI for a category, $state',
+      () => Scaffold(
+        body: SingleChildScrollView(
+          child: CategoryAskPage(
+            asking: ValueNotifier(answer()..ignore()),
+            onRetry: () {},
           ),
         ),
       ),

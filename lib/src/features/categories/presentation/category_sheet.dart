@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
@@ -5,69 +6,149 @@ import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import '../application/ai_keys.dart';
+import '../application/ai_tiers.dart';
 import '../application/channel_categories.dart';
+import '../application/channel_categorizer.dart';
 import '../domain/channel_category.dart';
 import '../domain/youtube_topics.dart';
+import 'ai_keys_setup.dart';
 import 'category_chip.dart';
 
-/// Explains [channel]'s category in a modal: where it came from.
-Future<void> showCategorySheet(
+/// What the user chose, having asked AI for another category.
+sealed class CategorySheetResult {
+  const CategorySheetResult();
+}
+
+/// Use AI's [suggestion] instead.
+class AcceptedSuggestion extends CategorySheetResult {
+  final ChannelCategory suggestion;
+
+  const AcceptedSuggestion(this.suggestion);
+}
+
+/// Keep the category there was.
+class KeptCategory extends CategorySheetResult {
+  const KeptCategory();
+}
+
+/// Explains [channel]'s category in a modal: where it came from. A
+/// category not chosen by AI can be sent to AI for another, on the next
+/// page; without a key, that opens where keys are added, then comes back.
+/// Null when closed without choosing.
+Future<CategorySheetResult?> showCategorySheet(
   BuildContext context, {
   required HistoryChannel channel,
-}) => WoltModalSheet.show<void>(
-  context: context,
-  pageListBuilder: (_) => [
-    WoltModalSheetPage(
-      topBarTitle: Semantics(
-        header: true,
-        child: Text(
-          channel.title,
-          style: Theme.of(context).textTheme.titleMedium,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+}) {
+  final categorizer = ProviderScope.containerOf(
+    context,
+    listen: false,
+  ).read(channelCategorizerProvider.notifier);
+  // One request however many times the modal builds the page showing it
+  // (it measures pages offstage): each ask is paid for.
+  final asking = ValueNotifier<Future<ChannelCategory>?>(null);
+  void ask() => asking.value = categorizer.suggest(channel)
+    // Shown on the page; not an unhandled error if it closed first.
+    ..ignore();
+  Widget title(String text) => Semantics(
+    header: true,
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.titleMedium,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+  );
+  const close = Padding(
+    padding: EdgeInsetsDirectional.only(end: 8),
+    child: CloseButton(),
+  );
+  return WoltModalSheet.show<CategorySheetResult>(
+    context: context,
+    pageListBuilder: (_) => [
+      WoltModalSheetPage(
+        id: CategorySheet.explainId,
+        topBarTitle: title(channel.title),
+        isTopBarLayerAlwaysVisible: true,
+        trailingNavBarWidget: close,
+        child: Consumer(
+          builder: (context, ref, _) {
+            final category = ref.watch(
+              channelCategoriesProvider.select((m) => m.value?[channel.key]),
+            );
+            final topics =
+                ref.watch(
+                  channelDetailsProvider.select(
+                    (m) => m.value?[channel.channelId]?.topicUrls,
+                  ),
+                ) ??
+                const <String>[];
+            // Rebuilt as keys are added or turned off.
+            ref
+              ..watch(aiKeysProvider)
+              ..watch(aiTierStatusProvider);
+            final modal = WoltModalSheet.of(context);
+            return CategorySheet(
+              category: category,
+              topicLabels: [for (final url in topics) topicLabel(url)],
+              canAskAi: ref.read(channelCategorizerProvider.notifier).canAskAi,
+              onAskAi: () {
+                ask();
+                modal.showPageWithId(CategorySheet.askId);
+              },
+              onAddKeys: () => modal.showPageWithId(AiKeysPages.id),
+            );
+          },
         ),
       ),
-      isTopBarLayerAlwaysVisible: true,
-      trailingNavBarWidget: const Padding(
-        padding: EdgeInsetsDirectional.only(end: 8),
-        child: CloseButton(),
+      WoltModalSheetPage(
+        id: CategorySheet.askId,
+        topBarTitle: title('Ask AI'),
+        isTopBarLayerAlwaysVisible: true,
+        leadingNavBarWidget: Padding(
+          padding: const EdgeInsetsDirectional.only(start: 8),
+          child: Builder(
+            builder: (context) => IconButton(
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+              onPressed: () => WoltModalSheet.of(context).showAtIndex(0),
+              icon: const BackButtonIcon(),
+            ),
+          ),
+        ),
+        trailingNavBarWidget: close,
+        child: CategoryAskPage(asking: asking, onRetry: ask),
       ),
-      child: Consumer(
-        builder: (context, ref, _) {
-          final category = ref.watch(
-            channelCategoriesProvider.select((m) => m.value?[channel.key]),
-          );
-          final topics =
-              ref.watch(
-                channelDetailsProvider.select(
-                  (m) => m.value?[channel.channelId]?.topicUrls,
-                ),
-              ) ??
-              const <String>[];
-          return CategorySheet(
-            category: category,
-            topicLabels: [for (final url in topics) topicLabel(url)],
-          );
-        },
-      ),
-    ),
-  ],
-);
+      AiKeysPages.page(),
+    ],
+  ).whenComplete(asking.dispose);
+}
 
 /// A channel's category, large, and where it came from.
 class CategorySheet extends StatelessWidget {
   static const youtubeSourceKey = ValueKey('category-source-youtube');
   static const aiSourceKey = ValueKey('category-source-ai');
+  static const askAiKey = ValueKey('category-ask-ai');
+  static const explainId = 'category-explain';
+  static const askId = 'category-ask';
 
   final ChannelCategory? category;
 
   /// The topics YouTube gives the channel, by name.
   final List<String> topicLabels;
 
+  /// Whether AI can be asked for another category; without, asking opens
+  /// [onAddKeys].
+  final bool canAskAi;
+  final VoidCallback? onAskAi;
+  final VoidCallback? onAddKeys;
+
   const CategorySheet({
     super.key,
     required this.category,
     this.topicLabels = const [],
+    this.canAskAi = false,
+    this.onAskAi,
+    this.onAddKeys,
   });
 
   @override
@@ -103,10 +184,194 @@ class CategorySheet extends StatelessWidget {
           const SizedBox(height: 12),
           if (category == null)
             Text('Not categorized yet.', style: hint)
-          else
+          else ...[
             _Explanation(category: category, topicLabels: topicLabels),
+            // AI's choices explain themselves; others can go to AI.
+            if (!category.isAi && (onAskAi != null || onAddKeys != null)) ...[
+              const SizedBox(height: 20),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: canAskAi
+                    ? FilledButton.tonalIcon(
+                        key: askAiKey,
+                        onPressed: onAskAi,
+                        icon: tiny
+                            ? null
+                            : const Icon(ChannelCategoryChip.aiIcon),
+                        label: const Text(
+                          'Ask AI for another',
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : TextButton.icon(
+                        key: askAiKey,
+                        onPressed: onAddKeys,
+                        style: TextButton.styleFrom(
+                          foregroundColor: scheme.onSurfaceVariant,
+                        ),
+                        icon: const Icon(Icons.lock_outline),
+                        label: const Text(
+                          'Ask AI for another',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+              ),
+              if (!canAskAi) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Add an API key for Jev or Claude to ask AI.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ],
         ],
       ),
+    );
+  }
+}
+
+/// What AI suggests instead, as [asking] answers: a progress bar while it's
+/// asked, then the suggestion to use or not, which closes the modal; a
+/// failure says why in place, to [onRetry].
+class CategoryAskPage extends StatelessWidget {
+  static const progressKey = ValueKey('category-ask-progress');
+  static const acceptKey = ValueKey('category-ask-accept');
+  static const denyKey = ValueKey('category-ask-deny');
+  static const retryKey = ValueKey('category-ask-retry');
+  static const failureKey = ValueKey('category-ask-failure');
+
+  final ValueListenable<Future<ChannelCategory>?> asking;
+  final VoidCallback onRetry;
+
+  const CategoryAskPage({
+    super.key,
+    required this.asking,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder(
+    valueListenable: asking,
+    builder: (context, request, _) => FutureBuilder(
+      future: request,
+      builder: (context, answer) => _answer(context, answer),
+    ),
+  );
+
+  Widget _answer(BuildContext context, AsyncSnapshot<ChannelCategory> answer) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tiny = isTinyWidth(context);
+    final hint = theme.textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    );
+    final suggestion = answer.data;
+
+    final Widget body;
+    if (answer.connectionState != ConnectionState.done) {
+      body = Column(
+        key: progressKey,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Asking AI for another category…', style: hint),
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(),
+        ],
+      );
+    } else if (answer.hasError || suggestion == null) {
+      final error = answer.error;
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              key: failureKey,
+              "AI couldn't be asked: ${error is AiTierFailure ? error.failure : error}",
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton.tonalIcon(
+              key: retryKey,
+              onPressed: onRetry,
+              icon: tiny ? null : const Icon(Icons.refresh),
+              label: const Text('Try again', textAlign: TextAlign.center),
+            ),
+          ),
+        ],
+      );
+    } else {
+      final confidence = suggestion.confidence;
+      final reason = suggestion.reason;
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Card.filled(
+            margin: EdgeInsets.zero,
+            color: scheme.surfaceContainerHigh,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(ChannelCategoryChip.aiIcon, color: scheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          suggestion.path?.label ?? 'Uncategorized',
+                          style: theme.textTheme.titleLarge,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (reason != null) ...[
+                    const SizedBox(height: 8),
+                    Text(reason, style: hint),
+                  ] else if (confidence != null) ...[
+                    const SizedBox(height: 8),
+                    Text('Jev is ${_percent(confidence)} sure.', style: hint),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                key: denyKey,
+                onPressed: () =>
+                    Navigator.of(context).pop(const KeptCategory()),
+                child: const Text('Keep current', textAlign: TextAlign.center),
+              ),
+              FilledButton(
+                key: acceptKey,
+                onPressed: () =>
+                    Navigator.of(context).pop(AcceptedSuggestion(suggestion)),
+                child: const Text(
+                  'Use this category',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.fromLTRB(tiny ? 8 : 24, 8, tiny ? 8 : 24, 24),
+      child: body,
     );
   }
 }
@@ -136,7 +401,10 @@ class _Explanation extends StatelessWidget {
         switch (category.source) {
           CategorySource.claude => Text(
             key: CategorySheet.aiSourceKey,
-            'Chosen by Claude.',
+            switch (category.reason) {
+              final reason? => 'Chosen by Claude: $reason',
+              null => 'Chosen by Claude.',
+            },
             style: hint,
           ),
           CategorySource.jev => Text(

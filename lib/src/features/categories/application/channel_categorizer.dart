@@ -9,12 +9,15 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import '../domain/categorization_plan.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
+import '../data/anthropic_repository.dart';
 import '../data/typesafe_repository.dart';
 import 'ai_keys.dart';
 import 'ai_tiers.dart';
@@ -125,20 +128,8 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       }
     }
 
-    final keys = await ref
-        .read(aiKeysProvider.future)
-        .catchError((Object _) => AiKeys.none);
+    final pipeline = await _pipeline();
     if (dropped()) return;
-    final disabled = ref.read(aiTierStatusProvider).disabled;
-    final pipeline = CategoryPipeline(
-      taxonomy: ref.read(categoryTaxonomyProvider),
-      jev: keys.hasJev && !disabled.contains(AiService.jev)
-          ? (
-              repository: ref.read(typeSafeRepositoryProvider),
-              apiKey: keys.keyFor(AiService.jev),
-            )
-          : null,
-    );
     final titles = recentTitlesByChannel(loaded);
     final queue = [
       for (final channel in channels)
@@ -162,27 +153,18 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     Future<void> worker() async {
       while (next < queue.length && stoppedBy == null && !dropped()) {
         final channel = queue[next++];
-        final channelDetails = details[channel.channelId];
-        final topicUrls = channelDetails?.topicUrls ?? const <String>[];
-        final index = loaded.channelIndexByKey[channel.key];
         final ChannelCategory category;
         try {
-          category = await pipeline.categorize((
-            key: channel.key,
-            topicUrls: topicUrls,
-            evidence: ChannelEvidence(
-              title: channel.title,
-              description: channelDetails?.description,
-              topicLabels: [for (final url in topicUrls) topicLabel(url)],
-              recentTitles: index == null ? const [] : titles[index],
-            ),
-          ));
+          category = await pipeline.categorize(
+            _inputFor(channel, loaded, details, titles),
+          );
         } on AiTierFailure catch (e) {
           stoppedBy ??= e;
           return;
         }
         if (dropped()) return;
         _unreachable = 0;
+        await _keepLearned(pipeline);
         await categories.putIfUndecided(channel.key, category);
         progress.update(++done);
         if (done % _saveEvery == 0) await categories.persist();
@@ -199,6 +181,143 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       if (ref.mounted) await categories.persist();
     }
     if (stoppedBy case final failure? when ref.mounted) _stopped(failure);
+  }
+
+  /// Whether AI can be asked for another category: there's a key for Jev
+  /// or Claude, and it isn't turned off.
+  bool get canAskAi {
+    final keys = ref.read(aiKeysProvider).value ?? AiKeys.none;
+    final disabled = ref.read(aiTierStatusProvider).disabled;
+    return AiService.values.any(
+      (service) => keys.has(service) && !disabled.contains(service),
+    );
+  }
+
+  /// Another category for [channel], from AI told the one it has is wrong.
+  /// Throws an [AiTierFailure] when the AI can't be asked.
+  Future<ChannelCategory> suggest(HistoryChannel channel) async {
+    final pipeline = await _pipeline();
+    final LoadedHistory loaded =
+        ref.read(categorizationInputsProvider)?.loaded ??
+        ref.read(takeoutHistoryProvider).value ??
+        LoadedHistory.empty;
+    final details = await ref
+        .read(channelDetailsProvider.future)
+        .catchError((Object _) => const <String, ChannelDetails>{});
+    final current = (await ref.read(
+      channelCategoriesProvider.future,
+    ))[channel.key];
+    return pipeline.suggestInstead(
+      _inputFor(channel, loaded, details, recentTitlesByChannel(loaded)),
+      current?.path,
+    );
+  }
+
+  /// Makes [suggestion] [channel]'s category, as the user chose, keeping a
+  /// new sub-category it names.
+  Future<void> accept(
+    HistoryChannel channel,
+    ChannelCategory suggestion,
+  ) async {
+    final path = suggestion.path;
+    await ref.read(customCategoriesProvider.future);
+    if (path != null &&
+        path.child != null &&
+        !ref.read(categoryTaxonomyProvider).contains(path)) {
+      await ref
+          .read(customCategoriesProvider.notifier)
+          .add(path.parent, path.child!);
+    }
+    await ref
+        .read(channelCategoriesProvider.notifier)
+        .decide(
+          channel.key,
+          suggestion.copyWith(
+            userDecision: UserDecision.accepted,
+            decidedAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
+
+  /// Keeps [channel]'s category as it is, as the user chose: nothing
+  /// replaces it.
+  Future<void> deny(HistoryChannel channel) async {
+    final now = DateTime.now().toUtc();
+    final current = (await ref.read(
+      channelCategoriesProvider.future,
+    ))[channel.key];
+    await ref
+        .read(channelCategoriesProvider.notifier)
+        .decide(
+          channel.key,
+          (current ?? ChannelCategory(decidedAt: now)).copyWith(
+            userDecision: UserDecision.denied,
+            decidedAt: now,
+          ),
+        );
+  }
+
+  /// A pipeline with the steps there are keys for, and every category.
+  Future<CategoryPipeline> _pipeline() async {
+    final keys = await ref
+        .read(aiKeysProvider.future)
+        .catchError((Object _) => AiKeys.none);
+    await ref
+        .read(customCategoriesProvider.future)
+        .catchError((Object _) => const <String, List<String>>{});
+    final disabled = ref.read(aiTierStatusProvider).disabled;
+    bool on(AiService service) =>
+        keys.has(service) && !disabled.contains(service);
+    return CategoryPipeline(
+      taxonomy: ref.read(categoryTaxonomyProvider),
+      jev: on(AiService.jev)
+          ? (
+              repository: ref.read(typeSafeRepositoryProvider),
+              apiKey: keys.keyFor(AiService.jev),
+            )
+          : null,
+      claude: on(AiService.claude)
+          ? (
+              repository: ref.read(anthropicRepositoryProvider),
+              apiKey: keys.keyFor(AiService.claude),
+              model: anthropicModel,
+            )
+          : null,
+    );
+  }
+
+  /// What's known about [channel]: its topics and description, and the
+  /// titles of videos watched from it.
+  static ChannelInput _inputFor(
+    HistoryChannel channel,
+    LoadedHistory loaded,
+    Map<String, ChannelDetails> details,
+    List<List<String>> titles,
+  ) {
+    final channelDetails = details[channel.channelId];
+    final topicUrls = channelDetails?.topicUrls ?? const <String>[];
+    final index = loaded.channelIndexByKey[channel.key];
+    return (
+      key: channel.key,
+      topicUrls: topicUrls,
+      evidence: ChannelEvidence(
+        title: channel.title,
+        description: channelDetails?.description,
+        topicLabels: [for (final url in topicUrls) topicLabel(url)],
+        recentTitles: index == null || index >= titles.length
+            ? const []
+            : titles[index],
+      ),
+    );
+  }
+
+  /// Keeps the sub-categories [pipeline] learned, for later channels.
+  Future<void> _keepLearned(CategoryPipeline pipeline) async {
+    for (final path in pipeline.takeLearned()) {
+      await ref
+          .read(customCategoriesProvider.notifier)
+          .add(path.parent, path.child!);
+    }
   }
 
   /// Says why categorizing stopped: a service that can't work is turned off

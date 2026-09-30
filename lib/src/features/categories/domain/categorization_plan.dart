@@ -1,5 +1,9 @@
 import 'channel_category.dart';
 
+/// How sure Jev must be, of YouTube's category fitting, of its own pick,
+/// or of a sub-category matching one Claude named, to go with it.
+const jevThreshold = 0.6;
+
 /// The AI steps: they can categorize a channel from its name and the
 /// videos watched from it, without topics.
 const _aiTiers = {CategorizationTier.jev, CategorizationTier.claude};
@@ -20,8 +24,11 @@ bool needsCategorizing(
   if (existing.path == null) {
     return (hasTopics && !existing.hadTopics) || untried.isNotEmpty;
   }
-  // YouTube's pick gets Jev's check once Jev is there.
-  return existing.source == CategorySource.youtube &&
-      existing.jevAgreed == null &&
-      untried.contains(CategorizationTier.jev);
+  if (existing.source != CategorySource.youtube) return false;
+  // YouTube's pick gets Jev's check once Jev is there, and Claude's once
+  // Claude is, when Jev doubted it and had nothing better.
+  final agreed = existing.jevAgreed;
+  return agreed == null
+      ? untried.contains(CategorizationTier.jev)
+      : agreed < jevThreshold && untried.contains(CategorizationTier.claude);
 }

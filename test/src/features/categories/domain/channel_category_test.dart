@@ -133,6 +133,25 @@ void main() {
       );
     });
 
+    test("again for Claude, once it is there, when Jev doubted YouTube's "
+        'pick and had none better', () {
+      const withClaude = {...withJev, CategorizationTier.claude};
+      final doubted = _category(tried: withJev, jevAgreed: 0.3);
+
+      expect(
+        needsCategorizing(doubted, available: withClaude, hasTopics: true),
+        isTrue,
+      );
+      expect(
+        needsCategorizing(
+          _category(tried: withJev, jevAgreed: jevThreshold),
+          available: withClaude,
+          hasTopics: true,
+        ),
+        isFalse,
+      );
+    });
+
     test('not again for an AI pick', () {
       expect(
         needsCategorizing(

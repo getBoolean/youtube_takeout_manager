@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
@@ -22,6 +23,7 @@ import 'package:youtube_takeout_manager/src/features/history/application/takeout
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
@@ -103,6 +105,26 @@ class _Jev extends TypeSafeRepository {
   }
 }
 
+/// Claude, answering with [answer], keeping what it was asked.
+class _Claude extends AnthropicRepository {
+  _Claude(this.answer);
+
+  final Map<String, Object?> answer;
+  final asked = <String>[];
+
+  @override
+  Future<Map<String, Object?>> structured({
+    required String apiKey,
+    required String model,
+    required String system,
+    required String user,
+    required Map<String, Object?> schema,
+  }) async {
+    asked.add(user);
+    return answer;
+  }
+}
+
 /// The AI keys, changeable as when entered in the app.
 class _Keys extends Notifier<AiKeys> {
   @override
@@ -141,6 +163,7 @@ void main() {
     List<Subscription> subscriptions = const [],
     AiKeys keys = AiKeys.none,
     TypeSafeRepository? jev,
+    AnthropicRepository? claude,
   }) {
     fetcher = _Fetcher(give);
     final c = ProviderContainer(
@@ -154,6 +177,10 @@ void main() {
         ),
         aiKeysProvider.overrideWith((ref) async => ref.watch(_keys)),
         typeSafeRepositoryProvider.overrideWithValue(jev ?? _Jev()),
+        anthropicRepositoryProvider.overrideWithValue(
+          claude ??
+              _Claude({'parent': 'Knowledge', 'child': null, 'reason': ''}),
+        ),
       ],
     );
     addTearDown(c.dispose);
@@ -335,6 +362,88 @@ void main() {
         hasLength(1),
       );
     });
+  });
+
+  group('with a Claude key', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    test('Claude names the categories YouTube gives none for, and a new '
+        'sub-category it names is kept', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'Speedruns',
+        'reason': 'Races through games',
+      });
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      // No Unknown topics for No topics, so Claude named it.
+      final none = c.read(channelCategoriesProvider).value?['UCx'];
+      expect(none?.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(none?.source, CategorySource.claude);
+      expect(none?.reason, 'Races through games');
+      // YouTube's sub-categories stand.
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      expect(await c.read(customCategoriesProvider.future), {
+        'Gaming': ['Speedruns'],
+      });
+    });
+
+    test('asked again, Claude suggests another category, and accepting it '
+        'keeps it as the user chose', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'Speedruns',
+        'reason': 'Races, not fights',
+      });
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      final categorizer = c.read(channelCategorizerProvider.notifier);
+      const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
+      expect(categorizer.canAskAi, isTrue);
+
+      final suggestion = await categorizer.suggest(gamer);
+      expect(suggestion.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(claude.asked.last, contains('Gaming › Action'));
+      await categorizer.accept(gamer, suggestion);
+
+      final kept = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(kept?.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(kept?.userDecision, UserDecision.accepted);
+      expect(await c.read(customCategoriesProvider.future), contains('Gaming'));
+    });
+
+    test("denying a suggestion keeps the category, and it's not asked "
+        'about again', () async {
+      final c = container(
+        details: known,
+        keys: claudeKey,
+        claude: _Claude({'parent': 'Music', 'child': null, 'reason': ''}),
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      final categorizer = c.read(channelCategorizerProvider.notifier);
+      const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
+
+      await categorizer.deny(gamer);
+      c.read(_keys.notifier).set(const AiKeys(anthropic: 'sk-ant-2'));
+      await _settle();
+
+      final kept = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(kept?.path, const CategoryPath('Gaming', 'Action'));
+      expect(kept?.userDecision, UserDecision.denied);
+    });
+  });
+
+  test('without any key, AI cannot be asked', () async {
+    final c = container(details: known);
+    c.read(historyShownProvider.notifier).markShown();
+    await _settle();
+
+    expect(c.read(channelCategorizerProvider.notifier).canAskAi, isFalse);
   });
 
   test('categories are kept after a restart, and not made again', () async {
