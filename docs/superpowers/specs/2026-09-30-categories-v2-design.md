@@ -221,11 +221,13 @@ One request layer serves both Jev and Claude. It paces requests, applies a timeo
 - When any remaining count is below what the next request needs, the client waits until that reset.
 - It starts with one request at a time and adds one after every 20 successes, up to 3, since Anthropic asks for gradual ramps.
 
+**A 429 pauses the whole service.** Jev and Claude both send `Retry-After` when they rate-limit. That wait applies to the service's pacing as a whole: requests already queued or about to send wait for it too, not only the one that was refused. Otherwise the 3 requests in flight would each run into the limit.
+
 ### Retries and timeouts (#4)
 
 | | Jev | Claude |
 |---|---|---|
-| Retried | 408, 429, 5xx, connection errors (its SDK's documented policy) | 429 with `retry-after`, 500, 529, connection errors |
+| Retried | 408, 429 (sent with `Retry-After`), 5xx, connection errors (its SDK's documented policy) | 429 with `retry-after`, 500, 529, connection errors |
 | Attempts | 3 in all | 3 in all |
 | Backoff | 0.5 s, doubling, capped at 5 s, with jitter | 1 s, doubling, capped at 8 s, with jitter |
 | Timeout per attempt | 30 s | 60 s |
