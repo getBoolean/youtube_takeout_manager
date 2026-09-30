@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
+import 'package:youtube_takeout_manager/src/app_version.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/google_cloud_client_setup.dart';
@@ -97,6 +98,8 @@ final _workSummary = TakeoutSummary(
 );
 
 final _picked = [PickedZip.bytes('takeout-001.zip', Uint8List(1))];
+
+const _version = '9.8.7';
 
 TakeoutImportPlan _planFor(String accountId, {bool accountAssumed = false}) =>
     TakeoutImportPlan(
@@ -389,6 +392,7 @@ void main() {
           deletionProcessingProvider.overrideWith(
             () => _Processing(processing),
           ),
+          appVersionProvider.overrideWith((ref) async => _version),
         ],
         child: fromChannelPage
             ? MaterialApp.router(routerConfig: pages.config())
@@ -920,6 +924,30 @@ void main() {
 
     expectNoPopups();
     expect(cache.clears, 1);
+  });
+
+  testWidgets('opens the licenses page over the dialog with the app version, '
+      'and Back comes back here', (tester) async {
+    await pumpDialog(tester, fromChannelPage: true);
+
+    await tester.ensureVisible(find.byKey(TakeoutsDialog.licensesKey));
+    await tester.tap(find.byKey(TakeoutsDialog.licensesKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(LicensePage), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(LicensePage),
+        matching: find.textContaining(_version),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LicensePage), findsNothing);
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
+    expect(pages.current.name, ChannelDetailRoute.name);
   });
 
   group('account button', () {

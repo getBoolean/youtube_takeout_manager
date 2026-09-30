@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
+import 'package:youtube_takeout_manager/src/app_version.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
@@ -59,9 +60,11 @@ Future<void> showTakeoutsDialog(BuildContext context) =>
 /// The Takeouts dialog's first page: the Google account the viewed takeout
 /// is from, with its channels to view and sign in, importing a takeout, and
 /// the other saved accounts to switch to, then the Google Cloud client users
-/// bring, the app's YouTube API quota and on-device cache. Errors show in
-/// place, never in another popup.
+/// bring, the app's YouTube API quota and on-device cache, and a link to the
+/// open-source licenses. Errors show in place, never in another popup.
 class TakeoutsDialog extends StatelessWidget {
+  static const licensesKey = ValueKey('takeouts-licenses');
+
   const TakeoutsDialog({super.key});
 
   @override
@@ -81,8 +84,32 @@ class TakeoutsDialog extends StatelessWidget {
             padding: EdgeInsetsDirectional.only(start: 8),
             child: _Settings(),
           ),
+          SizedBox(height: 16),
+          Center(child: _LicensesLink()),
         ],
       ),
+    );
+  }
+}
+
+/// A small link to Flutter's page of the open-source licenses the app ships
+/// with, headed by the app's version. It opens over this dialog, and Back
+/// comes back here.
+class _LicensesLink extends ConsumerWidget {
+  const _LicensesLink();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(appVersionProvider).value;
+    return TextButton(
+      key: TakeoutsDialog.licensesKey,
+      style: TextButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        textStyle: Theme.of(context).textTheme.bodySmall,
+      ),
+      onPressed: () =>
+          showLicensePage(context: context, applicationVersion: version),
+      child: const Text('Open-source licenses', textAlign: TextAlign.center),
     );
   }
 }
