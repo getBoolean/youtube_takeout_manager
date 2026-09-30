@@ -1,6 +1,6 @@
 name: youtube_takeout_manager
 description: "A Flutter app to manage YouTube Takeout data - view and delete comments and live chats."
-publish_to: 'none'
+publish_to: "none"
 version: 0.1.1+2
 
 environment:
