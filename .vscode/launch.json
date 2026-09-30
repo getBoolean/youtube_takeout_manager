@@ -31,7 +31,7 @@
             ]
         },
         {
-            "name": "takeout_manager (no google api)",
+            "name": "takeout_manager (no api keys)",
             "request": "launch",
             "type": "dart"
         },
