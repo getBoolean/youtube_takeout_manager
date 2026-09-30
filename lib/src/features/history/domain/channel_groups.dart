@@ -55,7 +55,7 @@ class ChannelGroups {
         ? _groupOfChannel[channel]
         : -1;
     if (group < 0) return null;
-    final position = _binarySearch(groups[group].indices, watchIndex);
+    final position = sortedIndexOf(groups[group].indices, watchIndex);
     return position < 0 ? null : (group, position);
   }
 
@@ -82,22 +82,23 @@ class ChannelGroups {
       noChannel == null ? -1 : watched.length + unwatched.length,
     );
   }
+}
 
-  static int _binarySearch(List<int> sorted, int value) {
-    var low = 0;
-    var high = sorted.length - 1;
-    while (low <= high) {
-      final mid = (low + high) >> 1;
-      final at = sorted[mid];
-      if (at == value) return mid;
-      if (at < value) {
-        low = mid + 1;
-      } else {
-        high = mid - 1;
-      }
+/// Where [value] is in [sorted], ascending, or -1.
+int sortedIndexOf(List<int> sorted, int value) {
+  var low = 0;
+  var high = sorted.length - 1;
+  while (low <= high) {
+    final mid = (low + high) >> 1;
+    final at = sorted[mid];
+    if (at == value) return mid;
+    if (at < value) {
+      low = mid + 1;
+    } else {
+      high = mid - 1;
     }
-    return -1;
   }
+  return -1;
 }
 
 /// Groups the watched videos at [watchIndices] (ascending, so newest first)

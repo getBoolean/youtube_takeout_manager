@@ -216,6 +216,64 @@ final class HistoryFilterChannelsProvider
 String _$historyFilterChannelsHash() =>
     r'29dea637b263a425e2246ce3d479b4fbf1ed336e';
 
+/// Each channel's category, by key, while categories are picked; null
+/// otherwise, so categories arriving don't search again.
+
+@ProviderFor(historyPickedCategoryOf)
+final historyPickedCategoryOfProvider = HistoryPickedCategoryOfProvider._();
+
+/// Each channel's category, by key, while categories are picked; null
+/// otherwise, so categories arriving don't search again.
+
+final class HistoryPickedCategoryOfProvider
+    extends
+        $FunctionalProvider<
+          CategoryPath? Function(String key)?,
+          CategoryPath? Function(String key)?,
+          CategoryPath? Function(String key)?
+        >
+    with $Provider<CategoryPath? Function(String key)?> {
+  /// Each channel's category, by key, while categories are picked; null
+  /// otherwise, so categories arriving don't search again.
+  HistoryPickedCategoryOfProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyPickedCategoryOfProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyPickedCategoryOfHash();
+
+  @$internal
+  @override
+  $ProviderElement<CategoryPath? Function(String key)?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  CategoryPath? Function(String key)? create(Ref ref) {
+    return historyPickedCategoryOf(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CategoryPath? Function(String key)? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CategoryPath? Function(String key)?>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$historyPickedCategoryOfHash() =>
+    r'7c3bff0b01580936b379dfd18fd10b9b915cc170';
+
 /// The watched channels the channel filters show, or null when they narrow
 /// nothing.
 
@@ -264,7 +322,60 @@ final class HistoryChannelMaskProvider
 }
 
 String _$historyChannelMaskHash() =>
-    r'f68812c6c6b0288703227f8576ccacd436975ea2';
+    r'7d1e8486167cc00503dc2596836032fee7f14a5f';
+
+/// How many videos were watched from each watched channel, in the loaded
+/// history's order, of the kinds of videos shown: Shorts and YouTube Music
+/// as filtered.
+
+@ProviderFor(historyChannelWatchCounts)
+final historyChannelWatchCountsProvider = HistoryChannelWatchCountsProvider._();
+
+/// How many videos were watched from each watched channel, in the loaded
+/// history's order, of the kinds of videos shown: Shorts and YouTube Music
+/// as filtered.
+
+final class HistoryChannelWatchCountsProvider
+    extends $FunctionalProvider<List<int>, List<int>, List<int>>
+    with $Provider<List<int>> {
+  /// How many videos were watched from each watched channel, in the loaded
+  /// history's order, of the kinds of videos shown: Shorts and YouTube Music
+  /// as filtered.
+  HistoryChannelWatchCountsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyChannelWatchCountsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyChannelWatchCountsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<int>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<int> create(Ref ref) {
+    return historyChannelWatchCounts(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<int> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<int>>(value),
+    );
+  }
+}
+
+String _$historyChannelWatchCountsHash() =>
+    r'2b112964ffe7fca8d5d88e643256e6fc2382fdee';
 
 /// Which watched videos are Shorts: watched through a Shorts link, or
 /// short and tall by the format fetched for them.
@@ -713,4 +824,57 @@ final class HistoryChannelGroupsProvider
 }
 
 String _$historyChannelGroupsHash() =>
-    r'264dbfcd03ce23c12d5aa303e9db982f7ee16f5b';
+    r'b9866c876d7950c88ac22563e0948a4902f879e1';
+
+/// The watched videos shown, by the category of their channels, with the
+/// channels subscribed to but never watched as [historyChannelGroups] has
+/// them.
+
+@ProviderFor(historyCategoryGroups)
+final historyCategoryGroupsProvider = HistoryCategoryGroupsProvider._();
+
+/// The watched videos shown, by the category of their channels, with the
+/// channels subscribed to but never watched as [historyChannelGroups] has
+/// them.
+
+final class HistoryCategoryGroupsProvider
+    extends $FunctionalProvider<CategoryGroups, CategoryGroups, CategoryGroups>
+    with $Provider<CategoryGroups> {
+  /// The watched videos shown, by the category of their channels, with the
+  /// channels subscribed to but never watched as [historyChannelGroups] has
+  /// them.
+  HistoryCategoryGroupsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyCategoryGroupsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyCategoryGroupsHash();
+
+  @$internal
+  @override
+  $ProviderElement<CategoryGroups> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  CategoryGroups create(Ref ref) {
+    return historyCategoryGroups(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(CategoryGroups value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<CategoryGroups>(value),
+    );
+  }
+}
+
+String _$historyCategoryGroupsHash() =>
+    r'801c4bca15ed525e19895bf861e93c22563e9de7';

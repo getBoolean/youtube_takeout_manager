@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
@@ -114,6 +116,68 @@ void main() {
       expect(shown(mask), ['Alpha']);
     });
 
+    const categories = {
+      'UCa': CategoryPath('Gaming', 'Action game'),
+      'UCb': CategoryPath('Lifestyle', 'Cooking'),
+    };
+    ChannelMask? byCategory(
+      ChannelSelection selection, {
+      SubscriptionFilter subscription = SubscriptionFilter.all,
+    }) => buildChannelMask(
+      channels: _channels,
+      subscribedKeys: const {'UCa'},
+      subscription: subscription,
+      selection: selection,
+      categoryOf: (key) => categories[key],
+    );
+
+    test('keeps the channels of the categories picked', () {
+      expect(
+        shown(
+          byCategory(
+            ChannelSelection(
+              categories: {const CategoryPick.category('Gaming')},
+            ),
+          ),
+        ),
+        ['Alpha'],
+      );
+      expect(
+        shown(
+          byCategory(
+            ChannelSelection(categories: {CategoryPick.uncategorized()}),
+          ),
+        ),
+        ['Gamma'],
+      );
+    });
+
+    test('keeps the channels picked and those of the categories picked', () {
+      final mask = byCategory(
+        ChannelSelection(
+          channels: {'UCb': _channels[1].channel},
+          categories: {const CategoryPick.uncategorized()},
+        ),
+      );
+
+      expect(shown(mask), ['Beta', 'Gamma']);
+    });
+
+    test('channels of the categories picked must also pass the subscription '
+        'filter', () {
+      final mask = byCategory(
+        ChannelSelection(
+          categories: {
+            const CategoryPick.category('Gaming'),
+            const CategoryPick.category('Lifestyle'),
+          },
+        ),
+        subscription: SubscriptionFilter.notSubscribed,
+      );
+
+      expect(shown(mask), ['Beta']);
+    });
+
     test('masks that show the same channels are equal', () {
       ChannelMask? mask() => buildChannelMask(
         channels: _channels,
@@ -145,5 +209,19 @@ void main() {
     expect(passes(SubscriptionFilter.subscribed), isTrue);
     expect(passes(SubscriptionFilter.notSubscribed), isFalse);
     expect(passes(SubscriptionFilter.all, picked: false), isFalse);
+  });
+
+  test('picking categories picks something, and selections of the same '
+      'channels and categories are equal', () {
+    final picked = ChannelSelection(
+      categories: {const CategoryPick.category('Gaming')},
+    );
+
+    expect(picked.isEmpty, isFalse);
+    expect(
+      picked,
+      ChannelSelection(categories: {const CategoryPick.category('Gaming')}),
+    );
+    expect(picked, isNot(const ChannelSelection()));
   });
 }

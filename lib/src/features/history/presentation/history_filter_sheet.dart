@@ -6,6 +6,8 @@ import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/adaptive_segmented_button.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
+import 'package:youtube_takeout_manager/src/common_widgets/share_bar.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
@@ -29,8 +31,9 @@ const WatchFilterDraft noWatchFilters = (
 
 /// Asks for the filters of the watched videos, starting from [initial]:
 /// subscriptions when [hasSubscriptions], Shorts when [hasShorts] (with
-/// [shortsNote] under them), YouTube Music when [hasMusic], and any of
-/// [channels]. Null when closed without showing or clearing.
+/// [shortsNote] under them), YouTube Music when [hasMusic], the categories
+/// of the viewing [mix] once any channel has one, and any of [channels].
+/// Null when closed without showing or clearing.
 Future<WatchFilterDraft?> showHistoryFilterSheet(
   BuildContext context, {
   required WatchFilterDraft initial,
@@ -39,6 +42,7 @@ Future<WatchFilterDraft?> showHistoryFilterSheet(
   required bool hasShorts,
   String? shortsNote,
   required bool hasMusic,
+  List<CategoryShare> mix = const [],
 }) => WoltModalSheet.show<WatchFilterDraft>(
   context: context,
   modalDecorator: (child) => _DraftScope(initial: initial, child: child),
@@ -66,6 +70,7 @@ Future<WatchFilterDraft?> showHistoryFilterSheet(
             hasShorts: hasShorts,
             shortsNote: shortsNote,
             hasMusic: hasMusic,
+            mix: mix,
           ),
         ),
         _ChannelsSliver(channels: channels),
@@ -81,6 +86,7 @@ abstract final class HistoryFilterSheet {
   static const subscriptionSectionKey = ValueKey('filters-subscriptions');
   static const shortsSectionKey = ValueKey('filters-shorts');
   static const musicSectionKey = ValueKey('filters-music');
+  static const categoriesSectionKey = ValueKey('filters-categories');
   static const showKey = ValueKey('filters-show');
   static const clearKey = ValueKey('filters-clear');
 
@@ -92,6 +98,10 @@ abstract final class HistoryFilterSheet {
       ValueKey('filters-music-${filter.name}');
   static ValueKey<String> channelKey(String channelKey) =>
       ValueKey('filters-channel-$channelKey');
+  static ValueKey<String> categoryKey(CategoryPick pick) =>
+      ValueKey('filters-category-${pick.label}');
+  static ValueKey<String> categoryExpandKey(String parent) =>
+      ValueKey('filters-category-expand-$parent');
 }
 
 /// Holds the filters being set, for the page and its actions alike.
@@ -113,19 +123,21 @@ class _Draft extends InheritedNotifier<ValueNotifier<WatchFilterDraft>> {
       context.dependOnInheritedWidgetOfExactType<_Draft>()!.notifier!;
 }
 
-/// The subscription, Shorts and Music filters, each a row of choices, for
-/// what the takeout has.
+/// The subscription, Shorts and Music filters, each a row of choices, and
+/// the categories, for what the takeout has.
 class _Sections extends StatelessWidget {
   final bool hasSubscriptions;
   final bool hasShorts;
   final String? shortsNote;
   final bool hasMusic;
+  final List<CategoryShare> mix;
 
   const _Sections({
     required this.hasSubscriptions,
     required this.hasShorts,
     this.shortsNote,
     required this.hasMusic,
+    this.mix = const [],
   });
 
   @override
@@ -217,8 +229,165 @@ class _Sections extends StatelessWidget {
                 ),
               ),
             ),
+          // Once there's anything but the uncategorized.
+          if (mix.any((share) => share.pick.parent != null))
+            _Section(
+              key: HistoryFilterSheet.categoriesSectionKey,
+              title: 'Categories',
+              note: "Each one's share of the videos you watched.",
+              child: _Categories(mix: mix),
+            ),
         ],
       ),
+    );
+  }
+}
+
+/// The viewing mix, largest first, each category a row to tick with its
+/// share of the watched videos; one with sub-categories opens to them, each
+/// to tick alone.
+class _Categories extends HookWidget {
+  final List<CategoryShare> mix;
+
+  const _Categories({required this.mix});
+
+  @override
+  Widget build(BuildContext context) {
+    final draft = _Draft.of(context);
+    final picks = draft.value.selection.categories;
+    final open = useState(const <String>{});
+
+    void toggle(CategoryPick pick, CategoryShare category) {
+      final value = draft.value;
+      draft.value = (
+        subscription: value.subscription,
+        shorts: value.shorts,
+        music: value.music,
+        selection: ChannelSelection(
+          channels: value.selection.channels,
+          categories: togglePick(value.selection.categories, pick, category),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final category in mix) ...[
+          _CategoryRow(
+            share: category,
+            state: pickState(picks, category),
+            onTap: () => toggle(category.pick, category),
+            open: category.children.isEmpty
+                ? null
+                : open.value.contains(category.pick.parent),
+            onOpen: () {
+              final parent = category.pick.parent!;
+              open.value = open.value.contains(parent)
+                  ? ({...open.value}..remove(parent))
+                  : {...open.value, parent};
+            },
+          ),
+          if (open.value.contains(category.pick.parent))
+            for (final sub in category.children)
+              _CategoryRow(
+                share: sub,
+                state: pickState(picks, sub),
+                onTap: () => toggle(sub.pick, category),
+                indented: true,
+              ),
+        ],
+      ],
+    );
+  }
+}
+
+/// A row of the viewing mix: a checkbox, its name, its share as a bar, and
+/// the percent and how many channels it has. A category with sub-categories
+/// has a button to [open] them.
+class _CategoryRow extends StatelessWidget {
+  final CategoryShare share;
+
+  /// Ticked, not, or partly (null).
+  final bool? state;
+  final VoidCallback onTap;
+  final bool indented;
+
+  /// Whether its sub-categories show; null when it has none.
+  final bool? open;
+  final VoidCallback? onOpen;
+
+  const _CategoryRow({
+    required this.share,
+    required this.state,
+    required this.onTap,
+    this.indented = false,
+    this.open,
+    this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tiny = isTinyWidth(context);
+    final pick = share.pick;
+    final channels = formatCount(share.channelCount, 'channel');
+    final animate = !MediaQuery.disableAnimationsOf(context);
+    return Row(
+      children: [
+        Expanded(
+          child: CheckboxListTile(
+            key: HistoryFilterSheet.categoryKey(pick),
+            value: state,
+            tristate: true,
+            onChanged: (_) => onTap(),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsetsDirectional.only(
+              start: indented && !tiny ? 24 : 0,
+            ),
+            title: Text(indented ? pick.shortLabel : pick.label),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 4),
+                ShareBar(share: share.share),
+                const SizedBox(height: 4),
+                Semantics(
+                  label:
+                      '${(share.share * 100).round()} percent of the watched '
+                      'videos, $channels',
+                  child: ExcludeSemantics(
+                    child: Text(
+                      '${formatShare(share.share)} · $channels',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (open case final open?)
+          IconButton(
+            key: HistoryFilterSheet.categoryExpandKey(pick.parent!),
+            tooltip: open
+                ? 'Hide the kinds of ${pick.label}'
+                : 'Show the kinds of ${pick.label}',
+            onPressed: onOpen,
+            icon: AnimatedRotation(
+              turns: open ? 0.5 : 0,
+              duration: animate
+                  ? const Duration(milliseconds: 200)
+                  : Duration.zero,
+              curve: Curves.easeOutCubic,
+              child: const Icon(Icons.expand_more),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -2,6 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_channel_selection.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_removed_filter.dart';
@@ -9,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/history/application/history
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/category_groups.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
@@ -83,6 +89,18 @@ class _Formats extends VideoFormats {
   Future<Map<String, VideoFormat>> build() async => formats;
 }
 
+class _Categories extends ChannelCategories {
+  _Categories(this.categories);
+
+  final Map<String, CategoryPath?> categories;
+
+  @override
+  Future<Map<String, ChannelCategory>> build() async => {
+    for (final MapEntry(:key, :value) in categories.entries)
+      key: ChannelCategory(path: value, decidedAt: DateTime.utc(2026, 9, 30)),
+  };
+}
+
 /// Waits for the search the filters just changed to finish.
 Future<void> _settle(ProviderContainer c) =>
     c.read(historySearchProvider.future);
@@ -117,12 +135,16 @@ void main() {
     );
   }
 
-  ProviderContainer container({TakeoutHistory? history}) {
+  ProviderContainer container({
+    TakeoutHistory? history,
+    Map<String, CategoryPath?> categories = const {},
+  }) {
     final c = ProviderContainer(
       overrides: [
         takeoutRepositoryProvider.overrideWithValue(repository),
         if (history != null)
           takeoutHistoryProvider.overrideWith(() => _Fixed(history)),
+        channelCategoriesProvider.overrideWith(() => _Categories(categories)),
       ],
     );
     addTearDown(c.dispose);
@@ -131,10 +153,14 @@ void main() {
     return c;
   }
 
-  /// A container showing [_history], loaded.
-  Future<ProviderContainer> loaded() async {
-    final c = container(history: _history);
+  /// A container showing [_history], loaded, with channels in
+  /// [categories].
+  Future<ProviderContainer> loaded({
+    Map<String, CategoryPath?> categories = const {},
+  }) async {
+    final c = container(history: _history, categories: categories);
     await c.read(takeoutHistoryProvider.future);
+    await c.read(channelCategoriesProvider.future);
     return c;
   }
 
@@ -447,6 +473,93 @@ void main() {
       ],
       ['Song'],
     );
+  });
+
+  group('categories', () {
+    const action = CategoryPath('Gaming', 'Action game');
+    const cooking = CategoryPath('Lifestyle', 'Cooking');
+
+    test('picking a category shows only the videos of its channels, in '
+        'every grouping', () async {
+      final c = await loaded(categories: {'UCx': action});
+
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(
+            ChannelSelection(
+              categories: {const CategoryPick.category('Gaming')},
+            ),
+          );
+      await _settle(c);
+
+      expect(watchTitles(c), ['Café tour', 'Unrelated', 'Last']);
+      expect(channelGroups(c), [('X', 3)]);
+    });
+
+    test('a channel subscribed to but never watched is listed when its '
+        'category is picked', () async {
+      subscribe([
+        Subscription(
+          channelId: 'UCz',
+          channelUrl: 'http://www.youtube.com/channel/UCz',
+          channelTitle: 'Zed',
+        ),
+      ]);
+      final c = await loaded(categories: {'UCx': action, 'UCz': cooking});
+      await c.read(historySubscriptionsProvider.future);
+
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(
+            ChannelSelection(
+              categories: {const CategoryPick.category('Lifestyle')},
+            ),
+          );
+      await _settle(c);
+
+      expect(channelGroups(c), [('Zed', 0)]);
+      expect(watchTitles(c), isEmpty);
+    });
+
+    test('watched videos are grouped by category too, the uncategorized '
+        'last', () async {
+      final c = await loaded(categories: {'UCx': action});
+
+      expect(
+        [
+          for (final g in c.read(historyCategoryGroupsProvider).groups)
+            (g.path?.label ?? g.key, g.indices.length, g.channelCount),
+        ],
+        [('Gaming › Action game', 3, 1), (uncategorizedGroupKey, 1, 1)],
+      );
+    });
+
+    test('the viewing mix counts only the kinds of videos shown', () async {
+      final c = container(
+        history: TakeoutHistory(
+          watches: [
+            _watch(
+              'Song',
+              DateTime(2026, 4, 12, 9),
+              channelId: 'UCm',
+            ).copyWith(music: true),
+            _watch('Video', DateTime(2026, 4, 11, 9), channelId: 'UCx'),
+          ],
+        ),
+        categories: {'UCm': const CategoryPath('Music'), 'UCx': action},
+      );
+      await c.read(takeoutHistoryProvider.future);
+      await c.read(channelCategoriesProvider.future);
+      List<(String, int)> mix() => [
+        for (final s in c.read(viewingMixProvider))
+          (s.pick.label, s.watchCount),
+      ];
+
+      expect(mix(), [('Gaming', 1), ('Music', 1)]);
+
+      c.read(historyMusicFilterProvider.notifier).set(ShowFilter.only);
+      expect(mix(), [('Music', 1), ('Gaming', 0)]);
+    });
   });
 
   test('watched videos are grouped by month too', () async {

@@ -53,6 +53,30 @@ bool _shows(ShowFilter filter, bool flag) => switch (filter) {
   ShowFilter.hide => !flag,
 };
 
+/// How many videos were watched from each of [loaded]'s watched channels,
+/// in its order, of the kinds [shorts] and [music] show; [shortWatches]
+/// says which are Shorts, as for [HistoryFilters].
+List<int> countChannelWatches(
+  LoadedHistory loaded, {
+  ShowFilter shorts = ShowFilter.all,
+  WatchMask? shortWatches,
+  ShowFilter music = ShowFilter.all,
+}) {
+  if (shorts == ShowFilter.all && music == ShowFilter.all) {
+    return [for (final watched in loaded.watchedChannels) watched.count];
+  }
+  final counts = List.filled(loaded.watchedChannels.length, 0);
+  for (final (i, watch) in loaded.history.watches.indexed) {
+    final channel = loaded.watchChannelIndex[i];
+    if (channel >= 0 &&
+        _shows(shorts, shortWatches?.allows(i) ?? watch.isShort) &&
+        _shows(music, watch.music)) {
+      counts[channel]++;
+    }
+  }
+  return counts;
+}
+
 /// Narrows [loaded] to [filters]. Watched videos match the search by title
 /// or channel name, and searches by their text. Grouped by channel, the
 /// channels whose names match come first.

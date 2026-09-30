@@ -4,10 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
+import '../domain/category_groups.dart';
 import '../domain/channel_groups.dart';
 import '../domain/history_days.dart';
 import '../domain/history_search.dart';
@@ -59,6 +62,19 @@ List<FilterChannel> historyFilterChannels(Ref ref) {
   ];
 }
 
+/// Each channel's category, by key, while categories are picked; null
+/// otherwise, so categories arriving don't search again.
+@riverpod
+CategoryPath? Function(String key)? historyPickedCategoryOf(Ref ref) {
+  if (ref.watch(
+    historyChannelSelectionProvider.select((s) => s.categories.isEmpty),
+  )) {
+    return null;
+  }
+  final categories = ref.watch(channelCategoriesProvider).value ?? const {};
+  return (key) => categories[key]?.path;
+}
+
 /// The watched channels the channel filters show, or null when they narrow
 /// nothing.
 @riverpod
@@ -69,7 +85,24 @@ ChannelMask? historyChannelMask(Ref ref) => buildChannelMask(
   ),
   subscription: ref.watch(historySubscriptionFilterProvider),
   selection: ref.watch(historyChannelSelectionProvider),
+  categoryOf: ref.watch(historyPickedCategoryOfProvider),
 );
+
+/// How many videos were watched from each watched channel, in the loaded
+/// history's order, of the kinds of videos shown: Shorts and YouTube Music
+/// as filtered.
+@riverpod
+List<int> historyChannelWatchCounts(Ref ref) {
+  final shorts = ref.watch(historyShortsFilterProvider);
+  return countChannelWatches(
+    ref.watch(loadedHistoryProvider),
+    shorts: shorts,
+    shortWatches: shorts == ShowFilter.all
+        ? null
+        : ref.watch(historyShortWatchesProvider),
+    music: ref.watch(historyMusicFilterProvider),
+  );
+}
 
 /// Which watched videos are Shorts: watched through a Shorts link, or
 /// short and tall by the format fetched for them.
@@ -176,6 +209,7 @@ ChannelGroups historyChannelGroups(Ref ref) {
     return groups;
   }
   final selection = ref.watch(historyChannelSelectionProvider);
+  final categoryOf = ref.watch(historyPickedCategoryOfProvider);
   final query = foldForSearch(ref.watch(historySearchQueryProvider));
   return groups.withUnwatched([
     for (final channel in unwatched)
@@ -184,8 +218,21 @@ ChannelGroups historyChannelGroups(Ref ref) {
             subscribed: true,
             subscription: subscription,
             selection: selection,
+            category: categoryOf?.call(channel.key),
           ) &&
           (query.isEmpty || foldForSearch(channel.title).contains(query)))
         channel,
   ]);
+}
+
+/// The watched videos shown, by the category of their channels, with the
+/// channels subscribed to but never watched as [historyChannelGroups] has
+/// them.
+@riverpod
+CategoryGroups historyCategoryGroups(Ref ref) {
+  final categories = ref.watch(channelCategoriesProvider).value ?? const {};
+  return groupByCategory(
+    ref.watch(historyChannelGroupsProvider),
+    categoryOf: (key) => categories[key]?.path,
+  );
 }

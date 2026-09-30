@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
@@ -26,6 +27,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/grouping_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_category_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_channel_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_day_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_filter_sheet.dart';
@@ -244,6 +246,26 @@ Finder _channelHeader(String title) => find
     )
     .first;
 
+/// The header of the group of [label], grouped by category.
+Finder _categoryHeader(String label) => find
+    .byWidgetPredicate(
+      (w) => w is CategoryGroupHeader && (w.group.path?.label ?? '') == label,
+    )
+    .first;
+
+/// X's videos are Gaming › Action game; CAFE Channel's aren't categorized.
+Map<String, ChannelCategory> _gamingX({CategoryPath? cafe}) => {
+  'UCx': ChannelCategory(
+    path: const CategoryPath('Gaming', 'Action game'),
+    decidedAt: DateTime.utc(2026, 9, 30),
+  ),
+  if (cafe != null)
+    'name:CAFE Channel': ChannelCategory(
+      path: cafe,
+      decidedAt: DateTime.utc(2026, 9, 30),
+    ),
+};
+
 Subscription _subscription(String id, String title) => Subscription(
   channelId: id,
   channelUrl: 'http://www.youtube.com/channel/$id',
@@ -361,6 +383,121 @@ void main() {
         matching: find.textContaining('Gaming'),
       ),
       findsOneWidget,
+    );
+  });
+
+  testWidgets('grouped by category, each category is a collapsed header, '
+      'the most watched first, that opens to its videos and their channels', (
+    tester,
+  ) async {
+    await _open(tester, categories: _gamingX());
+
+    await _groupBy(tester, HistoryGrouping.category);
+
+    final gaming = _categoryHeader('Gaming › Action game');
+    expect(gaming, findsOneWidget);
+    expect(find.byType(CategoryGroupHeader), findsWidgets);
+    expect(_shown('Café tour'), findsNothing);
+    expect(find.byIcon(Icons.event), findsNothing);
+
+    await tester.tap(gaming);
+    await tester.pumpAndSettle();
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Unrelated'), findsOneWidget);
+    expect(_shown('Other'), findsNothing);
+    // Rows keep their channel, as a category has several.
+    expect(
+      find.descendant(
+        of: find.byType(ChannelMetaLine),
+        matching: find.textContaining('X'),
+      ),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('ticking a category in the Filters modal narrows every '
+      'grouping, shown as a chip that clears it', (tester) async {
+    await _open(tester, categories: _gamingX());
+
+    await _openFilters(tester);
+    await _tapKey(
+      tester,
+      HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
+    );
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Other'), findsNothing);
+    await _groupBy(tester, HistoryGrouping.channel);
+    expect(_channelHeader('X'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (w) =>
+            w is ChannelGroupHeader && w.group.channel?.title == 'CAFE Channel',
+      ),
+      findsNothing,
+    );
+
+    expect(find.byType(InputChip), findsOneWidget);
+    await tester.tap(
+      find
+          .descendant(of: find.byType(InputChip), matching: find.byType(Icon))
+          .last,
+    );
+    await tester.pumpAndSettle();
+    expect(_channelHeader('CAFE Channel'), findsOneWidget);
+  });
+
+  testWidgets("a category's sub-categories open under it in the Filters "
+      'modal, and one can be picked alone', (tester) async {
+    await _open(
+      tester,
+      categories: _gamingX(cafe: const CategoryPath('Gaming', 'Puzzle game')),
+    );
+
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoryExpandKey('Gaming'));
+    await _tapKey(
+      tester,
+      HistoryFilterSheet.categoryKey(
+        CategoryPick.of(const CategoryPath('Gaming', 'Puzzle game')),
+      ),
+    );
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(_shown('Other'), findsOneWidget);
+    expect(_shown('Café tour'), findsNothing);
+  });
+
+  testWidgets("showing all from a channel opens its category, with only "
+      "that channel's videos", (tester) async {
+    await _open(tester, categories: _gamingX());
+
+    await tester.tap(_shown('Café tour'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.byIcon(Icons.filter_list),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await _groupBy(tester, HistoryGrouping.category);
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Unrelated'), findsOneWidget);
+    expect(_shown('Other'), findsNothing);
+  });
+
+  testWidgets('categories are offered in the Filters modal once channels '
+      'have them', (tester) async {
+    await _open(tester);
+    await _openFilters(tester);
+
+    expect(
+      find.byKey(HistoryFilterSheet.categoriesSectionKey, skipOffstage: false),
+      findsNothing,
     );
   });
 

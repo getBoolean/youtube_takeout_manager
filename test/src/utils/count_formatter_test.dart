@@ -12,4 +12,11 @@ void main() {
     expect(formatCount(1, 'search', plural: 'searches'), '1 search');
     expect(formatCount(8296, 'search', plural: 'searches'), '8,296 searches');
   });
+
+  test('a share is a whole percent, and a sliver is less than one', () {
+    expect(formatShare(0.414), '41%');
+    expect(formatShare(1), '100%');
+    expect(formatShare(0), '0%');
+    expect(formatShare(0.001), '<1%');
+  });
 }

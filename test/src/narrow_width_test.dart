@@ -76,6 +76,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/takeout_hist
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_filter_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_toolbar.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
@@ -1011,13 +1012,20 @@ void main() {
       ),
     );
   }
-  for (final grouping in [HistoryGrouping.month, HistoryGrouping.channel]) {
+  for (final grouping in [
+    HistoryGrouping.month,
+    HistoryGrouping.channel,
+    HistoryGrouping.category,
+  ]) {
     for (final expanded in [false, true]) {
       fitsAtEveryWidth(
         "the history page's videos by ${grouping.name}"
         '${expanded ? ', expanded' : ', collapsed'}',
         () => const HistoryPage(),
-        overrides: historyOverrides,
+        overrides: [
+          ...historyOverrides,
+          channelCategoriesProvider.overrideWith(_LongCategories.new),
+        ],
         then: (tester) async {
           ProviderScope.containerOf(
             tester.element(find.byType(HistoryPage)),
@@ -1048,6 +1056,27 @@ void main() {
       },
     );
   }
+  fitsAtEveryWidth(
+    "the history page's Filters modal with a category open",
+    () => const HistoryPage(),
+    overrides: [
+      ...historyOverrides,
+      channelCategoriesProvider.overrideWith(_LongCategories.new),
+    ],
+    then: (tester) async {
+      await tester.tap(find.byKey(HistoryToolbar.filtersKey));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      final open = find.byKey(
+        HistoryFilterSheet.categoryExpandKey('Entertainment'),
+      );
+      expect(open, findsOneWidget);
+      await tester.ensureVisible(open);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(open);
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
 
   testWidgets('narrow tiles never overflow their trailing widgets', (
     tester,

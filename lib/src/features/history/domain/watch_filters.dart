@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 
@@ -13,24 +15,41 @@ enum SubscriptionFilter { all, subscribed, notSubscribed }
 enum ShowFilter { all, only, hide }
 
 /// The channels picked to narrow the watched videos to, by
-/// [HistoryChannel.key]; none picked narrows nothing.
+/// [HistoryChannel.key], and the categories whose channels are; nothing
+/// picked narrows nothing.
 @immutable
 class ChannelSelection {
   final Map<String, HistoryChannel> channels;
+  final Set<CategoryPick> categories;
 
-  const ChannelSelection({this.channels = const {}});
+  const ChannelSelection({
+    this.channels = const {},
+    this.categories = const {},
+  });
 
-  bool get isEmpty => channels.isEmpty;
+  bool get isEmpty => channels.isEmpty && categories.isEmpty;
 
+  /// Whether the channel [key] is picked itself.
   bool contains(String key) => channels.containsKey(key);
+
+  /// Whether the channel [key], in [category], is let through: nothing is
+  /// picked, or it or its category is.
+  bool allows(String key, CategoryPath? category) =>
+      isEmpty ||
+      channels.containsKey(key) ||
+      categories.any((pick) => pick.matches(category));
 
   @override
   bool operator ==(Object other) =>
       other is ChannelSelection &&
-      setEquals(other.channels.keys.toSet(), channels.keys.toSet());
+      setEquals(other.channels.keys.toSet(), channels.keys.toSet()) &&
+      setEquals(other.categories, categories);
 
   @override
-  int get hashCode => Object.hashAllUnordered(channels.keys);
+  int get hashCode => Object.hash(
+    Object.hashAllUnordered(channels.keys),
+    Object.hashAllUnordered(categories),
+  );
 }
 
 /// Which of the history's watched channels are shown: one flag per channel,
@@ -81,29 +100,32 @@ class WatchMask {
 }
 
 /// Whether the channel [key] passes the channel filters, being [subscribed]
-/// or not: the subscription filter, and, when channels are picked, being one
-/// of them.
+/// or not and in [category]: the subscription filter, and, when channels or
+/// categories are picked, being one of them or in one.
 bool channelPasses({
   required String key,
   required bool subscribed,
   required SubscriptionFilter subscription,
   required ChannelSelection selection,
+  CategoryPath? category,
 }) =>
     switch (subscription) {
       SubscriptionFilter.all => true,
       SubscriptionFilter.subscribed => subscribed,
       SubscriptionFilter.notSubscribed => !subscribed,
     } &&
-    (selection.isEmpty || selection.contains(key));
+    selection.allows(key, category);
 
 /// The channels of [channels] that pass the filters, or null when the
 /// filters narrow nothing. [subscribedKeys] are the keys of the channels
-/// subscribed to.
+/// subscribed to; [categoryOf] gives a channel's category, needed only
+/// while categories are picked.
 ChannelMask? buildChannelMask({
   required List<WatchedChannel> channels,
   required Set<String> subscribedKeys,
   required SubscriptionFilter subscription,
   required ChannelSelection selection,
+  CategoryPath? Function(String key)? categoryOf,
 }) {
   if (subscription == SubscriptionFilter.all && selection.isEmpty) return null;
   final shown = Uint8List(channels.length);
@@ -114,6 +136,7 @@ ChannelMask? buildChannelMask({
       subscribed: subscribedKeys.contains(key),
       subscription: subscription,
       selection: selection,
+      category: selection.categories.isEmpty ? null : categoryOf?.call(key),
     )) {
       shown[i] = 1;
     }

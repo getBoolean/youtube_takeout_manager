@@ -6,6 +6,8 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
@@ -26,11 +28,14 @@ import '../application/history_search_query.dart';
 import '../application/history_shown.dart';
 import '../application/takeout_history_notifier.dart';
 import '../application/watch_filter_providers.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import '../domain/category_groups.dart';
 import '../domain/history_days.dart';
 import '../domain/loaded_history.dart';
 import '../domain/watch_filters.dart';
 import '../domain/watched_channels.dart';
 import 'history_actions.dart';
+import 'history_category_list.dart';
 import 'history_channel_list.dart';
 import 'history_day_list.dart';
 import 'history_filter_sheet.dart';
@@ -189,9 +194,11 @@ typedef _WatchLists = ({
   StickyGroupedListController days,
   StickyGroupedListController months,
   StickyGroupedListController channels,
+  StickyGroupedListController categories,
   ScrollController dayScroll,
   ScrollController monthScroll,
   ScrollController channelScroll,
+  ScrollController categoryScroll,
 });
 
 class _HistoryBody extends HookConsumerWidget {
@@ -206,20 +213,26 @@ class _HistoryBody extends HookConsumerWidget {
     useEffect(() => dayList.dispose, [dayList]);
     final monthList = useMemoized(StickyGroupedListController.new);
     useEffect(() => monthList.dispose, [monthList]);
-    // Channels start closed, so they read as a list of channels.
+    // Channels and categories start closed, so they read as lists of them.
     final channelList = useMemoized(
       () => StickyGroupedListController(expandedByDefault: false),
     );
     useEffect(() => channelList.dispose, [channelList]);
+    final categoryList = useMemoized(
+      () => StickyGroupedListController(expandedByDefault: false),
+    );
+    useEffect(() => categoryList.dispose, [categoryList]);
     final searchList = useMemoized(StickyGroupedListController.new);
     useEffect(() => searchList.dispose, [searchList]);
     final lists = (
       days: dayList,
       months: monthList,
       channels: channelList,
+      categories: categoryList,
       dayScroll: useScrollController(),
       monthScroll: useScrollController(),
       channelScroll: useScrollController(),
+      categoryScroll: useScrollController(),
     );
     final searchScroll = useScrollController();
     final highlightedWatch = useState<int?>(null);
@@ -233,6 +246,7 @@ class _HistoryBody extends HookConsumerWidget {
       toTop(lists.dayScroll);
       toTop(lists.monthScroll);
       toTop(lists.channelScroll);
+      toTop(lists.categoryScroll);
     }
 
     ref.listen(historySearchQueryProvider, (_, _) {
@@ -439,8 +453,8 @@ class _JumpToDateButton extends HookConsumerWidget {
 
 /// The filters on above a list, each a chip that removes it: only entries
 /// removed from YouTube's history, and, over the watched videos, the
-/// subscription, Shorts and Music filters and the channels picked. Nothing
-/// while none are on.
+/// subscription, Shorts and Music filters and the categories and channels
+/// picked. Nothing while none are on.
 class _ActiveFilters extends ConsumerWidget {
   /// Whether the watched videos' filters show, not only the Removed one.
   final bool watched;
@@ -465,16 +479,18 @@ class _ActiveFilters extends ConsumerWidget {
     final music = watched
         ? ref.watch(historyMusicFilterProvider)
         : ShowFilter.all;
-    final channels = watched
-        ? ref.watch(historyChannelSelectionProvider).channels.values.toList()
-        : const <HistoryChannel>[];
+    final selection = watched
+        ? ref.watch(historyChannelSelectionProvider)
+        : const ChannelSelection();
+    final channels = selection.channels.values.toList();
+    final categories = selection.categories.toList();
     final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
     final none =
         !removedOnly &&
         subscription == SubscriptionFilter.all &&
         shorts == ShowFilter.all &&
         music == ShowFilter.all &&
-        channels.isEmpty;
+        selection.isEmpty;
 
     Widget chip({
       Key? key,
@@ -554,6 +570,18 @@ class _ActiveFilters extends ConsumerWidget {
                       onClear: () => ref
                           .read(historyMusicFilterProvider.notifier)
                           .set(ShowFilter.all),
+                    ),
+                  for (final pick in categories)
+                    chip(
+                      avatar: const Icon(Icons.category_outlined, size: 18),
+                      label: pick.label,
+                      clearTooltip:
+                          selection.channels.isEmpty && categories.length == 1
+                          ? 'Show every category'
+                          : 'Remove ${pick.label}',
+                      onClear: () => ref
+                          .read(historyChannelSelectionProvider.notifier)
+                          .removeCategory(pick),
                     ),
                   for (final channel in channels.take(_channelChips))
                     chip(
@@ -644,15 +672,12 @@ class _WatchedTab extends ConsumerWidget {
   });
 
   /// The groupings offered.
-  static const _groupings = [
-    HistoryGrouping.day,
-    HistoryGrouping.month,
-    HistoryGrouping.channel,
-  ];
+  static const _groupings = HistoryGrouping.values;
 
   StickyGroupedListController get _list => switch (grouping) {
     HistoryGrouping.month => lists.months,
-    HistoryGrouping.channel || HistoryGrouping.category => lists.channels,
+    HistoryGrouping.channel => lists.channels,
+    HistoryGrouping.category => lists.categories,
     HistoryGrouping.day => lists.days,
   };
 
@@ -664,11 +689,13 @@ class _WatchedTab extends ConsumerWidget {
     final picturesExpected = ref.watch(readSessionChannelIdProvider) != null;
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final watches = loaded.history.watches;
+    final selection = ref.watch(historyChannelSelectionProvider);
     final activeFilters = [
       ref.watch(historySubscriptionFilterProvider) != SubscriptionFilter.all,
       ref.watch(historyShortsFilterProvider) != ShowFilter.all,
       ref.watch(historyMusicFilterProvider) != ShowFilter.all,
-      !ref.watch(historyChannelSelectionProvider).isEmpty,
+      selection.categories.isNotEmpty,
+      selection.channels.isNotEmpty,
     ].where((on) => on).length;
 
     Future<void> act(int index) async {
@@ -687,6 +714,14 @@ class _WatchedTab extends ConsumerWidget {
           final channel = HistoryChannel.of(watch)!;
           ref.read(historyChannelSelectionProvider.notifier).showOnly(channel);
           lists.channels.setExpanded(channel.key, true);
+          final categories = await ref
+              .read(channelCategoriesProvider.future)
+              .catchError((Object _) => const <String, ChannelCategory>{});
+          if (!context.mounted) return;
+          lists.categories.setExpanded(
+            categories[channel.key]?.path?.label ?? uncategorizedGroupKey,
+            true,
+          );
         case WatchAction.openChannel:
           await openExternally(watch.channelUrl!);
         case WatchAction.copyLink:
@@ -697,6 +732,11 @@ class _WatchedTab extends ConsumerWidget {
     }
 
     Future<void> openFilters() async {
+      // The categories offered are the ones saved; loaded once, and kept.
+      await ref
+          .read(channelCategoriesProvider.future)
+          .catchError((Object _) => const <String, ChannelCategory>{});
+      if (!context.mounted) return;
       final signedIn = ref.read(readSessionChannelIdProvider) != null;
       final checking = ref.read(videoFormatProgressProvider);
       final draft = await showHistoryFilterSheet(
@@ -721,6 +761,7 @@ class _WatchedTab extends ConsumerWidget {
                   'far; more Shorts show as the rest are checked.'
             : null,
         hasMusic: loaded.musicCount > 0,
+        mix: ref.read(viewingMixProvider),
       );
       if (draft == null) return;
       ref
@@ -742,10 +783,19 @@ class _WatchedTab extends ConsumerWidget {
       }
     }
 
-    final channelGroups = ref.watch(historyChannelGroupsProvider);
-    final nothing = grouping == HistoryGrouping.channel
-        ? channelGroups.groups.isEmpty
-        : days.isEmpty;
+    final byChannel = grouping == HistoryGrouping.channel;
+    final byCategory = grouping == HistoryGrouping.category;
+    final channelGroups = byChannel
+        ? ref.watch(historyChannelGroupsProvider)
+        : null;
+    final categoryGroups = byCategory
+        ? ref.watch(historyCategoryGroupsProvider)
+        : null;
+    final nothing = switch ((channelGroups, categoryGroups)) {
+      (final channels?, _) => channels.groups.isEmpty,
+      (_, final categories?) => categories.groups.isEmpty,
+      _ => days.isEmpty,
+    };
 
     final top = Column(
       mainAxisSize: MainAxisSize.min,
@@ -762,7 +812,7 @@ class _WatchedTab extends ConsumerWidget {
             onExpandAll: () => _list.setAllExpanded(true),
           ),
         ),
-        if (grouping == HistoryGrouping.channel) const CategorizationBanner(),
+        if (byChannel || byCategory) const CategorizationBanner(),
         _ActiveFilters(watched: true, onMore: openFilters),
       ],
     );
@@ -782,9 +832,7 @@ class _WatchedTab extends ConsumerWidget {
               );
               Widget entry(BuildContext context, int index) {
                 final watch = watches[index];
-                if (grouping != HistoryGrouping.channel) {
-                  onChannelShown(watch.channelId);
-                }
+                if (!byChannel) onChannelShown(watch.channelId);
                 return WatchEntryTile(
                   watch: watch,
                   query: query,
@@ -792,16 +840,22 @@ class _WatchedTab extends ConsumerWidget {
                   channelPicture: pictures[watch.channelId],
                   picturesExpected: picturesExpected,
                   markRemoved: !removedOnly,
-                  showChannel: grouping != HistoryGrouping.channel,
+                  showChannel: !byChannel,
                   showDate: grouping != HistoryGrouping.day,
                   onTap: () => act(index),
                 );
               }
 
               return switch (grouping) {
-                HistoryGrouping.channel ||
-                HistoryGrouping.category => HistoryChannelList(
-                  groups: channelGroups,
+                HistoryGrouping.category => HistoryCategoryList(
+                  groups: categoryGroups!,
+                  watchChannelIndex: loaded.watchChannelIndex,
+                  controller: lists.categories,
+                  scrollController: lists.categoryScroll,
+                  entryBuilder: entry,
+                ),
+                HistoryGrouping.channel => HistoryChannelList(
+                  groups: channelGroups!,
                   watchChannelIndex: loaded.watchChannelIndex,
                   controller: lists.channels,
                   scrollController: lists.channelScroll,
