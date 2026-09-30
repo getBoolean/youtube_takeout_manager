@@ -130,6 +130,19 @@ Each video or channel is its own entry, so saving 10 new formats writes 10 entri
 
 Old saved entries decode with defaults: no tags, not tried, not edited.
 
+### From the previous build
+
+- **Every saved category moves to its box unchanged,** keeping:
+  - the category and where it came from;
+  - Jev's confidence and runners-up;
+  - Claude's reason;
+  - which steps were tried;
+  - your accept and deny decisions, which stay protected.
+- **The new fields start empty:** no tags, not asked for tags, not edited.
+- **No category is worked out again.** With a Claude key, each channel gets one tags-only call on the next categorizing run, about $1–2 per 1,000 channels on Haiku.
+- **AI-made sub-categories keep their names.** Spelling variants merge into the most-used spelling, and channels move to it. They have no emoji yet, so they show their category's emoji.
+- **"Uncategorized" entries stay,** and are looked at again when topics or a key arrive, as now.
+
 ### Tags
 
 - **Who names them:** Claude, in one call per channel. The request is shaped by what the channel has:
@@ -263,7 +276,7 @@ Every failure becomes an `AiFailure`, including unexpected exceptions, which bec
 
 - **Day, Month and Channel.** The Category grouping is removed.
 - **Channel is the default,** and your last pick is remembered.
-- A saved Category grouping falls back to Channel.
+- The grouping wasn't saved before, so everyone starts at Channel.
 
 ### Nested groups (#2, other 6)
 
