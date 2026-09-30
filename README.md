@@ -70,7 +70,7 @@ flutter run -d windows --dart-define-from-file=.env   # or macos, linux, chrome
 
 ## Quick Start
 
-You need the [Flutter SDK](https://docs.flutter.dev/get-started/install). No Google Cloud setup is needed to start: without it you can browse, search, export, and delete with the script. [Sign-in](#set-up-google-sign-in-optional) adds API deletion and video titles whenever you want them, and the app walks you through setting it up.
+Download the app for Windows, macOS, Linux, Android or the web from [Releases](https://github.com/getBoolean/youtube_takeout_manager/releases/latest), or build it yourself with the [Flutter SDK](https://docs.flutter.dev/get-started/install). No Google Cloud setup is needed to start: without it you can browse, search, export, and delete with the script. [Sign-in](#set-up-google-sign-in-optional) adds API deletion and video titles whenever you want them, and the app walks you through setting it up.
 
 ```sh
 # 1. Get the code
@@ -163,7 +163,7 @@ The script path takes four steps, and the app walks you through each one: open [
 
 | Limitation | Workaround |
 | --- | --- |
-| No prebuilt downloads yet | [Quick Start](#quick-start) builds and runs it with one command |
+| Release builds aren't store-signed: macOS warns on first open, the iOS build needs a sideloading tool, and an Android update needs the old version uninstalled first | Build and sign it yourself from [Quick Start](#quick-start) |
 | API deletion tops out around 200 a day | Use the script path |
 | The script relies on My Activity's internals; a Google change can break it | The API path still works; [open an issue](https://github.com/getBoolean/youtube_takeout_manager/issues) |
 | Sign-in needs your own Google Cloud OAuth client | The app walks you through making one; everything but API deletion and video titles works without it |
@@ -297,7 +297,7 @@ dart test -p chrome test_browser    # web storage (IndexedDB), in Chrome
 
 The web storage tests use `dart test`, not `flutter test --platform chrome`: the Flutter browser test host crashes before running any test (its page lacks the `#play` element the `test` runner expects).
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) checks formatting, analyzes, runs both test suites, and builds every platform on each push to `main` and each pull request. The builds are downloadable from the run's page.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) checks formatting, analyzes, runs both test suites, and builds every platform on each push to any branch and each pull request. The builds are downloadable from the run's page.
 
 To release, push a tag like `v1.2.0`. [release.yml](.github/workflows/release.yml) runs the same checks, builds every platform at that version, and publishes a GitHub release with the Android APK, the web, Windows, macOS and Linux archives, and an unsigned iOS IPA. A tag with a suffix, like `v1.2.0-beta.1`, becomes a pre-release. Release builds carry no Google Cloud client, so each user sets up their own. The macOS app isn't notarized, and the IPA needs a sideloading tool that signs it.
 
