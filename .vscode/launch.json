@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "youtube_takeout_manager",
+            "name": "takeout_manager",
             "request": "launch",
             "type": "dart",
             "toolArgs": [
@@ -13,7 +13,7 @@
             ]
         },
         {
-            "name": "youtube_takeout_manager (profile mode)",
+            "name": "takeout_manager (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile",
@@ -22,13 +22,18 @@
             ]
         },
         {
-            "name": "youtube_takeout_manager (release mode)",
+            "name": "takeout_manager (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release",
             "toolArgs": [
                 "--dart-define-from-file=.env"
             ]
-        }
+        },
+        {
+            "name": "takeout_manager (no google api)",
+            "request": "launch",
+            "type": "dart"
+        },
     ]
 }
