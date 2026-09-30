@@ -127,6 +127,7 @@ Each video or channel is its own entry, so saving 10 new formats writes 10 entri
 - **`tagsTried`:** whether Claude was asked for tags.
 - **`tagsEditedByUser`:** set once you add or remove a tag. Tags you edit are never replaced.
 - **A new source, `user`:** for a category you chose or typed.
+- **Who made a name:** sub-categories and tags record their origin: `ai` (named by Claude) or `user` (typed by you). YouTube's sub-categories have neither.
 
 Old saved entries decode with defaults: no tags, not tried, not edited.
 
@@ -140,7 +141,7 @@ Old saved entries decode with defaults: no tags, not tried, not edited.
   - your accept and deny decisions, which stay protected.
 - **The new fields start empty:** no tags, not asked for tags, not edited.
 - **No category is worked out again.** With a Claude key, each channel gets one tags-only call on the next categorizing run, about $1–2 per 1,000 channels on Haiku.
-- **AI-made sub-categories keep their names.** Spelling variants merge into the most-used spelling, and channels move to it. They have no emoji yet, so they show their category's emoji.
+- **AI-made sub-categories keep their names** and are marked `ai`, since Claude made all of them. Spelling variants merge into the most-used spelling, and channels move to it. They have no emoji yet, so they show their category's emoji.
 - **"Uncategorized" entries stay,** and are looked at again when topics or a key arrive, as now.
 
 ### Tags
@@ -183,6 +184,19 @@ Old saved entries decode with defaults: no tags, not tried, not edited.
   - chips, group headers and Filters rows show the emoji with the name, with the colour as an accent;
   - the share bars in Filters use the category's colour.
 - **Colour is never the only cue:** the name is always shown as text.
+
+### AI-made names
+
+- **The mark:** a sub-category or tag Claude created carries the ✨ mark (`Icons.auto_awesome`), the same mark as an AI-chosen category's chip. Its semantics label adds "made by AI".
+- **Where it shows,** wherever the name is offered as a choice or shown as picked:
+  - the Filters Categories and Tags pages;
+  - their row summaries on Filters' first page;
+  - the active-filter chips;
+  - the Change category picker;
+  - tag suggestions;
+  - tag chips in the category window.
+- **Who made it wins:** the mark follows who made the name, not who picked it. An AI-made tag you later add to another channel keeps its ✨. A name you typed never gets one, even if an AI later picks it.
+- **Merges:** when a typed name folds into an existing AI-made name, the existing name and its mark are kept.
 
 ### The category window
 
@@ -326,10 +340,11 @@ Grouped by channel **with categories picked** in Filters, the list nests: **cate
 
   Back keeps what was picked.
   - **Categories:** each row has a tristate checkbox, emoji, name, a share bar in the category's colour, and "41% · 212 channels". A category opens to its sub-categories, and picking works as today.
-  - **Tags:** each row has a checkbox, the tag, and how many channels have it, most first.
+  - **Tags:** each row has a checkbox, the tag (✨ when AI-made), and how many channels have it, most first.
+  - AI-made sub-categories on the Categories page carry ✨ too (see AI-made names).
   - **Channels:** as today's list.
 - **How picks combine:** picks within and across Categories, Tags and Channels combine with OR (a channel shows if any pick matches it). That result combines with AND with subscriptions, Shorts, Music, the search and the Removed filter.
-- **Active filters:** tags show as removable chips, like categories and channels.
+- **Active filters:** tags show as removable chips, like categories and channels, with ✨ on AI-made ones.
 
 ## Accessibility
 
