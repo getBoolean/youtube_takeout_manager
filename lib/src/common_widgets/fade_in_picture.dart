@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'cached_network_image.dart';
+
 /// How long a picture takes to fade in once it has loaded.
 const _fadeIn = Duration(milliseconds: 150);
 
@@ -85,12 +87,17 @@ class NetworkPicture extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final network = NetworkImage(
-      url,
-      webHtmlElementStrategy: htmlElementOnWeb
-          ? WebHtmlElementStrategy.prefer
-          : WebHtmlElementStrategy.never,
-    );
+    // Kept on the device where there's a cache; the web's browser keeps
+    // its own.
+    final cache = kIsWeb ? null : ImageBytesCacheScope.maybeOf(context);
+    final ImageProvider network = cache == null
+        ? NetworkImage(
+            url,
+            webHtmlElementStrategy: htmlElementOnWeb
+                ? WebHtmlElementStrategy.prefer
+                : WebHtmlElementStrategy.never,
+          )
+        : CachedNetworkImage(url, cache);
     final shownWidth = decodeWidth ?? width;
     final resize = shownWidth != null && !(kIsWeb && htmlElementOnWeb);
     return FadeInPicture(

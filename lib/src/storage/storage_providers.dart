@@ -5,6 +5,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:squadron/squadron.dart';
 
 import 'entry_store.dart';
+import 'image_bytes_cache.dart';
 import 'kv_storage_service.dart';
 import 'storage_migration.dart';
 import 'storage_service.dart';
@@ -84,6 +85,7 @@ void setMockStorage({Map<String, Map<String, String>> entries = const {}}) {
   _mockEntries = {
     for (final MapEntry(:key, :value) in entries.entries) key: {...value},
   };
+  _mockImages = MemoryImageBytesCache();
 }
 
 /// What the test storage holds now, by box; null outside tests.
@@ -111,4 +113,32 @@ WorkerStorage workerStorage(Ref ref) {
 EntryStore entryStore(Ref ref) {
   if (_mockEntries case final entries?) return MemoryEntryStore(entries);
   return WorkerEntryStore(ref.watch(workerStorageProvider));
+}
+
+/// An [ImageBytesCache] whose calls run on the storage worker.
+class WorkerImageBytesCache implements ImageBytesCache {
+  final WorkerStorage _storage;
+
+  WorkerImageBytesCache(this._storage);
+
+  @override
+  Future<Uint8List?> read(String key) => _storage.run((s) => s.readImage(key));
+
+  @override
+  Future<void> write(String key, Uint8List bytes) =>
+      _storage.run((s) => s.writeImage(key, bytes));
+
+  @override
+  Future<void> clear() => _storage.run((s) => s.clearImages());
+}
+
+MemoryImageBytesCache? _mockImages;
+
+/// Where pictures and thumbnails are kept on the device: none on the web,
+/// where the browser caches them.
+@Riverpod(keepAlive: true)
+ImageBytesCache? imageBytesCache(Ref ref) {
+  if (kIsWeb) return null;
+  if (_mockEntries != null) return _mockImages ??= MemoryImageBytesCache();
+  return WorkerImageBytesCache(ref.watch(workerStorageProvider));
 }

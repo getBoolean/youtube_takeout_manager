@@ -102,3 +102,57 @@ final class EntryStoreProvider
 }
 
 String _$entryStoreHash() => r'7f8005362754560db526117951b0e2e61f952fc2';
+
+/// Where pictures and thumbnails are kept on the device: none on the web,
+/// where the browser caches them.
+
+@ProviderFor(imageBytesCache)
+final imageBytesCacheProvider = ImageBytesCacheProvider._();
+
+/// Where pictures and thumbnails are kept on the device: none on the web,
+/// where the browser caches them.
+
+final class ImageBytesCacheProvider
+    extends
+        $FunctionalProvider<
+          ImageBytesCache?,
+          ImageBytesCache?,
+          ImageBytesCache?
+        >
+    with $Provider<ImageBytesCache?> {
+  /// Where pictures and thumbnails are kept on the device: none on the web,
+  /// where the browser caches them.
+  ImageBytesCacheProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'imageBytesCacheProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$imageBytesCacheHash();
+
+  @$internal
+  @override
+  $ProviderElement<ImageBytesCache?> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  ImageBytesCache? create(Ref ref) {
+    return imageBytesCache(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ImageBytesCache? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ImageBytesCache?>(value),
+    );
+  }
+}
+
+String _$imageBytesCacheHash() => r'177c37b6427e54bbe26be4607fa31f41d08af5b8';
