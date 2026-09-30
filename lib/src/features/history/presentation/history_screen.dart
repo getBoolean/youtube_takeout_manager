@@ -747,7 +747,8 @@ class _WatchedTab extends ConsumerWidget {
         ? channelGroups.groups.isEmpty
         : days.isEmpty;
 
-    return Column(
+    final top = Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
@@ -763,88 +764,104 @@ class _WatchedTab extends ConsumerWidget {
         ),
         if (grouping == HistoryGrouping.channel) const CategorizationBanner(),
         _ActiveFilters(watched: true, onMore: openFilters),
-        Expanded(
-          child: nothing
-              ? EmptyState(
-                  icon: Icons.history,
-                  message: watches.isEmpty
-                      ? 'This takeout has no watch history.'
-                      : 'No watched videos match.',
-                )
-              : LayoutBuilder(
-                  // Every row is as wide, so it's measured once, not per row.
-                  builder: (context, constraints) {
-                    final thumbnail = WatchEntryTile.thumbnailSizeFor(
-                      constraints.maxWidth,
-                    );
-                    Widget entry(BuildContext context, int index) {
-                      final watch = watches[index];
-                      if (grouping != HistoryGrouping.channel) {
-                        onChannelShown(watch.channelId);
-                      }
-                      return WatchEntryTile(
-                        watch: watch,
-                        query: query,
-                        thumbnailSize: thumbnail,
-                        channelPicture: pictures[watch.channelId],
-                        picturesExpected: picturesExpected,
-                        markRemoved: !removedOnly,
-                        showChannel: grouping != HistoryGrouping.channel,
-                        showDate: grouping != HistoryGrouping.day,
-                        onTap: () => act(index),
-                      );
-                    }
-
-                    return switch (grouping) {
-                      HistoryGrouping.channel ||
-                      HistoryGrouping.category => HistoryChannelList(
-                        groups: channelGroups,
-                        watchChannelIndex: loaded.watchChannelIndex,
-                        controller: lists.channels,
-                        scrollController: lists.channelScroll,
-                        subscribedKeys: ref.watch(
-                          historySubscriptionMatchProvider.select(
-                            (m) => m.subscribedKeys,
-                          ),
-                        ),
-                        pictures: pictures,
-                        query: query,
-                        onChannelShown: onChannelShown,
-                        headerExtra: (context, group) =>
-                            switch (group.channel) {
-                              final channel? => ChannelCategoryChip(
-                                channel: channel,
-                              ),
-                              null => null,
-                            },
-                        entryBuilder: entry,
-                      ),
-                      HistoryGrouping.month => HistoryDayList(
-                        days: ref.watch(watchMonthsProvider),
-                        controller: lists.months,
-                        scrollController: lists.monthScroll,
-                        noun: 'video',
-                        label: formatMonth,
-                        highlighted: highlighted.value,
-                        onHighlightDone: () => highlighted.value = null,
-                        entryBuilder: entry,
-                      ),
-                      HistoryGrouping.day => HistoryDayList(
-                        days: days,
-                        controller: lists.days,
-                        scrollController: lists.dayScroll,
-                        noun: 'video',
-                        highlighted: highlighted.value,
-                        onHighlightDone: () => highlighted.value = null,
-                        entryBuilder: entry,
-                      ),
-                    };
-                  },
-                ),
-        ),
       ],
     );
+
+    final Widget list = nothing
+        ? EmptyState(
+            icon: Icons.history,
+            message: watches.isEmpty
+                ? 'This takeout has no watch history.'
+                : 'No watched videos match.',
+          )
+        : LayoutBuilder(
+            // Every row is as wide, so it's measured once, not per row.
+            builder: (context, constraints) {
+              final thumbnail = WatchEntryTile.thumbnailSizeFor(
+                constraints.maxWidth,
+              );
+              Widget entry(BuildContext context, int index) {
+                final watch = watches[index];
+                if (grouping != HistoryGrouping.channel) {
+                  onChannelShown(watch.channelId);
+                }
+                return WatchEntryTile(
+                  watch: watch,
+                  query: query,
+                  thumbnailSize: thumbnail,
+                  channelPicture: pictures[watch.channelId],
+                  picturesExpected: picturesExpected,
+                  markRemoved: !removedOnly,
+                  showChannel: grouping != HistoryGrouping.channel,
+                  showDate: grouping != HistoryGrouping.day,
+                  onTap: () => act(index),
+                );
+              }
+
+              return switch (grouping) {
+                HistoryGrouping.channel ||
+                HistoryGrouping.category => HistoryChannelList(
+                  groups: channelGroups,
+                  watchChannelIndex: loaded.watchChannelIndex,
+                  controller: lists.channels,
+                  scrollController: lists.channelScroll,
+                  subscribedKeys: ref.watch(
+                    historySubscriptionMatchProvider.select(
+                      (m) => m.subscribedKeys,
+                    ),
+                  ),
+                  pictures: pictures,
+                  query: query,
+                  onChannelShown: onChannelShown,
+                  headerExtra: (context, group) => switch (group.channel) {
+                    final channel? => ChannelCategoryChip(channel: channel),
+                    null => null,
+                  },
+                  entryBuilder: entry,
+                ),
+                HistoryGrouping.month => HistoryDayList(
+                  days: ref.watch(watchMonthsProvider),
+                  controller: lists.months,
+                  scrollController: lists.monthScroll,
+                  noun: 'video',
+                  label: formatMonth,
+                  highlighted: highlighted.value,
+                  onHighlightDone: () => highlighted.value = null,
+                  entryBuilder: entry,
+                ),
+                HistoryGrouping.day => HistoryDayList(
+                  days: days,
+                  controller: lists.days,
+                  scrollController: lists.dayScroll,
+                  noun: 'video',
+                  highlighted: highlighted.value,
+                  onHighlightDone: () => highlighted.value = null,
+                  entryBuilder: entry,
+                ),
+              };
+            },
+          );
+
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // In a small window the toolbar, notices and filters scroll in
+          // at most so much room, so the list always keeps some.
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: constraints.maxHeight * _topShare,
+            ),
+            child: SingleChildScrollView(child: top),
+          ),
+          Expanded(child: list),
+        ],
+      ),
+    );
   }
+
+  /// The most of the tab the toolbar, notices and filters take.
+  static const _topShare = 0.45;
 }
 
 class _SearchesTab extends ConsumerWidget {

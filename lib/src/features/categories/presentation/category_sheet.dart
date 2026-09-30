@@ -103,26 +103,85 @@ class CategorySheet extends StatelessWidget {
           const SizedBox(height: 12),
           if (category == null)
             Text('Not categorized yet.', style: hint)
-          else if (category.isAi)
-            Text(key: aiSourceKey, switch (category.source) {
-              CategorySource.claude => 'Chosen by Claude.',
-              _ => 'Chosen by Jev from the known categories.',
-            }, style: hint)
-          else if (topicLabels.isNotEmpty)
-            Text(
-              key: youtubeSourceKey,
-              'From the topics YouTube gives this channel: '
-              '${topicLabels.join(', ')}.',
-              style: hint,
-            )
           else
-            Text(
-              key: youtubeSourceKey,
-              'YouTube gives this channel no topics to tell its category by.',
-              style: hint,
-            ),
+            _Explanation(category: category, topicLabels: topicLabels),
         ],
       ),
+    );
+  }
+}
+
+String _percent(double odds) => '${(odds * 100).round()}%';
+
+/// Where [category] came from: YouTube's topics, and how sure Jev was of
+/// them; or which AI chose it, how sure, and what came next.
+class _Explanation extends StatelessWidget {
+  final ChannelCategory category;
+  final List<String> topicLabels;
+
+  const _Explanation({required this.category, required this.topicLabels});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hint = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final category = this.category;
+    final confidence = category.confidence;
+    final jevAgreed = category.jevAgreed;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        switch (category.source) {
+          CategorySource.claude => Text(
+            key: CategorySheet.aiSourceKey,
+            'Chosen by Claude.',
+            style: hint,
+          ),
+          CategorySource.jev => Text(
+            key: CategorySheet.aiSourceKey,
+            confidence == null
+                ? 'Chosen by Jev from the known categories.'
+                : 'Chosen by Jev from the known categories, '
+                      '${_percent(confidence)} sure.',
+            style: hint,
+          ),
+          CategorySource.youtube => Text(
+            key: CategorySheet.youtubeSourceKey,
+            topicLabels.isEmpty
+                ? 'YouTube gives this channel no topics to tell its category '
+                      'by.'
+                : 'From the topics YouTube gives this channel: '
+                      '${topicLabels.join(', ')}.',
+            style: hint,
+          ),
+        },
+        if (category.source == CategorySource.youtube && jevAgreed != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Jev checked it: ${_percent(jevAgreed)} sure it fits.',
+            style: hint,
+          ),
+        ],
+        if (category.source == CategorySource.jev &&
+            category.runnersUp.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Semantics(
+            header: true,
+            child: Text('Next most likely', style: theme.textTheme.titleSmall),
+          ),
+          const SizedBox(height: 4),
+          for (final runner in category.runnersUp)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Text(
+                '${runner.path.label} · ${_percent(runner.score)}',
+                style: hint,
+              ),
+            ),
+        ],
+      ],
     );
   }
 }

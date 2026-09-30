@@ -40,6 +40,7 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
@@ -946,6 +947,7 @@ void main() {
       ...historyOverrides,
       channelCategoriesProvider.overrideWith(_LongCategories.new),
       categorizationProgressProvider.overrideWith(_Categorizing.new),
+      aiTierStatusProvider.overrideWith(_Notice.new),
     ],
     then: (tester) async {
       ProviderScope.containerOf(
@@ -954,13 +956,13 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     },
   );
-  for (final ai in [false, true]) {
+  for (final source in CategorySource.values) {
     fitsAtEveryWidth(
-      'the explanation of ${ai ? 'an AI' : "YouTube's"} category',
+      'the explanation of a category from ${source.name}',
       () => Scaffold(
         body: SingleChildScrollView(
           child: CategorySheet(
-            category: _longCategory(ai: ai),
+            category: _longCategory(source: source),
             topicLabels: const [
               'Role-playing video game',
               'Video game culture',
@@ -1047,20 +1049,43 @@ void main() {
   });
 }
 
-ChannelCategory _longCategory({bool ai = true}) => ChannelCategory(
+ChannelCategory _longCategory({
+  CategorySource source = CategorySource.claude,
+}) => ChannelCategory(
   path: const CategoryPath(
     'Entertainment',
     'Long-form video essays about obscure television history',
   ),
-  source: ai ? CategorySource.claude : CategorySource.youtube,
+  source: source,
+  jevAgreed: 0.42,
+  confidence: 0.77,
+  runnersUp: const [
+    ScoredPath(
+      path: CategoryPath(
+        'Knowledge',
+        'A very long runner-up sub-category name',
+      ),
+      score: 0.12,
+    ),
+  ],
   decidedAt: DateTime.utc(2026, 9, 30),
 );
+
+class _Notice extends AiTierStatus {
+  @override
+  AiTierState build() => (
+    disabled: const {},
+    notice:
+        "Jev rejected its API key, so it's off. Check the key in Takeouts › "
+        'AI categories.',
+  );
+}
 
 class _LongCategories extends ChannelCategories {
   @override
   Future<Map<String, ChannelCategory>> build() async => {
     'UClong': _longCategory(),
-    'name:Short': _longCategory(ai: false),
+    'name:Short': _longCategory(source: CategorySource.youtube),
   };
 }
 

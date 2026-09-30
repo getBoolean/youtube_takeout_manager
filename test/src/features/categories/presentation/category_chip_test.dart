@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
@@ -118,6 +120,73 @@ void main() {
 
     expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
     expect(find.textContaining('Action game'), findsWidgets);
+  });
+
+  testWidgets("a YouTube category Jev checked says how sure Jev was", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      categories: {
+        'UCg': ChannelCategory(
+          path: const CategoryPath('Gaming', 'Action'),
+          jevAgreed: 0.92,
+          decidedAt: DateTime.utc(2026, 9, 30),
+        ),
+      },
+    );
+
+    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('92%'), findsOneWidget);
+  });
+
+  testWidgets('a category Jev chose says how sure it was, and what came '
+      'next', (tester) async {
+    await _pump(
+      tester,
+      categories: {
+        'UCg': ChannelCategory(
+          path: const CategoryPath('Gaming', 'Speedruns'),
+          source: CategorySource.jev,
+          confidence: 0.81,
+          runnersUp: const [
+            ScoredPath(path: CategoryPath('Gaming', 'Action'), score: 0.12),
+          ],
+          decidedAt: DateTime.utc(2026, 9, 30),
+        ),
+      },
+    );
+
+    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(CategorySheet.aiSourceKey), findsOneWidget);
+    expect(find.textContaining('81%'), findsOneWidget);
+    expect(
+      find.textContaining(const CategoryPath('Gaming', 'Action').label),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a notice about AI shows, and can be dismissed', (tester) async {
+    await _pump(tester, child: const CategorizationBanner());
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(CategorizationBanner)),
+    );
+
+    container
+        .read(aiTierStatusProvider.notifier)
+        .disable(AiService.jev, 'Jev rejected its API key.');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Jev rejected'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Jev rejected'), findsNothing);
+    // Still off; only the notice goes.
+    expect(container.read(aiTierStatusProvider).disabled, {AiService.jev});
   });
 
   testWidgets('while channels are categorized, how far along shows', (

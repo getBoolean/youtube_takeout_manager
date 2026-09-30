@@ -2,10 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
@@ -67,6 +72,47 @@ class _Fetcher extends ChannelThumbnailFetcher {
   }
 }
 
+/// Jev, agreeing with every category YouTube gives [agree] sure, or failing
+/// with [failure] from its [failAfter]th request on.
+class _Jev extends TypeSafeRepository {
+  _Jev({this.agree = 0.9, this.failure, this.failAfter = 0});
+
+  final double agree;
+  final AiFailure? failure;
+  final int failAfter;
+  var requests = 0;
+
+  @override
+  Future<Map<String, JevAnswer>> ask({
+    required String apiKey,
+    required Object state,
+    required Map<String, JevQuestion> questions,
+  }) async {
+    if (failure case final f? when requests++ >= failAfter) throw f;
+    return {
+      for (final MapEntry(:key, :value) in questions.entries)
+        key: switch (value) {
+          JevNoul() => NoulAnswer(agree),
+          JevChoice(:final options) => ChoiceAnswer(
+            choice: options.keys.first,
+            probabilities: {options.keys.first: 0.1},
+            confidence: 0.1,
+          ),
+        },
+    };
+  }
+}
+
+/// The AI keys, changeable as when entered in the app.
+class _Keys extends Notifier<AiKeys> {
+  @override
+  AiKeys build() => AiKeys.none;
+
+  void set(AiKeys keys) => state = keys;
+}
+
+final _keys = NotifierProvider<_Keys, AiKeys>(_Keys.new);
+
 Future<void> _settle() async {
   for (var i = 0; i < 30; i++) {
     await pumpEventQueue();
@@ -93,6 +139,8 @@ void main() {
     Map<String, ChannelDetails> give = const {},
     String? session,
     List<Subscription> subscriptions = const [],
+    AiKeys keys = AiKeys.none,
+    TypeSafeRepository? jev,
   }) {
     fetcher = _Fetcher(give);
     final c = ProviderContainer(
@@ -104,9 +152,12 @@ void main() {
         historySubscriptionsProvider.overrideWith(
           (ref) async => {for (final s in subscriptions) s.channelId: s},
         ),
+        aiKeysProvider.overrideWith((ref) async => ref.watch(_keys)),
+        typeSafeRepositoryProvider.overrideWithValue(jev ?? _Jev()),
       ],
     );
     addTearDown(c.dispose);
+    c.read(_keys.notifier).set(keys);
     c.listen(channelCategorizerProvider, (_, _) {});
     return c;
   }
@@ -205,6 +256,85 @@ void main() {
     await _settle();
 
     expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Speedruns'));
+  });
+
+  group('with a Jev key', () {
+    const jevKey = AiKeys(typesafe: 'jv_live_1');
+
+    test("Jev checks the categories YouTube gives", () async {
+      final c = container(details: known, keys: jevKey, jev: _Jev());
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final gamer = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(gamer?.path, const CategoryPath('Gaming', 'Action'));
+      expect(gamer?.jevAgreed, 0.9);
+      expect(gamer?.tried, contains(CategorizationTier.jev));
+    });
+
+    test("a rejected key turns Jev off, saying so once, and YouTube's "
+        'categories still come', () async {
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: const AiKeyRejected()),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, {AiService.jev});
+      expect(status.notice, isNotNull);
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      expect(
+        c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed,
+        isNull,
+      );
+    });
+
+    test(
+      'adding the key later has Jev check the categories already made',
+      () async {
+        final c = container(details: known, jev: _Jev(agree: 0.8));
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        expect(
+          c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed,
+          isNull,
+        );
+
+        c.read(_keys.notifier).set(jevKey);
+        await _settle();
+
+        expect(c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed, 0.8);
+      },
+    );
+
+    test('when Jev is busy, categorizing stops for now, keeping what it '
+        'made, and says so', () async {
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: const AiOverloaded(), failAfter: 1),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, isEmpty);
+      expect(status.notice, isNotNull);
+      expect(
+        c
+            .read(channelCategoriesProvider)
+            .value!
+            .values
+            .where((category) => category.jevAgreed != null),
+        hasLength(1),
+      );
+    });
   });
 
   test('categories are kept after a restart, and not made again', () async {
