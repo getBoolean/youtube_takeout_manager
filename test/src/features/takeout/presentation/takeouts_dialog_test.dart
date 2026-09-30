@@ -3,10 +3,12 @@ import 'dart:typed_data';
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:youtube_takeout_manager/src/app_version.dart';
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/google_cloud_client_setup.dart';
@@ -24,6 +26,10 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_section.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/quota/application/quota_notifier.dart';
@@ -348,6 +354,7 @@ void main() {
     bool fromChannelPage = false,
     bool namesNoAccount = false,
   }) async {
+    FlutterSecureStorage.setMockInitialValues({});
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
     selection = _Selection(shows: fromChannelPage || namesNoAccount);
@@ -393,6 +400,9 @@ void main() {
             () => _Processing(processing),
           ),
           appVersionProvider.overrideWith((ref) async => _version),
+          aiKeysRepositoryProvider.overrideWithValue(
+            AiKeysRepository(CredentialStore(const FlutterSecureStorage())),
+          ),
         ],
         child: fromChannelPage
             ? MaterialApp.router(routerConfig: pages.config())
@@ -656,6 +666,7 @@ void main() {
       await pumpDialog(tester, client: null, fromChannelPage: true);
 
       await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
       await tester.tap(target);
       await tester.pumpAndSettle();
 
@@ -681,6 +692,7 @@ void main() {
     await pumpDialog(tester, fromChannelPage: true);
 
     await tester.ensureVisible(find.byKey(GoogleCloudSection.changeKey));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(GoogleCloudSection.changeKey));
     await tester.pumpAndSettle();
 
@@ -704,6 +716,7 @@ void main() {
     await pumpDialog(tester, fromChannelPage: true);
 
     await tester.ensureVisible(find.byKey(GoogleCloudSection.changeKey));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(GoogleCloudSection.changeKey));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(GoogleCloudSetupPages.cancelKey));
@@ -723,6 +736,7 @@ void main() {
     expect(find.byType(QuotaSection), findsOneWidget);
 
     await tester.ensureVisible(find.text('Remove client'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Remove client'));
     await tester.pumpAndSettle();
     expect(clientSetup.removes, 0);
@@ -731,6 +745,50 @@ void main() {
 
     expect(clientSetup.removes, 1);
     expectNoPopups();
+  });
+
+  testWidgets('AI keys are added in the same dialog, and saving comes back '
+      'here', (tester) async {
+    await pumpDialog(tester, fromChannelPage: true);
+
+    await tester.ensureVisible(find.byKey(AiKeysSection.setUpKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AiKeysSection.setUpKey));
+    await tester.pumpAndSettle();
+    expect(find.byType(TakeoutsDialog), findsNothing);
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(AiKeysForm.fieldKey(AiService.claude)),
+        matching: find.byType(TextField),
+      ),
+      'sk-ant-2',
+    );
+    await tester.ensureVisible(find.byKey(AiKeysForm.saveKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AiKeysForm.saveKey));
+    await tester.pumpAndSettle();
+
+    expect(container.read(aiKeysProvider).value?.hasClaude, isTrue);
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
+    expectNoPopups();
+  });
+
+  testWidgets('Back from the AI keys comes back here', (tester) async {
+    await pumpDialog(tester, fromChannelPage: true);
+
+    await tester.ensureVisible(find.byKey(AiKeysSection.setUpKey));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(AiKeysSection.setUpKey));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byWidgetPredicate((w) => w is WoltModalSheet),
+        matching: find.byTooltip('Back'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TakeoutsDialog), findsOneWidget);
   });
 
   testWidgets("the build's own client can't be changed", (tester) async {
@@ -902,6 +960,7 @@ void main() {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Reset usage'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Reset usage'));
     await tester.pumpAndSettle();
     expectNoPopups();
@@ -916,6 +975,7 @@ void main() {
     await pumpDialog(tester);
 
     await tester.ensureVisible(find.text('Clear cache'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Clear cache'));
     await tester.pumpAndSettle();
     expectNoPopups();
@@ -931,6 +991,7 @@ void main() {
     await pumpDialog(tester, fromChannelPage: true);
 
     await tester.ensureVisible(find.byKey(TakeoutsDialog.licensesKey));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(TakeoutsDialog.licensesKey));
     await tester.pumpAndSettle();
     expect(find.byType(LicensePage), findsOneWidget);

@@ -16,6 +16,9 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_account_header.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_section.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/google_cloud_setup_pages.dart';
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/presentation/cache_section.dart';
 import 'package:youtube_takeout_manager/src/features/quota/presentation/quota_section.dart';
@@ -54,6 +57,7 @@ Future<void> showTakeoutsDialog(BuildContext context) =>
           child: const TakeoutsDialog(),
         ),
         ...GoogleCloudSetupPages.build(),
+        AiKeysPages.page(),
       ],
     );
 
@@ -115,7 +119,7 @@ class _LicensesLink extends ConsumerWidget {
 }
 
 /// The Google Cloud client users bring, the quota once there's a client to
-/// use it, and the on-device cache.
+/// use it, the AI keys that categorize channels, and the on-device cache.
 class _Settings extends ConsumerWidget {
   const _Settings();
 
@@ -136,6 +140,12 @@ class _Settings extends ConsumerWidget {
         ],
         if (ref.watch(oauthConfiguredProvider)) ...[
           const QuotaSection(),
+          const SizedBox(height: 24),
+        ],
+        if (!AiService.values.every(
+          ref.watch(aiKeysRepositoryProvider).isBuiltIn,
+        )) ...[
+          const AiKeysSection(),
           const SizedBox(height: 24),
         ],
         const CacheSection(),

@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import '../domain/sign_in_profile.dart';
 
 part 'credential_store.g.dart';
@@ -15,7 +16,7 @@ CredentialStore credentialStore(Ref ref) =>
     CredentialStore(const FlutterSecureStorage());
 
 /// Saves each YouTube channel's Google sign-in in secure storage, one key per
-/// channel.
+/// channel, and the AI services' API keys users enter, one per service.
 ///
 /// Runs one operation at a time: on Windows every write rewrites a single
 /// encrypted file, so overlapping writes could lose each other.
@@ -23,6 +24,7 @@ class CredentialStore {
   /// Where the one sign-in was saved before there was one per channel.
   static const legacyKey = 'google_auth_credentials';
   static const _keyPrefix = 'google_auth_credentials:';
+  static const _apiKeyPrefix = 'ai_api_key:';
 
   final FlutterSecureStorage _storage;
   Future<void> _last = Future.value();
@@ -82,6 +84,25 @@ class CredentialStore {
   });
 
   Future<void> deleteLegacy() => _run(() => _storage.delete(key: legacyKey));
+
+  /// The AI API keys saved, by service. Signing out keeps them: they aren't
+  /// tied to a channel.
+  Future<Map<AiService, String>> loadApiKeys() => _run(() async {
+    final all = await _storage.readAll();
+    return {
+      for (final service in AiService.values)
+        if (all[_apiKey(service)] case final key? when key.isNotEmpty)
+          service: key,
+    };
+  });
+
+  Future<void> saveApiKey(AiService service, String key) =>
+      _run(() => _storage.write(key: _apiKey(service), value: key));
+
+  Future<void> deleteApiKey(AiService service) =>
+      _run(() => _storage.delete(key: _apiKey(service)));
+
+  static String _apiKey(AiService service) => '$_apiKeyPrefix${service.name}';
 
   /// Deletes every sign-in, the legacy one and ones that can't be read too.
   Future<void> deleteAll() => _run(() async {

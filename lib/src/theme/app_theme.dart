@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
+
+import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 
 class AppTheme {
   static const _seedColor = Color(0xFFFF0000); // YouTube red
@@ -8,6 +11,10 @@ class AppTheme {
     actionsPadding: EdgeInsetsDirectional.only(end: 8),
   );
 
+  static const _modalTheme = WoltModalSheetThemeData(
+    modalTypeBuilder: adaptiveModalType,
+  );
+
   static final light = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(
@@ -15,6 +22,7 @@ class AppTheme {
       brightness: Brightness.light,
     ),
     appBarTheme: _appBarTheme,
+    extensions: const [_modalTheme],
   );
 
   static final dark = ThemeData(
@@ -24,5 +32,6 @@ class AppTheme {
       brightness: Brightness.dark,
     ),
     appBarTheme: _appBarTheme,
+    extensions: const [_modalTheme],
   );
 }

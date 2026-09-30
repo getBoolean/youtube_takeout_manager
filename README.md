@@ -256,6 +256,24 @@ Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. I
 
 </details>
 
+## Set up AI categories (optional)
+
+Channels get categories from YouTube's topics. With an API key, AI checks those and names the ones YouTube has none for: [Jev](https://docs.typesafe.ai) by TypeSafe checks and picks from known categories for a fraction of a cent, and [Claude](https://docs.claude.com) by Anthropic names what Jev can't settle. Add either key, or both. Each service bills your own account.
+
+To pick a category, a channel's name and description, and the titles of videos you watched from it, go to the services you add keys for.
+
+**In the app:** open **Takeouts** with the account button, then choose **Add keys** under **AI categories**. Keys stay in the device's secure storage.
+
+**In a personal build:** fill in `.env` before building. Anyone can read a key out of a built app, including a web build's JavaScript, so never build a release you share with your keys. CI never passes `.env` to its builds, and a test keeps it that way.
+
+```properties
+TYPESAFE_API_KEY=your-typesafe-key
+ANTHROPIC_API_KEY=your-anthropic-key
+ANTHROPIC_MODEL=   # blank uses claude-haiku-4-5
+```
+
+A key built into the app can't be changed in it; the app offers only the keys the build lacks.
+
 ## Troubleshooting
 
 **`--dart-define-from-file` can't find `.env`**

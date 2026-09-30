@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:googleapis_auth/googleapis_auth.dart';
 
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/domain/sign_in_profile.dart';
 
@@ -123,6 +124,39 @@ void main() {
 
     expect(await const FlutterSecureStorage().readAll(), {
       'something_else': 'x',
+    });
+  });
+
+  group('AI keys', () {
+    test('are kept, one per service, after reopening', () async {
+      await CredentialStore(storage).saveApiKey(AiService.jev, 'jv_live_1');
+      await CredentialStore(storage).saveApiKey(AiService.claude, 'sk-ant-2');
+
+      expect(await CredentialStore(storage).loadApiKeys(), {
+        AiService.jev: 'jv_live_1',
+        AiService.claude: 'sk-ant-2',
+      });
+    });
+
+    test('are not sign-ins, and signing everyone out keeps them', () async {
+      final store = CredentialStore(storage);
+      await store.saveApiKey(AiService.claude, 'sk-ant-2');
+      await store.save(_a, _credentials('ta'));
+
+      expect((await store.loadAll()).map((s) => s.profile), [_a]);
+      await store.deleteAll();
+
+      expect(await store.loadApiKeys(), {AiService.claude: 'sk-ant-2'});
+    });
+
+    test('a removed key is gone', () async {
+      final store = CredentialStore(storage);
+      await store.saveApiKey(AiService.jev, 'jv_live_1');
+      await store.saveApiKey(AiService.claude, 'sk-ant-2');
+
+      await store.deleteApiKey(AiService.jev);
+
+      expect(await store.loadApiKeys(), {AiService.claude: 'sk-ant-2'});
     });
   });
 }

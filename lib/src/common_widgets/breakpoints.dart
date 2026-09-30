@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 /// Below this width, labeled buttons shrink to icons.
 const compactWidthBreakpoint = 600.0;
@@ -18,3 +19,10 @@ bool isTinyWidth(BuildContext context) =>
 /// Dialog margins for compact widths, narrower than the default 40 so a
 /// dialog's content still fits in a tiny window.
 const compactDialogInsets = EdgeInsets.symmetric(horizontal: 16, vertical: 24);
+
+/// Modals are dialogs from [compactWidthBreakpoint] up, on tablets and
+/// desktops, and sheets from the bottom below it, on phones. The theme sets
+/// it for every modal, so none pick their own.
+WoltModalType adaptiveModalType(BuildContext context) => isCompactWidth(context)
+    ? WoltModalType.bottomSheet()
+    : WoltModalType.dialog();

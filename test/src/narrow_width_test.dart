@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
@@ -36,6 +37,11 @@ import 'package:youtube_takeout_manager/src/features/channels/presentation/chann
 import 'package:youtube_takeout_manager/src/features/channels/presentation/channel_list/cross_channel_result_tile.dart';
 import 'package:youtube_takeout_manager/src/features/channels/presentation/unknown_channel_hint.dart';
 import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dart';
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_items_by_channel.dart';
@@ -337,6 +343,9 @@ final List<Override> _overrides = [
   channelUnicodeEmojisProvider(fixture.channelId).overrideWithValue([_fire]),
   crossChannelDeletableItemsProvider.overrideWithValue(const []),
   queuedItemChannelIdsProvider.overrideWithValue(const {}),
+  aiKeysRepositoryProvider.overrideWithValue(
+    AiKeysRepository(CredentialStore(const FlutterSecureStorage())),
+  ),
 ];
 
 /// In selection mode from the start.
@@ -491,6 +500,8 @@ Widget _channelListParts() => Scaffold(
 );
 
 void main() {
+  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+
   void fitsAtEveryWidth(
     String subject,
     Widget Function() build, {
@@ -589,6 +600,33 @@ void main() {
         expect(find.byType(TakeoutLoadFailed), findsOneWidget),
   );
   fitsAtEveryWidth('the Takeouts dialog', _takeoutsDialog);
+  fitsAtEveryWidth(
+    'the Takeouts dialog with AI keys',
+    _takeoutsDialog,
+    overrides: [
+      aiKeysProvider.overrideWith(
+        (ref) async => const AiKeys(typesafe: 'jv', anthropic: 'sk'),
+      ),
+    ],
+  );
+  for (final builtIn in [
+    <AiService>{},
+    {AiService.jev},
+  ]) {
+    fitsAtEveryWidth(
+      'the AI keys page${builtIn.isEmpty ? '' : ' with a key built in'}',
+      () => Scaffold(
+        body: SingleChildScrollView(
+          child: AiKeysForm(
+            initial: AiKeys.none,
+            builtIn: builtIn,
+            onSave: (_) async {},
+            onCancel: () {},
+          ),
+        ),
+      ),
+    );
+  }
   fitsAtEveryWidth(
     'the Takeouts dialog without a Google Cloud client',
     () => _takeoutsDialog(const [], null),
