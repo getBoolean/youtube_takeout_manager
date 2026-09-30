@@ -8,21 +8,18 @@ part of 'device_cache_clearer.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Clears what's loaded from YouTube and kept on this device, so it's
-/// fetched again. A service: nothing depends on it, so it can read any
-/// provider.
+/// Clears the pictures and thumbnails kept on this device. A service:
+/// nothing depends on it, so it can read any provider.
 
 @ProviderFor(DeviceCacheClearer)
 final deviceCacheClearerProvider = DeviceCacheClearerProvider._();
 
-/// Clears what's loaded from YouTube and kept on this device, so it's
-/// fetched again. A service: nothing depends on it, so it can read any
-/// provider.
+/// Clears the pictures and thumbnails kept on this device. A service:
+/// nothing depends on it, so it can read any provider.
 final class DeviceCacheClearerProvider
     extends $NotifierProvider<DeviceCacheClearer, void> {
-  /// Clears what's loaded from YouTube and kept on this device, so it's
-  /// fetched again. A service: nothing depends on it, so it can read any
-  /// provider.
+  /// Clears the pictures and thumbnails kept on this device. A service:
+  /// nothing depends on it, so it can read any provider.
   DeviceCacheClearerProvider._()
     : super(
         from: null,
@@ -51,11 +48,10 @@ final class DeviceCacheClearerProvider
 }
 
 String _$deviceCacheClearerHash() =>
-    r'841bf9e7cb95bd75384c81c17964bb7c67288112';
+    r'b1fd24a0231af4a553c6a2521c767fd9c346faa6';
 
-/// Clears what's loaded from YouTube and kept on this device, so it's
-/// fetched again. A service: nothing depends on it, so it can read any
-/// provider.
+/// Clears the pictures and thumbnails kept on this device. A service:
+/// nothing depends on it, so it can read any provider.
 
 abstract class _$DeviceCacheClearer extends $Notifier<void> {
   void build();

@@ -604,7 +604,14 @@ void main() {
 
     expectNoPopups();
     expect(find.byKey(SignInNoticeBanner.signInFailedKey), findsOneWidget);
-    expect(find.textContaining('offline'), findsOneWidget);
+    // Why it failed shows in the notice.
+    expect(
+      find.descendant(
+        of: find.byKey(SignInNoticeBanner.signInFailedKey),
+        matching: find.textContaining('offline'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a sign-in that stopped working shows on its row', (

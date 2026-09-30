@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
@@ -148,7 +149,8 @@ class _Settings extends ConsumerWidget {
           const AiKeysSection(),
           const SizedBox(height: 24),
         ],
-        const CacheSection(),
+        // The web leaves pictures to the browser's cache.
+        if (!kIsWeb) const CacheSection(),
       ],
     );
   }

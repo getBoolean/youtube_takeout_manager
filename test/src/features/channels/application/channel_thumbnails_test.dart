@@ -121,6 +121,9 @@ class _SignIns extends SignInService {
 }
 
 void main() {
+  // Clearing the device's pictures also forgets the ones held in memory.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
   ProviderContainer container({
@@ -277,8 +280,8 @@ void main() {
       expect(clients.used, hasLength(signInsUsed));
     });
 
-    test("once the device's pictures are cleared, channels that had none "
-        'are asked for again', () async {
+    test("clearing the device's pictures keeps knowing which channels have "
+        'none, so they are not asked for again', () async {
       final channels = _Channels(missing: {...ids});
       final c = container(
         clients: _Clients(),
@@ -293,7 +296,7 @@ void main() {
       c.read(_shown.notifier).set(ids);
       await pumpEventQueue();
 
-      expect(channels.requests, hasLength(2));
+      expect(channels.requests, hasLength(1));
     });
   });
 
