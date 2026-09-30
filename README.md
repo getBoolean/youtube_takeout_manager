@@ -60,7 +60,7 @@ flutter run -d windows --dart-define-from-file=.env   # or macos, linux, chrome
 | Delete thousands in one sitting | Script deletion: about one per second, no API quota |
 | Delete steadily without babysitting it | API deletion: live queue with pause/resume and a quota meter |
 | Keep a copy before deleting | Export to CSV or JSON |
-| Look back at what you watched | Watch and search history by day, month or channel |
+| Look back at what you watched | Watch and search history by day, month, channel or category |
 
 **How it works:**
 
@@ -104,7 +104,7 @@ Everything sits under `Takeout/YouTube and YouTube Music/` in the zip. Anything 
 | --- | --- | --- | --- |
 | `comments` | Every comment you've posted (`comments.csv`, split into numbered files) | Yes | Browse, search, delete, export |
 | `live chats` | Every live chat message and Super Chat (`live chats.csv`, numbered the same way) | Yes | Browse, search, delete, export |
-| `history` | `watch-history` and `search-history`, as HTML or JSON | Read-only | Browse and search by day, month or channel; YouTube's API can't delete history |
+| `history` | `watch-history` and `search-history`, as HTML or JSON | Read-only | Browse and search by day, month, channel or category; YouTube's API can't delete history |
 | `channels` | `channel.csv` and `channel URL configs.csv` | Yes | Names your account's channels and their handles |
 | `channels` | Community moderation settings, feature data, images, page settings | No | |
 | `subscriptions` | `subscriptions.csv` | Yes | Lists the channels you subscribe to beside the ones you watched, including ones you never watched, and filters to them |
@@ -121,7 +121,7 @@ Everything sits under `Takeout/YouTube and YouTube Music/` in the zip. Anything 
 - **Search it all.** Comment text, video titles, and emoji, ignoring case and accents.
 - **Bulk delete.** Select a whole channel at once and delete through YouTube's API or a quota-free script, from [one queue](#deleting-two-ways-one-queue) that survives restarts.
 - **Merge takeouts.** Import newer exports on top of older ones; anything since gone from YouTube is kept and marked.
-- **Watch and search history.** Browse and search it by day, month or channel, filtered to the channels you subscribe to, YouTube Music, or channels you pick.
+- **Watch and search history.** Browse and search it by day, month, channel or category, filtered to Shorts, YouTube Music, the channels you subscribe to, or the categories and channels you pick. The filters show how much of what you watched each category is.
 - **Export.** Save comments and live chats as CSV or JSON.
 
 ## Deleting: two ways, one queue
@@ -258,7 +258,9 @@ Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. I
 
 ## Set up AI categories (optional)
 
-Channels get categories from YouTube's topics. With an API key, AI checks those and names the ones YouTube has none for: [Jev](https://docs.typesafe.ai) by TypeSafe checks and picks from known categories for a fraction of a cent, and [Claude](https://docs.claude.com) by Anthropic names what Jev can't settle. Add either key, or both. Each service bills your own account.
+Signed in, channels get categories from YouTube's topics. With an API key, AI checks those and names the ones YouTube has none for: [Jev](https://docs.typesafe.ai) by TypeSafe checks and picks from known categories for a fraction of a cent, and [Claude](https://docs.claude.com) by Anthropic names what Jev can't settle. Add either key, or both. Each service bills your own account.
+
+Tap a channel's category to see where it came from. With a key, you can ask AI for another when it's wrong; what you choose is never replaced.
 
 To pick a category, a channel's name and description, and the titles of videos you watched from it, go to the services you add keys for.
 
