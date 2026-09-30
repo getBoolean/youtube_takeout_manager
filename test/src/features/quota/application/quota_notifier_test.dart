@@ -46,6 +46,31 @@ void main() {
     }
   });
 
+  test(
+    'usage recorded at the same time, as two fetchers can, all counts',
+    () async {
+      final c = container();
+      final quota = c.read(quotaProvider.notifier);
+      await c.read(quotaProvider.future);
+
+      await Future.wait([
+        quota.recordUsage(QuotaOperation.videosList),
+        quota.recordUsage(QuotaOperation.channelsList),
+        quota.recordUsage(QuotaOperation.videosList),
+      ]);
+
+      final state = await container().read(quotaProvider.future);
+      expect(
+        state.usageFor(QuotaOperation.videosList),
+        2 * QuotaOperation.videosList.cost,
+      );
+      expect(
+        state.usageFor(QuotaOperation.channelsList),
+        QuotaOperation.channelsList.cost,
+      );
+    },
+  );
+
   test('usage from an earlier quota period is gone once checked', () async {
     final c = container();
     final quota = c.read(quotaProvider.notifier);
