@@ -137,6 +137,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "8.12.5"
+  cancelation_token:
+    dependency: transitive
+    description:
+      name: cancelation_token
+      sha256: "7f1cd2148f6d14dc307ddc22cece6ab52f60e3b7212ef0b8cb9fd294d7b06931"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
   characters:
     dependency: transitive
     description:
@@ -488,6 +496,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.3.2"
+  hive_ce:
+    dependency: "direct main"
+    description:
+      name: hive_ce
+      sha256: "2b1bf607ddf852cad8deaf2331cac0e54289d3a3c64079463b26f196008909ce"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.20.1"
   hooks:
     dependency: transitive
     description:
@@ -552,6 +568,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.5"
+  isolate_channel:
+    dependency: transitive
+    description:
+      name: isolate_channel
+      sha256: a9d3d620695bc984244dafae00b95e4319d6974b2d77f4b9e1eb4f2efe099094
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.6.1"
   jni:
     dependency: transitive
     description:
@@ -616,6 +640,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.1.0"
+  logger:
+    dependency: transitive
+    description:
+      name: logger
+      sha256: "2a0dc097e7b01d942475bdd552356db2d0f768b05540bd4b2b53f1840f2239a7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.8.0"
   logging:
     dependency: transitive
     description:
@@ -989,6 +1021,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.2"
+  squadron:
+    dependency: "direct main"
+    description:
+      name: squadron
+      sha256: d75ec6b5271edef3a44c9414281e26698b84eaae52a94a658dcc12759ab23beb
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.4.4"
+  squadron_builder:
+    dependency: "direct dev"
+    description:
+      name: squadron_builder
+      sha256: "08debc30b15702c339728f59730061e4ef7e057cf5d2909f1c6b5919a0c2251b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.3.2"
   stack_trace:
     dependency: transitive
     description:
@@ -1157,6 +1205,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.5"
+  using:
+    dependency: transitive
+    description:
+      name: using
+      sha256: "60cc4569f782c5d73637a16aac933aea59fa5d31ed019fd50128f209e25730d3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.5"
   vector_math:
     dependency: transitive
     description:
