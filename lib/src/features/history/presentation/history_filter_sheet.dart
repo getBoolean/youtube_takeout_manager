@@ -468,7 +468,10 @@ class _ChannelsSliver extends HookConsumerWidget {
         subscription: value.subscription,
         shorts: value.shorts,
         music: value.music,
-        selection: ChannelSelection(channels: picked),
+        selection: ChannelSelection(
+          channels: picked,
+          categories: value.selection.categories,
+        ),
       );
     }
 
@@ -483,7 +486,7 @@ class _ChannelsSliver extends HookConsumerWidget {
                 Semantics(
                   header: true,
                   child: Text(
-                    selection.isEmpty
+                    selection.channels.isEmpty
                         ? 'Channels'
                         : 'Channels · ${selection.channels.length} picked',
                     style: theme.textTheme.titleSmall,

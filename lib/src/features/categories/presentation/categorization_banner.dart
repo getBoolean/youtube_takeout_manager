@@ -4,19 +4,34 @@ import 'package:intl/intl.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/notice_banner.dart';
 import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import '../application/ai_keys.dart';
 import '../application/ai_tiers.dart';
 import '../application/categorization_progress.dart';
 
-/// While channels are categorized, how far along it is, as a slim bar with
-/// a line saying so; it folds away when done. Above it, a notice about AI,
-/// such as a key rejected, until dismissed.
+/// A notice about AI, such as a key rejected, until dismissed. Over
+/// channels or categories ([grouped]), also how far along categorizing
+/// them is, as a slim bar with a line saying so that folds away when done,
+/// or, when nothing can categorize them, what would.
 class CategorizationBanner extends ConsumerWidget {
-  const CategorizationBanner({super.key});
+  static const hintKey = ValueKey('categorization-hint');
+
+  final bool grouped;
+
+  const CategorizationBanner({super.key, this.grouped = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final (:running, :done, :total) = ref.watch(categorizationProgressProvider);
-    final notice = ref.watch(aiTierStatusProvider.select((s) => s.notice));
+    final (:disabled, :notice) = ref.watch(aiTierStatusProvider);
+    final keys = ref.watch(aiKeysProvider).value ?? AiKeys.none;
+    // Signed out, YouTube's topics can't be asked for.
+    final stuck =
+        ref.watch(readSessionChannelIdProvider) == null &&
+        !AiService.values.any(
+          (service) => keys.has(service) && !disabled.contains(service),
+        );
     final theme = Theme.of(context);
     return AnimatedSize(
       duration: MediaQuery.disableAnimationsOf(context)
@@ -37,7 +52,19 @@ class CategorizationBanner extends ConsumerWidget {
                     ref.read(aiTierStatusProvider.notifier).dismiss(),
               ),
             ),
-          if (running && total > 0)
+          if (grouped && stuck)
+            Padding(
+              key: hintKey,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Sign in to get categories from YouTube, or add an AI key '
+                'under Takeouts › AI categories.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (grouped && running && total > 0)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Semantics(

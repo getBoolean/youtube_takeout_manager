@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,6 +46,10 @@ class _Fixed extends TakeoutHistoryNotifier {
 
   @override
   Future<LoadedHistory?> build() async => LoadedHistory.of(history);
+
+  /// As switching to another takeout does.
+  void switchTo(TakeoutHistory other) =>
+      state = AsyncData(LoadedHistory.of(other));
 }
 
 class _Details extends ChannelDetailsNotifier {
@@ -105,11 +111,14 @@ class _Jev extends TypeSafeRepository {
   }
 }
 
-/// Claude, answering with [answer], keeping what it was asked.
+/// Claude, answering with [answer] once [hold] completes, or failing with
+/// [failure], keeping what it was asked.
 class _Claude extends AnthropicRepository {
-  _Claude(this.answer);
+  _Claude(this.answer, {this.failure, this.hold});
 
   final Map<String, Object?> answer;
+  final AiFailure? failure;
+  final Completer<void>? hold;
   final asked = <String>[];
 
   @override
@@ -121,6 +130,8 @@ class _Claude extends AnthropicRepository {
     required Map<String, Object?> schema,
   }) async {
     asked.add(user);
+    await hold?.future;
+    if (failure case final failure?) throw failure;
     return answer;
   }
 }
@@ -164,11 +175,16 @@ void main() {
     AiKeys keys = AiKeys.none,
     TypeSafeRepository? jev,
     AnthropicRepository? claude,
+    TakeoutHistory? history,
+    bool browser = false,
   }) {
     fetcher = _Fetcher(give);
     final c = ProviderContainer(
       overrides: [
-        takeoutHistoryProvider.overrideWith(() => _Fixed(_history)),
+        takeoutHistoryProvider.overrideWith(() => _Fixed(history ?? _history)),
+        channelCategorizerProvider.overrideWith(
+          () => ChannelCategorizer(browser: browser),
+        ),
         channelDetailsProvider.overrideWith(() => _Details({...details})),
         channelThumbnailFetcherProvider.overrideWith(() => fetcher),
         readSessionChannelIdProvider.overrideWithValue(session),
@@ -231,6 +247,8 @@ void main() {
       'UCg': const CategoryPath('Gaming', 'Action'),
       'UCs': const CategoryPath('Music', 'Pop'),
       'UCn': const CategoryPath('Society', 'Politics'),
+      // No topics, and no AI to ask.
+      'UCx': null,
     });
     expect(
       c.read(channelCategoriesProvider).value?['UCg']?.source,
@@ -238,8 +256,8 @@ void main() {
     );
   });
 
-  test('without topics or AI, a channel is left uncategorized and not '
-      'counted', () async {
+  test('without topics or AI, a channel is uncategorized, and not counted '
+      'as categorized', () async {
     final c = container(details: known);
     final seen = <({bool running, int done, int total})>[];
     c.listen(categorizationProgressProvider, (_, p) => seen.add(p));
@@ -247,7 +265,7 @@ void main() {
     c.read(historyShownProvider.notifier).markShown();
     await _settle();
 
-    expect(paths(c).containsKey('UCx'), isFalse);
+    expect(paths(c), containsPair('UCx', null));
     expect(seen.map((p) => p.total), everyElement(2));
     expect(seen.last.running, isFalse);
   });
@@ -287,6 +305,43 @@ void main() {
 
   group('with a Jev key', () {
     const jevKey = AiKeys(typesafe: 'jv_live_1');
+
+    test('a request Jev turns down turns it off for now, saying so, and '
+        "YouTube's categories still come", () async {
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: const AiBadRequest('Too many options')),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, {AiService.jev});
+      expect(status.notice, isNotNull);
+      expect(paths(c)['UCs'], const CategoryPath('Music', 'Pop'));
+    });
+
+    test("in a browser, Jev that can't be reached is turned off at once, "
+        'and categorizing finishes without it', () async {
+      final jev = _Jev(failure: const AiUnreachable());
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        browser: true,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(c.read(aiTierStatusProvider).disabled, {AiService.jev});
+      // Only the channels already asked about when it failed, three at once.
+      expect(jev.requests, lessThanOrEqualTo(3));
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      expect(paths(c)['UCs'], const CategoryPath('Music', 'Pop'));
+    });
 
     test("Jev checks the categories YouTube gives", () async {
       final c = container(details: known, keys: jevKey, jev: _Jev());
@@ -366,6 +421,80 @@ void main() {
 
   group('with a Claude key', () {
     const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    test('a channel Claude gives no usable answer for is left as it was, the '
+        "rest go on, and it isn't paid for again", () async {
+      final claude = _Claude(const {}, failure: const AiNoAnswer());
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(paths(c), containsPair('UCx', null));
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      expect(c.read(aiTierStatusProvider).disabled, isEmpty);
+
+      // A new key has every channel looked at again.
+      c.read(_keys.notifier).set(const AiKeys(anthropic: 'sk-ant-2'));
+      await _settle();
+      expect(claude.asked, hasLength(1));
+    });
+
+    test('a decision the user makes while AI is asked is kept', () async {
+      final hold = Completer<void>();
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': null,
+        'reason': '',
+      }, hold: hold);
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.asked, hasLength(1));
+
+      const topicless = HistoryChannel(channelId: 'UCx', title: 'No topics');
+      await c.read(channelCategorizerProvider.notifier).deny(topicless);
+      hold.complete();
+      await _settle();
+
+      final kept = c.read(channelCategoriesProvider).value?['UCx'];
+      expect(kept?.userDecision, UserDecision.denied);
+      expect(kept?.path, isNull);
+    });
+
+    test('switching takeouts stops the run under way, keeping the answers '
+        'already asked for', () async {
+      final hold = Completer<void>();
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      }, hold: hold);
+      // No topics for any: each goes to Claude, three at a time.
+      final c = container(
+        keys: claudeKey,
+        claude: claude,
+        history: TakeoutHistory(
+          watches: [
+            for (final id in ['UC1', 'UC2', 'UC3', 'UC4'])
+              _watch(id, 'Channel $id'),
+          ],
+        ),
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.asked, hasLength(3));
+
+      (c.read(takeoutHistoryProvider.notifier) as _Fixed).switchTo(
+        TakeoutHistory(watches: [_watch('UCo', 'Other')]),
+      );
+      await _settle();
+      hold.complete();
+      await _settle();
+
+      expect(paths(c).keys, containsAll(['UC1', 'UC2', 'UC3', 'UCo']));
+      expect(paths(c).containsKey('UC4'), isFalse);
+      expect(claude.asked, hasLength(4));
+    });
 
     test('Claude names the categories YouTube gives none for, and a new '
         'sub-category it names is kept', () async {

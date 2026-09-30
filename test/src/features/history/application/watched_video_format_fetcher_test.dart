@@ -38,16 +38,20 @@ class _Videos extends YoutubeVideoRepository {
   /// up.
   final bool quotaRunsOut;
 
+  /// Which batch fails, as the API does when YouTube errors on one request:
+  /// no answer, and on to the next batch.
+  final int? failingBatch;
+
   /// The IDs asked for, in order.
   final asked = <String>[];
 
-  _Videos(this.known, {this.quotaRunsOut = false});
+  _Videos(this.known, {this.quotaRunsOut = false, this.failingBatch});
 
   @override
   Stream<(String, VideoFormat)> fetchVideoFormats(
     http.Client authClient,
     List<String> videoIds, {
-    void Function()? onResponse,
+    void Function(List<String> batch)? onResponse,
   }) async* {
     const size = YoutubeVideoRepository.batchSize;
     for (var i = 0; i < videoIds.length; i += size) {
@@ -56,7 +60,8 @@ class _Videos extends YoutubeVideoRepository {
       }
       final batch = videoIds.skip(i).take(size).toList();
       asked.addAll(batch);
-      onResponse?.call();
+      if (i ~/ size == failingBatch) continue;
+      onResponse?.call(batch);
       for (final id in batch) {
         if (known[id] case final format?) yield (id, format);
       }
@@ -211,6 +216,28 @@ void main() {
     expect((await cache.loadFormats()).keys, ['v0']);
     // Not asked for yet, so not taken to be gone.
     expect(await cache.loadNotFoundIds(), isNot(contains('v50')));
+  });
+
+  test("a batch YouTube fails to answer isn't taken to be gone", () async {
+    final watched = TakeoutHistory(
+      watches: [
+        for (var i = 0; i <= 2 * YoutubeVideoRepository.batchSize; i++)
+          _watch('v$i'),
+      ],
+    );
+    final c = container(
+      _Videos({
+        for (final w in watched.watches) w.videoId!: _long,
+      }, failingBatch: 1),
+      watched: watched,
+    );
+
+    c.read(historyShownProvider.notifier).markShown();
+    await _settle();
+
+    final cache = c.read(videoFormatCacheRepositoryProvider);
+    expect(await cache.loadNotFoundIds(), isEmpty);
+    expect((await cache.loadFormats()).keys, containsAll(['v0', 'v100']));
   });
 
   test('says how far along it is', () async {

@@ -51,7 +51,8 @@ typedef _Pick = ({CategoryPath path, double score, List<ScoredPath> runnersUp});
 /// YouTube gives no sub-category). A sub-category Claude names that
 /// [taxonomy] lacks joins it, unless Jev finds it's one there already.
 /// Throws an [AiTierFailure] naming the service when an AI step can't be
-/// done.
+/// done, except for one with no usable answer for the channel: that
+/// channel keeps YouTube's category, the step counted as tried.
 class CategoryPipeline {
   Taxonomy _taxonomy;
   final JevAccess? jev;
@@ -105,6 +106,20 @@ class CategoryPipeline {
   );
 
   Future<ChannelCategory> categorize(ChannelInput input) async {
+    try {
+      return await _categorize(input);
+    } on AiTierFailure catch (e) {
+      if (e.failure is! AiNoAnswer) rethrow;
+      // About this channel alone, such as a refusal, and paid for: asking
+      // again would only pay again.
+      return _result(
+        input,
+        path: youtubeCandidates(input.topicUrls).firstOrNull,
+      );
+    }
+  }
+
+  Future<ChannelCategory> _categorize(ChannelInput input) async {
     final candidates = youtubeCandidates(input.topicUrls);
     final jev = this.jev;
     if (jev == null) {

@@ -63,4 +63,4 @@ final class WatchedVideoFormatFetcherProvider
 }
 
 String _$watchedVideoFormatFetcherHash() =>
-    r'7ec41138692598ce85b930bb0efab406f6f12c7c';
+    r'925b54278ddb944c60bf053b442c879ce5ddac7d';

@@ -8,18 +8,18 @@ part of 'history_channel_selection.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// The channels the history screen's watched videos are narrowed to; none
-/// for every channel.
+/// The channels the history screen's watched videos are narrowed to, and
+/// the categories whose channels are; none for every channel.
 
 @ProviderFor(HistoryChannelSelection)
 final historyChannelSelectionProvider = HistoryChannelSelectionProvider._();
 
-/// The channels the history screen's watched videos are narrowed to; none
-/// for every channel.
+/// The channels the history screen's watched videos are narrowed to, and
+/// the categories whose channels are; none for every channel.
 final class HistoryChannelSelectionProvider
     extends $NotifierProvider<HistoryChannelSelection, ChannelSelection> {
-  /// The channels the history screen's watched videos are narrowed to; none
-  /// for every channel.
+  /// The channels the history screen's watched videos are narrowed to, and
+  /// the categories whose channels are; none for every channel.
   HistoryChannelSelectionProvider._()
     : super(
         from: null,
@@ -48,10 +48,10 @@ final class HistoryChannelSelectionProvider
 }
 
 String _$historyChannelSelectionHash() =>
-    r'6cfa107aa0628003b2aaaf44c7fceae35fbbfd84';
+    r'604d9b5721f619b9f75d4da78797bb1d95877f35';
 
-/// The channels the history screen's watched videos are narrowed to; none
-/// for every channel.
+/// The channels the history screen's watched videos are narrowed to, and
+/// the categories whose channels are; none for every channel.
 
 abstract class _$HistoryChannelSelection extends $Notifier<ChannelSelection> {
   ChannelSelection build();

@@ -44,6 +44,11 @@ const _inFlight = 3;
 /// A service: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
 class ChannelCategorizer extends _$ChannelCategorizer {
+  ChannelCategorizer({this.browser = kIsWeb});
+
+  /// Whether this runs in a browser, which can refuse a service outright.
+  final bool browser;
+
   var _generation = 0;
   Future<void>? _running;
   var _again = false;
@@ -69,10 +74,6 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       _requestRun();
     });
   }
-
-  /// Web: unreachable twice in a row, a service is taken to be blocked by
-  /// the browser.
-  var _unreachable = 0;
 
   /// Runs now, or again once the run under way ends.
   void _requestRun() {
@@ -131,15 +132,32 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final pipeline = await _pipeline();
     if (dropped()) return;
     final titles = recentTitlesByChannel(loaded);
-    final queue = [
-      for (final channel in channels)
-        if (needsCategorizing(
-          existing[channel.key],
-          available: pipeline.tiers,
-          hasTopics: details[channel.channelId]?.topicUrls.isNotEmpty ?? false,
-        ))
-          channel,
-    ];
+    final queue = <HistoryChannel>[];
+    final unplaced = <String, ChannelCategory>{};
+    final now = DateTime.now().toUtc();
+    for (final channel in channels) {
+      final hasTopics =
+          details[channel.channelId]?.topicUrls.isNotEmpty ?? false;
+      if (needsCategorizing(
+        existing[channel.key],
+        available: pipeline.tiers,
+        hasTopics: hasTopics,
+      )) {
+        queue.add(channel);
+      } else if (existing[channel.key] == null) {
+        // Nothing to go on yet: uncategorized, and looked at again once
+        // topics or AI come.
+        unplaced[channel.key] = ChannelCategory(
+          tried: pipeline.tiers,
+          hadTopics: hasTopics,
+          decidedAt: now,
+        );
+      }
+    }
+    if (unplaced.isNotEmpty) {
+      await categories.addMissing(unplaced);
+      if (ref.mounted) await categories.persist();
+    }
     if (queue.isEmpty) return;
 
     final progress = ref.read(categorizationProgressProvider.notifier);
@@ -162,10 +180,12 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           stoppedBy ??= e;
           return;
         }
-        if (dropped()) return;
-        _unreachable = 0;
+        if (!ref.mounted) return;
+        // Still right for its channel when the run was dropped, and paid
+        // for: kept either way.
         await _keepLearned(pipeline);
         await categories.putIfUndecided(channel.key, category);
+        if (dropped()) return;
         progress.update(++done);
         if (done % _saveEvery == 0) await categories.persist();
       }
@@ -328,8 +348,9 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       AiService.jev => 'Jev',
       AiService.claude => 'Claude',
     };
-    final blocked =
-        failure.failure is AiUnreachable && kIsWeb && ++_unreachable >= 2;
+    // In a browser, a service still unreachable after its retries is taken
+    // to be refused by the browser: asking again would fail the same way.
+    final blocked = failure.failure is AiUnreachable && browser;
     switch (failure.failure) {
       case AiKeyRejected():
         status.disable(
@@ -346,6 +367,12 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         status.disable(
           failure.service,
           "$name's model isn't available to this key, so it's off.",
+        );
+      case AiBadRequest(:final message):
+        // A request it can't read is one every channel's would be.
+        status.disable(
+          failure.service,
+          "$name turned down the request ($message), so it's off for now.",
         );
       case _ when blocked:
         status.disable(

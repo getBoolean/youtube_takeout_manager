@@ -253,7 +253,10 @@ class _HistoryBody extends HookConsumerWidget {
       watchesToTop();
       toTop(searchScroll);
     });
-    ref.listen(historyChannelMaskProvider, (_, _) => watchesToTop());
+    // What the user picks, not the mask made from it: channels categorized
+    // in the background change the mask while a category is picked.
+    ref.listen(historyChannelSelectionProvider, (_, _) => watchesToTop());
+    ref.listen(historySubscriptionFilterProvider, (_, _) => watchesToTop());
     ref.listen(historyShortsFilterProvider, (_, _) => watchesToTop());
     ref.listen(historyMusicFilterProvider, (_, _) => watchesToTop());
     ref.listen(historyRemovedFilterProvider, (_, _) {
@@ -812,7 +815,7 @@ class _WatchedTab extends ConsumerWidget {
             onExpandAll: () => _list.setAllExpanded(true),
           ),
         ),
-        if (byChannel || byCategory) const CategorizationBanner(),
+        CategorizationBanner(grouped: byChannel || byCategory),
         _ActiveFilters(watched: true, onMore: openFilters),
       ],
     );

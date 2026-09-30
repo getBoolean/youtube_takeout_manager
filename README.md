@@ -260,7 +260,7 @@ Sign-in turns on API deletion, video titles, thumbnails, and channel pictures. I
 
 Signed in, channels get categories from YouTube's topics. With an API key, AI checks those and names the ones YouTube has none for: [Jev](https://docs.typesafe.ai) by TypeSafe checks and picks from known categories for a fraction of a cent, and [Claude](https://docs.claude.com) by Anthropic names what Jev can't settle. Add either key, or both. Each service bills your own account.
 
-Tap a channel's category to see where it came from. With a key, you can ask AI for another when it's wrong; what you choose is never replaced.
+Tap a channel's category to see where it came from. With a key, you can ask AI for another when YouTube's is wrong; what you choose is never replaced. Signed out with no key, channels stay uncategorized.
 
 To pick a category, a channel's name and description, and the titles of videos you watched from it, go to the services you add keys for.
 

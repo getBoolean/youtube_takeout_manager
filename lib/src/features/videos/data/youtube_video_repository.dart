@@ -84,12 +84,13 @@ class YoutubeVideoRepository {
 
   /// Streams each video's length and shape as the API answers, in batches
   /// of [batchSize], for telling Shorts apart. Videos YouTube no longer has
-  /// are left out. Calls [onResponse] as each request is answered, so its
-  /// quota can be counted as it's used.
+  /// are left out. Calls [onResponse] with each batch's IDs as its request
+  /// is answered, so its quota can be counted as it's used; a batch whose
+  /// request fails is skipped, uncalled.
   Stream<(String, VideoFormat)> fetchVideoFormats(
     http.Client authClient,
     List<String> videoIds, {
-    void Function()? onResponse,
+    void Function(List<String> batch)? onResponse,
   }) async* {
     final youtube = yt.YouTubeApi(authClient);
     for (var i = 0; i < videoIds.length; i += batchSize) {
@@ -103,7 +104,7 @@ class YoutubeVideoRepository {
           $fields:
               'items(id,contentDetails/duration,player(embedWidth,embedHeight))',
         );
-        onResponse?.call();
+        onResponse?.call(batch);
         for (final item in response.items ?? <yt.Video>[]) {
           final id = item.id;
           if (id == null) continue;

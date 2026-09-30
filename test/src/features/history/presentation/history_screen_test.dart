@@ -1,13 +1,18 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
@@ -15,6 +20,7 @@ import 'package:youtube_takeout_manager/src/features/categories/presentation/cat
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_channel_selection.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_grouping.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
@@ -146,6 +152,15 @@ class _Categories extends ChannelCategories {
 
   @override
   Future<Map<String, ChannelCategory>> build() async => categories;
+
+  /// As the background run categorizing channels does.
+  void replace(Map<String, ChannelCategory> next) => state = AsyncData(next);
+}
+
+class _Notice extends AiTierStatus {
+  @override
+  AiTierState build() =>
+      (disabled: const {AiService.jev}, notice: "Jev's key was rejected.");
 }
 
 late _Fetcher _fetcher;
@@ -176,6 +191,8 @@ Future<ProviderContainer> _open(
   String? session,
   List<Subscription> subscriptions = const [],
   Map<String, ChannelCategory> categories = const {},
+  AiKeys keys = AiKeys.none,
+  List<Override> overrides = const [],
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -193,6 +210,8 @@ Future<ProviderContainer> _open(
         (ref) async => {for (final s in subscriptions) s.channelId: s},
       ),
       channelCategoriesProvider.overrideWith(() => _Categories(categories)),
+      aiKeysProvider.overrideWith((ref) async => keys),
+      ...overrides,
     ],
   );
   addTearDown(container.dispose);
@@ -449,6 +468,33 @@ void main() {
     expect(_channelHeader('CAFE Channel'), findsOneWidget);
   });
 
+  testWidgets('a category and a channel ticked together both narrow what '
+      'shows', (tester) async {
+    await _open(
+      tester,
+      history: TakeoutHistory(
+        watches: [
+          ..._history.watches,
+          _watch('Elsewhere', DateTime(2026, 4, 8, 9), channel: 'Z'),
+        ],
+      ),
+      categories: _gamingX(),
+    );
+
+    await _openFilters(tester);
+    await _tapKey(
+      tester,
+      HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
+    );
+    await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Other'), findsOneWidget);
+    expect(_shown('Elsewhere'), findsNothing);
+    expect(find.byType(InputChip), findsNWidgets(2));
+  });
+
   testWidgets("a category's sub-categories open under it in the Filters "
       'modal, and one can be picked alone', (tester) async {
     await _open(
@@ -488,6 +534,71 @@ void main() {
     expect(_shown('Café tour'), findsOneWidget);
     expect(_shown('Unrelated'), findsOneWidget);
     expect(_shown('Other'), findsNothing);
+  });
+
+  testWidgets('channels categorized while a category is picked leave the '
+      'list where it was', (tester) async {
+    ChannelCategory gaming() => ChannelCategory(
+      path: const CategoryPath('Gaming'),
+      decidedAt: DateTime.utc(2026, 9, 30),
+    );
+    final container = await _open(
+      tester,
+      history: _longHistory,
+      categories: {'UCtop': gaming()},
+    );
+    container
+        .read(historyChannelSelectionProvider.notifier)
+        .set(
+          ChannelSelection(categories: {const CategoryPick.category('Gaming')}),
+        );
+    await tester.pumpAndSettle();
+    await tester.drag(_shown('Old 2'), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(_shown('Old 0'), findsNothing);
+
+    (container.read(channelCategoriesProvider.notifier) as _Categories).replace(
+      {'UCtop': gaming(), 'UCr0': gaming()},
+    );
+    await tester.pumpAndSettle();
+
+    expect(_shown('Old 0'), findsNothing);
+  });
+
+  testWidgets('signed out without AI keys, grouping by channel says what '
+      'would categorize them', (tester) async {
+    await _open(tester);
+    await _groupBy(tester, HistoryGrouping.channel);
+    expect(find.byKey(CategorizationBanner.hintKey), findsOneWidget);
+
+    await _groupBy(tester, HistoryGrouping.day);
+    expect(find.byKey(CategorizationBanner.hintKey), findsNothing);
+  });
+
+  testWidgets('with an AI key, or signed in, there is nothing to say', (
+    tester,
+  ) async {
+    await _open(tester, keys: const AiKeys(anthropic: 'sk-ant-1'));
+    await _groupBy(tester, HistoryGrouping.channel);
+    expect(find.byKey(CategorizationBanner.hintKey), findsNothing);
+  });
+
+  testWidgets("a notice about AI shows however the videos are grouped", (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      overrides: [aiTierStatusProvider.overrideWith(_Notice.new)],
+    );
+
+    expect(find.byType(CategorizationBanner), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(CategorizationBanner),
+        matching: find.byIcon(Icons.close),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('categories are offered in the Filters modal once channels '

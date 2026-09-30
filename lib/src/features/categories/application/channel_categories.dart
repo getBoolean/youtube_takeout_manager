@@ -29,6 +29,17 @@ class ChannelCategories extends _$ChannelCategories {
     state = AsyncData({...current, key: category});
   }
 
+  /// Adds [categories] for the channels that have none yet, at once.
+  Future<void> addMissing(Map<String, ChannelCategory> categories) async {
+    await future;
+    final current = state.requireValue;
+    final missing = {
+      for (final MapEntry(:key, :value) in categories.entries)
+        if (!current.containsKey(key)) key: value,
+    };
+    if (missing.isNotEmpty) state = AsyncData({...current, ...missing});
+  }
+
   /// Sets [key]'s category as the user decided it, and keeps it.
   Future<void> decide(String key, ChannelCategory category) async {
     await future;

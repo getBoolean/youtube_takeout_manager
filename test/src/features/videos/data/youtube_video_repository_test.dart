@@ -137,9 +137,38 @@ void main() {
 
         await YoutubeVideoRepository().fetchVideoFormats(client, [
           for (var i = 0; i < YoutubeVideoRepository.batchSize + 1; i++) 'v$i',
-        ], onResponse: () => answers++).toList();
+        ], onResponse: (batch) => answers++).toList();
 
         expect((requests, answers), (2, 2));
+      },
+    );
+
+    test(
+      'say which batches were answered, not one whose request failed',
+      () async {
+        var requests = 0;
+        final client = MockClient((request) async {
+          requests++;
+          return requests == 2
+              ? http.Response('busy', 500)
+              : http.Response(
+                  jsonEncode({'items': []}),
+                  200,
+                  headers: {'content-type': 'application/json; charset=utf-8'},
+                );
+        });
+        final answered = <String>[];
+
+        await YoutubeVideoRepository().fetchVideoFormats(client, [
+          for (var i = 0; i < 2 * YoutubeVideoRepository.batchSize + 1; i++)
+            'v$i',
+        ], onResponse: answered.addAll).toList();
+
+        expect(answered, hasLength(YoutubeVideoRepository.batchSize + 1));
+        expect(
+          answered,
+          isNot(contains('v${YoutubeVideoRepository.batchSize}')),
+        );
       },
     );
 

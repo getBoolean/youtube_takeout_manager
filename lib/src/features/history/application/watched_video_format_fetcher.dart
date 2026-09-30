@@ -82,13 +82,9 @@ Stream<void> watchedVideoFormatFetcher(Ref ref) async* {
             .fetchVideoFormats(
               client,
               ids,
-              onResponse: () {
-                // Each answer covers the next batch of IDs asked for.
-                asked.addAll(
-                  ids
-                      .skip(responses * YoutubeVideoRepository.batchSize)
-                      .take(YoutubeVideoRepository.batchSize),
-                );
+              onResponse: (answered) {
+                // Only batches answered: one that failed wasn't looked for.
+                asked.addAll(answered);
                 responses++;
                 unawaited(quota.recordUsage(QuotaOperation.videosList));
                 formats.addAll(batch);
