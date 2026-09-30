@@ -14,6 +14,14 @@ void main() {
     expect(formatDate(afternoon), 'Apr 12, 2026');
   });
 
+  test('a month reads its name and year', () {
+    expect(formatMonth(afternoon), 'April 2026');
+  });
+
+  test('a date and time read together', () {
+    expect(formatDateTime(afternoon), 'Apr 12, 2026 2:05 PM');
+  });
+
   test('a time reads as hours and minutes', () {
     expect(formatTime(afternoon), '2:05 PM');
   });

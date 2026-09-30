@@ -60,7 +60,7 @@ flutter run -d windows --dart-define-from-file=.env   # or macos, linux, chrome
 | Delete thousands in one sitting | Script deletion: about one per second, no API quota |
 | Delete steadily without babysitting it | API deletion: live queue with pause/resume and a quota meter |
 | Keep a copy before deleting | Export to CSV or JSON |
-| Look back at what you watched | Watch and search history, day by day |
+| Look back at what you watched | Watch and search history by day, month or channel |
 
 **How it works:**
 
@@ -104,10 +104,10 @@ Everything sits under `Takeout/YouTube and YouTube Music/` in the zip. Anything 
 | --- | --- | --- | --- |
 | `comments` | Every comment you've posted (`comments.csv`, split into numbered files) | Yes | Browse, search, delete, export |
 | `live chats` | Every live chat message and Super Chat (`live chats.csv`, numbered the same way) | Yes | Browse, search, delete, export |
-| `history` | `watch-history` and `search-history`, as HTML or JSON | Read-only | Browse and search day by day; YouTube's API can't delete history |
+| `history` | `watch-history` and `search-history`, as HTML or JSON | Read-only | Browse and search by day, month or channel; YouTube's API can't delete history |
 | `channels` | `channel.csv` and `channel URL configs.csv` | Yes | Names your account's channels and their handles |
 | `channels` | Community moderation settings, feature data, images, page settings | No | |
-| `subscriptions` | `subscriptions.csv` | Partly | Names the channels you commented on; no subscriptions list |
+| `subscriptions` | `subscriptions.csv` | Yes | Lists the channels you subscribe to beside the ones you watched, including ones you never watched, and filters to them |
 | `playlists` | `playlists.csv`, plus one `…-videos.csv` per playlist | No | |
 | `video metadata` | Details of your uploads: `videos.csv`, `video texts.csv`, `video recordings.csv` | No | |
 | `videos` | Your uploaded video files | No | Untick it; it only makes the export bigger |
@@ -121,7 +121,7 @@ Everything sits under `Takeout/YouTube and YouTube Music/` in the zip. Anything 
 - **Search it all.** Comment text, video titles, and emoji, ignoring case and accents.
 - **Bulk delete.** Select a whole channel at once and delete through YouTube's API or a quota-free script, from [one queue](#deleting-two-ways-one-queue) that survives restarts.
 - **Merge takeouts.** Import newer exports on top of older ones; anything since gone from YouTube is kept and marked.
-- **Watch and search history.** Browse and search it day by day.
+- **Watch and search history.** Browse and search it by day, month or channel, filtered to the channels you subscribe to, YouTube Music, or channels you pick.
 - **Export.** Save comments and live chats as CSV or JSON.
 
 ## Deleting: two ways, one queue

@@ -54,6 +54,9 @@ class WatchEntry with WatchEntryMappable {
       ? _videoIdPattern.firstMatch(url)?.group(1)
       : null;
 
+  /// Whether it was watched as a Short, told by its link.
+  bool get isShort => kind == WatchKind.video && url.contains('/shorts/');
+
   /// The uploader's channel ID, when its link has one. Worked out once:
   /// channel filters compare it for every entry.
   final String? channelId;

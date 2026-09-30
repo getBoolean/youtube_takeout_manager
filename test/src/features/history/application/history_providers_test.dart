@@ -2,19 +2,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:youtube_takeout_manager/src/features/history/application/history_channel_filter.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_channel_selection.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_removed_filter.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_csv_encoder.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/data/takeout_repository.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 
 import '../../takeout/memory_takeout_repository.dart';
@@ -90,6 +93,19 @@ void main() {
     );
   });
 
+  /// Saves the takeout as subscribed to [subscriptions].
+  void subscribe(List<Subscription> subscriptions) {
+    repository.accounts['UCme'] = encodeTakeoutCsvs(
+      TakeoutData(
+        comments: const [],
+        liveChats: const [],
+        subscriptionsByChannelId: {
+          for (final s in subscriptions) s.channelId: s,
+        },
+      ),
+    );
+  }
+
   ProviderContainer container({TakeoutHistory? history}) {
     final c = ProviderContainer(
       overrides: [
@@ -110,6 +126,12 @@ void main() {
     await c.read(takeoutHistoryProvider.future);
     return c;
   }
+
+  /// Each channel group shown, with how many videos it has.
+  List<(String, int)> channelGroups(ProviderContainer c) => [
+    for (final g in c.read(historyChannelGroupsProvider).groups)
+      (g.channel?.title ?? g.key, g.indices.length),
+  ];
 
   List<String?> watchTitles(ProviderContainer c) => [
     for (final day in c.read(watchDaysProvider))
@@ -175,8 +197,8 @@ void main() {
     final c = await loaded();
 
     c
-        .read(historyChannelFilterProvider.notifier)
-        .show(const HistoryChannel(channelId: 'UCx', title: 'X'));
+        .read(historyChannelSelectionProvider.notifier)
+        .showOnly(const HistoryChannel(channelId: 'UCx', title: 'X'));
     await _settle(c);
 
     expect(watchTitles(c), ['Café tour', 'Unrelated', 'Last']);
@@ -188,14 +210,14 @@ void main() {
       final c = await loaded();
 
       c
-          .read(historyChannelFilterProvider.notifier)
-          .show(const HistoryChannel(channelId: 'UCx', title: 'X'));
+          .read(historyChannelSelectionProvider.notifier)
+          .showOnly(const HistoryChannel(channelId: 'UCx', title: 'X'));
       await _settle(c);
       c.read(historySearchQueryProvider.notifier).update('cafe');
       await _settle(c);
       expect(watchTitles(c), ['Café tour']);
 
-      c.read(historyChannelFilterProvider.notifier).clear();
+      c.read(historyChannelSelectionProvider.notifier).clear();
       await _settle(c);
       expect(watchTitles(c), ['Café tour', 'Other']);
     },
@@ -216,22 +238,15 @@ void main() {
   });
 
   test(
-    'top channels are ordered by how many videos were watched from each',
+    'watched videos are grouped by channel, the most watched first',
     () async {
       final c = await loaded();
 
-      expect(
-        [
-          for (final c in c.read(filteredWatchedChannelsProvider))
-            (c.channel.title, c.count),
-        ],
-        [('X', 3), ('CAFE Channel', 1)],
-      );
+      expect(channelGroups(c), [('X', 3), ('CAFE Channel', 1)]);
     },
   );
 
-  test('searching channels finds them by name first, then by the titles of '
-      'videos watched from them', () async {
+  test('searching, the channels named for it come first', () async {
     final c = container(
       history: TakeoutHistory(
         watches: [
@@ -260,11 +275,6 @@ void main() {
             DateTime(2026, 4, 8),
             channel: 'Shortcat',
           ),
-          _watch(
-            'Shortcat plays Zelda',
-            DateTime(2026, 4, 7),
-            channel: 'Shortcat',
-          ),
           _watch('Unrelated', DateTime(2026, 4, 6), channel: 'Nobody'),
         ],
       ),
@@ -273,17 +283,126 @@ void main() {
 
     c.read(historySearchQueryProvider.notifier).update('mario kart');
     await _settle(c);
-    final channels = c.read(filteredWatchedChannelsProvider);
 
-    // By name with every video; by title with the videos that match.
-    expect(
-      [for (final c in channels) (c.channel.title, c.count, c.byTitle)],
-      [
-        ('Mario Kart Fans', 1, false),
-        ('MKWorld', 2, true),
-        ('Shortcat', 1, true),
-      ],
+    // By name with every video; the rest with the videos that match.
+    expect(channelGroups(c), [
+      ('Mario Kart Fans', 1),
+      ('MKWorld', 2),
+      ('Shortcat', 1),
+    ]);
+  });
+
+  group('subscriptions', () {
+    Subscription sub(String id, String title) => Subscription(
+      channelId: id,
+      channelUrl: 'http://www.youtube.com/channel/$id',
+      channelTitle: title,
     );
+
+    test('channels subscribed to but never watched are listed after the '
+        'watched ones, with no videos', () async {
+      subscribe([sub('UCx', 'X'), sub('UCz', 'Zed')]);
+      final c = await loaded();
+      await c.read(historySubscriptionsProvider.future);
+
+      expect(channelGroups(c), [('X', 3), ('CAFE Channel', 1), ('Zed', 0)]);
+      expect(watchTitles(c), hasLength(4));
+    });
+
+    test('the subscription filter keeps only subscribed channels, or only '
+        'the others', () async {
+      subscribe([sub('UCx', 'X'), sub('UCz', 'Zed')]);
+      final c = await loaded();
+      await c.read(historySubscriptionsProvider.future);
+      final filter = c.read(historySubscriptionFilterProvider.notifier);
+
+      filter.set(SubscriptionFilter.subscribed);
+      await _settle(c);
+      expect(watchTitles(c), ['Café tour', 'Unrelated', 'Last']);
+      expect(channelGroups(c), [('X', 3), ('Zed', 0)]);
+
+      filter.set(SubscriptionFilter.notSubscribed);
+      await _settle(c);
+      expect(watchTitles(c), ['Other']);
+      expect(channelGroups(c), [('CAFE Channel', 1)]);
+    });
+
+    test('a channel never watched has nothing to show once the watched '
+        'videos are narrowed to some kind', () async {
+      subscribe([sub('UCz', 'Zed')]);
+      final c = await loaded();
+      await c.read(historySubscriptionsProvider.future);
+
+      c.read(historyMusicFilterProvider.notifier).set(ShowFilter.only);
+      await _settle(c);
+
+      expect(channelGroups(c), isEmpty);
+    });
+
+    test('the filters offer every channel, the watched ones most watched '
+        'first, then the ones subscribed to but never watched', () async {
+      subscribe([sub('UCx', 'X'), sub('UCz', 'Zed')]);
+      final c = await loaded();
+      await c.read(historySubscriptionsProvider.future);
+      // Narrowing what's shown doesn't narrow what can be picked.
+      c.read(historySearchQueryProvider.notifier).update('nothing like it');
+      await _settle(c);
+
+      expect(
+        [
+          for (final f in c.read(historyFilterChannelsProvider))
+            (f.channel.title, f.count, f.subscribed),
+        ],
+        [('X', 3, true), ('CAFE Channel', 1, false), ('Zed', 0, true)],
+      );
+    });
+
+    test('searching lists a channel never watched only when its name '
+        'matches', () async {
+      subscribe([sub('UCz', 'Zed'), sub('UCc', 'Cafe crawl')]);
+      final c = await loaded();
+      await c.read(historySubscriptionsProvider.future);
+
+      c.read(historySearchQueryProvider.notifier).update('cafe');
+      await _settle(c);
+
+      expect(
+        [for (final (name, _) in channelGroups(c)) name],
+        ['CAFE Channel', 'X', 'Cafe crawl'],
+      );
+    });
+  });
+
+  test('videos watched on YouTube Music can be shown alone', () async {
+    final c = container(
+      history: TakeoutHistory(
+        watches: [
+          _watch('Song', DateTime(2026, 4, 12, 9)).copyWith(music: true),
+          _watch('Video', DateTime(2026, 4, 11, 9)),
+        ],
+      ),
+    );
+    final loaded = (await c.read(takeoutHistoryProvider.future))!.history;
+
+    c.read(historyMusicFilterProvider.notifier).set(ShowFilter.only);
+    await _settle(c);
+
+    expect(
+      [
+        for (final day in c.read(watchDaysProvider))
+          for (final i in day.indices) loaded.watches[i].title,
+      ],
+      ['Song'],
+    );
+  });
+
+  test('watched videos are grouped by month too', () async {
+    final c = await loaded();
+
+    final months = c.read(watchMonthsProvider);
+
+    expect([for (final m in months) m.day], [DateTime(2026, 4)]);
+    expect(months.single.indices, hasLength(4));
   });
 
   test(
@@ -341,6 +460,6 @@ void main() {
 
     expect(c.read(watchDaysProvider), isEmpty);
     expect(c.read(searchDaysProvider), isEmpty);
-    expect(c.read(filteredWatchedChannelsProvider), isEmpty);
+    expect(c.read(historyChannelGroupsProvider).groups, isEmpty);
   });
 }

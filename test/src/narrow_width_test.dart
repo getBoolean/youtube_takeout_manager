@@ -58,7 +58,8 @@ import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_pro
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
-import 'package:youtube_takeout_manager/src/features/history/application/history_channel_filter.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_channel_selection.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_grouping.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
@@ -66,6 +67,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/takeout_hist
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_toolbar.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/application/interaction_providers.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/interaction.dart';
 import 'package:youtube_takeout_manager/src/features/interactions/domain/queue_item_kind.dart';
@@ -913,8 +915,8 @@ void main() {
     overrides: historyOverrides,
     then: (tester) async {
       ProviderScope.containerOf(tester.element(find.byType(HistoryPage)))
-          .read(historyChannelFilterProvider.notifier)
-          .show(
+          .read(historyChannelSelectionProvider.notifier)
+          .showOnly(
             const HistoryChannel(
               channelId: 'UClong',
               title: 'A channel with a very long name indeed, it goes on',
@@ -923,13 +925,48 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     },
   );
-  for (final (tab, name) in [(1, 'searches'), (2, 'channels')]) {
+  fitsAtEveryWidth(
+    "the history page's searches",
+    () => const HistoryPage(),
+    overrides: historyOverrides,
+    then: (tester) async {
+      await tester.tap(find.byType(Tab).at(1));
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+  for (final grouping in [HistoryGrouping.month, HistoryGrouping.channel]) {
+    for (final expanded in [false, true]) {
+      fitsAtEveryWidth(
+        "the history page's videos by ${grouping.name}"
+        '${expanded ? ', expanded' : ', collapsed'}',
+        () => const HistoryPage(),
+        overrides: historyOverrides,
+        then: (tester) async {
+          ProviderScope.containerOf(
+            tester.element(find.byType(HistoryPage)),
+          ).read(historyGroupingProvider.notifier).set(grouping);
+          await tester.pump(const Duration(seconds: 1));
+          final button = find.byKey(
+            expanded
+                ? HistoryToolbar.expandAllKey
+                : HistoryToolbar.collapseAllKey,
+          );
+          await tester.tap(button);
+          await tester.pump(const Duration(seconds: 1));
+        },
+      );
+    }
+  }
+  for (final (name, key) in [
+    ('Group by', HistoryToolbar.groupByKey),
+    ('Filters', HistoryToolbar.filtersKey),
+  ]) {
     fitsAtEveryWidth(
-      "the history page's $name",
+      "the history page's $name modal",
       () => const HistoryPage(),
       overrides: historyOverrides,
       then: (tester) async {
-        await tester.tap(find.byType(Tab).at(tab));
+        await tester.tap(find.byKey(key));
         await tester.pump(const Duration(seconds: 1));
       },
     );

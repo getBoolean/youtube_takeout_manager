@@ -32,6 +32,13 @@ class WatchEntryTile extends StatelessWidget {
   /// Whether it's marked when removed from YouTube's history; not when
   /// only those are listed.
   final bool markRemoved;
+
+  /// Whether its channel shows; not under a header naming it.
+  final bool showChannel;
+
+  /// Whether its date shows beside the time of day; not under a header
+  /// naming the day.
+  final bool showDate;
   final VoidCallback onTap;
 
   const WatchEntryTile({
@@ -42,6 +49,8 @@ class WatchEntryTile extends StatelessWidget {
     this.channelPicture,
     this.picturesExpected = false,
     this.markRemoved = true,
+    this.showChannel = true,
+    this.showDate = false,
     required this.onTap,
   });
 
@@ -109,9 +118,11 @@ class WatchEntryTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   ChannelMetaLine(
-                    channelName: watch.channelTitle,
+                    channelName: showChannel ? watch.channelTitle : null,
                     thumbnailUrl: channelPicture,
-                    detail: formatTime(watch.time),
+                    detail: showDate
+                        ? formatDateTime(watch.time)
+                        : formatTime(watch.time),
                     // Without an ID, no picture can come for the channel.
                     keepPictureSpace:
                         picturesExpected && watch.channelId != null,

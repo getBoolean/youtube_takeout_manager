@@ -5,21 +5,32 @@ part of '../sticky_grouped_list.dart';
 /// Collapse state lives here rather than in the list so it survives group
 /// headers being built and disposed as they scroll in and out of view.
 /// Created and disposed by the caller.
+///
+/// Groups are expanded unless [expandedByDefault] is false; the groups set
+/// otherwise are kept apart, so collapsing or expanding every group is one
+/// step however many there are, and covers groups that appear later.
 class StickyGroupedListController extends ChangeNotifier {
-  StickyGroupedListController({Iterable<Object> collapsed = const []})
-    : _collapsed = {...collapsed};
+  StickyGroupedListController({
+    Iterable<Object> collapsed = const [],
+    bool expandedByDefault = true,
+  }) : _expandedByDefault = expandedByDefault,
+       _exceptions = {if (expandedByDefault) ...collapsed};
 
-  final Set<Object> _collapsed;
+  bool _expandedByDefault;
+
+  /// The groups whose state isn't the default.
+  final Set<Object> _exceptions;
   _StickyGroupedListViewState<dynamic, dynamic, dynamic>? _view;
 
-  bool isExpanded(Object groupKey) => !_collapsed.contains(groupKey);
+  /// Whether groups not set one way or the other are expanded.
+  bool get expandedByDefault => _expandedByDefault;
+
+  bool isExpanded(Object groupKey) =>
+      _expandedByDefault != _exceptions.contains(groupKey);
 
   /// Collapsing or expanding is instant; the scroll offset is left alone.
   void setExpanded(Object groupKey, bool expanded) {
-    final changed = expanded
-        ? _collapsed.remove(groupKey)
-        : _collapsed.add(groupKey);
-    if (changed) notifyListeners();
+    if (_setExpanded(groupKey, expanded)) notifyListeners();
   }
 
   void toggle(Object groupKey) => setExpanded(groupKey, !isExpanded(groupKey));
@@ -27,10 +38,32 @@ class StickyGroupedListController extends ChangeNotifier {
   void collapseAll(Iterable<Object> groupKeys) {
     var changed = false;
     for (final key in groupKeys) {
-      changed = _collapsed.add(key) || changed;
+      changed = _setExpanded(key, false) || changed;
     }
     if (changed) notifyListeners();
   }
+
+  void expandAll(Iterable<Object> groupKeys) {
+    var changed = false;
+    for (final key in groupKeys) {
+      changed = _setExpanded(key, true) || changed;
+    }
+    if (changed) notifyListeners();
+  }
+
+  /// Expands or collapses every group, including ones that appear later.
+  void setAllExpanded(bool expanded) {
+    if (_expandedByDefault == expanded && _exceptions.isEmpty) return;
+    _expandedByDefault = expanded;
+    _exceptions.clear();
+    notifyListeners();
+  }
+
+  /// Whether it changed.
+  bool _setExpanded(Object groupKey, bool expanded) =>
+      expanded == _expandedByDefault
+      ? _exceptions.remove(groupKey)
+      : _exceptions.add(groupKey);
 
   /// Key of the group whose header is currently pinned, if any.
   Object? get pinnedGroupKey => _view?._pinnedGroupKey;

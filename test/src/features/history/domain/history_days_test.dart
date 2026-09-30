@@ -98,6 +98,68 @@ void main() {
     });
   });
 
+  group('months', () {
+    // Local times, newest first, across three months.
+    final times = [
+      DateTime(2026, 4, 12, 20),
+      DateTime(2026, 4, 1, 8),
+      DateTime(2026, 3, 31, 23),
+      DateTime(2026, 3, 2, 9),
+      DateTime(2025, 12, 25, 12),
+    ];
+    final dayKeys = [for (final t in times) dayKeyOf(t.toUtc())];
+    final days = groupByDay([0, 1, 2, 3, 4], dayKeys);
+
+    test('join the days of each local month, newest first', () {
+      final months = monthsOf(days);
+
+      expect(
+        [for (final m in months) m.day],
+        [DateTime(2026, 4), DateTime(2026, 3), DateTime(2025, 12)],
+      );
+      expect(
+        [for (final m in months) m.indices],
+        [
+          [0, 1],
+          [2, 3],
+          [4],
+        ],
+      );
+    });
+
+    test('only the days given are joined', () {
+      final months = monthsOf(groupByDay([1, 4], dayKeys));
+
+      expect(
+        [for (final m in months) m.indices],
+        [
+          [1],
+          [4],
+        ],
+      );
+    });
+
+    test('find which month an entry is in, and where', () {
+      final months = monthsOf(days);
+
+      expect(dayAndPositionOf(months, 3), (1, 1));
+      expect(dayAndPositionOf(months, 4), (2, 0));
+    });
+
+    test('jumping to a day finds its month', () {
+      final months = monthsOf(days);
+
+      expect(
+        dayGroupFor(months, DateTime(2026, 3, 15))?.day,
+        DateTime(2026, 3),
+      );
+      expect(
+        dayGroupFor(months, DateTime(2026, 1, 5))?.day,
+        DateTime(2025, 12),
+      );
+    });
+  });
+
   group('watched channels', () {
     test('are ordered by how many videos were watched from each', () {
       final channels = countWatchedChannels([

@@ -1,31 +1,38 @@
-import 'dart:typed_data';
-
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 
+import 'channel_groups.dart';
 import 'history_days.dart';
 import 'loaded_history.dart';
-import 'watched_channels.dart';
+import 'watch_filters.dart';
 
-/// What the history is narrowed to: text to search for, the channel of the
-/// watched videos, and whether only entries removed from YouTube's history
-/// are shown.
+/// What the history is narrowed to: text to search for, whether only
+/// entries removed from YouTube's history are shown, whether Shorts and
+/// videos watched on YouTube Music are shown, and the channels of the
+/// watched videos (null for every channel, and the videos without one).
 typedef HistoryFilters = ({
   String query,
-  HistoryChannel? channel,
   bool removedOnly,
+  ShowFilter shorts,
+  ShowFilter music,
+  ChannelMask? channels,
 });
 
 /// Whether [filters] narrow nothing.
 bool isUnfiltered(HistoryFilters filters) =>
-    filters.query.isEmpty && filters.channel == null && !filters.removedOnly;
+    filters.query.isEmpty &&
+    !filters.removedOnly &&
+    filters.shorts == ShowFilter.all &&
+    filters.music == ShowFilter.all &&
+    filters.channels == null;
 
 /// What's shown of [loaded] for some filters: the watched videos and
-/// searches by day (as indices into its lists), and the channels.
+/// searches by day (as indices into its lists), and the watched videos by
+/// channel.
 typedef HistoryResults = ({
   LoadedHistory loaded,
   List<HistoryDay> watchDays,
   List<HistoryDay> searchDays,
-  List<WatchedChannel> channels,
+  ChannelGroups channelGroups,
 });
 
 /// Everything in [loaded], worked out while it was loaded.
@@ -33,17 +40,23 @@ HistoryResults defaultResults(LoadedHistory loaded) => (
   loaded: loaded,
   watchDays: loaded.watchDays,
   searchDays: loaded.searchDays,
-  channels: loaded.watchedChannels,
+  channelGroups: loaded.channelGroups,
 );
 
+/// Whether [flag] passes [filter]: shown with the rest, alone, or hidden.
+bool _shows(ShowFilter filter, bool flag) => switch (filter) {
+  ShowFilter.all => true,
+  ShowFilter.only => flag,
+  ShowFilter.hide => !flag,
+};
+
 /// Narrows [loaded] to [filters]. Watched videos match the search by title
-/// or channel name, searches by their text, and channels by name first,
-/// then by the titles of videos watched from them (counting only those).
+/// or channel name, and searches by their text. Grouped by channel, the
+/// channels whose names match come first.
 ///
 /// Works through at most [sliceSize] entries at a time, awaiting [pause]
 /// between slices so no frame waits on it, and gives up with null when
-/// [cancelled] says a newer search replaced it. Counts go in typed arrays,
-/// so a search allocates little for the collector to pause frames over.
+/// [cancelled] says a newer search replaced it.
 Future<HistoryResults?> searchHistory(
   LoadedHistory loaded,
   HistoryFilters filters, {
@@ -52,12 +65,12 @@ Future<HistoryResults?> searchHistory(
   bool Function()? cancelled,
 }) async {
   final query = foldForSearch(filters.query);
-  final removedOnly = filters.removedOnly;
-  final channelIndex = switch (filters.channel) {
-    // A channel this history doesn't have matches nothing.
-    final channel? => loaded.channelIndexByKey[channel.key] ?? -2,
-    null => null,
-  };
+  final (:removedOnly, :shorts, :music, :channels) = (
+    removedOnly: filters.removedOnly,
+    shorts: filters.shorts,
+    music: filters.music,
+    channels: filters.channels,
+  );
   Future<bool> keepGoing() async {
     await pause?.call();
     return !(cancelled?.call() ?? false);
@@ -78,21 +91,15 @@ Future<HistoryResults?> searchHistory(
 
   final watches = loaded.history.watches;
   final channelOf = loaded.watchChannelIndex;
-  final channels = loaded.watchedChannels;
   final watchIndices = <int>[];
-  // Per channel: how many videos' titles match, and the newest's index.
-  final titleMatches = Int32List(channels.length);
-  final newestMatch = Int32List(channels.length);
   if (!await sliced(watches.length, (i) {
     final watch = watches[i];
     if ((!removedOnly || watch.removedAt != null) &&
-        (channelIndex == null || channelOf[i] == channelIndex) &&
+        (channels == null || channels.allows(channelOf[i])) &&
+        _shows(shorts, watch.isShort) &&
+        _shows(music, watch.music) &&
         watch.matches(query)) {
       watchIndices.add(i);
-    }
-    final c = channelOf[i];
-    if (query.isNotEmpty && c >= 0 && watch.titleSearchText.contains(query)) {
-      if (titleMatches[c]++ == 0) newestMatch[c] = i;
     }
   })) {
     return null;
@@ -110,47 +117,28 @@ Future<HistoryResults?> searchHistory(
     return null;
   }
 
-  List<WatchedChannel> found = channels;
-  if (query.isNotEmpty) {
-    final byName = <int>[];
-    final byTitle = <int>[];
-    if (!await sliced(channels.length, (c) {
-      if (channels[c].searchText.contains(query)) {
-        byName.add(c);
-      } else if (titleMatches[c] > 0) {
-        byTitle.add(c);
-      }
-    })) {
-      return null;
-    }
-    // Channels are already the most watched first; among those found by
-    // title, most matches first, ties as before.
-    byTitle.sort((a, b) {
-      final byCount = titleMatches[b] - titleMatches[a];
-      return byCount != 0 ? byCount : a - b;
-    });
-    if (!await keepGoing()) return null;
-    found = [for (final c in byName) channels[c]];
-    if (!await sliced(byTitle.length, (i) {
-      final c = byTitle[i];
-      found.add(
-        channels[c].found(
-          count: titleMatches[c],
-          lastWatched: watches[newestMatch[c]].time,
-          byTitle: true,
-        ),
-      );
-    })) {
-      return null;
-    }
+  final watchedChannels = loaded.watchedChannels;
+  final nameMatches = <int>{};
+  if (query.isNotEmpty &&
+      !await sliced(watchedChannels.length, (c) {
+        if (watchedChannels[c].searchText.contains(query)) nameMatches.add(c);
+      })) {
+    return null;
   }
 
   final watchDays = groupByDay(watchIndices, loaded.watchDayKeys);
+  if (!await keepGoing()) return null;
+  final channelGroups = groupByChannel(
+    channels: watchedChannels,
+    watchChannelIndex: channelOf,
+    watchIndices: watchIndices,
+    nameMatches: nameMatches,
+  );
   if (!await keepGoing()) return null;
   return (
     loaded: loaded,
     watchDays: watchDays,
     searchDays: groupByDay(searchIndices, loaded.searchDayKeys),
-    channels: found,
+    channelGroups: channelGroups,
   );
 }

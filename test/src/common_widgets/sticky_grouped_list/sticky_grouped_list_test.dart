@@ -27,8 +27,11 @@ class _HeaderState {
 }
 
 class _Harness {
+  _Harness([StickyGroupedListController? controller])
+    : controller = controller ?? StickyGroupedListController();
+
   final ScrollController scroll = ScrollController();
-  final StickyGroupedListController controller = StickyGroupedListController();
+  final StickyGroupedListController controller;
   final created = <String, _HeaderState>{};
   final disposed = <String>[];
   final headerBuilds = <String>[];
@@ -50,11 +53,12 @@ Future<_Harness> _pump(
   WidgetTester tester, {
   required List<_Group> groups,
   (int, int)? Function(Object itemKey)? locateItem,
+  StickyGroupedListController? controller,
 }) async {
   tester.view.physicalSize = const Size(400, 600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  final h = _Harness();
+  final h = _Harness(controller);
   addTearDown(h.dispose);
 
   await tester.pumpWidget(_app(h, groups, locateItem: locateItem));
@@ -214,6 +218,69 @@ void main() {
     await tester.tap(_header('g1'));
     await tester.pump();
     expect(find.text('g1-i0'), findsOneWidget);
+  });
+
+  testWidgets('a list can start with every group collapsed, and a tap opens '
+      'one', (tester) async {
+    final h = await _pump(
+      tester,
+      groups: _groups(5, 3),
+      controller: StickyGroupedListController(expandedByDefault: false),
+    );
+    expect(_header('g1'), findsOneWidget);
+    expect(find.text('g1-i0'), findsNothing);
+
+    await tester.tap(_header('g1'));
+    await tester.pump();
+
+    expect(find.text('g1-i0'), findsOneWidget);
+    expect(find.text('g2-i0'), findsNothing);
+    expect(h.controller.isExpanded('g1'), isTrue);
+  });
+
+  testWidgets('collapsing every group also collapses groups added later', (
+    tester,
+  ) async {
+    final h = await _pump(tester, groups: _groups(3, 3));
+
+    h.controller.setAllExpanded(false);
+    await tester.pumpWidget(_app(h, _groups(8, 3)));
+
+    expect(_header('g6'), findsOneWidget);
+    expect(find.text('g0-i0'), findsNothing);
+    expect(find.text('g6-i0'), findsNothing);
+  });
+
+  testWidgets('expanding every group opens ones collapsed one by one', (
+    tester,
+  ) async {
+    final h = await _pump(tester, groups: _groups(5, 3));
+    h.controller
+      ..setExpanded('g0', false)
+      ..setExpanded('g1', false);
+    await tester.pump();
+    expect(find.text('g0-i0'), findsNothing);
+
+    h.controller.setAllExpanded(true);
+    await tester.pump();
+
+    expect(find.text('g0-i0'), findsOneWidget);
+    expect(find.text('g1-i0'), findsOneWidget);
+  });
+
+  testWidgets('expanding some groups opens just those', (tester) async {
+    final h = await _pump(
+      tester,
+      groups: _groups(5, 3),
+      controller: StickyGroupedListController(expandedByDefault: false),
+    );
+
+    h.controller.expandAll(['g0', 'g2']);
+    await tester.pump();
+
+    expect(find.text('g0-i0'), findsOneWidget);
+    expect(find.text('g1-i0'), findsNothing);
+    expect(find.text('g2-i0'), findsOneWidget);
   });
 
   testWidgets('reveals an item that was never laid out below its header', (

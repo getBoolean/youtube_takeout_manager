@@ -10,18 +10,26 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_grouping.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/history_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/grouping_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_channel_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_day_list.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_filter_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_screen.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/removed_badge.dart';
-import 'package:youtube_takeout_manager/src/features/history/presentation/top_channels_list.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_toolbar.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
+import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 WatchEntry _watch(
@@ -150,6 +158,7 @@ Future<ProviderContainer> _open(
   double width = 800,
   Map<String, String> pictures = const {},
   String? session,
+  List<Subscription> subscriptions = const [],
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -163,6 +172,9 @@ Future<ProviderContainer> _open(
       channelThumbnailFetcherProvider.overrideWith(() => _fetcher = _Fetcher()),
       channelThumbnailsProvider.overrideWith(() => _Pictures(pictures)),
       readSessionChannelIdProvider.overrideWithValue(session),
+      historySubscriptionsProvider.overrideWith(
+        (ref) async => {for (final s in subscriptions) s.channelId: s},
+      ),
     ],
   );
   addTearDown(container.dispose);
@@ -188,6 +200,39 @@ Future<void> _openTab(WidgetTester tester, int index) async {
   await tester.tap(find.byType(Tab).at(index));
   await tester.pumpAndSettle();
 }
+
+Future<void> _tapKey(WidgetTester tester, Key key) async {
+  // Only within modals: over the tabs it would scroll them sideways.
+  if (find.byKey(key).hitTestable().evaluate().isEmpty) {
+    await tester.ensureVisible(find.byKey(key));
+    await tester.pumpAndSettle();
+  }
+  await tester.tap(find.byKey(key));
+  await tester.pumpAndSettle();
+}
+
+/// Groups the watched videos by [grouping], through the Group by modal.
+Future<void> _groupBy(WidgetTester tester, HistoryGrouping grouping) async {
+  await _tapKey(tester, HistoryToolbar.groupByKey);
+  await _tapKey(tester, GroupingSheet.optionKey(grouping));
+}
+
+Future<void> _openFilters(WidgetTester tester) =>
+    _tapKey(tester, HistoryToolbar.filtersKey);
+
+/// The header of [title]'s group, grouped by channel. The first group's
+/// header has a pinned copy over it; this is the one in the list.
+Finder _channelHeader(String title) => find
+    .byWidgetPredicate(
+      (w) => w is ChannelGroupHeader && w.group.channel?.title == title,
+    )
+    .first;
+
+Subscription _subscription(String id, String title) => Subscription(
+  channelId: id,
+  channelUrl: 'http://www.youtube.com/channel/$id',
+  channelTitle: title,
+);
 
 void main() {
   testWidgets('the History button opens the watch history, by day', (
@@ -215,19 +260,12 @@ void main() {
     expect(_shown('Other'), findsOneWidget);
     expect(_shown('Unrelated'), findsNothing);
 
-    // Channels named for it, then those with videos titled for it.
-    await _openTab(tester, 2);
-    final channels = find.descendant(
-      of: find.byType(TopChannelsList),
-      matching: find.byType(ListTile),
-    );
-    expect(channels, findsNWidgets(2));
+    // Grouped by channel: the channel named for it, then those with
+    // videos titled for it.
+    await _groupBy(tester, HistoryGrouping.channel);
     expect(
-      find.descendant(
-        of: channels.first,
-        matching: find.textContaining('CAFE Channel', findRichText: true),
-      ),
-      findsOneWidget,
+      tester.getTopLeft(_channelHeader('CAFE Channel')).dy,
+      lessThan(tester.getTopLeft(_channelHeader('X')).dy),
     );
 
     c.read(historySearchQueryProvider.notifier).update('creme');
@@ -259,26 +297,175 @@ void main() {
     },
   );
 
-  testWidgets('picking a top channel shows its watches on Watched', (
+  testWidgets('grouped by channel, each channel is a collapsed header that '
+      'opens to the videos watched from it', (tester) async {
+    await _open(tester);
+
+    await _groupBy(tester, HistoryGrouping.channel);
+
+    expect(_channelHeader('X'), findsOneWidget);
+    expect(_channelHeader('CAFE Channel'), findsOneWidget);
+    expect(_shown('Café tour'), findsNothing);
+    // Jumping to a day belongs to grouping by day or month.
+    expect(find.byIcon(Icons.event), findsNothing);
+
+    await tester.tap(_channelHeader('X'));
+    await tester.pumpAndSettle();
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Unrelated'), findsOneWidget);
+    expect(_shown('Other'), findsNothing);
+  });
+
+  testWidgets('every group can be collapsed and expanded at once', (
     tester,
   ) async {
     await _open(tester);
-    await _openTab(tester, 2);
 
-    // The most watched, X, is first.
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byType(TopChannelsList),
-            matching: find.byType(ListTile),
-          )
-          .first,
+    await _tapKey(tester, HistoryToolbar.collapseAllKey);
+    expect(_shown('Café tour'), findsNothing);
+    await _tapKey(tester, HistoryToolbar.expandAllKey);
+    expect(_shown('Café tour'), findsOneWidget);
+
+    await _groupBy(tester, HistoryGrouping.channel);
+    await _tapKey(tester, HistoryToolbar.expandAllKey);
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Other'), findsOneWidget);
+    await _tapKey(tester, HistoryToolbar.collapseAllKey);
+    expect(_shown('Other'), findsNothing);
+  });
+
+  testWidgets('grouped by month, videos are under their month, newest first', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      history: TakeoutHistory(
+        watches: [
+          _watch('April video', DateTime(2026, 4, 12, 9)),
+          _watch('March video', DateTime(2026, 3, 30, 9)),
+        ],
+      ),
     );
-    await tester.pumpAndSettle();
 
-    expect(find.byType(InputChip), findsOneWidget);
+    await _groupBy(tester, HistoryGrouping.month);
+
+    // The newest month's header has a pinned copy over it.
+    final april = find.text(formatMonth(DateTime(2026, 4))).first;
+    final march = find.text(formatMonth(DateTime(2026, 3))).first;
+    expect(april, findsOneWidget);
+    expect(
+      tester.getTopLeft(april).dy,
+      lessThan(tester.getTopLeft(_shown('April video')).dy),
+    );
+    expect(
+      tester.getTopLeft(_shown('April video')).dy,
+      lessThan(tester.getTopLeft(march).dy),
+    );
+    expect(
+      tester.getTopLeft(march).dy,
+      lessThan(tester.getTopLeft(_shown('March video')).dy),
+    );
+  });
+
+  testWidgets('the Filters modal narrows to subscribed channels, shown as a '
+      'chip that clears it', (tester) async {
+    await _open(tester, subscriptions: [_subscription('UCx', 'X')]);
+
+    await _openFilters(tester);
+    await _tapKey(
+      tester,
+      HistoryFilterSheet.subscriptionKey(SubscriptionFilter.subscribed),
+    );
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
     expect(_shown('Café tour'), findsOneWidget);
     expect(_shown('Other'), findsNothing);
+    expect(find.byType(InputChip), findsOneWidget);
+
+    await tester.tap(
+      find
+          .descendant(of: find.byType(InputChip), matching: find.byType(Icon))
+          .last,
+    );
+    await tester.pumpAndSettle();
+    expect(_shown('Other'), findsOneWidget);
+    expect(find.byType(InputChip), findsNothing);
+  });
+
+  testWidgets('picking channels in the Filters modal shows only theirs', (
+    tester,
+  ) async {
+    await _open(tester);
+
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(_shown('Other'), findsOneWidget);
+    expect(_shown('Café tour'), findsNothing);
+    expect(find.byType(InputChip), findsOneWidget);
+  });
+
+  testWidgets('clearing the Filters modal shows everything again', (
+    tester,
+  ) async {
+    await _open(tester);
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.clearKey);
+
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(find.byType(InputChip), findsNothing);
+  });
+
+  testWidgets('Shorts, YouTube Music and subscriptions are only offered when '
+      'the takeout has some', (tester) async {
+    await _open(tester);
+
+    await _openFilters(tester);
+
+    expect(find.byKey(HistoryFilterSheet.shortsSectionKey), findsNothing);
+    expect(find.byKey(HistoryFilterSheet.musicSectionKey), findsNothing);
+    expect(find.byKey(HistoryFilterSheet.subscriptionSectionKey), findsNothing);
+  });
+
+  testWidgets('Shorts can be shown alone', (tester) async {
+    await _open(
+      tester,
+      history: TakeoutHistory(
+        watches: [
+          WatchEntry(
+            time: DateTime(2026, 4, 12, 9).toUtc(),
+            kind: WatchKind.video,
+            title: 'A short',
+            url: 'https://www.youtube.com/shorts/s1',
+            channelTitle: 'Y',
+          ),
+          _watch('A long one', DateTime(2026, 4, 11, 9)),
+        ],
+      ),
+    );
+
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.shortsKey(ShowFilter.only));
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(_shown('A short'), findsOneWidget);
+    expect(_shown('A long one'), findsNothing);
+  });
+
+  testWidgets('channels subscribed to but never watched show only when '
+      'grouped by channel', (tester) async {
+    await _open(tester, subscriptions: [_subscription('UCz', 'Zed')]);
+    expect(_shown('Zed'), findsNothing);
+
+    await _groupBy(tester, HistoryGrouping.channel);
+
+    expect(_channelHeader('Zed'), findsOneWidget);
   });
 
   testWidgets('jumping to a day reveals its entries', (tester) async {
@@ -288,6 +475,47 @@ void main() {
           _watch('Day $day video $i', DateTime(2026, 4, day, 23 - i)),
     ];
     await _open(tester, history: TakeoutHistory(watches: watches));
+    expect(_shown('Day 3 video 0'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.event));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3').hitTestable());
+    await tester.tap(find.widgetWithText(TextButton, 'OK'));
+    await tester.pumpAndSettle();
+
+    expect(_shown('Day 3 video 0'), findsOneWidget);
+  });
+
+  testWidgets('jumping to a day opens it when every day is collapsed', (
+    tester,
+  ) async {
+    final watches = [
+      for (var day = 30; day >= 1; day--)
+        for (var i = 0; i < 20; i++)
+          _watch('Day $day video $i', DateTime(2026, 4, day, 23 - i)),
+    ];
+    await _open(tester, history: TakeoutHistory(watches: watches));
+    await _tapKey(tester, HistoryToolbar.collapseAllKey);
+
+    await tester.tap(find.byIcon(Icons.event));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3').hitTestable());
+    await tester.tap(find.widgetWithText(TextButton, 'OK'));
+    await tester.pumpAndSettle();
+
+    expect(_shown('Day 3 video 0'), findsOneWidget);
+  });
+
+  testWidgets('grouped by month, jumping to a day reveals its videos', (
+    tester,
+  ) async {
+    final watches = [
+      for (var day = 30; day >= 1; day--)
+        for (var i = 0; i < 20; i++)
+          _watch('Day $day video $i', DateTime(2026, 4, day, 23 - i)),
+    ];
+    await _open(tester, history: TakeoutHistory(watches: watches));
+    await _groupBy(tester, HistoryGrouping.month);
     expect(_shown('Day 3 video 0'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.event));
@@ -473,13 +701,12 @@ void main() {
     expect(_fetcher.askedFirst.last, contains('UCtop'));
   });
 
-  testWidgets('the top channels are asked for first when shown', (
-    tester,
-  ) async {
+  testWidgets('grouped by channel, the channels on screen are asked for '
+      'first', (tester) async {
     await _open(tester, history: _longHistory);
     final before = _fetcher.askedFirst.length;
 
-    await _openTab(tester, 2);
+    await _groupBy(tester, HistoryGrouping.channel);
 
     expect(_fetcher.askedFirst.skip(before).first.first, 'UCtop');
   });
@@ -515,7 +742,7 @@ void main() {
   });
 
   testWidgets('channel pictures show in the rows, the channel chip and the '
-      'top channels', (tester) async {
+      'channel headers', (tester) async {
     const picture = 'https://yt3.example/x';
     await _open(tester, pictures: {'UCx': picture});
 
@@ -526,24 +753,21 @@ void main() {
       findsWidgets,
     );
 
-    await _openTab(tester, 2);
+    await _groupBy(tester, HistoryGrouping.channel);
     expect(
-      find.byWidgetPredicate(
-        (w) => w is ChannelAvatar && w.thumbnailUrl == picture,
+      find.descendant(
+        of: _channelHeader('X'),
+        matching: find.byWidgetPredicate(
+          (w) => w is ChannelAvatar && w.thumbnailUrl == picture,
+        ),
       ),
       findsOneWidget,
     );
 
-    // Picking it shows its chip, with its picture too.
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byType(TopChannelsList),
-            matching: find.byType(ListTile),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
+    // Showing it alone gives it a chip, with its picture too.
+    await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelKey('UCx'));
+    await _tapKey(tester, HistoryFilterSheet.showKey);
     expect(
       find.descendant(
         of: find.byType(InputChip),

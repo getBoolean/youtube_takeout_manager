@@ -27,6 +27,25 @@ List<HistoryDay> groupByDay(Iterable<int> indices, List<int> dayKeys) {
   return days;
 }
 
+/// [days] (newest first) joined into local months, newest first: each a
+/// [HistoryDay] whose key is `yyyymm00` and whose day is the month's first,
+/// so the same lookups work on months as on days.
+List<HistoryDay> monthsOf(List<HistoryDay> days) {
+  final months = <HistoryDay>[];
+  for (final day in days) {
+    final key = day.dayKey ~/ 100 * 100;
+    if (months.isEmpty || months.last.dayKey != key) {
+      months.add((
+        dayKey: key,
+        day: DateTime(day.day.year, day.day.month),
+        indices: [],
+      ));
+    }
+    months.last.indices.addAll(day.indices);
+  }
+  return months;
+}
+
 /// The day of [days] (newest first) to show for [date]: that day, else the
 /// nearest older one, else the oldest. Null when there are no days.
 HistoryDay? dayGroupFor(List<HistoryDay> days, DateTime date) {

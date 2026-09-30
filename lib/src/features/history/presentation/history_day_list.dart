@@ -6,8 +6,10 @@ import 'package:youtube_takeout_manager/src/utils/count_formatter.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import '../domain/history_days.dart';
 
-/// History entries under a sticky header for each day, built lazily however
-/// many there are. Entries are indices into the history's list of them.
+/// History entries under a sticky header for each day, or each month with
+/// [label] naming months, built lazily however many there are. Entries are
+/// indices into the history's list of them. Tapping a header closes or
+/// opens its group.
 class HistoryDayList extends StatelessWidget {
   final List<HistoryDay> days;
   final StickyGroupedListController controller;
@@ -16,6 +18,9 @@ class HistoryDayList extends StatelessWidget {
   /// What one entry is called in a day's count, e.g. "video".
   final String noun;
   final String? plural;
+
+  /// Names a group by its first day; [formatDay] by default.
+  final String Function(DateTime day) label;
 
   /// The entry to highlight, once, having jumped to it.
   final int? highlighted;
@@ -30,6 +35,7 @@ class HistoryDayList extends StatelessWidget {
     required this.scrollController,
     required this.noun,
     this.plural,
+    this.label = formatDay,
     required this.highlighted,
     required this.onHighlightDone,
     required this.entryBuilder,
@@ -55,9 +61,11 @@ class HistoryDayList extends StatelessWidget {
       createHeaderState: (_, _, _) => _noState,
       updateHeaderState: (_, _, _) {},
       disposeHeaderState: (_) {},
-      headerBuilder: (context, day, _, _) => _DayHeader(
-        day: formatDay(day.day),
+      headerBuilder: (context, day, _, status) => _DayHeader(
+        day: label(day.day),
         count: formatCount(day.indices.length, noun, plural: plural),
+        expanded: status.isExpanded,
+        onTap: () => controller.toggle(day.dayKey),
       ),
       itemBuilder: (context, day, index, _) {
         final entry = entryBuilder(context, index);
@@ -73,13 +81,21 @@ class HistoryDayList extends StatelessWidget {
   }
 }
 
-/// A day's header: the day, and how many entries it has on the far side.
-/// Opaque, since its pinned copy is drawn over the rows.
+/// A day's header: the day, and how many entries it has on the far side,
+/// with a chevron that turns as it opens. Opaque, since its pinned copy is
+/// drawn over the rows.
 class _DayHeader extends StatelessWidget {
   final String day;
   final String count;
+  final bool expanded;
+  final VoidCallback onTap;
 
-  const _DayHeader({required this.day, required this.count});
+  const _DayHeader({
+    required this.day,
+    required this.count,
+    required this.expanded,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -90,25 +106,51 @@ class _DayHeader extends StatelessWidget {
         color: scheme.surfaceContainerLow,
         border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        // Day and count at either side; the count under the day when both
-        // don't fit.
-        child: Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          runSpacing: 2,
-          children: [
-            Text(day, style: theme.textTheme.titleSmall),
-            Text(
-              count,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+      child: Semantics(
+        expanded: expanded,
+        button: true,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 8, 10),
+            child: Row(
+              children: [
+                // Day and count at either side; the count under the day
+                // when both don't fit.
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 12,
+                    runSpacing: 2,
+                    children: [
+                      Text(day, style: theme.textTheme.titleSmall),
+                      Text(
+                        count,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: Icon(
+                    Icons.expand_more,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
