@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
@@ -25,6 +26,15 @@ class _Thumbnails extends ChannelThumbnailFetcher {
 
   @override
   void build() => started.add('thumbnails');
+}
+
+class _Categorizer extends ChannelCategorizer {
+  final List<String> started;
+
+  _Categorizer(this.started);
+
+  @override
+  void build() => started.add('categories');
 }
 
 class _EmojiNames extends EmojiNameResolver {
@@ -77,6 +87,7 @@ void main() {
           (ref) => Stream.value(started.add('video formats')),
         ),
         emojiNameResolverProvider.overrideWith(() => _EmojiNames(started)),
+        channelCategorizerProvider.overrideWith(() => _Categorizer(started)),
         queueChannelAssignmentProvider.overrideWith(
           (ref) => started.add('queue channels'),
         ),
@@ -93,6 +104,7 @@ void main() {
       'thumbnails',
       'video titles',
       'video formats',
+      'categories',
       'emoji names',
       'queue channels',
     });

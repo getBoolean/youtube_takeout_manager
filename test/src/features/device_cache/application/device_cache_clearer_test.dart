@@ -48,7 +48,9 @@ class _FormatCache implements VideoFormatCacheRepository {
 /// Channels' topics kept on the device, in memory.
 class _DetailsCache implements ChannelDetailsRepository {
   var details = <String, ChannelDetails>{
-    'UCold': const ChannelDetails(topicUrls: ['https://en.wikipedia.org/wiki/Music']),
+    'UCold': const ChannelDetails(
+      topicUrls: ['https://en.wikipedia.org/wiki/Music'],
+    ),
   };
 
   @override

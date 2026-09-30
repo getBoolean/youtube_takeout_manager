@@ -72,7 +72,7 @@ final class ChannelThumbnailFetcherProvider
 }
 
 String _$channelThumbnailFetcherHash() =>
-    r'b069e19054add6f52bd35143bb2af4aa39f98a4d';
+    r'cdff8fb3e55b848aa61d53f81dd3c4895080d631';
 
 /// Fetches channel pictures, and with them each channel's topics and
 /// description, at no extra cost: for the channels the viewed channel

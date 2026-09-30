@@ -7,6 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
@@ -133,6 +137,15 @@ class _Pictures extends ChannelThumbnails {
   Future<Map<String, String>> build() async => pictures;
 }
 
+class _Categories extends ChannelCategories {
+  _Categories(this.categories);
+
+  final Map<String, ChannelCategory> categories;
+
+  @override
+  Future<Map<String, ChannelCategory>> build() async => categories;
+}
+
 late _Fetcher _fetcher;
 
 /// The channel list, with only its History button, and history.
@@ -160,6 +173,7 @@ Future<ProviderContainer> _open(
   Map<String, String> pictures = const {},
   String? session,
   List<Subscription> subscriptions = const [],
+  Map<String, ChannelCategory> categories = const {},
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -176,6 +190,7 @@ Future<ProviderContainer> _open(
       historySubscriptionsProvider.overrideWith(
         (ref) async => {for (final s in subscriptions) s.channelId: s},
       ),
+      channelCategoriesProvider.overrideWith(() => _Categories(categories)),
     ],
   );
   addTearDown(container.dispose);
@@ -316,6 +331,37 @@ void main() {
     expect(_shown('Café tour'), findsOneWidget);
     expect(_shown('Unrelated'), findsOneWidget);
     expect(_shown('Other'), findsNothing);
+  });
+
+  testWidgets("grouped by channel, each channel's header has its category", (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      categories: {
+        'UCx': ChannelCategory(
+          path: const CategoryPath('Gaming', 'Action'),
+          decidedAt: DateTime.utc(2026, 9, 30),
+        ),
+      },
+    );
+
+    await _groupBy(tester, HistoryGrouping.channel);
+
+    expect(
+      find.descendant(
+        of: _channelHeader('X'),
+        matching: find.byType(ChannelCategoryChip),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _channelHeader('X'),
+        matching: find.textContaining('Gaming'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('every group can be collapsed and expanded at once', (

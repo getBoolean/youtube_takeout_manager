@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/sign_in_service.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/queue_channel_assignment.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_name_resolver.dart';
@@ -26,5 +27,6 @@ void appEffects(Ref ref) {
   ref.listen(videoTitleFetcherProvider, (_, _) {});
   ref.listen(watchedVideoFormatFetcherProvider, (_, _) {});
   ref.listen(emojiNameResolverProvider, (_, _) {});
+  ref.listen(channelCategorizerProvider, (_, _) {});
   ref.listen(queueChannelAssignmentProvider, (_, _) {});
 }

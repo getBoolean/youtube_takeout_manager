@@ -1,0 +1,143 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
+import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
+
+class _Categories extends ChannelCategories {
+  _Categories(this.categories);
+
+  final Map<String, ChannelCategory> categories;
+
+  @override
+  Future<Map<String, ChannelCategory>> build() async => categories;
+}
+
+class _Details extends ChannelDetailsNotifier {
+  @override
+  Future<Map<String, ChannelDetails>> build() async => {
+    'UCg': const ChannelDetails(
+      topicUrls: ['https://en.wikipedia.org/wiki/Action_game'],
+    ),
+  };
+}
+
+class _Progress extends CategorizationProgress {
+  @override
+  ({bool running, int done, int total}) build() =>
+      (running: true, done: 3, total: 12);
+}
+
+const _gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
+
+ChannelCategory _category({
+  CategoryPath? path = const CategoryPath('Gaming', 'Action'),
+  CategorySource source = CategorySource.youtube,
+}) => ChannelCategory(
+  path: path,
+  source: source,
+  hadTopics: true,
+  decidedAt: DateTime.utc(2026, 9, 30),
+);
+
+Future<void> _pump(
+  WidgetTester tester, {
+  Map<String, ChannelCategory> categories = const {},
+  Widget child = const ChannelCategoryChip(channel: _gamer),
+  List<Override> overrides = const [],
+}) async {
+  tester.view.physicalSize = const Size(800, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        channelCategoriesProvider.overrideWith(() => _Categories(categories)),
+        channelDetailsProvider.overrideWith(_Details.new),
+        ...overrides,
+      ],
+      child: MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(body: Center(child: child)),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  testWidgets("a channel's category shows as a chip", (tester) async {
+    await _pump(tester, categories: {'UCg': _category()});
+
+    expect(
+      find.textContaining(const CategoryPath('Gaming', 'Action').label),
+      findsOneWidget,
+    );
+    expect(find.byIcon(ChannelCategoryChip.aiIcon), findsNothing);
+  });
+
+  testWidgets('a category an AI chose is marked as such', (tester) async {
+    await _pump(
+      tester,
+      categories: {'UCg': _category(source: CategorySource.claude)},
+    );
+
+    expect(find.byIcon(ChannelCategoryChip.aiIcon), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('AI')), findsOneWidget);
+  });
+
+  testWidgets('a channel not categorized yet shows no chip', (tester) async {
+    await _pump(tester);
+
+    expect(find.byType(InkWell), findsNothing);
+  });
+
+  testWidgets('a channel nothing could categorize says so', (tester) async {
+    await _pump(tester, categories: {'UCg': _category(path: null)});
+
+    expect(find.byType(InkWell), findsOneWidget);
+  });
+
+  testWidgets("tapping a YouTube category explains it comes from YouTube's "
+      'topics for the channel', (tester) async {
+    await _pump(tester, categories: {'UCg': _category()});
+
+    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
+    expect(find.textContaining('Action game'), findsWidgets);
+  });
+
+  testWidgets('while channels are categorized, how far along shows', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      child: const CategorizationBanner(),
+      overrides: [categorizationProgressProvider.overrideWith(_Progress.new)],
+    );
+
+    final bar = tester.widget<LinearProgressIndicator>(
+      find.byType(LinearProgressIndicator),
+    );
+    expect(bar.value, closeTo(3 / 12, 0.001));
+  });
+
+  testWidgets('once done, the progress goes away', (tester) async {
+    await _pump(tester, child: const CategorizationBanner());
+
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+  });
+}

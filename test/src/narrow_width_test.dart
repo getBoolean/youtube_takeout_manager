@@ -40,6 +40,11 @@ import 'package:youtube_takeout_manager/src/features/comments/domain/comment.dar
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
@@ -934,6 +939,37 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     },
   );
+  fitsAtEveryWidth(
+    "the history page's channels with their categories, while categorizing",
+    () => const HistoryPage(),
+    overrides: [
+      ...historyOverrides,
+      channelCategoriesProvider.overrideWith(_LongCategories.new),
+      categorizationProgressProvider.overrideWith(_Categorizing.new),
+    ],
+    then: (tester) async {
+      ProviderScope.containerOf(
+        tester.element(find.byType(HistoryPage)),
+      ).read(historyGroupingProvider.notifier).set(HistoryGrouping.channel);
+      await tester.pump(const Duration(seconds: 1));
+    },
+  );
+  for (final ai in [false, true]) {
+    fitsAtEveryWidth(
+      'the explanation of ${ai ? 'an AI' : "YouTube's"} category',
+      () => Scaffold(
+        body: SingleChildScrollView(
+          child: CategorySheet(
+            category: _longCategory(ai: ai),
+            topicLabels: const [
+              'Role-playing video game',
+              'Video game culture',
+            ],
+          ),
+        ),
+      ),
+    );
+  }
   for (final grouping in [HistoryGrouping.month, HistoryGrouping.channel]) {
     for (final expanded in [false, true]) {
       fitsAtEveryWidth(
@@ -1009,6 +1045,29 @@ void main() {
       );
     }
   });
+}
+
+ChannelCategory _longCategory({bool ai = true}) => ChannelCategory(
+  path: const CategoryPath(
+    'Entertainment',
+    'Long-form video essays about obscure television history',
+  ),
+  source: ai ? CategorySource.claude : CategorySource.youtube,
+  decidedAt: DateTime.utc(2026, 9, 30),
+);
+
+class _LongCategories extends ChannelCategories {
+  @override
+  Future<Map<String, ChannelCategory>> build() async => {
+    'UClong': _longCategory(),
+    'name:Short': _longCategory(ai: false),
+  };
+}
+
+class _Categorizing extends CategorizationProgress {
+  @override
+  ({bool running, int done, int total}) build() =>
+      (running: true, done: 1234, total: 56789);
 }
 
 /// History with long titles and names, and every badge.
