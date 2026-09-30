@@ -175,7 +175,11 @@ Jev's and Claude's prompts both get, for each channel:
   - your decisions (accepted, denied, chosen or typed);
   - tags you edited;
   - a suggestion you accepted from Ask AI, which is your decision.
-- **Model changes don't count.** Changing the model (`ANTHROPIC_MODEL`) isn't a prompt change and doesn't redo anything.
+- **A model change is a prompt change.** The fingerprint also covers the model:
+  - the model name set for the step: Claude's `ANTHROPIC_MODEL` (or the default), and Jev's `jev-latest`;
+  - the exact version the service answers with: Claude's id from the Models API (such as `claude-haiku-4-5-20251001`), and Jev's `model` field in each answer (such as `jev-1.13.0`).
+
+  So changing `ANTHROPIC_MODEL` redoes Claude's outputs. A service moving its alias to a new version redoes that step's outputs too, and the progress line says the model changed. For Jev, the version is learned from the run's first answer, and outputs made with an older one are redone in that run.
 
 ### Tags
 
@@ -423,7 +427,7 @@ Behaviour tests throughout: no exact copy, no goldens, round-trip saves.
   - Ask AI on Uncategorized;
   - the signed-out wording;
   - the evidence including up to 5 recent videos' cleaned, cut descriptions, with missing ones fetched first when signed in and cache-only when signed out;
-  - a prompt's fingerprint changing when its wording or evidence changes, and staying the same otherwise;
+  - a prompt's fingerprint changing when its wording, evidence, model name or model version changes, and staying the same otherwise;
   - an output with an old fingerprint redone, while a user decision or edited tags with an old fingerprint are kept.
 - **History:**
   - nested groups' shape and order;
