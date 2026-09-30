@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/storage/storage_migration.dart';
+import 'package:youtube_takeout_manager/src/storage/storage_service.dart';
 
 /// Fails every write, as a full disk would.
 class _Failing extends MemoryEntryStore {
@@ -78,6 +80,29 @@ void main() {
     await migrateLegacyBlobs(kv, _Lossy());
 
     expect(await kv.getString('cached_video_metadata'), isNotNull);
+  });
+
+  test('a channel keyed by a long name moves into storage and is still '
+      'there after reopening', () async {
+    final long = 'name:${'日本語のチャンネル名' * 12}';
+    SharedPreferences.setMockInitialValues({
+      'flutter.channel_categories': jsonEncode({
+        long: {'decidedAt': '2026-09-30'},
+      }),
+    });
+    final dir = await Directory.systemTemp.createTemp('migration');
+    addTearDown(() => dir.delete(recursive: true));
+    final first = StorageService();
+    await first.open(dir.path);
+
+    await migrateLegacyBlobs(KvStorageService(), first);
+    await first.close();
+
+    final again = StorageService();
+    addTearDown(again.close);
+    await again.open(dir.path);
+    expect((await again.loadAll(EntryBoxes.channelCategories)).keys, [long]);
+    expect(await KvStorageService().getString('channel_categories'), isNull);
   });
 
   test('once done, running again changes nothing', () async {

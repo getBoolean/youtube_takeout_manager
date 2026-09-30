@@ -8,8 +8,9 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_takeout_manager/src/storage/image_bytes_cache.dart';
 
 /// The picture at [url], read from [cache] when kept there, else downloaded
-/// and kept for next time. A cache that can't be read is skipped; a failed
-/// download is never kept.
+/// and kept for next time. A cache that can't be read is skipped; only
+/// bytes that show as a picture are kept, and kept bytes that no longer do
+/// are fetched again.
 class CachedNetworkImage extends ImageProvider<CachedNetworkImage> {
   final String url;
   final ImageBytesCache cache;
@@ -35,26 +36,40 @@ class CachedNetworkImage extends ImageProvider<CachedNetworkImage> {
 
   Future<ui.Codec> _load(ImageDecoderCallback decode) async {
     final key = imageCacheKey(url);
-    Uint8List? bytes;
-    try {
-      bytes = await cache.read(key);
-    } on Object {
-      // Shown from the network instead.
-    }
-    if (bytes == null) {
-      final uri = Uri.parse(url);
-      final response = await (client ?? _client).get(uri);
-      if (response.statusCode != 200) {
-        throw NetworkImageLoadException(
-          statusCode: response.statusCode,
-          uri: uri,
-        );
+    if (await _read(key) case final kept?) {
+      try {
+        return await decode(await ui.ImmutableBuffer.fromUint8List(kept));
+      } on Object {
+        // No longer a picture: fetched again, and replaced.
       }
-      bytes = response.bodyBytes;
-      // Kept for next time; showing it doesn't wait.
-      unawaited(cache.write(key, bytes).catchError((Object _) {}));
     }
-    return decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+    final bytes = await _download();
+    final codec = await decode(await ui.ImmutableBuffer.fromUint8List(bytes));
+    // Kept only once it shows as a picture; showing it doesn't wait.
+    unawaited(cache.write(key, bytes).catchError((Object _) {}));
+    return codec;
+  }
+
+  /// What [cache] holds for [key]; none when it can't be read.
+  Future<Uint8List?> _read(String key) async {
+    try {
+      return await cache.read(key);
+    } on Object {
+      return null;
+    }
+  }
+
+  /// The picture's bytes, or an error for a failed or empty answer.
+  Future<Uint8List> _download() async {
+    final uri = Uri.parse(url);
+    final response = await (client ?? _client).get(uri);
+    if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+      throw NetworkImageLoadException(
+        statusCode: response.statusCode,
+        uri: uri,
+      );
+    }
+    return response.bodyBytes;
   }
 
   @override

@@ -12,36 +12,78 @@ import 'storage_service.dart';
 
 part 'storage_providers.g.dart';
 
-/// Runs calls on a storage worker it starts on first use. A worker that
-/// fails is replaced once, the call running again on the new one; a second
-/// failure is passed on, not retried forever.
+/// Runs calls on a storage worker it starts on first use. An operation
+/// that fails is the caller's to handle, on the same worker. A worker that
+/// died is closed and replaced once, and every call under way when it died
+/// runs again on the new one; dying again is passed on, not retried
+/// forever. A start that fails is tried again on the next call.
 class WorkerStorage {
   final Future<StorageService> Function() _start;
+  final bool Function(StorageService service) _isDead;
   Future<StorageService>? _service;
+
+  /// Raised when a dead worker is replaced, so a call that failed on it
+  /// knows to run on the replacement rather than replace it again.
+  var _generation = 0;
   var _restarted = false;
 
-  WorkerStorage(this._start);
+  WorkerStorage(this._start, {bool Function(StorageService service)? isDead})
+    : _isDead = isDead ?? _workerDied;
+
+  /// Whether [service]'s worker thread is gone.
+  static bool _workerDied(StorageService service) => switch (service) {
+    final Worker worker => worker.isStopped || !worker.isConnected,
+    _ => false,
+  };
 
   Future<T> run<T>(Future<T> Function(StorageService storage) call) async {
-    final service = await (_service ??= _start());
+    final generation = _generation;
+    final service = await _current();
     try {
       return await call(service);
     } on SquadronException {
-      if (_restarted) rethrow;
-      _restarted = true;
-      _stopWorker(service);
-      final fresh = await (_service = _start());
-      return call(fresh);
+      if (!_isDead(service)) rethrow;
+      if (generation == _generation) {
+        if (_restarted) rethrow;
+        _restarted = true;
+        _generation++;
+        _service = null;
+        await _retire(service);
+      }
+      return call(await _current());
     }
+  }
+
+  /// The worker, started when there's none, or when the last start failed.
+  Future<StorageService> _current() {
+    if (_service case final service?) return service;
+    late final Future<StorageService> started;
+    started = _start().onError<Object>((error, stackTrace) {
+      if (identical(_service, started)) _service = null;
+      Error.throwWithStackTrace(error, stackTrace);
+    });
+    return _service = started;
   }
 
   Future<void> stop() async {
     final service = _service;
     _service = null;
-    if (service != null) _stopWorker(await service);
+    if (service == null) return;
+    try {
+      await _retire(await service);
+    } on Object {
+      // It never started.
+    }
   }
 
-  static void _stopWorker(StorageService service) {
+  /// Closes [service]'s storage, releasing its files for a replacement,
+  /// when it still answers, then stops its thread.
+  static Future<void> _retire(StorageService service) async {
+    try {
+      await service.close().timeout(const Duration(seconds: 2));
+    } on Object {
+      // Already gone.
+    }
     if (service case final Worker worker) worker.stop();
   }
 }

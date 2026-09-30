@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -86,6 +87,43 @@ void main() {
     expect(cache.images, isEmpty);
   });
 
+  testWidgets("a download that isn't a picture isn't kept", (tester) async {
+    await pumpHost(tester);
+    final cache = MemoryImageBytesCache();
+    final portal = MockClient((_) async {
+      requests++;
+      return http.Response('<html>Sign in to the Wi-Fi</html>', 200);
+    });
+
+    await load(tester, CachedNetworkImage(_url, cache, client: portal));
+
+    expect(cache.images, isEmpty);
+  });
+
+  testWidgets("an empty download isn't kept", (tester) async {
+    await pumpHost(tester);
+    final cache = MemoryImageBytesCache();
+    final empty = MockClient((_) async => http.Response.bytes([], 200));
+
+    await load(tester, CachedNetworkImage(_url, cache, client: empty));
+
+    expect(cache.images, isEmpty);
+  });
+
+  testWidgets('kept bytes that no longer show as a picture are fetched again', (
+    tester,
+  ) async {
+    await pumpHost(tester);
+    final cache = MemoryImageBytesCache()
+      ..images[imageCacheKey(_url)] = Uint8List.fromList([1, 2, 3]);
+
+    await load(tester, CachedNetworkImage(_url, cache, client: client()));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+
+    expect(requests, 1);
+    expect(cache.images[imageCacheKey(_url)], png);
+  });
+
   testWidgets('a cache that fails to read falls back to the network', (
     tester,
   ) async {
@@ -125,5 +163,7 @@ void main() {
     final long = 'https://yt3.ggpht.com/${'x' * 400}';
     expect(imageCacheKey(long).length, lessThanOrEqualTo(255));
     expect(imageCacheKey(long), isNot(imageCacheKey('${long}y')));
+    final wide = 'https://example.com/${'画像' * 60}';
+    expect(utf8.encode(imageCacheKey(wide)).length, lessThanOrEqualTo(255));
   });
 }

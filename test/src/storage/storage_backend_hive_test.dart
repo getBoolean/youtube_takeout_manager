@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_ce/hive.dart';
 
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 import 'package:youtube_takeout_manager/src/storage/storage_backend_hive.dart';
@@ -45,6 +46,32 @@ void main() {
     expect(await again.loadAll(EntryBoxes.channelDetails), isEmpty);
   });
 
+  test(
+    'keys too long for hive survive reopening, and can be deleted',
+    () async {
+      // A channel known only by a long non-Latin name is keyed by it.
+      final long = 'name:${'日本語のチャンネル名' * 12}';
+      await (await backend()).putAll(EntryBoxes.channelCategories, {
+        'UCa': '"a"',
+        long: '"long"',
+        '#long:x': '"looks encoded"',
+      });
+
+      final again = await backend();
+      expect(await again.loadAll(EntryBoxes.channelCategories), {
+        'UCa': '"a"',
+        long: '"long"',
+        '#long:x': '"looks encoded"',
+      });
+
+      await again.deleteAll(EntryBoxes.channelCategories, [long]);
+      expect(
+        (await (await backend()).loadAll(EntryBoxes.channelCategories)).keys,
+        {'UCa', '#long:x'},
+      );
+    },
+  );
+
   test('entries can be deleted, and a box cleared', () async {
     final store = await backend();
     await store.putAll(EntryBoxes.videos, {'a': '1', 'b': '2', 'c': '3'});
@@ -54,6 +81,17 @@ void main() {
 
     await store.clear(EntryBoxes.videos);
     expect(await store.loadAll(EntryBoxes.videos), isEmpty);
+  });
+
+  test('entries are read without first reading the image cache', () async {
+    await (await backend()).writeImage('pic', bytes(5));
+
+    final again = await backend();
+    await again.loadAll(EntryBoxes.videos);
+    expect(Hive.isBoxOpen(HiveBackend.imageBox), isFalse);
+
+    expect(await again.readImage('pic'), isNotNull);
+    expect(Hive.isBoxOpen(HiveBackend.imageBox), isTrue);
   });
 
   test('images are kept and read back after reopening', () async {
