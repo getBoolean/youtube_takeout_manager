@@ -140,9 +140,42 @@ Old saved entries decode with defaults: no tags, not tried, not edited.
   - which steps were tried;
   - your accept and deny decisions, which stay protected.
 - **The new fields start empty:** no tags, not asked for tags, not edited.
-- **No category is worked out again.** With a Claude key, each channel gets one tags-only call on the next categorizing run, about $1–2 per 1,000 channels on Haiku.
+- **AI outputs are redone once.** The old build's AI outputs have no prompt fingerprint (below), and this build's prompts change anyway, since they add video descriptions. So:
+  - Jev's checks and picks, and Claude's categories, are redone on the next categorizing run with keys.
+  - With a Claude key, each channel's redo is the same single call that brings its tags: about $1–2 per 1,000 channels on Haiku.
+  - Categories YouTube's topics gave, with no AI step, stay as they are.
+  - Your accept and deny decisions are never redone.
 - **AI-made sub-categories keep their names** and are marked `ai`, since Claude made all of them. Spelling variants merge into the most-used spelling, and channels move to it. They have no emoji yet, so they show their category's emoji.
 - **"Uncategorized" entries stay,** and are looked at again when topics or a key arrive, as now.
+
+### What the AI sees
+
+Jev's and Claude's prompts both get, for each channel:
+
+- its name and description (up to 500 characters);
+- YouTube's topics;
+- up to 30 titles of videos watched from it;
+- **the descriptions of the 5 videos watched from it most recently**, each cut to 300 characters, with links, hashtags and timestamps removed.
+
+**Getting the descriptions:**
+
+- They come from the video details cache the app already keeps for commented videos (`videos.list` with `snippet`).
+- Signed in, the ones missing are fetched before a channel is categorized, as channel topics are. That costs 1 quota unit per 50 videos, recorded: about 200 units for 2,000 channels.
+- Signed out, only what's already cached is used.
+
+**Cost:** about 400 more input tokens per channel, around $0.40 more per 1,000 channels on Haiku. Jev's input cost is negligible.
+
+### Prompt fingerprints
+
+- **Fingerprinted steps:** every AI step's prompt has a fingerprint: Jev's check, Jev's pick, Jev's name check, Claude's category and tags, and Claude's tags only.
+- **Worked out automatically:** the fingerprint is a hash of the prompt and answer schema, built for a fixed sample channel against a fixed taxonomy. Any change to the wording, the schema, or what evidence goes in changes it, without anyone remembering to bump a number.
+- **Stored with each output:** each AI output keeps the fingerprint it was made with, whether Jev's agreement or pick, Claude's category, or the tags.
+- **Redone on the next run:** outputs whose fingerprint differs from the current one are redone, that step and the steps after it. The progress line says "Categorizing again with updated prompts".
+- **Never redone:**
+  - your decisions (accepted, denied, chosen or typed);
+  - tags you edited;
+  - a suggestion you accepted from Ask AI, which is your decision.
+- **Model changes don't count.** Changing the model (`ANTHROPIC_MODEL`) isn't a prompt change and doesn't redo anything.
 
 ### Tags
 
@@ -388,7 +421,10 @@ Behaviour tests throughout: no exact copy, no goldens, round-trip saves.
   - Change category and New sub-category;
   - Ask AI disabled while the channel is being categorized;
   - Ask AI on Uncategorized;
-  - the signed-out wording.
+  - the signed-out wording;
+  - the evidence including up to 5 recent videos' cleaned, cut descriptions, with missing ones fetched first when signed in and cache-only when signed out;
+  - a prompt's fingerprint changing when its wording or evidence changes, and staying the same otherwise;
+  - an output with an old fingerprint redone, while a user decision or edited tags with an old fingerprint are kept.
 - **History:**
   - nested groups' shape and order;
   - collapse and expand on both levels;
