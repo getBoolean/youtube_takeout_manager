@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -42,14 +44,14 @@ Future<Map<String, Object?>> _ask(
   http.Client client, {
   String model = 'claude-haiku-4-5',
   bool browser = false,
+  DateTime Function()? now,
   Future<void> Function(Duration)? sleep,
-  int maxAttempts = 4,
 }) =>
     AnthropicRepository(
       client: client,
       browser: browser,
+      now: now,
       sleep: sleep ?? (_) async {},
-      maxAttempts: maxAttempts,
     ).structured(
       apiKey: 'sk-ant-1',
       model: model,
@@ -182,6 +184,7 @@ void main() {
   test('when busy, Claude is asked again after the wait it gives', () async {
     final statuses = [529, 429, 200];
     final waits = <Duration>[];
+    var now = DateTime.utc(2026, 10, 1);
     final answer = await _ask(
       MockClient((_) async {
         final status = statuses.removeAt(0);
@@ -196,7 +199,11 @@ void main() {
                 status == 429 ? {'retry-after': '4'} : null,
               );
       }),
-      sleep: (wait) async => waits.add(wait),
+      now: () => now,
+      sleep: (wait) async {
+        waits.add(wait);
+        now = now.add(wait);
+      },
     );
 
     expect(answer, {'parent': 'Music'});
@@ -213,9 +220,245 @@ void main() {
             'error': {'type': 'rate_limit_error'},
           }, 429),
         ),
-        maxAttempts: 2,
       ),
       throwsA(isA<AiRateLimited>()),
     );
+  });
+
+  group('spend caps', () {
+    test(
+      "Anthropic's monthly cap is a billing problem, quoting the API",
+      () async {
+        var requests = 0;
+        await expectLater(
+          _ask(
+            MockClient((_) async {
+              requests++;
+              return _json({
+                'type': 'error',
+                'error': {
+                  'type': 'rate_limit_error',
+                  'message': 'You have reached your monthly spend cap.',
+                  'details': {'error_code': 'enforced_spend_limit_reached'},
+                },
+              }, 429);
+            }),
+          ),
+          throwsA(
+            isA<AiBillingProblem>().having(
+              (f) => f.message,
+              'message',
+              contains('monthly spend cap'),
+            ),
+          ),
+        );
+        expect(requests, 1);
+      },
+    );
+
+    test(
+      'a spend limit you set is a billing problem, quoting the API',
+      () async {
+        await expectLater(
+          _ask(
+            MockClient(
+              (_) async => _json({
+                'type': 'error',
+                'error': {
+                  'type': 'invalid_request_error',
+                  'message':
+                      'You have reached your specified API usage limits. You '
+                      'will regain access on 2026-11-01 at 00:00 UTC.',
+                },
+              }, 400),
+            ),
+          ),
+          throwsA(
+            isA<AiBillingProblem>().having(
+              (f) => f.message,
+              'message',
+              contains('2026-11-01'),
+            ),
+          ),
+        );
+      },
+    );
+  });
+
+  test('a request Claude turns down says why', () async {
+    await expectLater(
+      _ask(
+        MockClient(
+          (_) async => _json({
+            'type': 'error',
+            'error': {
+              'type': 'invalid_request_error',
+              'message': 'output_config.format: schema too deep',
+            },
+          }, 400),
+        ),
+      ),
+      throwsA(
+        isA<AiBadRequest>().having(
+          (f) => f.message,
+          'message',
+          contains('schema too deep'),
+        ),
+      ),
+    );
+  });
+
+  test('a 429 without a stated wait is not tried again, and gives no time '
+      'to resume', () async {
+    var requests = 0;
+    await expectLater(
+      _ask(
+        MockClient((_) async {
+          requests++;
+          return _json({
+            'type': 'error',
+            'error': {'type': 'rate_limit_error', 'message': 'slow down'},
+          }, 429);
+        }),
+      ),
+      throwsA(
+        isA<AiRateLimited>().having((f) => f.resumeAt, 'resumeAt', isNull),
+      ),
+    );
+    expect(requests, 1);
+  });
+
+  test(
+    'a stated wait over a minute fails at once, saying when to resume',
+    () async {
+      var requests = 0;
+      final now = DateTime.utc(2026, 10, 1, 12);
+      await expectLater(
+        _ask(
+          MockClient((_) async {
+            requests++;
+            return _json(
+              {
+                'type': 'error',
+                'error': {'type': 'rate_limit_error', 'message': 'slow down'},
+              },
+              429,
+              {'retry-after': '90'},
+            );
+          }),
+          now: () => now,
+        ),
+        throwsA(
+          isA<AiRateLimited>().having(
+            (f) => f.resumeAt,
+            'resumeAt',
+            now.add(const Duration(seconds: 90)),
+          ),
+        ),
+      );
+      expect(requests, 1);
+    },
+  );
+
+  for (final status in [500, 529]) {
+    test('a $status is tried again', () async {
+      final statuses = [status, 200];
+      final answer = await _ask(
+        MockClient((_) async {
+          final next = statuses.removeAt(0);
+          return next == 200
+              ? _json(_message({'parent': 'Music'}))
+              : _json({
+                  'type': 'error',
+                  'error': {'type': 'api_error'},
+                }, next);
+        }),
+      );
+
+      expect(answer, {'parent': 'Music'});
+    });
+  }
+
+  test('a 503 is not tried again, and fails as busy', () async {
+    var requests = 0;
+    await expectLater(
+      _ask(
+        MockClient((_) async {
+          requests++;
+          return _json({
+            'type': 'error',
+            'error': {'type': 'api_error'},
+          }, 503);
+        }),
+      ),
+      throwsA(isA<AiOverloaded>()),
+    );
+    expect(requests, 1);
+  });
+
+  test('a request that takes too long is tried again only once', () {
+    fakeAsync((async) {
+      var requests = 0;
+      Object? outcome;
+      _ask(
+        MockClient((_) {
+          requests++;
+          return Completer<http.Response>().future;
+        }),
+      ).then<void>((_) {}, onError: (Object e) => outcome = e);
+
+      async.elapse(const Duration(minutes: 10));
+
+      expect(outcome, isA<AiOverloaded>());
+      expect(requests, 2);
+    });
+  });
+
+  test(
+    'with few output tokens left, the next request waits for the reset',
+    () async {
+      var now = DateTime.utc(2026, 10, 1, 12);
+      final reset = now.add(const Duration(seconds: 20));
+      final waits = <Duration>[];
+      final repository = AnthropicRepository(
+        client: MockClient(
+          (_) async => _json(_message({'parent': 'Music'}), 200, {
+            'anthropic-ratelimit-output-tokens-remaining': '50',
+            'anthropic-ratelimit-output-tokens-reset': reset.toIso8601String(),
+          }),
+        ),
+        browser: false,
+        now: () => now,
+        sleep: (wait) async {
+          waits.add(wait);
+          now = now.add(wait);
+        },
+      );
+      Future<void> ask() => repository.structured(
+        apiKey: 'sk-ant-1',
+        model: 'claude-haiku-4-5',
+        system: 'Categorize the channel.',
+        user: '{}',
+        schema: _schema,
+      );
+
+      await ask();
+      expect(waits, isEmpty);
+      await ask();
+
+      expect(waits, const [Duration(seconds: 20)]);
+    },
+  );
+
+  test('an unexpected error never shows the key', () async {
+    final failure = await _ask(
+      MockClient(
+        (request) async =>
+            throw StateError('bad header ${request.headers['x-api-key']}'),
+      ),
+    ).then<Object>((_) => 'no failure', onError: (Object e) => e);
+
+    expect(failure, isA<AiUnexpected>());
+    expect('$failure', isNot(contains('sk-ant-1')));
   });
 }
