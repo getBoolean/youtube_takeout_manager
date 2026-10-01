@@ -47,7 +47,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/key_check.dart';
@@ -1005,32 +1005,45 @@ void main() {
   );
   for (final source in CategorySource.values) {
     fitsAtEveryWidth(
-      'the explanation of a category from ${source.name}',
+      'the category window for a category from ${source.name}',
       () => Scaffold(
         body: SingleChildScrollView(
-          child: CategorySheet(
+          child: CategoryWindowMain(
             category: _longCategory(source: source),
+            emoji: '🎬',
             topicLabels: const [
               'Role-playing video game',
               'Video game culture',
             ],
+            youtube: const CategoryPath(
+              'Gaming',
+              'Role-playing, with a long name too',
+            ),
+            onUseYouTube: () {},
+            onRemoveTag: (_) {},
+            onAddTag: () {},
           ),
         ),
       ),
     );
   }
-  for (final canAskAi in [true, false]) {
+  fitsAtEveryWidth(
+    'the category window for a channel not categorized yet, signed out',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: CategoryWindowMain(category: null, emoji: '❔', signedIn: false),
+      ),
+    ),
+  );
+  for (final askAi in AskAi.values) {
     fitsAtEveryWidth(
-      'the explanation of a YouTube category, '
-      '${canAskAi ? 'to ask AI' : 'with asking AI locked'}',
+      "the category window's actions, Ask AI ${askAi.name}",
       () => Scaffold(
-        body: SingleChildScrollView(
-          child: CategorySheet(
-            category: _longCategory(source: CategorySource.youtube),
-            canAskAi: canAskAi,
-            onAskAi: () {},
-            onAddKeys: () {},
-          ),
+        body: CategoryWindowActions(
+          askAi: askAi,
+          onChange: () {},
+          onAskAi: () {},
+          onAddKeys: () {},
         ),
       ),
     );

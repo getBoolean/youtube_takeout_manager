@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
-import '../application/category_editor.dart';
 import '../application/channel_categories.dart';
 import '../domain/channel_category.dart';
 import 'category_colors.dart';
-import 'category_sheet.dart';
+import 'category_window.dart';
 
 /// A channel's category as a small pill tinted with its colour, its emoji
 /// then its name, marked when an AI chose it; "Uncategorized" in a grey
@@ -56,19 +55,7 @@ class ChannelCategoryChips extends ConsumerWidget {
         child: InkWell(
           key: tapKey,
           borderRadius: BorderRadius.circular(8),
-          onTap: () async {
-            // Read now: the chip may be gone once the window closes.
-            final editor = ref.read(categoryEditorProvider.notifier);
-            final result = await showCategorySheet(context, channel: channel);
-            switch (result) {
-              case AcceptedSuggestion(:final suggestion):
-                await editor.accept(channel, suggestion);
-              case KeptCategory():
-                await editor.deny(channel);
-              case null:
-                break;
-            }
-          },
+          onTap: () => showCategoryWindow(context, channel: channel),
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Align(

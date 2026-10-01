@@ -16,7 +16,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/category_
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -147,7 +147,7 @@ void main() {
       "using it keeps it as the user's", (tester) async {
     await open(tester);
 
-    await tapKey(tester, CategorySheet.askAiKey);
+    await tapKey(tester, CategoryWindow.askAiKey);
     expect(find.textContaining(_suggestion.path!.label), findsWidgets);
     expect(find.textContaining('Races through games'), findsWidgets);
     // Each ask is paid for: once, however the modal builds the page.
@@ -155,14 +155,15 @@ void main() {
     await tapKey(tester, CategoryAskPage.acceptKey);
 
     expect(editor.accepted, [_suggestion]);
-    expect(find.byType(CategorySheet), findsNothing);
+    // Back in the window, where the category now shows.
+    expect(find.byKey(CategoryWindow.changeKey), findsOneWidget);
   });
 
   testWidgets('keeping the current category says so, and nothing else '
       'changes', (tester) async {
     await open(tester);
 
-    await tapKey(tester, CategorySheet.askAiKey);
+    await tapKey(tester, CategoryWindow.askAiKey);
     await tapKey(tester, CategoryAskPage.denyKey);
 
     expect(editor.denied, 1);
@@ -173,7 +174,7 @@ void main() {
     final hold = Completer<void>();
     await open(tester, using: _Categorizer(hold: hold));
 
-    await tester.tap(find.byKey(CategorySheet.askAiKey));
+    await tester.tap(find.byKey(CategoryWindow.askAiKey));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byKey(CategoryAskPage.progressKey), findsOneWidget);
 
@@ -188,7 +189,7 @@ void main() {
   ) async {
     await open(tester, using: _Categorizer(failures: 1));
 
-    await tapKey(tester, CategorySheet.askAiKey);
+    await tapKey(tester, CategoryWindow.askAiKey);
     expect(find.byKey(CategoryAskPage.failureKey), findsOneWidget);
     expect(find.byKey(CategoryAskPage.acceptKey), findsNothing);
 
@@ -213,7 +214,7 @@ void main() {
       ),
     );
 
-    await tapKey(tester, CategorySheet.askAiKey);
+    await tapKey(tester, CategoryWindow.askAiKey);
 
     final failure = tester.widget<Text>(find.byKey(CategoryAskPage.failureKey));
     expect(failure.data, contains('3:45'));
@@ -225,12 +226,12 @@ void main() {
 
     expect(
       find.descendant(
-        of: find.byKey(CategorySheet.askAiKey),
+        of: find.byKey(CategoryWindow.askAiKey),
         matching: find.byIcon(Icons.lock_outline),
       ),
       findsOneWidget,
     );
-    await tapKey(tester, CategorySheet.askAiKey);
+    await tapKey(tester, CategoryWindow.askAiKey);
 
     expect(find.byType(AiKeysForm), findsOneWidget);
   });
@@ -241,6 +242,6 @@ void main() {
     await open(tester, category: _suggestion);
 
     expect(find.textContaining('Races through games'), findsOneWidget);
-    expect(find.byKey(CategorySheet.askAiKey), findsNothing);
+    expect(find.byKey(CategoryWindow.askAiKey), findsNothing);
   });
 }

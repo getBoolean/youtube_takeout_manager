@@ -13,7 +13,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/channel_c
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
@@ -188,7 +188,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(outer, 0);
-    expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
+    expect(find.byKey(CategoryWindow.youtubeSourceKey), findsOneWidget);
   });
 
   testWidgets("tapping a YouTube category explains it comes from YouTube's "
@@ -198,7 +198,7 @@ void main() {
     await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
+    expect(find.byKey(CategoryWindow.youtubeSourceKey), findsOneWidget);
     expect(find.textContaining('Action game'), findsWidgets);
   });
 
@@ -242,11 +242,12 @@ void main() {
     await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(CategorySheet.aiSourceKey), findsOneWidget);
+    expect(find.byKey(CategoryWindow.aiSourceKey), findsOneWidget);
     expect(find.textContaining('81%'), findsOneWidget);
+    // The runner-up, and YouTube's category to switch to.
     expect(
       find.textContaining(const CategoryPath('Gaming', 'Action').label),
-      findsOneWidget,
+      findsWidgets,
     );
   });
 
