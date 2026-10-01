@@ -141,12 +141,16 @@ class _Claude extends AnthropicRepository {
     this.failure,
     this.hold,
     this.structuredOutputs = true,
+    this.capabilitiesFailure,
   });
 
   final Map<String, Object?> answer;
   final AiFailure? failure;
   final Completer<void>? hold;
   final bool structuredOutputs;
+
+  /// Why its model can't be looked up, if it can't.
+  final AiFailure? capabilitiesFailure;
   final asked = <String>[];
 
   /// The models whose capabilities were asked for.
@@ -158,6 +162,7 @@ class _Claude extends AnthropicRepository {
     required String model,
   }) async {
     capabilitiesAsked.add(model);
+    if (capabilitiesFailure case final failure?) throw failure;
     return ModelCapabilities(
       id: model,
       structuredOutputs: structuredOutputs,
@@ -582,6 +587,32 @@ void main() {
       await _settle();
 
       expect(claude.capabilitiesAsked, [anthropicModel]);
+    });
+
+    test("when Claude's model can't be looked up, categorizing goes on "
+        'without Claude, saying so', () async {
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      }, capabilitiesFailure: const AiUnreachable());
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: _Jev(),
+        claude: claude,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, isEmpty);
+      expect(status.notice, isNotNull);
+      expect(claude.asked, isEmpty);
+      final gamer = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(gamer?.path, const CategoryPath('Gaming', 'Action'));
+      expect(gamer?.jevAgreed, 0.9);
     });
 
     test("a model that can't answer in shapes turns Claude off, saying so, "

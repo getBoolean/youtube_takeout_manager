@@ -176,14 +176,18 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       }
     }
 
-    final CategoryPipeline pipeline;
+    CategoryPipeline pipeline;
     try {
       pipeline = await _pipeline();
     } on AiTierFailure catch (e) {
-      // Claude's model couldn't be looked up: turned off, the run goes on
-      // without it.
-      if (ref.mounted) _stopped(e);
-      return;
+      // Claude's model couldn't be looked up. Turned off, it all runs again
+      // without Claude; paused, it waits; otherwise this run goes on
+      // without Claude.
+      if (!ref.mounted) return;
+      _stopped(e);
+      final off = ref.read(aiTierStatusProvider).disabled.contains(e.service);
+      if (off || _pausedUntil.isNotEmpty) return;
+      pipeline = await _pipeline(withClaude: false);
     }
     if (dropped()) return;
     final titles = recentTitlesByChannel(loaded);
@@ -356,9 +360,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         );
   }
 
-  /// A pipeline with the steps there are keys for, and every category.
-  /// Throws an [AiTierFailure] when Claude's model can't be used.
-  Future<CategoryPipeline> _pipeline() async {
+  /// A pipeline with the steps there are keys for, Claude only [withClaude],
+  /// and every category. Throws an [AiTierFailure] when Claude's model can't
+  /// be used.
+  Future<CategoryPipeline> _pipeline({bool withClaude = true}) async {
     final keys = await ref
         .read(aiKeysProvider.future)
         .catchError((Object _) => AiKeys.none);
@@ -380,7 +385,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
               apiKey: keys.keyFor(AiService.jev),
             )
           : null,
-      claude: on(AiService.claude)
+      claude: withClaude && on(AiService.claude)
           ? (
               repository: ref.read(anthropicRepositoryProvider),
               apiKey: keys.keyFor(AiService.claude),
