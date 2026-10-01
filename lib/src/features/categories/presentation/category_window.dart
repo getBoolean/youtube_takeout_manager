@@ -22,6 +22,7 @@ import '../domain/sub_category.dart';
 import '../domain/tag_name.dart';
 import '../domain/youtube_topics.dart';
 import 'ai_keys_setup.dart';
+import 'category_change_pages.dart';
 import 'category_colors.dart';
 
 /// Whether AI can be asked for another category in the window, and how.
@@ -75,7 +76,7 @@ abstract final class CategoryWindow {
 }
 
 /// The title of one of the window's pages.
-Widget _title(BuildContext context, String text) => Semantics(
+Widget windowTitle(BuildContext context, String text) => Semantics(
   header: true,
   child: Text(
     text,
@@ -120,6 +121,21 @@ WoltModalSheetPage windowPage({
   child: child,
 );
 
+/// A page of the window built of [slivers], as [windowPage] is.
+SliverWoltModalSheetPage windowSliverPage({
+  required String id,
+  required Widget Function(BuildContext context) title,
+  String? backTo,
+  required List<Widget> slivers,
+}) => SliverWoltModalSheetPage(
+  id: id,
+  topBarTitle: Builder(builder: title),
+  isTopBarLayerAlwaysVisible: true,
+  leadingNavBarWidget: backTo == null ? null : windowBack(backTo),
+  trailingNavBarWidget: _close,
+  mainContentSliversBuilder: (_) => slivers,
+);
+
 /// Opens [channel]'s category window: its category, where it came from,
 /// YouTube's category to switch to when AI chose another, its tags to
 /// change, and, at the bottom, changing the category or asking AI for
@@ -135,6 +151,7 @@ Future<void> showCategoryWindow(
   // One request however many times the modal builds the page showing it
   // (it measures pages offstage): each ask is paid for.
   final asking = ValueNotifier<Future<ChannelCategory>?>(null);
+  final draft = NewSubCategoryDraft();
   void ask() => asking.value = categorizer.suggest(channel)
     // Shown on the page; not an unhandled error if it closed first.
     ..ignore();
@@ -143,7 +160,7 @@ Future<void> showCategoryWindow(
     pageListBuilder: (_) => [
       windowPage(
         id: CategoryWindow.mainId,
-        title: (context) => _title(context, channel.title),
+        title: (context) => windowTitle(context, channel.title),
         stickyActionBar: Consumer(
           builder: (context, ref, _) {
             final category = ref.watch(
@@ -215,7 +232,7 @@ Future<void> showCategoryWindow(
       ),
       windowPage(
         id: CategoryWindow.askId,
-        title: (context) => _title(context, 'Ask AI'),
+        title: (context) => windowTitle(context, 'Ask AI'),
         backTo: CategoryWindow.mainId,
         child: CategoryAskPage(
           asking: asking,
@@ -224,9 +241,13 @@ Future<void> showCategoryWindow(
           onKeep: () => editor.deny(channel),
         ),
       ),
+      ...categoryChangePages(channel, draft),
       AiKeysPages.page(),
     ],
-  ).whenComplete(asking.dispose);
+  ).whenComplete(() {
+    asking.dispose();
+    draft.dispose();
+  });
 }
 
 /// Whether a sub-category or tag name was made by AI: [custom]'s records

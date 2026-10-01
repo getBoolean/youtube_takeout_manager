@@ -47,6 +47,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_change_pages.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
@@ -1032,6 +1033,36 @@ void main() {
     () => Scaffold(
       body: SingleChildScrollView(
         child: CategoryWindowMain(category: null, emoji: '❔', signedIn: false),
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'the Change category page, a category open',
+    () => Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          ChangePage(
+            channel: const HistoryChannel(channelId: 'UClong', title: 'Long'),
+            draft: NewSubCategoryDraft(),
+          ),
+        ],
+      ),
+    ),
+    overrides: [channelCategoriesProvider.overrideWith(_LongCategories.new)],
+    then: (tester) async {
+      await tester.tap(find.byKey(ChangePage.categoryKey('Entertainment')));
+      await tester.pump();
+    },
+  );
+  fitsAtEveryWidth(
+    'the New sub-category page',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: NewSubCategoryPage(
+          draft: NewSubCategoryDraft()
+            ..start('Entertainment')
+            ..setName('Long-form video essays about television'),
+        ),
       ),
     ),
   );
