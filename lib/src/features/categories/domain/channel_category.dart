@@ -15,6 +15,9 @@ enum CategorySource {
 
   /// Claude's.
   claude,
+
+  /// Chosen or typed by the user.
+  user,
 }
 
 /// What the user said to an AI's suggestion for a channel.
@@ -24,6 +27,12 @@ enum UserDecision { none, accepted, denied }
 /// A step of categorizing, available or not, and tried or not.
 @MappableEnum(defaultValue: CategorizationTier.youtube)
 enum CategorizationTier { youtube, jev, claude }
+
+/// The most tags a channel has.
+const maxTags = 5;
+
+/// The longest a tag can be.
+const maxTagName = 40;
 
 /// A category and how likely it is.
 @MappableClass()
@@ -62,6 +71,23 @@ class ChannelCategory with ChannelCategoryMappable {
   final UserDecision userDecision;
   final DateTime decidedAt;
 
+  /// Up to [maxTags] specific things the channel is about, such as a game or
+  /// a series; Claude names them.
+  final List<String> tags;
+
+  /// Whether Claude was asked for tags, so it's asked once.
+  final bool tagsTried;
+
+  /// Whether the user added or removed a tag: then they're never replaced.
+  final bool tagsEditedByUser;
+
+  /// The fingerprint of each step's prompt that decided the category, by
+  /// step name, so a changed prompt has it redone.
+  final Map<String, String> prompts;
+
+  /// The fingerprint of the prompt that named the tags.
+  final String? tagsPrompt;
+
   const ChannelCategory({
     this.path,
     this.source = CategorySource.youtube,
@@ -73,9 +99,18 @@ class ChannelCategory with ChannelCategoryMappable {
     this.hadTopics = false,
     this.userDecision = UserDecision.none,
     required this.decidedAt,
+    this.tags = const [],
+    this.tagsTried = false,
+    this.tagsEditedByUser = false,
+    this.prompts = const {},
+    this.tagsPrompt,
   });
 
   /// Whether an AI chose it, rather than YouTube's topics.
   bool get isAi =>
       source == CategorySource.jev || source == CategorySource.claude;
+
+  /// Whether the user decided it: chose it, or accepted or kept one.
+  bool get isDecided =>
+      userDecision != UserDecision.none || source == CategorySource.user;
 }

@@ -253,7 +253,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           // Still right for its channel when the run was dropped, and paid
           // for: kept either way.
           await _keepLearned(pipeline);
-          await categories.putIfUndecided(channel.key, category);
+          await categories.putAiResult(channel.key, category);
           if (dropped()) return;
           progress.update(++done);
           if (done % _saveEvery == 0) await categories.persist();

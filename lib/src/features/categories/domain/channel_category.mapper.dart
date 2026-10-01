@@ -33,6 +33,8 @@ class CategorySourceMapper extends EnumMapper<CategorySource> {
         return CategorySource.jev;
       case r'claude':
         return CategorySource.claude;
+      case r'user':
+        return CategorySource.user;
       default:
         return CategorySource.values[0];
     }
@@ -47,6 +49,8 @@ class CategorySourceMapper extends EnumMapper<CategorySource> {
         return r'jev';
       case CategorySource.claude:
         return r'claude';
+      case CategorySource.user:
+        return r'user';
     }
   }
 }
@@ -366,6 +370,40 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
     'decidedAt',
     _$decidedAt,
   );
+  static List<String> _$tags(ChannelCategory v) => v.tags;
+  static const Field<ChannelCategory, List<String>> _f$tags = Field(
+    'tags',
+    _$tags,
+    opt: true,
+    def: const [],
+  );
+  static bool _$tagsTried(ChannelCategory v) => v.tagsTried;
+  static const Field<ChannelCategory, bool> _f$tagsTried = Field(
+    'tagsTried',
+    _$tagsTried,
+    opt: true,
+    def: false,
+  );
+  static bool _$tagsEditedByUser(ChannelCategory v) => v.tagsEditedByUser;
+  static const Field<ChannelCategory, bool> _f$tagsEditedByUser = Field(
+    'tagsEditedByUser',
+    _$tagsEditedByUser,
+    opt: true,
+    def: false,
+  );
+  static Map<String, String> _$prompts(ChannelCategory v) => v.prompts;
+  static const Field<ChannelCategory, Map<String, String>> _f$prompts = Field(
+    'prompts',
+    _$prompts,
+    opt: true,
+    def: const {},
+  );
+  static String? _$tagsPrompt(ChannelCategory v) => v.tagsPrompt;
+  static const Field<ChannelCategory, String> _f$tagsPrompt = Field(
+    'tagsPrompt',
+    _$tagsPrompt,
+    opt: true,
+  );
 
   @override
   final MappableFields<ChannelCategory> fields = const {
@@ -379,6 +417,11 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
     #hadTopics: _f$hadTopics,
     #userDecision: _f$userDecision,
     #decidedAt: _f$decidedAt,
+    #tags: _f$tags,
+    #tagsTried: _f$tagsTried,
+    #tagsEditedByUser: _f$tagsEditedByUser,
+    #prompts: _f$prompts,
+    #tagsPrompt: _f$tagsPrompt,
   };
 
   static ChannelCategory _instantiate(DecodingData data) {
@@ -393,6 +436,11 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
       hadTopics: data.dec(_f$hadTopics),
       userDecision: data.dec(_f$userDecision),
       decidedAt: data.dec(_f$decidedAt),
+      tags: data.dec(_f$tags),
+      tagsTried: data.dec(_f$tagsTried),
+      tagsEditedByUser: data.dec(_f$tagsEditedByUser),
+      prompts: data.dec(_f$prompts),
+      tagsPrompt: data.dec(_f$tagsPrompt),
     );
   }
 
@@ -461,6 +509,9 @@ abstract class ChannelCategoryCopyWith<$R, $In extends ChannelCategory, $Out>
   CategoryPathCopyWith<$R, CategoryPath, CategoryPath>? get path;
   ListCopyWith<$R, ScoredPath, ScoredPathCopyWith<$R, ScoredPath, ScoredPath>>
   get runnersUp;
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get tags;
+  MapCopyWith<$R, String, String, ObjectCopyWith<$R, String, String>>
+  get prompts;
   $R call({
     CategoryPath? path,
     CategorySource? source,
@@ -472,6 +523,11 @@ abstract class ChannelCategoryCopyWith<$R, $In extends ChannelCategory, $Out>
     bool? hadTopics,
     UserDecision? userDecision,
     DateTime? decidedAt,
+    List<String>? tags,
+    bool? tagsTried,
+    bool? tagsEditedByUser,
+    Map<String, String>? prompts,
+    String? tagsPrompt,
   });
   ChannelCategoryCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -497,6 +553,20 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     (v) => call(runnersUp: v),
   );
   @override
+  ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get tags =>
+      ListCopyWith(
+        $value.tags,
+        (v, t) => ObjectCopyWith(v, $identity, t),
+        (v) => call(tags: v),
+      );
+  @override
+  MapCopyWith<$R, String, String, ObjectCopyWith<$R, String, String>>
+  get prompts => MapCopyWith(
+    $value.prompts,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(prompts: v),
+  );
+  @override
   $R call({
     Object? path = $none,
     CategorySource? source,
@@ -508,6 +578,11 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     bool? hadTopics,
     UserDecision? userDecision,
     DateTime? decidedAt,
+    List<String>? tags,
+    bool? tagsTried,
+    bool? tagsEditedByUser,
+    Map<String, String>? prompts,
+    Object? tagsPrompt = $none,
   }) => $apply(
     FieldCopyWithData({
       if (path != $none) #path: path,
@@ -520,6 +595,11 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
       if (hadTopics != null) #hadTopics: hadTopics,
       if (userDecision != null) #userDecision: userDecision,
       if (decidedAt != null) #decidedAt: decidedAt,
+      if (tags != null) #tags: tags,
+      if (tagsTried != null) #tagsTried: tagsTried,
+      if (tagsEditedByUser != null) #tagsEditedByUser: tagsEditedByUser,
+      if (prompts != null) #prompts: prompts,
+      if (tagsPrompt != $none) #tagsPrompt: tagsPrompt,
     }),
   );
   @override
@@ -534,6 +614,11 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     hadTopics: data.get(#hadTopics, or: $value.hadTopics),
     userDecision: data.get(#userDecision, or: $value.userDecision),
     decidedAt: data.get(#decidedAt, or: $value.decidedAt),
+    tags: data.get(#tags, or: $value.tags),
+    tagsTried: data.get(#tagsTried, or: $value.tagsTried),
+    tagsEditedByUser: data.get(#tagsEditedByUser, or: $value.tagsEditedByUser),
+    prompts: data.get(#prompts, or: $value.prompts),
+    tagsPrompt: data.get(#tagsPrompt, or: $value.tagsPrompt),
   );
 
   @override

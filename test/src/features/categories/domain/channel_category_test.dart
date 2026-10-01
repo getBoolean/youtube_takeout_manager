@@ -49,6 +49,44 @@ void main() {
     }
   });
 
+  test('tags, who chose it and the prompts used are kept and read back', () {
+    final tagged = ChannelCategory(
+      path: const CategoryPath('Gaming', 'Racing'),
+      source: CategorySource.user,
+      tags: const ['Mario Kart World', 'Speedruns'],
+      tagsTried: true,
+      tagsEditedByUser: true,
+      prompts: const {'jevCheck': 'ab12', 'claudeCategory': 'cd34'},
+      tagsPrompt: 'ef56',
+      decidedAt: DateTime.utc(2026, 10, 1),
+    );
+
+    expect(ChannelCategoryMapper.fromJson(tagged.toJson()), tagged);
+  });
+
+  test('a category saved before tags reads with none, not asked for, not '
+      'edited, and no prompts', () {
+    final category = ChannelCategoryMapper.fromMap({
+      'path': {'parent': 'Music', 'child': 'Jazz'},
+      'source': 'claude',
+      'decidedAt': '2026-09-30T00:00:00.000Z',
+    });
+
+    expect(category.tags, isEmpty);
+    expect(category.tagsTried, isFalse);
+    expect(category.tagsEditedByUser, isFalse);
+    expect(category.prompts, isEmpty);
+    expect(category.tagsPrompt, isNull);
+  });
+
+  test('a category the user chose, accepted or kept is decided', () {
+    expect(_category().isDecided, isFalse);
+    expect(_category(source: CategorySource.user).isDecided, isTrue);
+    expect(_category(userDecision: UserDecision.accepted).isDecided, isTrue);
+    expect(_category(userDecision: UserDecision.denied).isDecided, isTrue);
+    expect(_category(source: CategorySource.user).isAi, isFalse);
+  });
+
   test('a category saved by a newer version still reads', () {
     final category = ChannelCategoryMapper.fromMap({
       'path': {'parent': 'Music'},

@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/channel_category_repository.dart';
+import '../domain/ai_result_merge.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_key.dart';
 import '../domain/youtube_taxonomy.dart';
@@ -18,16 +19,13 @@ class ChannelCategories extends _$ChannelCategories {
   Future<Map<String, ChannelCategory>> build() =>
       ref.watch(channelCategoryRepositoryProvider).loadCategories();
 
-  /// Sets [key]'s category, unless the user accepted or denied one for it:
-  /// what they said stands, even over an answer that was already on its way.
-  Future<void> putIfUndecided(String key, ChannelCategory category) async {
+  /// Sets [key]'s category to an AI run's [result], as [mergeAiResult]
+  /// says: what the user decided stands, even over an answer that was
+  /// already on its way.
+  Future<void> putAiResult(String key, ChannelCategory result) async {
     await future;
     final current = state.requireValue;
-    if ((current[key]?.userDecision ?? UserDecision.none) !=
-        UserDecision.none) {
-      return;
-    }
-    state = AsyncData({...current, key: category});
+    state = AsyncData({...current, key: mergeAiResult(current[key], result)});
   }
 
   /// Adds [categories] for the channels that have none yet, at once.
@@ -45,6 +43,13 @@ class ChannelCategories extends _$ChannelCategories {
   Future<void> decide(String key, ChannelCategory category) async {
     await future;
     state = AsyncData({...state.requireValue, key: category});
+    await persist();
+  }
+
+  /// Makes [categories] every channel's, and keeps them.
+  Future<void> replaceAll(Map<String, ChannelCategory> categories) async {
+    await future;
+    state = AsyncData(categories);
     await persist();
   }
 

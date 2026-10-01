@@ -426,6 +426,7 @@ class _Explanation extends StatelessWidget {
                       '${_percent(confidence)} sure.',
             style: hint,
           ),
+          CategorySource.user => Text('You chose this.', style: hint),
           CategorySource.youtube => Text(
             key: CategorySheet.youtubeSourceKey,
             topicLabels.isEmpty
