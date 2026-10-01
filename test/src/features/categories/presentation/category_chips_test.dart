@@ -7,10 +7,12 @@ import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
@@ -46,17 +48,20 @@ const _gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
 ChannelCategory _category({
   CategoryPath? path = const CategoryPath('Gaming', 'Action'),
   CategorySource source = CategorySource.youtube,
+  List<String> tags = const [],
 }) => ChannelCategory(
   path: path,
   source: source,
   hadTopics: true,
+  tags: tags,
+  tagsTried: tags.isNotEmpty,
   decidedAt: DateTime.utc(2026, 9, 30),
 );
 
 Future<void> _pump(
   WidgetTester tester, {
   Map<String, ChannelCategory> categories = const {},
-  Widget child = const ChannelCategoryChip(channel: _gamer),
+  Widget child = const ChannelCategoryChips(channel: _gamer),
   List<Override> overrides = const [],
 }) async {
   tester.view.physicalSize = const Size(800, 900);
@@ -86,7 +91,12 @@ void main() {
       find.textContaining(const CategoryPath('Gaming', 'Action').label),
       findsOneWidget,
     );
-    expect(find.byIcon(ChannelCategoryChip.aiIcon), findsNothing);
+    expect(find.byType(AiMark), findsNothing);
+    expect(find.text(categoryEmoji['Gaming']!), findsNothing);
+    expect(
+      find.text(youtubeSubCategoryEmoji['Gaming']!['Action']!),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a category an AI chose is marked as such', (tester) async {
@@ -95,27 +105,97 @@ void main() {
       categories: {'UCg': _category(source: CategorySource.claude)},
     );
 
-    expect(find.byIcon(ChannelCategoryChip.aiIcon), findsOneWidget);
+    expect(find.byType(AiMark), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('AI')), findsOneWidget);
   });
 
-  testWidgets('a channel not categorized yet shows no chip', (tester) async {
+  testWidgets('a channel not categorized yet has a chip too', (tester) async {
     await _pump(tester);
 
-    expect(find.byType(InkWell), findsNothing);
+    expect(find.byKey(ChannelCategoryChips.tapKey), findsOneWidget);
+    expect(find.text(uncategorizedEmoji), findsOneWidget);
   });
 
   testWidgets('a channel nothing could categorize says so', (tester) async {
     await _pump(tester, categories: {'UCg': _category(path: null)});
 
-    expect(find.byType(InkWell), findsOneWidget);
+    expect(find.byKey(ChannelCategoryChips.tapKey), findsOneWidget);
+    expect(find.text(uncategorizedEmoji), findsOneWidget);
+  });
+
+  testWidgets("a channel's tags show beside its category, and are told", (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      categories: {
+        'UCg': _category(tags: ['Mario Kart World', 'Speedruns']),
+      },
+    );
+
+    expect(find.textContaining('Mario Kart World'), findsOneWidget);
+    expect(find.textContaining('Speedruns'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('Mario Kart World.*Speedruns')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('nested under its category, a channel shows only its tags', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      categories: {
+        'UCg': _category(tags: ['Speedruns']),
+      },
+      child: const ChannelCategoryChips(channel: _gamer, showCategory: false),
+    );
+
+    expect(find.textContaining('Speedruns'), findsOneWidget);
+    expect(
+      find.textContaining(const CategoryPath('Gaming', 'Action').label),
+      findsNothing,
+    );
+  });
+
+  testWidgets('the chip is easy to tap: at least 48 points tall', (
+    tester,
+  ) async {
+    await _pump(tester, categories: {'UCg': _category()});
+
+    expect(
+      tester.getSize(find.byKey(ChannelCategoryChips.tapKey)).height,
+      greaterThanOrEqualTo(48),
+    );
+  });
+
+  testWidgets('tapping the chip opens it, not what it sits in', (tester) async {
+    var outer = 0;
+    await _pump(
+      tester,
+      categories: {'UCg': _category()},
+      child: InkWell(
+        onTap: () => outer++,
+        child: const Padding(
+          padding: EdgeInsets.all(24),
+          child: ChannelCategoryChips(channel: _gamer),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
+    await tester.pumpAndSettle();
+
+    expect(outer, 0);
+    expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
   });
 
   testWidgets("tapping a YouTube category explains it comes from YouTube's "
       'topics for the channel', (tester) async {
     await _pump(tester, categories: {'UCg': _category()});
 
-    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
 
     expect(find.byKey(CategorySheet.youtubeSourceKey), findsOneWidget);
@@ -136,7 +216,7 @@ void main() {
       },
     );
 
-    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('92%'), findsOneWidget);
@@ -159,7 +239,7 @@ void main() {
       },
     );
 
-    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
 
     expect(find.byKey(CategorySheet.aiSourceKey), findsOneWidget);

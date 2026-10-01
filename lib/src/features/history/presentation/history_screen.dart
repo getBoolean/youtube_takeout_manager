@@ -9,7 +9,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
@@ -871,7 +871,7 @@ class _WatchedTab extends ConsumerWidget {
                   query: query,
                   onChannelShown: onChannelShown,
                   headerExtra: (context, group) => switch (group.channel) {
-                    final channel? => ChannelCategoryChip(channel: channel),
+                    final channel? => ChannelCategoryChips(channel: channel),
                     null => null,
                   },
                   entryBuilder: entry,

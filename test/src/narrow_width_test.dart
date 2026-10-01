@@ -1180,6 +1180,11 @@ ChannelCategory _longCategory({
     ),
   ],
   decidedAt: DateTime.utc(2026, 9, 30),
+  tags: [
+    for (var i = 1; i <= maxTags; i++)
+      'A long tag naming a game series, number $i',
+  ],
+  tagsTried: true,
 );
 
 class _Notice extends AiTierStatus {

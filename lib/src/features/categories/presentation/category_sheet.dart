@@ -13,7 +13,7 @@ import '../application/channel_categorizer.dart';
 import '../domain/channel_category.dart';
 import '../domain/youtube_topics.dart';
 import 'ai_keys_setup.dart';
-import 'category_chip.dart';
+import 'category_colors.dart';
 
 /// What the user chose, having asked AI for another category.
 sealed class CategorySheetResult {
@@ -170,7 +170,7 @@ class CategorySheet extends StatelessWidget {
           Row(
             children: [
               if (category?.isAi ?? false) ...[
-                Icon(ChannelCategoryChip.aiIcon, color: scheme.primary),
+                AiMark(size: 24, color: scheme.primary),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -195,9 +195,7 @@ class CategorySheet extends StatelessWidget {
                     ? FilledButton.tonalIcon(
                         key: askAiKey,
                         onPressed: onAskAi,
-                        icon: tiny
-                            ? null
-                            : const Icon(ChannelCategoryChip.aiIcon),
+                        icon: tiny ? null : const Icon(Icons.auto_awesome),
                         label: const Text(
                           'Ask AI for another',
                           textAlign: TextAlign.center,
@@ -333,7 +331,7 @@ class CategoryAskPage extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Icon(ChannelCategoryChip.aiIcon, color: scheme.primary),
+                      AiMark(size: 24, color: scheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(

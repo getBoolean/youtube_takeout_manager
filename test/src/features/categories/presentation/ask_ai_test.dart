@@ -15,7 +15,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_rep
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
@@ -126,13 +126,13 @@ void main() {
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(
-            body: Center(child: ChannelCategoryChip(channel: _gamer)),
+            body: Center(child: ChannelCategoryChips(channel: _gamer)),
           ),
         ),
       ),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(ChannelCategoryChip));
+    await tester.tap(find.byKey(ChannelCategoryChips.tapKey));
     await tester.pumpAndSettle();
   }
 

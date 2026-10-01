@@ -16,7 +16,7 @@ import 'package:youtube_takeout_manager/src/features/categories/presentation/cat
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
-import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chip.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/presentation/queue_panel/deletion_queue_pane.dart';
@@ -392,7 +392,7 @@ void main() {
     expect(
       find.descendant(
         of: _channelHeader('X'),
-        matching: find.byType(ChannelCategoryChip),
+        matching: find.byKey(ChannelCategoryChips.tapKey),
       ),
       findsOneWidget,
     );
