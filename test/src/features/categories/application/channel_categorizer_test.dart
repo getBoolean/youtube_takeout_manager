@@ -209,10 +209,17 @@ class _Claude extends AnthropicRepository {
 /// Fetches nothing: gives each video asked for a description, as YouTube
 /// would, and records the IDs.
 class _VideoDetails extends VideoDetailsFetcher {
+  _VideoDetails({this.endless = false});
+
+  /// Whether it fetches until told to stop, as thousands of videos would.
+  final bool endless;
   final asked = <String>{};
 
   @override
-  Future<void> fetch(Iterable<String> videoIds) async {
+  Future<void> fetch(Iterable<String> videoIds, {bool Function()? stop}) async {
+    while (endless && !(stop?.call() ?? false)) {
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
     asked.addAll(videoIds);
     ref.read(videoMetadataProvider.notifier).addAll([
       for (final id in videoIds)
@@ -1265,6 +1272,52 @@ void main() {
       expect(categories['UCx']?.isAi, isFalse);
       expect(categories['UCx']?.path, isNull);
       expect(categories.values.expand((c) => c.tags), isEmpty);
+    });
+
+    test("a clear doesn't wait for the videos' descriptions to finish "
+        'coming', () async {
+      final c = container(
+        details: known,
+        keys: claudeKey,
+        session: 'UCme',
+        videoDetails: _VideoDetails(endless: true),
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await c
+          .read(aiResultsClearerProvider.notifier)
+          .clear()
+          .timeout(const Duration(seconds: 5));
+    });
+
+    test('a service turned off by an answer during a clear starts no run '
+        'that lands after it', () async {
+      final hold = Completer<void>();
+      final jev = _Jev();
+      final claude = _Claude(
+        {'parent': 'Knowledge', 'child': null, 'reason': ''},
+        failure: const AiKeyRejected(),
+        hold: hold,
+      );
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: jev,
+        claude: claude,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      final jevAsked = jev.asked.length;
+
+      final clearing = c.read(aiResultsClearerProvider.notifier).clear();
+      hold.complete();
+      await clearing;
+      await _settle();
+
+      expect(jev.asked, hasLength(jevAsked));
+      final categories = c.read(channelCategoriesProvider).value ?? const {};
+      expect(categories.values.where((c) => c.jevAgreed != null), isEmpty);
     });
 
     test('History opened next categorizes again', () async {

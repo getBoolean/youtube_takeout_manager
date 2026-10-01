@@ -19,7 +19,8 @@ part 'video_details_fetcher.g.dart';
 /// the watched videos AI is told about: signed in, while the quota lasts,
 /// and only for those neither kept on this device nor known to be gone.
 /// Each request is counted against the quota. Signed out, nothing is
-/// fetched; what's kept is all there is.
+/// fetched; what's kept is all there is. Once [fetch]'s `stop` says so, it
+/// asks for nothing more.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
@@ -27,9 +28,10 @@ class VideoDetailsFetcher extends _$VideoDetailsFetcher {
   @override
   void build() {}
 
-  Future<void> fetch(Iterable<String> videoIds) async {
+  Future<void> fetch(Iterable<String> videoIds, {bool Function()? stop}) async {
+    bool stopped() => stop?.call() ?? false;
     final sessionChannelId = ref.read(readSessionChannelIdProvider);
-    if (sessionChannelId == null) return;
+    if (sessionChannelId == null || stopped()) return;
     final quota = ref.read(quotaProvider.notifier);
     if ((await ref.read(quotaProvider.future)).usedUp) return;
 
@@ -41,7 +43,7 @@ class VideoDetailsFetcher extends _$VideoDetailsFetcher {
       for (final id in videoIds)
         if (!kept.containsKey(id) && !gone.contains(id)) id,
     };
-    if (wanted.isEmpty) return;
+    if (wanted.isEmpty || stopped()) return;
 
     final client = ref
         .read(googleAuthRepositoryProvider)
@@ -66,8 +68,10 @@ class VideoDetailsFetcher extends _$VideoDetailsFetcher {
               )) {
         batch.add(video);
         fetched.add(video.videoId);
+        // Leaving the stream ends it before its next request.
+        if (stopped()) break;
       }
-      complete = true;
+      complete = !stopped();
     } catch (e) {
       if (isQuotaExceeded(e)) {
         // Keep what came; the rest isn't gone, just not asked for until

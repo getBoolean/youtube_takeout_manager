@@ -263,7 +263,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       if (videoIds.isNotEmpty) {
         await ref
             .read(videoDetailsFetcherProvider.notifier)
-            .fetch(videoIds)
+            .fetch(videoIds, stop: dropped)
             .catchError((Object _) {});
         if (dropped()) return;
       }

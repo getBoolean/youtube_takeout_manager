@@ -122,6 +122,35 @@ void main() {
     );
   });
 
+  test('told to stop, it asks for nothing more', () async {
+    final videos = _Videos();
+    final c = container(videos: videos);
+    var stop = false;
+
+    await c.read(videoDetailsFetcherProvider.notifier).fetch([
+      for (var i = 0; i < 120; i++) 'v$i',
+    ], stop: () => stop);
+    expect(videos.requests, hasLength(3));
+
+    videos.requests.clear();
+    stop = true;
+    await c.read(videoDetailsFetcherProvider.notifier).fetch([
+      for (var i = 200; i < 320; i++) 'v$i',
+    ], stop: () => stop);
+    expect(videos.requests, isEmpty);
+  });
+
+  test('told to stop partway, it asks for nothing after', () async {
+    final videos = _Videos();
+    final c = container(videos: videos);
+
+    await c.read(videoDetailsFetcherProvider.notifier).fetch([
+      for (var i = 0; i < 120; i++) 'v$i',
+    ], stop: () => videos.requests.isNotEmpty);
+
+    expect(videos.requests, hasLength(1));
+  });
+
   test('kept videos and ones YouTube lacks are not asked for again', () async {
     final videos = _Videos(gone: {'gone'});
     final c = container(videos: videos);

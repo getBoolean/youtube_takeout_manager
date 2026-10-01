@@ -23,6 +23,9 @@ class AiResultsClearer extends _$AiResultsClearer {
   void build() {}
 
   Future<void> clear() async {
+    // First, so a run asked for while clearing, such as one without a
+    // service an answer turned off, waits for History too.
+    ref.read(historyShownProvider.notifier).reset();
     await ref.read(channelCategorizerProvider.notifier).stopRun();
     final details = await ref
         .read(channelDetailsProvider.future)
@@ -44,6 +47,5 @@ class AiResultsClearer extends _$AiResultsClearer {
         .read(customCategoriesProvider.notifier)
         .replaceAll(cleared.custom);
     await ref.read(tagNamesProvider.notifier).replaceAll(cleared.tags);
-    ref.read(historyShownProvider.notifier).reset();
   }
 }
