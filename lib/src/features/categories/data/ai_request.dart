@@ -199,11 +199,12 @@ class AiRequester {
       final last = attempt >= rules.attempts;
       final turn = await pacer?.turn(tokens: tokens);
       final abort = Completer<void>();
+      final built = request(abort.future);
       http.Response? response;
       (Object, StackTrace)? error;
       try {
         response = await () async {
-          final streamed = await _client.send(request(abort.future));
+          final streamed = await _client.send(built);
           return http.Response.fromStream(streamed);
         }().timeout(rules.timeout);
       } on Object catch (e, stack) {
@@ -214,7 +215,9 @@ class AiRequester {
       }
       if (error case (final e, final stack)) {
         final timedOut = e is TimeoutException || abort.isCompleted;
-        if (!timedOut && e is! http.ClientException) {
+        // Whatever the connection threw: a ClientException, or what dart:io
+        // passes on as it is, such as a failed handshake or a reset.
+        if (!timedOut && e is! Exception) {
           Error.throwWithStackTrace(e, stack);
         }
         if (timedOut) {

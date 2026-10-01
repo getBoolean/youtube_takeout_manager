@@ -281,6 +281,40 @@ void main() {
     expect(requests, 3);
   });
 
+  test('a secure connection that fails is tried again, then fails as '
+      'unreachable', () async {
+    var requests = 0;
+    final (:requester, sleeps: _) = _requester(
+      MockClient((_) async {
+        requests++;
+        throw const _Handshake();
+      }),
+    );
+
+    await expectLater(
+      requester.send(apiKey: 'sk-test', request: _post, read: _read),
+      throwsA(isA<AiUnreachable>()),
+    );
+    expect(requests, 3);
+  });
+
+  test('a reply cut off while it is read is tried again', () async {
+    var requests = 0;
+    final (:requester, sleeps: _) = _requester(
+      _Streaming(
+        () => ++requests == 1
+            ? Stream<List<int>>.error(const _Reset())
+            : Stream.value(utf8.encode('whole')),
+      ),
+    );
+
+    expect(
+      await requester.send(apiKey: 'sk-test', request: _post, read: _read),
+      'whole',
+    );
+    expect(requests, 2);
+  });
+
   group('a request that takes too long', () {
     test('is tried again, and its answer used', () {
       fakeAsync((async) {
@@ -528,6 +562,27 @@ void main() {
       expect(pacerSleeps, isEmpty);
     });
   });
+}
+
+/// As dart:io throws when a secure connection can't be made.
+class _Handshake implements Exception {
+  const _Handshake();
+}
+
+/// As dart:io throws when a connection is reset mid-reply.
+class _Reset implements Exception {
+  const _Reset();
+}
+
+/// A client answering 200 with the body [body] streams.
+class _Streaming extends http.BaseClient {
+  final Stream<List<int>> Function() body;
+
+  _Streaming(this.body);
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async =>
+      http.StreamedResponse(body(), 200);
 }
 
 /// A client whose requests never answer, telling [onSend] about each.
