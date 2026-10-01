@@ -73,6 +73,28 @@ void main() {
       expect(custom['Gaming'], [const SubCategory(name: 'Speed runs')]);
     });
 
+    test('keeps the tags there are when it brings none', () async {
+      final c = _container();
+      await _start(c);
+
+      await c
+          .read(categoryEditorProvider.notifier)
+          .accept(
+            _gamer,
+            ChannelCategory(
+              path: const CategoryPath('Gaming', 'Racing'),
+              source: CategorySource.claude,
+              tagsTried: true,
+              decidedAt: _now,
+            ),
+          );
+
+      final kept = await _kept(c);
+      expect(kept?.path, const CategoryPath('Gaming', 'Racing'));
+      expect(kept?.tags, ['Old tag']);
+      expect(kept?.tagsEditedByUser, isFalse);
+    });
+
     test('keeps tags the user edited, changing only the category', () async {
       final c = _container();
       await _start(c, edited: true);

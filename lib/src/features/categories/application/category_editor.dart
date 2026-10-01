@@ -23,8 +23,8 @@ class CategoryEditor extends _$CategoryEditor {
   void build() {}
 
   /// Makes [suggestion] [channel]'s category, as the user chose, keeping a
-  /// new sub-category it names, with the emoji AI gave it; and its tags,
-  /// as the user's, unless they edited the ones there are.
+  /// new sub-category it names, with the emoji AI gave it; and the tags it
+  /// brings, as the user's, unless they edited the ones there are.
   Future<void> accept(
     HistoryChannel channel,
     ChannelCategory suggestion,
@@ -42,7 +42,9 @@ class CategoryEditor extends _$CategoryEditor {
       userDecision: UserDecision.accepted,
       decidedAt: DateTime.now().toUtc(),
     );
-    if ((current?.tagsEditedByUser ?? false) || !suggestion.tagsTried) {
+    if ((current?.tagsEditedByUser ?? false) ||
+        !suggestion.tagsTried ||
+        suggestion.tags.isEmpty) {
       accepted = accepted.copyWith(
         tags: current?.tags ?? const [],
         tagsTried: current?.tagsTried ?? false,
