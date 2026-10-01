@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
@@ -34,5 +36,22 @@ void main() {
 
       expect(blank.hasAny, isFalse);
     });
+  });
+
+  group('a key can go in a request header', () {
+    for (final (key, safe) in [
+      ('sk-ant-api03-AbC_dEf-123', true),
+      ('jv_live_0123456789abcdef', true),
+      ('', false),
+      ('sk-ant api03', false),
+      ('sk-ant\napi03', false),
+      ('sk-ant\u0000', false),
+      ('sk-ant-é', false),
+      ('sk-ant-\u200b', false),
+    ]) {
+      test('${safe ? 'yes' : 'no'}: ${jsonEncode(key)}', () {
+        expect(isHeaderSafeKey(key), safe);
+      });
+    }
   });
 }

@@ -16,6 +16,12 @@ String resolveAnthropicModel(String configured) {
 /// The Claude model this build categorizes channels with.
 final anthropicModel = resolveAnthropicModel(_anthropicModel);
 
+/// Whether [key] can go in a request header: printable ASCII, without
+/// spaces. Anything else, e.g. a line break pasted with it, is refused.
+bool isHeaderSafeKey(String key) => _headerSafe.hasMatch(key);
+
+final _headerSafe = RegExp(r'^[\x21-\x7E]+$');
+
 /// The AI services channels can be categorized with.
 enum AiService {
   /// TypeSafe's Jev: cheap checks and picks from known categories.
