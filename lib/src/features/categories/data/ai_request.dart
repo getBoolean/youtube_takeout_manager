@@ -101,15 +101,15 @@ final class AiRefused<T> extends AiReply<T> {
 }
 
 /// How long [headers] ask to wait before asking again: `retry-after-ms`,
-/// else `retry-after` in whole seconds. Null when they don't say, or say it
-/// in a way that can't be read, such as a date.
+/// else `retry-after` in whole seconds. Null when they don't say, say no
+/// wait at all, or say it in a way that can't be read, such as a date.
 Duration? requestedWait(Map<String, String> headers) {
   if (double.tryParse(headers['retry-after-ms'] ?? '') case final ms?
-      when ms >= 0 && ms.isFinite) {
+      when ms > 0 && ms.isFinite) {
     return Duration(microseconds: (ms * 1000).round());
   }
   if (int.tryParse(headers['retry-after']?.trim() ?? '') case final seconds?
-      when seconds >= 0) {
+      when seconds > 0) {
     return Duration(seconds: seconds);
   }
   return null;

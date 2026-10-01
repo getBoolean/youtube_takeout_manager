@@ -892,6 +892,28 @@ void main() {
       expect(timers.active.single.after, const Duration(seconds: 90));
     });
 
+    test('a stated wait that has all but passed still pauses for a minute, '
+        'so a run never starts again at once', () async {
+      final timers = _Timers();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(
+          failure: AiRateLimited(
+            'Too many requests for now.',
+            t0.add(const Duration(milliseconds: 1)),
+          ),
+        ),
+        timers: timers,
+        now: () => t0,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(timers.active.single.after, const Duration(minutes: 1));
+    });
+
     test('runs asked for while paused wait for the resume', () async {
       final timers = _Timers();
       final jev = _Jev(failure: const AiOverloaded());

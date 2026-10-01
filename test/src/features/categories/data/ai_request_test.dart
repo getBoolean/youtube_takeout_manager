@@ -255,6 +255,11 @@ void main() {
       );
     });
 
+    test('of nothing is no stated wait', () {
+      expect(requestedWait({'retry-after': '0'}), isNull);
+      expect(requestedWait({'retry-after-ms': '0'}), isNull);
+    });
+
     test('that cannot be read is no stated wait', () {
       expect(
         requestedWait({'retry-after': 'Wed, 21 Oct 2026 07:28:00 GMT'}),

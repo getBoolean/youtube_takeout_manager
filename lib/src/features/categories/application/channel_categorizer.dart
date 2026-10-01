@@ -42,6 +42,10 @@ const _inFlight = 3;
 /// How long categorizing pauses for a busy service that didn't say.
 const _defaultPause = Duration(minutes: 5);
 
+/// How long categorizing pauses at least: a service still refusing after
+/// its stated waits isn't asked again straight away.
+const _shortestPause = Duration(minutes: 1);
+
 /// Categorizes the channels watched and subscribed to, the most watched
 /// first, once the history screen has been opened. Signed in, it first asks
 /// YouTube for the topics of channels it doesn't know them for. A category
@@ -501,7 +505,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           'categorized next time.',
         );
       case AiRateLimited(:final resumeAt) || AiOverloaded(:final resumeAt):
-        final until = resumeAt ?? _now().add(_defaultPause);
+        final now = _now();
+        final soonest = now.add(_shortestPause);
+        final until = switch (resumeAt) {
+          null => now.add(_defaultPause),
+          final at when at.isBefore(soonest) => soonest,
+          final at => at,
+        };
         _hold(service, until);
         unawaited(
           ref
