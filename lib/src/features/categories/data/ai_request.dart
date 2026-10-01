@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:http/http.dart' as http;
@@ -112,6 +113,26 @@ Duration? requestedWait(Map<String, String> headers) {
     return Duration(seconds: seconds);
   }
   return null;
+}
+
+/// What an API's error [body] says went wrong, at most 200 characters;
+/// null when it says nothing readable.
+String? apiErrorMessage(String body) {
+  final Object? json;
+  try {
+    json = jsonDecode(body);
+  } on FormatException {
+    return null;
+  }
+  final message = switch (json) {
+    {'error': {'message': final String message}} => message,
+    {'error': final String message} => message,
+    {'message': final String message} => message,
+    {'detail': final String message} => message,
+    _ => null,
+  }?.trim();
+  if (message == null || message.isEmpty) return null;
+  return message.length <= 200 ? message : '${message.substring(0, 199)}…';
 }
 
 /// Runs [body], turning anything it throws into an [AiFailure] that never

@@ -1,11 +1,11 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'ai_errors.dart';
+import 'ai_pacer.dart';
+import 'ai_request.dart';
 
 part 'typesafe_repository.g.dart';
 
@@ -94,24 +94,49 @@ class ChoiceAnswer extends JevAnswer {
 
 /// Asks TypeSafe's Jev, a classifier that picks from options it's given
 /// for a fraction of a cent, questions about some state, all in one
-/// request. Busy or rate-limited, it waits and asks again, longer each
-/// time; a rejected key, or a request it can't read, isn't asked again.
+/// request. Requests are paced to Jev's documented limits; busy or
+/// rate-limited, it waits and asks again within [RetryPolicy.jev]'s caps; a
+/// rejected key, or a request it can't read, isn't asked again.
 class TypeSafeRepository {
   static final _endpoint = Uri.parse('https://api.typesafe.ai/v1/systemone');
+  static final _models = Uri.parse('https://api.typesafe.ai/v1/models');
   static const _model = 'jev-latest';
-  static const _timeout = Duration(seconds: 30);
 
   final http.Client _client;
-  final Future<void> Function(Duration) _sleep;
-  final int maxAttempts;
-  final _random = Random();
+  final AiPacer _pacer;
+  final AiRequester _requester;
 
   TypeSafeRepository({
     http.Client? client,
-    Future<void> Function(Duration)? sleep,
-    this.maxAttempts = 5,
-  }) : _client = client ?? http.Client(),
-       _sleep = sleep ?? Future<void>.delayed;
+    AiPacer? pacer,
+    RetryPolicy policy = RetryPolicy.jev,
+    Now? now,
+    Sleep? sleep,
+    double Function()? jitter,
+  }) : this._(
+         client ?? http.Client(),
+         pacer ?? BucketPacer(now: now, sleep: sleep),
+         policy,
+         now,
+         sleep,
+         jitter,
+       );
+
+  TypeSafeRepository._(
+    this._client,
+    this._pacer,
+    RetryPolicy policy,
+    Now? now,
+    Sleep? sleep,
+    double Function()? jitter,
+  ) : _requester = AiRequester(
+        client: _client,
+        policy: policy,
+        pacer: _pacer,
+        now: now,
+        sleep: sleep,
+        jitter: jitter,
+      );
 
   /// Asks [questions] about [state], a string or JSON, with [apiKey], and
   /// gives each answer by its question's key. Throws an [AiFailure].
@@ -119,7 +144,16 @@ class TypeSafeRepository {
     required String apiKey,
     required Object state,
     required Map<String, JevQuestion> questions,
-  }) async {
+  }) => guardAi(secret: apiKey, () async {
+    if (questions.values.any(
+      (question) =>
+          question is JevChoice &&
+          question.options.length > JevChoice.maxOptions,
+    )) {
+      throw const AiUnexpected(
+        'A question offered Jev more than ${JevChoice.maxOptions} options.',
+      );
+    }
     final body = jsonEncode({
       'model': _model,
       'state': state,
@@ -128,56 +162,58 @@ class TypeSafeRepository {
           key: value.toJson(),
       },
     });
-    for (var attempt = 1; ; attempt++) {
-      final http.Response response;
-      try {
-        response = await _client
-            .post(
-              _endpoint,
-              headers: {
-                'Authorization': 'Bearer $apiKey',
-                'Content-Type': 'application/json',
-              },
-              body: body,
-            )
-            .timeout(_timeout);
-      } on Object catch (e) {
-        if (e is! http.ClientException && e is! TimeoutException) rethrow;
-        if (attempt >= maxAttempts) throw const AiUnreachable();
-        await _sleep(_backoff(attempt, null));
-        continue;
-      }
-      switch (response.statusCode) {
-        case 200:
-          return _answers(response.body);
-        case 401 || 403:
-          throw const AiKeyRejected();
-        case 402:
-          throw const AiBillingProblem();
-        case 404:
-          throw const AiModelUnavailable();
-        case 400 || 422:
-          throw const AiBadRequest();
-        case final status when status == 429 || status >= 500:
-          if (attempt >= maxAttempts) {
-            throw status == 429 ? const AiRateLimited() : const AiOverloaded();
-          }
-          await _sleep(_backoff(attempt, response.headers['retry-after']));
-        default:
-          throw AiBadRequest('Jev answered ${response.statusCode}.');
-      }
-    }
-  }
+    return _requester.send(
+      apiKey: apiKey,
+      tokens: body.length ~/ 4,
+      request: (abort) =>
+          http.AbortableRequest('POST', _endpoint, abortTrigger: abort)
+            ..headers.addAll({
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+            })
+            ..body = body,
+      read: (response) => _reply(response, _answers),
+    );
+  });
 
-  /// How long to wait before try [attempt] + 1: what the service said, else
-  /// a second, doubling each time, with some jitter.
-  Duration _backoff(int attempt, String? retryAfter) {
-    if (int.tryParse(retryAfter ?? '') case final seconds? when seconds >= 0) {
-      return Duration(seconds: seconds);
-    }
-    final base = 1000 * pow(2, attempt - 1);
-    return Duration(milliseconds: base.toInt() + _random.nextInt(250));
-  }
+  /// Checks [apiKey] by listing Jev's models, which costs nothing. Not
+  /// paced, so a pause doesn't hold it. Throws an [AiFailure] when the key
+  /// can't be used, or Jev couldn't say.
+  Future<void> checkKey(String apiKey) => _requester.send(
+    apiKey: apiKey,
+    paced: false,
+    policy: RetryPolicy.keyCheck,
+    request: (abort) =>
+        http.AbortableRequest('GET', _models, abortTrigger: abort)
+          ..headers['Authorization'] = 'Bearer $apiKey',
+    read: (response) => _reply<void>(response, (_) {}),
+  );
+
+  /// Holds every question until [until], e.g. restoring a pause Jev asked
+  /// for before the app was closed.
+  void pauseUntil(DateTime until) => _pacer.pauseUntil(until);
+
+  /// What Jev's [response] comes to, [answer] reading a 200's body.
+  static AiReply<T> _reply<T>(
+    http.Response response,
+    T Function(String body) answer,
+  ) => switch (response.statusCode) {
+    200 => AiAnswered(answer(response.body)),
+    401 || 403 => const AiRefused(AiKeyRejected()),
+    402 => AiRefused(switch (apiErrorMessage(response.body)) {
+      final message? => AiBillingProblem(message),
+      null => const AiBillingProblem(),
+    }),
+    404 => const AiRefused(AiModelUnavailable()),
+    400 || 422 => AiRefused(switch (apiErrorMessage(response.body)) {
+      final message? => AiBadRequest(message),
+      null => const AiBadRequest(),
+    }),
+    408 => const AiTryAgain(AiOverloaded("Jev didn't answer in time.")),
+    429 => const AiTryAgain(AiRateLimited()),
+    >= 500 => const AiTryAgain(AiOverloaded()),
+    final status => AiRefused(AiBadRequest('Jev answered $status.')),
+  };
 
   static Map<String, JevAnswer> _answers(String body) {
     try {
