@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 
 ProviderContainer _container() {
   final c = ProviderContainer();
@@ -42,6 +43,37 @@ void main() {
     final kept = (await c.read(channelCategoriesProvider.future))['UCa']!;
     expect(kept.path, const CategoryPath('Music'));
     expect(kept.tags, ['Mario Kart World']);
+  });
+
+  group('a sub-category added', () {
+    test('keeps who made it and its emoji', () async {
+      final c = _container();
+      final custom = c.read(customCategoriesProvider.notifier);
+
+      await custom.add('Gaming', 'Retro', origin: NameOrigin.user, emoji: '👾');
+
+      expect((await c.read(customCategoriesProvider.future))['Gaming'], [
+        const SubCategory(name: 'Retro', origin: NameOrigin.user, emoji: '👾'),
+      ]);
+    });
+
+    test('that folds into one AI made is the one AI made', () async {
+      final c = _container();
+      final custom = c.read(customCategoriesProvider.notifier);
+      await custom.add('Gaming', 'Speedruns', emoji: '🏃');
+
+      final spelled = await custom.add(
+        'Gaming',
+        'speed-runs',
+        origin: NameOrigin.user,
+        emoji: '⏱️',
+      );
+
+      expect(spelled, 'Speedruns');
+      expect((await c.read(customCategoriesProvider.future))['Gaming'], [
+        const SubCategory(name: 'Speedruns', emoji: '🏃'),
+      ]);
+    });
   });
 
   test('replacing every category keeps them on this device', () async {

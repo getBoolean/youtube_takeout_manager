@@ -1,13 +1,14 @@
 import 'category_path.dart';
 import 'channel_category.dart';
 import 'name_key.dart';
+import 'sub_category.dart';
 import 'youtube_taxonomy.dart';
 
-/// Channels' categories by channel key, and the sub-categories AI made, by
-/// category, as kept.
+/// Channels' categories by channel key, and the sub-categories made for
+/// them, by category, as kept.
 typedef StoredNames = ({
   Map<String, ChannelCategory> categories,
-  Map<String, List<String>> custom,
+  Map<String, List<SubCategory>> custom,
 });
 
 /// [stored] with sub-category names that differ only by case, accents,
@@ -15,9 +16,10 @@ typedef StoredNames = ({
 /// one. [builtIn]'s spelling always wins, and leaves the AI-made list;
 /// otherwise the spelling the most channels have wins, ties going to the
 /// AI-made list's order, then to the spelling a channel had first. Every
-/// channel and runner-up moves to it; what changes nothing is given back as
-/// it was, so saving writes only what changed. Merging again changes
-/// nothing.
+/// channel and runner-up moves to it; the winner keeps its own record, with
+/// an emoji a variant had when it has none. What changes nothing is given
+/// back as it was, so saving writes only what changed. Merging again
+/// changes nothing.
 StoredNames mergeNameVariants(
   StoredNames stored, {
   Taxonomy builtIn = youtubeTaxonomy,
@@ -30,7 +32,7 @@ StoredNames mergeNameVariants(
   }
   for (final MapEntry(key: parent, value: children) in stored.custom.entries) {
     for (final (i, child) in children.indexed) {
-      variants.of(parent, child).listed ??= i;
+      variants.of(parent, child.name).listed ??= i;
     }
   }
   for (final category in stored.categories.values) {
@@ -80,23 +82,44 @@ StoredNames mergeNameVariants(
         : category;
   }
 
-  final custom = <String, List<String>>{};
+  final custom = <String, List<SubCategory>>{};
   for (final MapEntry(key: parent, value: children) in stored.custom.entries) {
     final keys = <String>{};
-    final kept = <String>[];
+    final kept = <SubCategory>[];
     for (final child in children) {
-      final winner = renamed[(parent, child)] ?? child;
+      final winner = renamed[(parent, child.name)] ?? child.name;
       if (variants.isBuiltIn(parent, winner)) continue;
-      if (keys.add(nameKey(winner))) kept.add(winner);
+      final key = nameKey(winner);
+      if (keys.add(key)) kept.add(_winningRecord(children, winner, key));
     }
     if (kept.isEmpty) continue;
     var same = kept.length == children.length;
     for (var i = 0; same && i < kept.length; i++) {
-      same = kept[i] == children[i];
+      same = identical(kept[i], children[i]);
     }
     custom[parent] = same ? children : kept;
   }
   return (categories: categories, custom: custom);
+}
+
+/// The record [winner] keeps among [children], whose names have [key]: its
+/// own, else the first variant's renamed; with an emoji a variant had when
+/// it has none.
+SubCategory _winningRecord(
+  List<SubCategory> children,
+  String winner,
+  String key,
+) {
+  final variants = [
+    for (final child in children)
+      if (nameKey(child.name) == key) child,
+  ];
+  final record =
+      variants.where((child) => child.name == winner).firstOrNull ??
+      variants.first.copyWith(name: winner);
+  if (record.emoji != null) return record;
+  final emoji = variants.map((child) => child.emoji).nonNulls.firstOrNull;
+  return emoji == null ? record : record.copyWith(emoji: emoji);
 }
 
 /// One spelling of a sub-category, and what's known of it.

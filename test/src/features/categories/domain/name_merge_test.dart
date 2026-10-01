@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/name_merge.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 
 ChannelCategory _category(
   String parent,
@@ -18,10 +19,16 @@ ChannelCategory _category(
   decidedAt: at ?? DateTime.utc(2026, 9, 30),
 );
 
+/// [names] as records AI made.
+Map<String, List<SubCategory>> _records(Map<String, List<String>> names) => {
+  for (final MapEntry(:key, :value) in names.entries)
+    key: [for (final name in value) SubCategory(name: name)],
+};
+
 StoredNames _merge(
   Map<String, ChannelCategory> categories, [
   Map<String, List<String>> custom = const {},
-]) => mergeNameVariants((categories: categories, custom: custom));
+]) => mergeNameVariants((categories: categories, custom: _records(custom)));
 
 void main() {
   test("variants of YouTube's sub-category take YouTube's spelling, and "
@@ -38,7 +45,7 @@ void main() {
       merged.categories['UCa']?.path,
       const CategoryPath('Music', 'Hip hop'),
     );
-    expect(merged.custom, {
+    expect(subCategoryNames(merged.custom), {
       'Music': ['Shoegaze'],
     });
   });
@@ -60,7 +67,7 @@ void main() {
       {for (final e in merged.categories.entries) e.key: e.value.path?.child},
       {'UCa': 'Speedruns', 'UCb': 'Speedruns', 'UCc': 'Speedruns'},
     );
-    expect(merged.custom, {
+    expect(subCategoryNames(merged.custom), {
       'Gaming': ['Speedruns'],
     });
   });
@@ -77,7 +84,7 @@ void main() {
     );
 
     expect(merged.categories['UCa']?.path?.child, 'Speed-runs');
-    expect(merged.custom, {
+    expect(subCategoryNames(merged.custom), {
       'Gaming': ['Speed-runs'],
     });
   });
@@ -129,7 +136,7 @@ void main() {
     );
 
     expect(merged.categories['UCb']?.path?.child, 'C# programming');
-    expect(merged.custom, {
+    expect(subCategoryNames(merged.custom), {
       'Knowledge': ['C programming', 'C# programming'],
     });
   });
@@ -147,7 +154,7 @@ void main() {
       merged.categories['UCb']?.path,
       const CategoryPath('Music', 'retro'),
     );
-    expect(merged.custom, {
+    expect(subCategoryNames(merged.custom), {
       'Gaming': ['Retro'],
       'Music': ['retro'],
     });
@@ -180,11 +187,11 @@ void main() {
       'UCb': _category('Music', 'Pop'),
       'UCc': ChannelCategory(decidedAt: DateTime.utc(2026, 9, 30)),
     };
-    final custom = {
+    final custom = _records({
       'Gaming': ['Speedruns'],
-    };
+    });
 
-    final merged = _merge(categories, custom);
+    final merged = mergeNameVariants((categories: categories, custom: custom));
 
     for (final MapEntry(:key, :value) in categories.entries) {
       expect(identical(merged.categories[key], value), isTrue, reason: key);
@@ -211,5 +218,40 @@ void main() {
       expect(identical(twice.categories[key], value), isTrue, reason: key);
     }
     expect(twice.custom, once.custom);
+  });
+
+  test('the spelling that wins keeps an emoji a variant had', () {
+    final merged = mergeNameVariants((
+      categories: {
+        'UCa': _category('Gaming', 'Speedruns'),
+        'UCb': _category('Gaming', 'Speedruns'),
+      },
+      custom: {
+        'Gaming': [
+          const SubCategory(name: 'Speed-runs', emoji: '🏃'),
+          const SubCategory(name: 'Speedruns'),
+        ],
+      },
+    ));
+
+    expect(merged.custom, {
+      'Gaming': [const SubCategory(name: 'Speedruns', emoji: '🏃')],
+    });
+  });
+
+  test('a name the user typed stays theirs when it wins', () {
+    final merged = mergeNameVariants((
+      categories: {'UCa': _category('Gaming', 'Speedruns')},
+      custom: {
+        'Gaming': [
+          const SubCategory(name: 'Speedruns', origin: NameOrigin.user),
+          const SubCategory(name: 'speed runs'),
+        ],
+      },
+    ));
+
+    expect(merged.custom['Gaming'], [
+      const SubCategory(name: 'Speedruns', origin: NameOrigin.user),
+    ]);
   });
 }

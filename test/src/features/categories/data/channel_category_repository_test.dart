@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/channel_category_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 
 /// Keeps entries in memory, recording the keys each write puts, and
@@ -49,13 +50,25 @@ void main() {
     expect((await repository().loadCategories()).keys, ['UCa']);
   });
 
-  test("sub-categories AI made are kept by category", () async {
-    await repository().saveCustomChildren({
-      'Gaming': ['Speedruns'],
-    });
+  test('sub-categories are kept by category, with who made them and their '
+      'emoji', () async {
+    final custom = {
+      'Gaming': [
+        const SubCategory(name: 'Speedruns'),
+        const SubCategory(name: 'Retro', origin: NameOrigin.user, emoji: '👾'),
+      ],
+    };
+
+    await repository().saveCustomChildren(custom);
+
+    expect(await repository().loadCustomChildren(), custom);
+  });
+
+  test('sub-categories kept as names alone read as made by AI', () async {
+    store.boxes[EntryBoxes.customSubCategories] = {'Gaming': '["Speedruns"]'};
 
     expect(await repository().loadCustomChildren(), {
-      'Gaming': ['Speedruns'],
+      'Gaming': [const SubCategory(name: 'Speedruns')],
     });
   });
 
@@ -80,8 +93,11 @@ void main() {
         ),
       });
       await before.saveCustomChildren({
-        'Gaming': ['Speed-runs', 'Speedruns'],
-        'Music': ['Shoegaze'],
+        'Gaming': [
+          const SubCategory(name: 'Speed-runs'),
+          const SubCategory(name: 'Speedruns'),
+        ],
+        'Music': [const SubCategory(name: 'Shoegaze')],
       });
       recording.puts.clear();
       return recording;
@@ -100,7 +116,7 @@ void main() {
           categories['UCc']?.path,
           const CategoryPath('Gaming', 'Speedruns'),
         );
-        expect(custom, {
+        expect(subCategoryNames(custom), {
           'Gaming': ['Speedruns'],
           'Music': ['Shoegaze'],
         });

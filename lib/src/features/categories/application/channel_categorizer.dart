@@ -20,6 +20,7 @@ import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/prompt_videos.dart';
+import '../domain/sub_category.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
 import '../data/ai_pause_repository.dart';
@@ -379,7 +380,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         .catchError((Object _) => AiKeys.none);
     await ref
         .read(customCategoriesProvider.future)
-        .catchError((Object _) => const <String, List<String>>{});
+        .catchError((Object _) => const <String, List<SubCategory>>{});
     final disabled = ref.read(aiTierStatusProvider).disabled;
     bool on(AiService service) =>
         keys.has(service) && !disabled.contains(service);

@@ -21,6 +21,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/model_capab
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
@@ -734,7 +735,7 @@ void main() {
       expect(none?.reason, 'Races through games');
       // YouTube's sub-categories stand.
       expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
-      expect(await c.read(customCategoriesProvider.future), {
+      expect(subCategoryNames(await c.read(customCategoriesProvider.future)), {
         'Gaming': ['Speedruns'],
       });
     });
@@ -795,7 +796,7 @@ void main() {
 
       expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Speedruns'));
       expect(paths(c)['UCs'], const CategoryPath('Music', 'Hip hop'));
-      expect(await c.read(customCategoriesProvider.future), {
+      expect(subCategoryNames(await c.read(customCategoriesProvider.future)), {
         'Gaming': ['Speedruns'],
       });
     });
@@ -810,7 +811,7 @@ void main() {
       expect(await custom.add('Music', 'hip-hop'), 'Hip hop');
       expect(await custom.add('Gaming', 'Retro'), 'Retro');
 
-      expect(await c.read(customCategoriesProvider.future), {
+      expect(subCategoryNames(await c.read(customCategoriesProvider.future)), {
         'Gaming': ['Speedruns', 'Retro'],
       });
     });

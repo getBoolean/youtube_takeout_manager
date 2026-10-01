@@ -5,6 +5,7 @@ import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_merge.dart';
+import '../domain/sub_category.dart';
 
 part 'channel_category_repository.g.dart';
 
@@ -19,7 +20,7 @@ ChannelCategoryRepository channelCategoryRepository(Ref ref) =>
 /// hyphens, spaces or punctuation, and keep the merge.
 class ChannelCategoryRepository {
   final EntryBox<ChannelCategory> _categories;
-  final EntryBox<List<String>> _custom;
+  final EntryBox<List<SubCategory>> _custom;
 
   /// Both boxes, merged, until each has been loaded from it once.
   Future<StoredNames>? _merged;
@@ -37,8 +38,11 @@ class ChannelCategoryRepository {
       _custom = EntryBox(
         store,
         EntryBoxes.customSubCategories,
-        encode: (children) => children,
-        decode: (json) => (json! as List<dynamic>).cast<String>(),
+        encode: (children) => [for (final child in children) child.toMap()],
+        decode: (json) => [
+          for (final child in json! as List<dynamic>)
+            SubCategory.fromStored(child),
+        ],
       );
 
   /// Categories that can't be read are skipped, keeping the rest.
@@ -52,15 +56,16 @@ class ChannelCategoryRepository {
   Future<void> saveCategories(Map<String, ChannelCategory> categories) =>
       _categories.save(categories);
 
-  /// The sub-categories AI made, by category.
-  Future<Map<String, List<String>>> loadCustomChildren() async {
+  /// The sub-categories made for channels YouTube's don't fit, by
+  /// category.
+  Future<Map<String, List<SubCategory>>> loadCustomChildren() async {
     if (_customServed) return _custom.load();
     final merged = await _merge();
     _customServed = true;
     return merged.custom;
   }
 
-  Future<void> saveCustomChildren(Map<String, List<String>> children) =>
+  Future<void> saveCustomChildren(Map<String, List<SubCategory>> children) =>
       _custom.save(children);
 
   /// Both boxes with name variants merged, the merge kept: categories

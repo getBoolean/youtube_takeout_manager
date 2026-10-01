@@ -75,16 +75,22 @@ abstract class _$ChannelCategories
   }
 }
 
-/// The sub-categories AI made for channels YouTube's don't fit, by category.
+/// The sub-categories made for channels YouTube's don't fit, by category:
+/// by AI, or typed by the user.
 
 @ProviderFor(CustomCategories)
 final customCategoriesProvider = CustomCategoriesProvider._();
 
-/// The sub-categories AI made for channels YouTube's don't fit, by category.
+/// The sub-categories made for channels YouTube's don't fit, by category:
+/// by AI, or typed by the user.
 final class CustomCategoriesProvider
     extends
-        $AsyncNotifierProvider<CustomCategories, Map<String, List<String>>> {
-  /// The sub-categories AI made for channels YouTube's don't fit, by category.
+        $AsyncNotifierProvider<
+          CustomCategories,
+          Map<String, List<SubCategory>>
+        > {
+  /// The sub-categories made for channels YouTube's don't fit, by category:
+  /// by AI, or typed by the user.
   CustomCategoriesProvider._()
     : super(
         from: null,
@@ -104,30 +110,31 @@ final class CustomCategoriesProvider
   CustomCategories create() => CustomCategories();
 }
 
-String _$customCategoriesHash() => r'1cd26caaf667956503f068bb957cc3495eeca3fd';
+String _$customCategoriesHash() => r'ecda0d220916a1f4154f08511169558e8a698105';
 
-/// The sub-categories AI made for channels YouTube's don't fit, by category.
+/// The sub-categories made for channels YouTube's don't fit, by category:
+/// by AI, or typed by the user.
 
 abstract class _$CustomCategories
-    extends $AsyncNotifier<Map<String, List<String>>> {
-  FutureOr<Map<String, List<String>>> build();
+    extends $AsyncNotifier<Map<String, List<SubCategory>>> {
+  FutureOr<Map<String, List<SubCategory>>> build();
   @$mustCallSuper
   @override
   void runBuild() {
     final ref =
         this.ref
             as $Ref<
-              AsyncValue<Map<String, List<String>>>,
-              Map<String, List<String>>
+              AsyncValue<Map<String, List<SubCategory>>>,
+              Map<String, List<SubCategory>>
             >;
     final element =
         ref.element
             as $ClassProviderElement<
               AnyNotifier<
-                AsyncValue<Map<String, List<String>>>,
-                Map<String, List<String>>
+                AsyncValue<Map<String, List<SubCategory>>>,
+                Map<String, List<SubCategory>>
               >,
-              AsyncValue<Map<String, List<String>>>,
+              AsyncValue<Map<String, List<SubCategory>>>,
               Object?,
               Object?
             >;
@@ -135,17 +142,20 @@ abstract class _$CustomCategories
   }
 }
 
-/// Every category: YouTube's, with the sub-categories AI made.
+/// Every category: YouTube's, with the sub-categories made for channels
+/// they don't fit.
 
 @ProviderFor(categoryTaxonomy)
 final categoryTaxonomyProvider = CategoryTaxonomyProvider._();
 
-/// Every category: YouTube's, with the sub-categories AI made.
+/// Every category: YouTube's, with the sub-categories made for channels
+/// they don't fit.
 
 final class CategoryTaxonomyProvider
     extends $FunctionalProvider<Taxonomy, Taxonomy, Taxonomy>
     with $Provider<Taxonomy> {
-  /// Every category: YouTube's, with the sub-categories AI made.
+  /// Every category: YouTube's, with the sub-categories made for channels
+  /// they don't fit.
   CategoryTaxonomyProvider._()
     : super(
         from: null,
@@ -179,4 +189,4 @@ final class CategoryTaxonomyProvider
   }
 }
 
-String _$categoryTaxonomyHash() => r'fc9cb56196dbf12ed84d62195e1f498bce99a5c4';
+String _$categoryTaxonomyHash() => r'e6f64b57f463e1f3abd1be9c7db349545db8e94f';

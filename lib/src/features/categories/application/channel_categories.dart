@@ -4,6 +4,7 @@ import '../data/channel_category_repository.dart';
 import '../domain/ai_result_merge.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_key.dart';
+import '../domain/sub_category.dart';
 import '../domain/youtube_taxonomy.dart';
 
 part 'channel_categories.g.dart';
@@ -57,42 +58,62 @@ class ChannelCategories extends _$ChannelCategories {
   Future<void> persist() => _repository.saveCategories(state.value ?? const {});
 }
 
-/// The sub-categories AI made for channels YouTube's don't fit, by category.
+/// The sub-categories made for channels YouTube's don't fit, by category:
+/// by AI, or typed by the user.
 @Riverpod(keepAlive: true)
 class CustomCategories extends _$CustomCategories {
+  ChannelCategoryRepository get _repository =>
+      ref.read(channelCategoryRepositoryProvider);
+
   @override
-  Future<Map<String, List<String>>> build() =>
+  Future<Map<String, List<SubCategory>>> build() =>
       ref.watch(channelCategoryRepositoryProvider).loadCustomChildren();
 
-  /// Adds [child] under [parent] and keeps it, unless it's a variant of a
-  /// sub-category there is, by [nameKey]. Gives the spelling in use:
-  /// YouTube's, the one kept already, or [child].
-  Future<String> add(String parent, String child) async {
+  /// Adds [child] under [parent], made by [origin], with [emoji] when one
+  /// was picked, and keeps it, unless it's a variant of a sub-category
+  /// there is, by [nameKey]: that one stays as it is, with who made it.
+  /// Gives the spelling in use: YouTube's, the one kept already, or
+  /// [child].
+  Future<String> add(
+    String parent,
+    String child, {
+    NameOrigin origin = NameOrigin.ai,
+    String? emoji,
+  }) async {
     // YouTube's alone: the taxonomy with these added is made from them.
     if (youtubeTaxonomy.find(parent, child)?.child case final youtube?) {
       return youtube;
     }
     await future;
     final current = state.requireValue;
-    final existing = current[parent] ?? const <String>[];
+    final existing = current[parent] ?? const <SubCategory>[];
     final key = nameKey(child);
     for (final kept in existing) {
-      if (nameKey(kept) == key) return kept;
+      if (nameKey(kept.name) == key) return kept.name;
     }
     final updated = {
       ...current,
-      parent: [...existing, child],
+      parent: [
+        ...existing,
+        SubCategory(name: child, origin: origin, emoji: emoji),
+      ],
     };
     state = AsyncData(updated);
-    await ref
-        .read(channelCategoryRepositoryProvider)
-        .saveCustomChildren(updated);
+    await _repository.saveCustomChildren(updated);
     return child;
+  }
+
+  /// Makes [custom] the sub-categories there are, and keeps them.
+  Future<void> replaceAll(Map<String, List<SubCategory>> custom) async {
+    await future;
+    state = AsyncData(custom);
+    await _repository.saveCustomChildren(custom);
   }
 }
 
-/// Every category: YouTube's, with the sub-categories AI made.
+/// Every category: YouTube's, with the sub-categories made for channels
+/// they don't fit.
 @riverpod
 Taxonomy categoryTaxonomy(Ref ref) => youtubeTaxonomy.withCustom(
-  ref.watch(customCategoriesProvider).value ?? const {},
+  subCategoryNames(ref.watch(customCategoriesProvider).value ?? const {}),
 );
