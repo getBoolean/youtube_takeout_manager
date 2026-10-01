@@ -29,6 +29,12 @@ void main() {
       expect(nameKey('कला'), isNot(nameKey('काला')));
     });
 
+    test('a sharp, as in C#', () {
+      expect(nameKey('C#'), isNot(nameKey('C')));
+      expect(nameKey('C# programming'), isNot(nameKey('C programming')));
+      expect(nameKey('F#'), nameKey('f #'));
+    });
+
     test('symbols, which are no punctuation', () {
       expect(nameKey('C++'), isNot(nameKey('C#')));
       expect(nameKey('C++'), nameKey('c ++'));

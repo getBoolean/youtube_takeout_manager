@@ -117,6 +117,23 @@ void main() {
     ]);
   });
 
+  test('names that differ by a sharp stay apart', () {
+    final merged = _merge(
+      {
+        'UCa': _category('Knowledge', 'C programming'),
+        'UCb': _category('Knowledge', 'C# programming'),
+      },
+      {
+        'Knowledge': ['C programming', 'C# programming'],
+      },
+    );
+
+    expect(merged.categories['UCb']?.path?.child, 'C# programming');
+    expect(merged.custom, {
+      'Knowledge': ['C programming', 'C# programming'],
+    });
+  });
+
   test('the same name under different categories stays apart', () {
     final merged = _merge(
       {'UCa': _category('Gaming', 'Retro'), 'UCb': _category('Music', 'retro')},
