@@ -50,6 +50,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/channel_c
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/key_check.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_queue_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
@@ -632,11 +633,53 @@ void main() {
           child: AiKeysForm(
             initial: AiKeys.none,
             builtIn: builtIn,
-            onSave: (_) async {},
+            onSave: (_) async => const {},
             onCancel: () {},
           ),
         ),
       ),
+    );
+  }
+  for (final (jev, claude) in [
+    (
+      const KeyCheck(KeyStatus.rejected),
+      const KeyCheck(
+        KeyStatus.needsCredit,
+        'Your credit balance is too low to access the Anthropic API.',
+      ),
+    ),
+    (
+      const KeyCheck(KeyStatus.unchecked, 'The service is busy right now.'),
+      const KeyCheck(KeyStatus.modelUnavailable, 'model: claude-haiku-4-5'),
+    ),
+    (const KeyCheck(KeyStatus.unchecked), const KeyCheck(KeyStatus.works)),
+  ]) {
+    fitsAtEveryWidth(
+      'the AI keys page saying ${jev.status.name} and ${claude.status.name}',
+      () => Scaffold(
+        body: SingleChildScrollView(
+          child: AiKeysForm(
+            initial: AiKeys.none,
+            onSave: (_) async => {AiService.jev: jev, AiService.claude: claude},
+            onCancel: () {},
+          ),
+        ),
+      ),
+      then: (tester) async {
+        for (final service in AiService.values) {
+          await tester.enterText(
+            find.descendant(
+              of: find.byKey(AiKeysForm.fieldKey(service)),
+              matching: find.byType(TextField),
+            ),
+            'key-${service.name}',
+          );
+        }
+        await tester.ensureVisible(find.byKey(AiKeysForm.saveKey));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(AiKeysForm.saveKey));
+        await tester.pumpAndSettle();
+      },
     );
   }
   fitsAtEveryWidth(

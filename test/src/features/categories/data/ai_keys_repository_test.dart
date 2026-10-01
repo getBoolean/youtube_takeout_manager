@@ -33,6 +33,22 @@ void main() {
     expect((await repository().load()).anthropic, 'sk-ant-2');
   });
 
+  test("a key that can't go in a request header is refused, without "
+      'saying it', () async {
+    await expectLater(
+      repository().save(AiService.claude, 'sk-ant api03'),
+      throwsA(
+        isA<ArgumentError>().having(
+          (e) => '$e',
+          'text',
+          isNot(contains('sk-ant api03')),
+        ),
+      ),
+    );
+
+    expect((await repository().load()).hasClaude, isFalse);
+  });
+
   test('saving a blank key removes it', () async {
     await repository().save(AiService.claude, 'sk-ant-2');
 

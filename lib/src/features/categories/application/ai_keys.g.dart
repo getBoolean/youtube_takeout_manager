@@ -49,17 +49,20 @@ final class AiKeysProvider
 
 String _$aiKeysHash() => r'801472c56e9ac411f09479792f0cb65801bffd9e';
 
-/// Enters or clears the API keys of the AI services the build has none for.
-/// Nothing depends on it, so it can use any provider.
+/// Enters or clears the API keys of the AI services the build has none for,
+/// checking each new key with its service first. Nothing depends on it, so
+/// it can use any provider.
 
 @ProviderFor(AiKeysSetup)
 final aiKeysSetupProvider = AiKeysSetupProvider._();
 
-/// Enters or clears the API keys of the AI services the build has none for.
-/// Nothing depends on it, so it can use any provider.
+/// Enters or clears the API keys of the AI services the build has none for,
+/// checking each new key with its service first. Nothing depends on it, so
+/// it can use any provider.
 final class AiKeysSetupProvider extends $NotifierProvider<AiKeysSetup, void> {
-  /// Enters or clears the API keys of the AI services the build has none for.
-  /// Nothing depends on it, so it can use any provider.
+  /// Enters or clears the API keys of the AI services the build has none for,
+  /// checking each new key with its service first. Nothing depends on it, so
+  /// it can use any provider.
   AiKeysSetupProvider._()
     : super(
         from: null,
@@ -87,10 +90,11 @@ final class AiKeysSetupProvider extends $NotifierProvider<AiKeysSetup, void> {
   }
 }
 
-String _$aiKeysSetupHash() => r'591bc466aa6a3899c23cd984a28f80565ea0dfe6';
+String _$aiKeysSetupHash() => r'242e945b52fc36a8118944fa65ec4bd584e02f49';
 
-/// Enters or clears the API keys of the AI services the build has none for.
-/// Nothing depends on it, so it can use any provider.
+/// Enters or clears the API keys of the AI services the build has none for,
+/// checking each new key with its service first. Nothing depends on it, so
+/// it can use any provider.
 
 abstract class _$AiKeysSetup extends $Notifier<void> {
   void build();

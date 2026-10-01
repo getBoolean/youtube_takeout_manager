@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
 import 'package:youtube_takeout_manager/src/app_version.dart';
@@ -28,6 +29,8 @@ import 'package:youtube_takeout_manager/src/features/authentication/presentation
 import 'package:youtube_takeout_manager/src/features/authentication/presentation/sign_in_notice_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
@@ -53,6 +56,8 @@ import 'package:youtube_takeout_manager/src/features/takeout/presentation/skippe
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+
+import '../../categories/key_check_fakes.dart';
 
 const _client = OAuthClient(
   id: '123-abc.apps.googleusercontent.com',
@@ -355,6 +360,7 @@ void main() {
     bool namesNoAccount = false,
   }) async {
     FlutterSecureStorage.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({});
     auth = _FakeAuth(outcome: outcome ?? () async => const SignInCancelled());
     quota = _FakeQuota();
     selection = _Selection(shows: fromChannelPage || namesNoAccount);
@@ -403,6 +409,8 @@ void main() {
           aiKeysRepositoryProvider.overrideWithValue(
             AiKeysRepository(CredentialStore(const FlutterSecureStorage())),
           ),
+          typeSafeRepositoryProvider.overrideWithValue(CheckedJev()),
+          anthropicRepositoryProvider.overrideWithValue(CheckedClaude()),
         ],
         child: fromChannelPage
             ? MaterialApp.router(routerConfig: pages.config())

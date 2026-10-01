@@ -36,13 +36,18 @@ class AiKeysRepository {
   }
 
   /// Uses [key] for [service] from now on; a blank one removes its key.
-  Future<void> save(AiService service, String key) {
+  /// A key that can't go in a request header is refused, never quoted.
+  Future<void> save(AiService service, String key) async {
     if (isBuiltIn(service)) {
       throw StateError("This build's ${service.name} key can't be changed");
     }
     final trimmed = key.trim();
-    return trimmed.isEmpty
-        ? _store.deleteApiKey(service)
-        : _store.saveApiKey(service, trimmed);
+    if (trimmed.isEmpty) return _store.deleteApiKey(service);
+    if (!isHeaderSafeKey(trimmed)) {
+      throw ArgumentError(
+        "The ${service.name} key has characters a request can't carry",
+      );
+    }
+    return _store.saveApiKey(service, trimmed);
   }
 }

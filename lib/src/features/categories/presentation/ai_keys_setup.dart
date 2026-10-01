@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import '../application/ai_keys.dart';
 import '../data/ai_keys_repository.dart';
+import '../domain/key_check.dart';
 
 /// What [service] is called on screen.
 String aiServiceName(AiService service) => switch (service) {
@@ -157,8 +158,9 @@ class _ServiceStatus extends StatelessWidget {
   }
 }
 
-/// The keys to enter, once they've loaded. Saving, or cancelling, goes back
-/// to the modal's first page.
+/// The keys to enter, once they've loaded. Saving keys that all work, or
+/// cancelling, goes back to the modal's first page; otherwise the page stays
+/// open saying what each check found.
 class _AiKeysPageBody extends ConsumerWidget {
   const _AiKeysPageBody();
 
@@ -172,15 +174,18 @@ class _AiKeysPageBody extends ConsumerWidget {
     final repository = ref.watch(aiKeysRepositoryProvider);
     void back() => WoltModalSheet.of(context).showAtIndex(0);
     return AiKeysForm(
-      key: ValueKey(keys.value),
       initial: keys.requireValue,
       builtIn: {
         for (final service in AiService.values)
           if (repository.isBuiltIn(service)) service,
       },
       onSave: (keys) async {
-        await ref.read(aiKeysSetupProvider.notifier).save(keys);
-        if (context.mounted) back();
+        final checks = await ref.read(aiKeysSetupProvider.notifier).save(keys);
+        final allWork = checks.values.every(
+          (check) => check.status == KeyStatus.works,
+        );
+        if (allWork && context.mounted) back();
+        return checks;
       },
       onCancel: back,
     );
@@ -189,8 +194,11 @@ class _AiKeysPageBody extends ConsumerWidget {
 
 /// Where the AI services' API keys are entered, hidden until shown, with a
 /// link to where each is made. A service whose key is [builtIn] has no field.
-/// [onSave] gets every field's text, blank for none; while it runs Save
-/// shows progress, and if it throws, why shows under Save.
+/// A key that can't go in a request is refused before [onSave], which gets
+/// every field's text, blank for none, and gives what checking each key
+/// found, shown under its field until it's changed. While it runs Save shows
+/// progress, and if it throws, why shows under Save. [claudeModel] is the
+/// Claude model in use.
 class AiKeysForm extends HookWidget {
   static ValueKey<String> fieldKey(AiService service) =>
       ValueKey('ai-key-field-${service.name}');
@@ -202,16 +210,19 @@ class AiKeysForm extends HookWidget {
 
   final AiKeys initial;
   final Set<AiService> builtIn;
-  final Future<void> Function(Map<AiService, String> keys) onSave;
+  final Future<Map<AiService, KeyCheck>> Function(Map<AiService, String> keys)
+  onSave;
   final VoidCallback? onCancel;
+  final String claudeModel;
 
-  const AiKeysForm({
+  AiKeysForm({
     super.key,
     required this.initial,
     this.builtIn = const {},
     required this.onSave,
     this.onCancel,
-  });
+    String? claudeModel,
+  }) : claudeModel = claudeModel ?? anthropicModel;
 
   @override
   Widget build(BuildContext context) {
@@ -225,16 +236,34 @@ class AiKeysForm extends HookWidget {
     final controllers = {AiService.jev: jev, AiService.claude: claude};
     final saving = useState(false);
     final failure = useState<String?>(null);
+    final checks = useState<Map<AiService, KeyCheck>>(const {});
 
     Future<void> save() async {
+      final keys = {
+        for (final MapEntry(key: service, value: controller)
+            in controllers.entries)
+          if (!builtIn.contains(service)) service: controller.text,
+      };
+      final unsafe = {
+        for (final MapEntry(key: service, value: key) in keys.entries)
+          if (key.trim() case final trimmed
+              when trimmed.isNotEmpty && !isHeaderSafeKey(trimmed))
+            service: const KeyCheck(
+              KeyStatus.rejected,
+              "It has characters a request can't carry, such as a space or "
+              'a line break.',
+            ),
+      };
+      if (unsafe.isNotEmpty) {
+        checks.value = unsafe;
+        return;
+      }
       saving.value = true;
       failure.value = null;
+      checks.value = const {};
       try {
-        await onSave({
-          for (final MapEntry(key: service, value: controller)
-              in controllers.entries)
-            if (!builtIn.contains(service)) service: controller.text,
-        });
+        final found = await onSave(keys);
+        if (context.mounted) checks.value = found;
       } on Exception catch (e) {
         if (!context.mounted) return;
         final text = '$e'.replaceFirst(RegExp('^Exception: '), '');
@@ -267,13 +296,23 @@ class AiKeysForm extends HookWidget {
         for (final service in AiService.values) ...[
           const SizedBox(height: 20),
           if (builtIn.contains(service))
-            _BuiltIn(key: builtInKey(service), service: service)
+            _BuiltIn(
+              key: builtInKey(service),
+              service: service,
+              model: service == AiService.claude ? claudeModel : null,
+            )
           else
             _KeyField(
               key: fieldKey(service),
               service: service,
               controller: controllers[service]!,
               enabled: !saving.value,
+              check: checks.value[service],
+              model: service == AiService.claude ? claudeModel : null,
+              onChanged: () {
+                if (!checks.value.containsKey(service)) return;
+                checks.value = {...checks.value}..remove(service);
+              },
               onSubmitted: save,
             ),
         ],
@@ -324,11 +363,36 @@ class AiKeysForm extends HookWidget {
   }
 }
 
-/// One service's key, hidden until shown, and a link to where it's made.
+/// What [check] of [service]'s key found, in words; [model] is the model it
+/// was checked for, if any.
+String _checkText(AiService service, KeyCheck check, String? model) {
+  final name = aiServiceName(service);
+  String why(String text) =>
+      check.detail == null ? '$text.' : '$text: ${check.detail}';
+  return switch (check.status) {
+    KeyStatus.works => 'The key works.',
+    KeyStatus.rejected => check.detail ?? '$name rejected this key.',
+    KeyStatus.needsCredit => why('Saved, but the account needs credit'),
+    KeyStatus.modelUnavailable => why(
+      "Saved, but the key can't use ${model ?? 'its model'}",
+    ),
+    KeyStatus.unchecked =>
+      check.detail == null
+          ? "Couldn't reach $name: saved, and checked when next used."
+          : "Couldn't check it (${check.detail}): saved, and checked when "
+                'next used.',
+  };
+}
+
+/// One service's key, hidden until shown, what checking it found, the
+/// [model] it's for, if any, and a link to where it's made.
 class _KeyField extends HookWidget {
   final AiService service;
   final TextEditingController controller;
   final bool enabled;
+  final KeyCheck? check;
+  final String? model;
+  final VoidCallback onChanged;
   final VoidCallback onSubmitted;
 
   const _KeyField({
@@ -336,13 +400,20 @@ class _KeyField extends HookWidget {
     required this.service,
     required this.controller,
     required this.enabled,
+    required this.check,
+    required this.model,
+    required this.onChanged,
     required this.onSubmitted,
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final obscured = useState(true);
     final name = aiServiceName(service);
+    final found = check;
+    final text = found == null ? null : _checkText(service, found, model);
+    final rejected = found?.status == KeyStatus.rejected;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -353,12 +424,17 @@ class _KeyField extends HookWidget {
           autocorrect: false,
           enableSuggestions: false,
           textInputAction: TextInputAction.done,
+          onChanged: (_) => onChanged(),
           onSubmitted: (_) => onSubmitted(),
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             labelText: '$name API key',
-            helperText: 'Leave it blank to go without $name.',
-            helperMaxLines: 3,
+            helperText: rejected
+                ? null
+                : text ?? 'Leave it blank to go without $name.',
+            helperMaxLines: 8,
+            errorText: rejected ? text : null,
+            errorMaxLines: 8,
             suffixIcon: IconButton(
               tooltip: obscured.value ? 'Show key' : 'Hide key',
               onPressed: () => obscured.value = !obscured.value,
@@ -370,6 +446,15 @@ class _KeyField extends HookWidget {
             ),
           ),
         ),
+        if (model case final model?) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Uses the model $model.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
         const SizedBox(height: 4),
         TextButton.icon(
           onPressed: () => launchUrl(Uri.parse(_keyPages[service]!)),
@@ -381,11 +466,13 @@ class _KeyField extends HookWidget {
   }
 }
 
-/// A service whose key came with the build, so there's nothing to enter.
+/// A service whose key came with the build, so there's nothing to enter,
+/// and the [model] it uses, if any.
 class _BuiltIn extends StatelessWidget {
   final AiService service;
+  final String? model;
 
-  const _BuiltIn({super.key, required this.service});
+  const _BuiltIn({super.key, required this.service, this.model});
 
   @override
   Widget build(BuildContext context) {
@@ -403,7 +490,10 @@ class _BuiltIn extends StatelessWidget {
             children: [
               Text(aiServiceName(service), style: theme.textTheme.titleSmall),
               Text(
-                'Its key is built into this app.',
+                [
+                  'Its key is built into this app.',
+                  if (model != null) 'It uses the model $model.',
+                ].join(' '),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
