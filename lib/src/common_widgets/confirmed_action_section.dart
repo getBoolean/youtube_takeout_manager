@@ -26,6 +26,10 @@ class ConfirmedActionSection extends StatefulWidget {
 
   final Future<void> Function() onConfirm;
 
+  /// Keys of the action's button and the confirming one, to find them by.
+  final Key? actionKey;
+  final Key? confirmKey;
+
   const ConfirmedActionSection({
     super.key,
     required this.title,
@@ -39,6 +43,8 @@ class ConfirmedActionSection extends StatefulWidget {
     required this.done,
     required this.failed,
     required this.onConfirm,
+    this.actionKey,
+    this.confirmKey,
   });
 
   @override
@@ -99,6 +105,7 @@ class _ConfirmedActionSectionState extends State<ConfirmedActionSection> {
         const SizedBox(height: 4),
         if (_step == _Step.idle) ...[
           TextButton.icon(
+            key: widget.actionKey,
             onPressed: () => setState(() {
               _step = _Step.asking;
               _outcome = null;
@@ -133,6 +140,7 @@ class _ConfirmedActionSectionState extends State<ConfirmedActionSection> {
                 child: const Text('Cancel', textAlign: TextAlign.center),
               ),
               FilledButton(
+                key: widget.confirmKey,
                 style: widget.destructive
                     ? FilledButton.styleFrom(
                         backgroundColor: theme.colorScheme.error,

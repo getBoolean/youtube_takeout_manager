@@ -346,6 +346,14 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     }
   }
 
+  /// Stops the run under way, if any, and waits for it to end: answers
+  /// already asked for still land, but nothing more is asked.
+  Future<void> stopRun() async {
+    _again = false;
+    _generation++;
+    await _running;
+  }
+
   /// Whether AI can be asked for another category: there's a key for Jev
   /// or Claude, and it isn't turned off.
   bool get canAskAi {

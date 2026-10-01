@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/ai_results_clearer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorizing_channels.dart';
@@ -1237,6 +1238,53 @@ void main() {
 
       expect(c.read(aiTierStatusProvider).notice, isNotNull);
       expect(c.read(categorizationProgressProvider).running, isFalse);
+    });
+  });
+
+  group('clearing AI results', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    test('an answer that comes after the clear began is not kept', () async {
+      final hold = Completer<void>();
+      final claude = _Claude(
+        {'parent': 'Knowledge', 'child': null, 'reason': ''},
+        tags: ['ASMR'],
+        hold: hold,
+      );
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.asked, isNotEmpty);
+
+      final clearing = c.read(aiResultsClearerProvider.notifier).clear();
+      hold.complete();
+      await clearing;
+      await _settle();
+
+      final categories = c.read(channelCategoriesProvider).value ?? const {};
+      expect(categories['UCx']?.isAi, isFalse);
+      expect(categories['UCx']?.path, isNull);
+      expect(categories.values.expand((c) => c.tags), isEmpty);
+    });
+
+    test('History opened next categorizes again', () async {
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      });
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      final asked = claude.asked.length;
+
+      await c.read(aiResultsClearerProvider.notifier).clear();
+      await _settle();
+      expect(claude.asked, hasLength(asked));
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.asked.length, greaterThan(asked));
     });
   });
 

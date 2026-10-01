@@ -32,6 +32,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_rep
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/ai_keys_setup.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/clear_ai_results_section.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/deletion/application/deletion_processing.dart';
 import 'package:youtube_takeout_manager/src/features/device_cache/application/device_cache_clearer.dart';
@@ -358,6 +359,7 @@ void main() {
     LoadedTakeout? loaded,
     bool fromChannelPage = false,
     bool namesNoAccount = false,
+    bool builtInKeys = false,
   }) async {
     FlutterSecureStorage.setMockInitialValues({});
     SharedPreferences.setMockInitialValues({});
@@ -407,7 +409,12 @@ void main() {
           ),
           appVersionProvider.overrideWith((ref) async => _version),
           aiKeysRepositoryProvider.overrideWithValue(
-            AiKeysRepository(CredentialStore(const FlutterSecureStorage())),
+            AiKeysRepository(
+              CredentialStore(const FlutterSecureStorage()),
+              build: builtInKeys
+                  ? const AiKeys(typesafe: 'jv_live_b', anthropic: 'sk-ant-b')
+                  : AiKeys.none,
+            ),
           ),
           typeSafeRepositoryProvider.overrideWithValue(CheckedJev()),
           anthropicRepositoryProvider.overrideWithValue(CheckedClaude()),
@@ -760,6 +767,24 @@ void main() {
 
     expect(clientSetup.removes, 1);
     expectNoPopups();
+  });
+
+  testWidgets('AI results can be cleared, with or without keys to change', (
+    tester,
+  ) async {
+    for (final builtIn in [false, true]) {
+      await pumpDialog(tester, builtInKeys: builtIn);
+
+      expect(
+        find.byType(ClearAiResultsSection),
+        findsOneWidget,
+        reason: 'built in: $builtIn',
+      );
+      expect(
+        find.byKey(AiKeysSection.setUpKey),
+        builtIn ? findsNothing : findsOneWidget,
+      );
+    }
   });
 
   testWidgets('AI keys are added in the same dialog, and saving comes back '

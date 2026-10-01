@@ -44,8 +44,8 @@ abstract final class AiKeysPages {
 }
 
 /// The AI categories setting: which AI services have keys, and adding or
-/// changing the ones the build has none for. Nothing when the build has
-/// every key.
+/// changing the ones the build has none for; with every key built in, just
+/// which services there are.
 class AiKeysSection extends ConsumerWidget {
   static const setUpKey = ValueKey('ai-keys-set-up');
   static const changeKey = ValueKey('ai-keys-change');
@@ -55,9 +55,7 @@ class AiKeysSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final repository = ref.watch(aiKeysRepositoryProvider);
-    if (AiService.values.every(repository.isBuiltIn)) {
-      return const SizedBox.shrink();
-    }
+    final allBuiltIn = AiService.values.every(repository.isBuiltIn);
     final theme = Theme.of(context);
     final keys = ref.watch(aiKeysProvider).value ?? AiKeys.none;
     final tiny = isTinyWidth(context);
@@ -91,12 +89,13 @@ class AiKeysSection extends ConsumerWidget {
                   : 'No key',
               on: keys.has(service),
             ),
-          TextButton.icon(
-            key: changeKey,
-            onPressed: () => showAiKeysSetup(context),
-            icon: tiny ? null : const Icon(Icons.edit_outlined),
-            label: const Text('Change', textAlign: TextAlign.center),
-          ),
+          if (!allBuiltIn)
+            TextButton.icon(
+              key: changeKey,
+              onPressed: () => showAiKeysSetup(context),
+              icon: tiny ? null : const Icon(Icons.edit_outlined),
+              label: const Text('Change', textAlign: TextAlign.center),
+            ),
         ] else
           FilledButton.tonalIcon(
             key: setUpKey,

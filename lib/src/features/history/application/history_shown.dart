@@ -13,4 +13,7 @@ class HistoryShown extends _$HistoryShown {
   void markShown() {
     if (!state) state = true;
   }
+
+  /// As if it hadn't been opened yet, so work waiting for it waits again.
+  void reset() => state = false;
 }

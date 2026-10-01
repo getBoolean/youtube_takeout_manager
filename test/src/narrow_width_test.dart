@@ -50,6 +50,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/channel_c
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_change_pages.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_tag_page.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/clear_ai_results_section.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/key_check.dart';
@@ -1052,6 +1053,17 @@ void main() {
     overrides: [channelCategoriesProvider.overrideWith(_LongCategories.new)],
     then: (tester) async {
       await tester.tap(find.byKey(ChangePage.categoryKey('Entertainment')));
+      await tester.pump();
+    },
+  );
+  fitsAtEveryWidth(
+    'clearing AI results, asking first',
+    () => const Scaffold(
+      body: SingleChildScrollView(child: ClearAiResultsSection()),
+    ),
+    overrides: [channelCategoriesProvider.overrideWith(_LongCategories.new)],
+    then: (tester) async {
+      await tester.tap(find.byKey(ClearAiResultsSection.actionKey));
       await tester.pump();
     },
   );

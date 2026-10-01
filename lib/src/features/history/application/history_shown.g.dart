@@ -49,7 +49,7 @@ final class HistoryShownProvider extends $NotifierProvider<HistoryShown, bool> {
   }
 }
 
-String _$historyShownHash() => r'90b87022e0bc1937f41cd5412be37abca785260f';
+String _$historyShownHash() => r'902559db94fab14f538e8c761ef8286588cadb74';
 
 /// Whether the history screen was opened this session. History loads when
 /// first looked at; background work on it waits for this rather than
