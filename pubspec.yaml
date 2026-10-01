@@ -35,6 +35,7 @@ dependencies:
   package_info_plus: ^9.0.1
   squadron: ^7.4.4
   hive_ce: ^2.20.1
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
