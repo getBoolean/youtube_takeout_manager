@@ -13,6 +13,7 @@ import '../domain/model_capabilities.dart';
 import '../domain/youtube_taxonomy.dart';
 import '../domain/youtube_topics.dart';
 import 'ai_tiers.dart';
+import 'jev_prompts.dart';
 
 /// A channel to categorize: its key, what's known about it, and YouTube's
 /// topics for it.
@@ -40,10 +41,7 @@ const _maxChecked = 3;
 /// its limit.
 const _maxChildren = 200;
 
-/// The option for "none of these sub-categories fits better".
-const _general = '_none';
-
-/// Sub-categories offered Jev at most, leaving room for [_general].
+/// Sub-categories offered Jev at most, leaving room for [jevGeneral].
 const _maxOffered = JevChoice.maxOptions - 1;
 
 /// Jev's pick: a category, how sure it is, and what came next.
@@ -146,13 +144,8 @@ class CategoryPipeline {
     final checked = candidates.take(_maxChecked).toList();
     final answers = await _askJev(jev, state, {
       for (final (i, candidate) in checked.indexed)
-        'fits_$i': JevNoul(
-          'Does the category "${candidate.label}" describe the videos this '
-          'channel makes and the ones the user watched from it?',
-          whenTrue: 'It clearly describes most of them.',
-          whenFalse: 'It does not, or only a small part of them.',
-        ),
-      'parent': _parentQuestion(),
+        'fits_$i': jevFitQuestion(candidate),
+      'parent': jevParentQuestion(_taxonomy),
     });
 
     // YouTube's category Jev agrees with most, if it agrees enough.
@@ -213,20 +206,7 @@ class CategoryPipeline {
   }
 
   /// The categories as Jev's options, by key: the same keys each time.
-  Map<String, String> get _parentOptions => _optionKeys(_taxonomy.parents);
-
-  JevChoice _parentQuestion({CategoryPath? exclude}) => JevChoice(
-    'Which category best describes the videos this channel makes and the '
-    'ones the user watched from it?',
-    {
-      for (final MapEntry(key: key, value: parent) in _parentOptions.entries)
-        // A category with no sub-categories to pick instead is left out.
-        if (!(exclude?.parent == parent &&
-            exclude?.child == null &&
-            _taxonomy.childrenOf(parent).isEmpty))
-          key: _describe(parent),
-    },
-  );
+  Map<String, String> get _parentOptions => jevOptionKeys(_taxonomy.parents);
 
   /// Jev's pick: a category, from [parentAnswer] when already asked, then a
   /// sub-category within it, leaving [exclude] out; null when it gave none.
@@ -238,7 +218,7 @@ class CategoryPipeline {
   }) async {
     final parents = _parentOptions;
     parentAnswer ??= (await _askJev(jev, state, {
-      'parent': _parentQuestion(exclude: exclude),
+      'parent': jevParentQuestion(_taxonomy, exclude: exclude),
     }))['parent'];
     if (parentAnswer is! ChoiceAnswer) return null;
     final parent = parents[parentAnswer.choice];
@@ -252,7 +232,7 @@ class CategoryPipeline {
           ScoredPath(path: CategoryPath(parents[key]!), score: value),
     ]..sort((a, b) => b.score.compareTo(a.score));
 
-    final children = _optionKeys(
+    final children = jevOptionKeys(
       _offered(
         parent,
         except: exclude?.parent == parent ? exclude?.child : null,
@@ -266,19 +246,15 @@ class CategoryPipeline {
       );
     }
     final childAnswer = (await _askJev(jev, state, {
-      'child': JevChoice(
-        'Which kind of $parent best describes the videos this channel makes '
-        'and the ones the user watched from it?',
-        {
-          ...children,
-          if (!(exclude?.parent == parent && exclude?.child == null))
-            _general: 'None of these; just $parent in general',
-        },
+      'child': jevChildQuestion(
+        parent,
+        children,
+        withGeneral: !(exclude?.parent == parent && exclude?.child == null),
       ),
     }))['child'];
     if (childAnswer is! ChoiceAnswer) return null;
     double score(double childOdds) => sqrt(parentOdds * childOdds);
-    CategoryPath? pathOf(String key) => key == _general
+    CategoryPath? pathOf(String key) => key == jevGeneral
         ? CategoryPath(parent)
         : children[key] == null
         ? null
@@ -330,7 +306,7 @@ class CategoryPipeline {
     if (suggestion == null) {
       throw const AiTierFailure(AiService.claude, AiNoAnswer());
     }
-    final (:parent, :child, :reason) = suggestion;
+    final (:parent, :child, :reason, emoji: _, tags: _) = suggestion;
     final path = child == null
         ? CategoryPath(parent)
         : _taxonomy.find(parent, child) ??
@@ -354,25 +330,19 @@ class CategoryPipeline {
     String reason,
   ) async {
     final jev = this.jev;
-    final existing = _optionKeys(_offered(parent));
+    final existing = jevOptionKeys(_offered(parent));
     if (jev == null || existing.isEmpty) return null;
     final answer = (await _askJev(
       jev,
-      {
-        'proposed_sub_category': child,
-        'category': parent,
-        'why': reason,
-        'channel': input.evidence.title,
-      },
-      {
-        'same': JevChoice(
-          'Is the proposed sub-category of $parent the same as one of these, '
-          'under another name?',
-          {...existing, _general: 'None of these; it is a different one'},
-        ),
-      },
+      jevSameState(
+        proposed: child,
+        parent: parent,
+        reason: reason,
+        channel: input.evidence.title,
+      ),
+      {'same': jevSameQuestion(parent, existing)},
     ))['same'];
-    if (answer is! ChoiceAnswer || answer.choice == _general) return null;
+    if (answer is! ChoiceAnswer || answer.choice == jevGeneral) return null;
     final match = existing[answer.choice];
     final odds = answer.probabilities[answer.choice] ?? answer.confidence;
     return match == null || odds < jevThreshold
@@ -410,12 +380,6 @@ class CategoryPipeline {
     }
   }
 
-  /// A category and its sub-categories, for Jev to pick between them.
-  String _describe(String parent) {
-    final children = _taxonomy.childrenOf(parent);
-    return children.isEmpty ? parent : '$parent: ${children.join(', ')}';
-  }
-
   /// [parent]'s sub-categories to offer Jev, leaving [except] out: all of
   /// them, or, when there are more than it takes, the most used, in their
   /// order, ties going to the first.
@@ -436,26 +400,5 @@ class CategoryPipeline {
       for (final child in children)
         if (kept.contains(child)) child,
     ];
-  }
-
-  /// [names] as Jev's options, by key. Jev reads keys, so they say what
-  /// they are, in ASCII; a name with no Latin letters or digits is
-  /// `option`, and keys that would be the same get `_2`, `_3`… Never
-  /// [_general].
-  static Map<String, String> _optionKeys(Iterable<String> names) {
-    final options = <String, String>{};
-    for (final name in names) {
-      final slug = name
-          .toLowerCase()
-          .replaceAll(RegExp('[^a-z0-9]+'), '_')
-          .replaceAll(RegExp(r'^_+|_+$'), '');
-      final base = slug.isEmpty ? 'option' : slug;
-      var key = base;
-      for (var n = 2; options.containsKey(key) || key == _general; n++) {
-        key = '${base}_$n';
-      }
-      options[key] = name;
-    }
-    return options;
   }
 }
