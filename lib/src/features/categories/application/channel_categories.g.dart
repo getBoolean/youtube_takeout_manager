@@ -104,7 +104,7 @@ final class CustomCategoriesProvider
   CustomCategories create() => CustomCategories();
 }
 
-String _$customCategoriesHash() => r'32a0c3eeccdc1d4c3ba23a9bbb6910f898f823ee';
+String _$customCategoriesHash() => r'1cd26caaf667956503f068bb957cc3495eeca3fd';
 
 /// The sub-categories AI made for channels YouTube's don't fit, by category.
 

@@ -213,5 +213,19 @@ void main() {
 
       expect(await EntrySet(store, 'ids').load(), {'a'});
     });
+
+    test('adding to a set from two places at once keeps both', () async {
+      final store = _Gated();
+      await EntrySet(store, 'ids').save({'x'});
+      final ids = EntrySet(store, 'ids');
+      store.gate = Completer();
+
+      final first = ids.addAll({'a'});
+      final second = ids.addAll({'b'});
+      store.gate!.complete();
+      await Future.wait([first, second]);
+
+      expect(await EntrySet(store, 'ids').load(), {'x', 'a', 'b'});
+    });
   });
 }

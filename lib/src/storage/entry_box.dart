@@ -113,6 +113,15 @@ class EntrySet with _OneAtATime {
     _saved = {...keys};
   });
 
+  /// Adds [keys], keeping every other key there is, even ones another
+  /// [EntrySet] over the same box added meanwhile.
+  Future<void> addAll(Set<String> keys) => _serial(() async {
+    final added = keys.difference(_saved ?? const {});
+    if (added.isEmpty) return;
+    await _store.putAll(name, {for (final key in added) key: '1'});
+    _saved?.addAll(added);
+  });
+
   Future<void> clear() => _serial(() async {
     await _store.clear(name);
     _saved = {};

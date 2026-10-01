@@ -49,6 +49,13 @@ class VideoMetadata extends _$VideoMetadata {
     Map.unmodifiable({...?state.value, video.videoId: video}),
   );
 
+  /// Adds fetched videos, at once.
+  void addAll(Iterable<Video> videos) {
+    final added = {for (final video in videos) video.videoId: video};
+    if (added.isEmpty) return;
+    state = AsyncData(Map.unmodifiable({...?state.value, ...added}));
+  }
+
   /// Keeps the videos on this device.
   Future<void> persist() => _cache.saveVideos(state.value ?? const {});
 }

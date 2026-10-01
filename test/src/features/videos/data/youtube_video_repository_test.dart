@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/data/google_
 import 'package:youtube_takeout_manager/src/features/channels/data/youtube_channel_repository.dart';
 import 'package:youtube_takeout_manager/src/features/quota/data/quota_errors.dart';
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
+import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 
 /// YouTube's answer to a token it no longer accepts.
 final _rejected = MockClient(
@@ -63,6 +64,30 @@ void main() {
       }).toList(),
       throwsA(predicate(isSignInFailure)),
     );
+  });
+
+  test('a long description is kept cut short', () async {
+    final answering = MockClient(
+      (_) async => http.Response(
+        jsonEncode({
+          'items': [
+            {
+              'id': 'v1',
+              'snippet': {'channelId': 'UCa', 'description': 'x' * 3000},
+            },
+          ],
+        }),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
+
+    final videos = await YoutubeVideoRepository().fetchVideoMetadataStream(
+      answering,
+      {'v1'},
+    ).toList();
+
+    expect(videos.single.description, hasLength(Video.maxDescription));
   });
 
   test('other failures skip the batch', () async {

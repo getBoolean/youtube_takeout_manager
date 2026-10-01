@@ -60,7 +60,13 @@ class YoutubeVideoRepository {
             channelId: snippet.channelId ?? '',
             channelTitle: snippet.channelTitle,
             title: snippet.title,
-            description: snippet.description,
+            description: switch (snippet.description) {
+              final d? when d.length > Video.maxDescription => d.substring(
+                0,
+                Video.maxDescription,
+              ),
+              final d => d,
+            },
             thumbnailUrl: thumbnailUrlOf(snippet.thumbnails),
             publishedAt: snippet.publishedAt,
           );

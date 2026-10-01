@@ -90,7 +90,7 @@ final class AiKeysSetupProvider extends $NotifierProvider<AiKeysSetup, void> {
   }
 }
 
-String _$aiKeysSetupHash() => r'242e945b52fc36a8118944fa65ec4bd584e02f49';
+String _$aiKeysSetupHash() => r'4493c8deb747911042d126754e8c7d1c36157918';
 
 /// Enters or clears the API keys of the AI services the build has none for,
 /// checking each new key with its service first. Nothing depends on it, so

@@ -103,7 +103,5 @@ Stream<void> videoTitleFetcher(Ref ref) async* {
   }
 
   final newNotFound = uncachedIds.difference(fetchedIds);
-  if (newNotFound.isNotEmpty) {
-    await cache.saveNotFoundIds(notFoundIds.union(newNotFound));
-  }
+  if (newNotFound.isNotEmpty) await cache.addNotFoundIds(newNotFound);
 }

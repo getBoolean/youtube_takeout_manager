@@ -51,6 +51,9 @@ class VideoCacheRepository {
 
   Future<void> saveNotFoundIds(Set<String> ids) => _notFound.save(ids);
 
+  /// Notes [ids] as gone from YouTube, keeping the ones noted already.
+  Future<void> addNotFoundIds(Set<String> ids) => _notFound.addAll(ids);
+
   Future<void> clearCache() async {
     await _videos.clear();
     await _notFound.clear();

@@ -177,7 +177,7 @@ final class VideoMetadataProvider
   VideoMetadata create() => VideoMetadata();
 }
 
-String _$videoMetadataHash() => r'5c76d066d6328a55a45164efc4231df1b08d8640';
+String _$videoMetadataHash() => r'b6527fa118073f01f46fb9c487b7de81ebd54e3b';
 
 /// Details of the videos commented or chatted on, by video ID, kept on this
 /// device. Fetching more is `videoTitleFetcher`'s.
