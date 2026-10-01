@@ -9,6 +9,7 @@ import '../domain/category_path.dart';
 import '../domain/category_prompts.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
+import '../domain/model_capabilities.dart';
 import '../domain/youtube_taxonomy.dart';
 import '../domain/youtube_topics.dart';
 import 'ai_tiers.dart';
@@ -24,11 +25,11 @@ typedef ChannelInput = ({
 /// Jev, and the key to ask it with.
 typedef JevAccess = ({TypeSafeRepository repository, String apiKey});
 
-/// Claude, the key to ask it with, and the model.
+/// Claude, the key to ask it with, and what its model can do.
 typedef ClaudeAccess = ({
   AnthropicRepository repository,
   String apiKey,
-  String model,
+  ModelCapabilities model,
 });
 
 /// YouTube's categories Jev checks at most, of those a channel's topics

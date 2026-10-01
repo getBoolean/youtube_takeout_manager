@@ -15,9 +15,11 @@ import 'package:youtube_takeout_manager/src/features/history/domain/watched_chan
 import '../domain/categorization_plan.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
+import '../domain/model_capabilities.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
 import '../data/anthropic_repository.dart';
+import '../data/model_capabilities_repository.dart';
 import '../data/typesafe_repository.dart';
 import 'ai_keys.dart';
 import 'ai_tiers.dart';
@@ -129,7 +131,15 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       }
     }
 
-    final pipeline = await _pipeline();
+    final CategoryPipeline pipeline;
+    try {
+      pipeline = await _pipeline();
+    } on AiTierFailure catch (e) {
+      // Claude's model couldn't be looked up: turned off, the run goes on
+      // without it.
+      if (ref.mounted) _stopped(e);
+      return;
+    }
     if (dropped()) return;
     final titles = recentTitlesByChannel(loaded);
     final queue = <HistoryChannel>[];
@@ -278,6 +288,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   }
 
   /// A pipeline with the steps there are keys for, and every category.
+  /// Throws an [AiTierFailure] when Claude's model can't be used.
   Future<CategoryPipeline> _pipeline() async {
     final keys = await ref
         .read(aiKeysProvider.future)
@@ -300,10 +311,37 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           ? (
               repository: ref.read(anthropicRepositoryProvider),
               apiKey: keys.keyFor(AiService.claude),
-              model: anthropicModel,
+              model: await _claudeModel(keys.keyFor(AiService.claude)),
             )
           : null,
     );
+  }
+
+  /// What the Claude model in use can do: as kept, else asked for with
+  /// [apiKey] and kept. Throws an [AiTierFailure] when it can't be asked,
+  /// or the model can't answer in shapes.
+  Future<ModelCapabilities> _claudeModel(String apiKey) async {
+    final kept = ref.read(modelCapabilitiesRepositoryProvider);
+    var model = await kept.load(anthropicModel);
+    if (model == null) {
+      try {
+        model = await ref
+            .read(anthropicRepositoryProvider)
+            .capabilities(apiKey: apiKey, model: anthropicModel);
+      } on AiFailure catch (e) {
+        throw AiTierFailure(AiService.claude, e);
+      }
+      await kept.save(model);
+    }
+    if (!model.structuredOutputs) {
+      throw AiTierFailure(
+        AiService.claude,
+        AiModelUnavailable(
+          "$anthropicModel can't answer in the shape categorizing needs.",
+        ),
+      );
+    }
+    return model;
   }
 
   /// What's known about [channel]: its topics and description, and the

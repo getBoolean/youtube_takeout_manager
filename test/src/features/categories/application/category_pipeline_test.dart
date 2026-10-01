@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_re
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_evidence.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/youtube_taxonomy.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
@@ -94,7 +95,7 @@ class _Claude extends AnthropicRepository {
   @override
   Future<Map<String, Object?>> structured({
     required String apiKey,
-    required String model,
+    required ModelCapabilities model,
     required String system,
     required String user,
     required Map<String, Object?> schema,
@@ -109,7 +110,15 @@ CategoryPipeline _withClaude(_Claude claude, {_Jev? jev}) => CategoryPipeline(
     'Gaming': ['Speedruns'],
   }),
   jev: jev == null ? null : (repository: jev, apiKey: 'jv_live_1'),
-  claude: (repository: claude, apiKey: 'sk-ant-1', model: 'claude-haiku-4-5'),
+  claude: (
+    repository: claude,
+    apiKey: 'sk-ant-1',
+    model: const ModelCapabilities(
+      id: 'claude-haiku-4-5',
+      structuredOutputs: true,
+      lowEffort: false,
+    ),
+  ),
 );
 
 ChannelInput _input({List<String> topics = const []}) => (

@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 
 http.Response _json(
   Object body, [
@@ -40,9 +41,17 @@ const _schema = {
   },
 };
 
+/// A model that answers in shapes, with no effort setting.
+const _haiku = ModelCapabilities(
+  id: 'claude-haiku-4-5',
+  structuredOutputs: true,
+  lowEffort: false,
+  maxTokens: 64000,
+);
+
 Future<Map<String, Object?>> _ask(
   http.Client client, {
-  String model = 'claude-haiku-4-5',
+  ModelCapabilities model = _haiku,
   bool browser = false,
   DateTime Function()? now,
   Future<void> Function(Duration)? sleep,
@@ -87,7 +96,7 @@ void main() {
     expect(body['output_config'], {
       'format': {'type': 'json_schema', 'schema': _schema},
     });
-    // Haiku takes neither.
+    // This model takes no effort setting.
     expect(body.containsKey('thinking'), isFalse);
     expect(
       (body['output_config'] as Map<String, dynamic>).containsKey('effort'),
@@ -95,18 +104,154 @@ void main() {
     );
   });
 
-  test('a larger model is asked to think little, with room to', () async {
-    late Map<String, dynamic> body;
-    await _ask(
-      MockClient((request) async {
-        body = jsonDecode(request.body) as Map<String, dynamic>;
-        return _json(_message({'parent': 'Gaming'}));
-      }),
-      model: 'claude-sonnet-5',
-    );
+  group('what the model supports decides the request', () {
+    Future<Map<String, dynamic>> sentFor(ModelCapabilities model) async {
+      late Map<String, dynamic> body;
+      await _ask(
+        MockClient((request) async {
+          body = jsonDecode(request.body) as Map<String, dynamic>;
+          return _json(_message({'parent': 'Gaming'}));
+        }),
+        model: model,
+      );
+      return body;
+    }
 
-    expect((body['output_config'] as Map<String, dynamic>)['effort'], 'low');
-    expect(body['max_tokens'], greaterThan(1024));
+    test('low effort is asked for only when the model supports it, whatever '
+        'its name', () async {
+      final supported = await sentFor(
+        const ModelCapabilities(
+          id: 'claude-haiku-4-5',
+          structuredOutputs: true,
+          lowEffort: true,
+        ),
+      );
+      final unsupported = await sentFor(
+        const ModelCapabilities(
+          id: 'claude-sonnet-5',
+          structuredOutputs: true,
+          lowEffort: false,
+        ),
+      );
+
+      expect(
+        (supported['output_config'] as Map<String, dynamic>)['effort'],
+        'low',
+      );
+      expect(
+        (unsupported['output_config'] as Map<String, dynamic>).containsKey(
+          'effort',
+        ),
+        isFalse,
+      );
+    });
+
+    test('an answer may be 1024 tokens long', () async {
+      expect((await sentFor(_haiku))['max_tokens'], 1024);
+    });
+
+    test("an answer may be only as long as the model's maximum", () async {
+      final body = await sentFor(
+        const ModelCapabilities(
+          id: 'claude-tiny',
+          structuredOutputs: true,
+          lowEffort: false,
+          maxTokens: 300,
+        ),
+      );
+
+      expect(body['max_tokens'], 300);
+    });
+
+    test(
+      "a model that can't answer in shapes is refused without asking",
+      () async {
+        var requests = 0;
+        await expectLater(
+          _ask(
+            MockClient((_) async {
+              requests++;
+              return _json(_message({'parent': 'Gaming'}));
+            }),
+            model: const ModelCapabilities(
+              id: 'claude-old',
+              structuredOutputs: false,
+              lowEffort: false,
+            ),
+          ),
+          throwsA(isA<AiModelUnavailable>()),
+        );
+        expect(requests, 0);
+      },
+    );
+  });
+
+  group("a model's capabilities", () {
+    test('are read from the Models API with the key', () async {
+      late http.Request sent;
+      final model = await AnthropicRepository(
+        client: MockClient((request) async {
+          sent = request;
+          return _json({
+            'id': 'claude-sonnet-5-20260801',
+            'type': 'model',
+            'max_tokens': 64000,
+            'capabilities': {
+              'structured_outputs': {'supported': true},
+              'effort': {
+                'low': {'supported': true},
+              },
+            },
+          });
+        }),
+        browser: false,
+        sleep: (_) async {},
+      ).capabilities(apiKey: 'sk-ant-1', model: 'claude-sonnet-5');
+
+      expect(sent.method, 'GET');
+      expect(
+        sent.url.toString(),
+        'https://api.anthropic.com/v1/models/claude-sonnet-5',
+      );
+      expect(sent.headers['x-api-key'], 'sk-ant-1');
+      expect(sent.headers['anthropic-version'], '2023-06-01');
+      expect(model.id, 'claude-sonnet-5');
+      expect(model.structuredOutputs, isTrue);
+      expect(model.lowEffort, isTrue);
+      expect(model.maxTokens, 64000);
+    });
+
+    test("of a model that doesn't exist say it isn't available", () async {
+      await expectLater(
+        AnthropicRepository(
+          client: MockClient(
+            (_) async => _json({
+              'type': 'error',
+              'error': {'type': 'not_found_error', 'message': 'model: nope'},
+            }, 404),
+          ),
+          browser: false,
+          sleep: (_) async {},
+        ).capabilities(apiKey: 'sk-ant-1', model: 'nope'),
+        throwsA(isA<AiModelUnavailable>()),
+      );
+    });
+
+    test('asked for with a rejected key say so', () async {
+      await expectLater(
+        AnthropicRepository(
+          client: MockClient(
+            (_) async => _json({
+              'type': 'error',
+              'error': {'type': 'authentication_error', 'message': 'invalid'},
+            }, 401),
+          ),
+          browser: false,
+          sleep: (_) async {},
+        ).capabilities(apiKey: 'sk-ant-1', model: 'claude-sonnet-5'),
+        throwsA(isA<AiKeyRejected>()),
+      );
+    });
   });
 
   test('from the web app, it says the key is meant to be used there', () async {
@@ -436,7 +581,7 @@ void main() {
       );
       Future<void> ask() => repository.structured(
         apiKey: 'sk-ant-1',
-        model: 'claude-haiku-4-5',
+        model: _haiku,
         system: 'Categorize the channel.',
         user: '{}',
         schema: _schema,

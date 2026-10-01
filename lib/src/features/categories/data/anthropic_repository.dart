@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../domain/model_capabilities.dart';
 import 'ai_errors.dart';
 import 'ai_pacer.dart';
 import 'ai_request.dart';
@@ -24,6 +25,7 @@ AnthropicRepository anthropicRepository(Ref ref) {
 /// the key can't use, or an account out of credit isn't asked again.
 class AnthropicRepository {
   static final _endpoint = Uri.parse('https://api.anthropic.com/v1/messages');
+  static final _models = Uri.parse('https://api.anthropic.com/v1/models');
   static const _version = '2023-06-01';
 
   final http.Client _client;
@@ -70,27 +72,31 @@ class AnthropicRepository {
       );
 
   /// Asks [model] with [apiKey], under [system], about [user], for JSON
-  /// matching [schema], and gives it decoded. Throws an [AiFailure].
+  /// matching [schema], and gives it decoded. What [model] supports decides
+  /// the effort asked for and how long the answer may be; a model that
+  /// can't answer in shapes isn't asked. Throws an [AiFailure].
   Future<Map<String, Object?>> structured({
     required String apiKey,
-    required String model,
+    required ModelCapabilities model,
     required String system,
     required String user,
     required Map<String, Object?> schema,
   }) => guardAi(secret: apiKey, () async {
-    // Haiku takes neither thinking nor effort; larger models think by
-    // default, so they're asked to think little, with room to.
-    final haiku = model.contains('haiku');
+    if (!model.structuredOutputs) {
+      throw AiModelUnavailable(
+        "${model.id} can't answer in the shape categorizing needs.",
+      );
+    }
     final body = jsonEncode({
-      'model': model,
-      'max_tokens': haiku ? 1024 : 4096,
+      'model': model.id,
+      'max_tokens': model.answerTokens,
       'system': system,
       'messages': [
         {'role': 'user', 'content': user},
       ],
       'output_config': {
         'format': {'type': 'json_schema', 'schema': schema},
-        if (!haiku) 'effort': 'low',
+        if (model.lowEffort) 'effort': 'low',
       },
     });
     return _requester.send(
@@ -106,6 +112,33 @@ class AnthropicRepository {
       read: (response) => _reply(response, _answer),
     );
   });
+
+  /// What [model] can do, from the Models API, which costs nothing; it also
+  /// checks [apiKey] and that the model exists. Not paced, so a pause
+  /// doesn't hold it. Throws an [AiFailure].
+  Future<ModelCapabilities> capabilities({
+    required String apiKey,
+    required String model,
+  }) => _requester.send(
+    apiKey: apiKey,
+    paced: false,
+    policy: RetryPolicy.keyCheck,
+    request: (abort) => http.AbortableRequest(
+      'GET',
+      _models.replace(pathSegments: [..._models.pathSegments, model]),
+      abortTrigger: abort,
+    )..headers.addAll(_headers(apiKey)),
+    read: (response) => _reply(
+      response,
+      (body) => switch (_tryDecode(body)) {
+        final Map<String, Object?> json => ModelCapabilities.fromModelsApi(
+          model,
+          json,
+        ),
+        _ => throw const AiNoAnswer(),
+      },
+    ),
+  );
 
   /// Holds every request until [until], e.g. restoring a pause Claude asked
   /// for before the app was closed.

@@ -13,9 +13,11 @@ import 'package:youtube_takeout_manager/src/features/categories/application/chan
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/model_capabilities_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/channels/domain/channel_details.dart';
@@ -27,6 +29,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/takeout_hist
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
+import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
 
@@ -112,19 +115,42 @@ class _Jev extends TypeSafeRepository {
 }
 
 /// Claude, answering with [answer] once [hold] completes, or failing with
-/// [failure], keeping what it was asked.
+/// [failure], keeping what it was asked. Its model answers in shapes when
+/// [structuredOutputs].
 class _Claude extends AnthropicRepository {
-  _Claude(this.answer, {this.failure, this.hold});
+  _Claude(
+    this.answer, {
+    this.failure,
+    this.hold,
+    this.structuredOutputs = true,
+  });
 
   final Map<String, Object?> answer;
   final AiFailure? failure;
   final Completer<void>? hold;
+  final bool structuredOutputs;
   final asked = <String>[];
+
+  /// The models whose capabilities were asked for.
+  final capabilitiesAsked = <String>[];
+
+  @override
+  Future<ModelCapabilities> capabilities({
+    required String apiKey,
+    required String model,
+  }) async {
+    capabilitiesAsked.add(model);
+    return ModelCapabilities(
+      id: model,
+      structuredOutputs: structuredOutputs,
+      lowEffort: false,
+    );
+  }
 
   @override
   Future<Map<String, Object?>> structured({
     required String apiKey,
-    required String model,
+    required ModelCapabilities model,
     required String system,
     required String user,
     required Map<String, Object?> schema,
@@ -421,6 +447,79 @@ void main() {
 
   group('with a Claude key', () {
     const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    test("the model's capabilities are asked for once, and kept after a "
+        'restart', () async {
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      });
+      final first = container(details: known, keys: claudeKey, claude: claude);
+      first.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.capabilitiesAsked, [anthropicModel]);
+      first.dispose();
+
+      final again = container(
+        details: known,
+        keys: claudeKey,
+        claude: claude,
+        history: TakeoutHistory(watches: [_watch('UCq', 'Quiet')]),
+      );
+      again.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.asked, isNotEmpty);
+      expect(claude.capabilitiesAsked, [anthropicModel]);
+    });
+
+    test('capabilities kept for another model are asked for again', () async {
+      await ModelCapabilitiesRepository(KvStorageService()).save(
+        const ModelCapabilities(
+          id: 'claude-some-other-model',
+          structuredOutputs: true,
+          lowEffort: true,
+        ),
+      );
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      });
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.capabilitiesAsked, [anthropicModel]);
+    });
+
+    test("a model that can't answer in shapes turns Claude off, saying so, "
+        "and YouTube's and Jev's categories still come", () async {
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      }, structuredOutputs: false);
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: _Jev(),
+        claude: claude,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, {AiService.claude});
+      expect(status.notice, isNotNull);
+      expect(claude.asked, isEmpty);
+      final gamer = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(gamer?.path, const CategoryPath('Gaming', 'Action'));
+      expect(gamer?.jevAgreed, 0.9);
+    });
 
     test('a channel Claude gives no usable answer for is left as it was, the '
         "rest go on, and it isn't paid for again", () async {
