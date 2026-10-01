@@ -6,6 +6,7 @@ import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_merge.dart';
 import '../domain/sub_category.dart';
+import '../domain/tag_name.dart';
 
 part 'channel_category_repository.g.dart';
 
@@ -21,6 +22,7 @@ ChannelCategoryRepository channelCategoryRepository(Ref ref) =>
 class ChannelCategoryRepository {
   final EntryBox<ChannelCategory> _categories;
   final EntryBox<List<SubCategory>> _custom;
+  final EntryBox<TagName> _tags;
 
   /// Both boxes, merged, until each has been loaded from it once.
   Future<StoredNames>? _merged;
@@ -43,6 +45,12 @@ class ChannelCategoryRepository {
           for (final child in json! as List<dynamic>)
             SubCategory.fromStored(child),
         ],
+      ),
+      _tags = EntryBox(
+        store,
+        EntryBoxes.tags,
+        encode: (tag) => tag.toMap(),
+        decode: (json) => TagNameMapper.fromMap(json! as Map<String, dynamic>),
       );
 
   /// Categories that can't be read are skipped, keeping the rest.
@@ -67,6 +75,11 @@ class ChannelCategoryRepository {
 
   Future<void> saveCustomChildren(Map<String, List<SubCategory>> children) =>
       _custom.save(children);
+
+  /// Every tag there is, by its folded name (`nameKey`).
+  Future<Map<String, TagName>> loadTags() => _tags.load();
+
+  Future<void> saveTags(Map<String, TagName> tags) => _tags.save(tags);
 
   /// Both boxes with name variants merged, the merge kept: categories
   /// first, then the AI-made list, each writing only what changed. A merge

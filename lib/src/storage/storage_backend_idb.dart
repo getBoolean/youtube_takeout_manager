@@ -20,7 +20,7 @@ class IdbBackend implements StorageBackend {
   static const databaseName = 'app_entries';
 
   /// Raised when [EntryBoxes.all] gains a box, so it's created.
-  static const version = 1;
+  static const version = 2;
 
   final web.IDBDatabase _db;
 

@@ -9,6 +9,7 @@ abstract final class EntryBoxes {
   static const channelDetails = 'channel_details';
   static const channelCategories = 'channel_categories';
   static const customSubCategories = 'custom_sub_categories';
+  static const tags = 'tags';
 
   /// Every box of entries, for storage that must create them up front.
   static const all = [
@@ -21,6 +22,7 @@ abstract final class EntryBoxes {
     channelDetails,
     channelCategories,
     customSubCategories,
+    tags,
   ];
 }
 

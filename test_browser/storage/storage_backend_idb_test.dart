@@ -1,6 +1,8 @@
 @TestOn('browser')
 library;
 
+import 'dart:js_interop';
+
 import 'package:test/test.dart';
 
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
@@ -25,6 +27,20 @@ void main() {
     expect(await again.loadAll(EntryBoxes.channelDetails), {'UCa': '{}'});
     expect(await again.loadAll(EntryBoxes.videoFormats), isEmpty);
     await again.close();
+  });
+
+  test('a database from before the tags box gains it, keeping what it '
+      'held', () async {
+    await writeRaw(IdbBackend.databaseName, EntryBoxes.videos, {
+      'v1': '1'.toJS,
+    });
+
+    final store = await IdbBackend.open();
+    await store.putAll(EntryBoxes.tags, {'asmr': '{}'});
+
+    expect(await store.loadAll(EntryBoxes.tags), {'asmr': '{}'});
+    expect(await store.loadAll(EntryBoxes.videos), {'v1': '1'});
+    await store.close();
   });
 
   test('entries can be deleted, and a box cleared', () async {

@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/channel_cat
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 
 /// Keeps entries in memory, recording the keys each write puts, and
@@ -62,6 +63,17 @@ void main() {
     await repository().saveCustomChildren(custom);
 
     expect(await repository().loadCustomChildren(), custom);
+  });
+
+  test('tags are kept with who made them', () async {
+    final tags = {
+      'asmr': const TagName(name: 'ASMR', origin: NameOrigin.ai),
+      'jazzpiano': const TagName(name: 'Jazz piano', origin: NameOrigin.user),
+    };
+
+    await repository().saveTags(tags);
+
+    expect(await repository().loadTags(), tags);
   });
 
   test('sub-categories kept as names alone read as made by AI', () async {
