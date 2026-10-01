@@ -683,6 +683,57 @@ void main() {
       expect(await c.read(customCategoriesProvider.future), contains('Gaming'));
     });
 
+    test("accepting a variant of a sub-category there is keeps that one's "
+        'spelling, and adds none', () async {
+      final c = container(details: known, keys: claudeKey);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      await c
+          .read(customCategoriesProvider.notifier)
+          .add('Gaming', 'Speedruns');
+      final categorizer = c.read(channelCategorizerProvider.notifier);
+      const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
+      const singer = HistoryChannel(channelId: 'UCs', title: 'Singer');
+
+      await categorizer.accept(
+        gamer,
+        ChannelCategory(
+          path: const CategoryPath('Gaming', 'speed-runs'),
+          source: CategorySource.claude,
+          decidedAt: DateTime.utc(2026, 10),
+        ),
+      );
+      await categorizer.accept(
+        singer,
+        ChannelCategory(
+          path: const CategoryPath('Music', 'Hip-Hop'),
+          source: CategorySource.claude,
+          decidedAt: DateTime.utc(2026, 10),
+        ),
+      );
+
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Speedruns'));
+      expect(paths(c)['UCs'], const CategoryPath('Music', 'Hip hop'));
+      expect(await c.read(customCategoriesProvider.future), {
+        'Gaming': ['Speedruns'],
+      });
+    });
+
+    test('adding a variant of a sub-category there is gives the spelling in '
+        'use, and adds none', () async {
+      final c = container(details: known);
+      final custom = c.read(customCategoriesProvider.notifier);
+      expect(await custom.add('Gaming', 'Speedruns'), 'Speedruns');
+
+      expect(await custom.add('Gaming', 'speed runs'), 'Speedruns');
+      expect(await custom.add('Music', 'hip-hop'), 'Hip hop');
+      expect(await custom.add('Gaming', 'Retro'), 'Retro');
+
+      expect(await c.read(customCategoriesProvider.future), {
+        'Gaming': ['Speedruns', 'Retro'],
+      });
+    });
+
     test("denying a suggestion keeps the category, and it's not asked "
         'about again', () async {
       final c = container(

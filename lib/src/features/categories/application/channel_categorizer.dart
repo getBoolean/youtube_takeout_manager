@@ -13,6 +13,7 @@ import 'package:youtube_takeout_manager/src/features/history/application/takeout
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import '../domain/categorization_plan.dart';
+import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
@@ -306,20 +307,27 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     HistoryChannel channel,
     ChannelCategory suggestion,
   ) async {
-    final path = suggestion.path;
     await ref.read(customCategoriesProvider.future);
-    if (path != null &&
-        path.child != null &&
-        !ref.read(categoryTaxonomyProvider).contains(path)) {
-      await ref
-          .read(customCategoriesProvider.notifier)
-          .add(path.parent, path.child!);
+    // As spelled where it's there already, else added.
+    final taxonomy = ref.read(categoryTaxonomyProvider);
+    var path = suggestion.path;
+    if (path != null) {
+      path = taxonomy.find(path.parent, path.child) ?? path;
+      if (path.child case final child? when !taxonomy.contains(path)) {
+        path = CategoryPath(
+          path.parent,
+          await ref
+              .read(customCategoriesProvider.notifier)
+              .add(path.parent, child),
+        );
+      }
     }
     await ref
         .read(channelCategoriesProvider.notifier)
         .decide(
           channel.key,
           suggestion.copyWith(
+            path: path,
             userDecision: UserDecision.accepted,
             decidedAt: DateTime.now().toUtc(),
           ),

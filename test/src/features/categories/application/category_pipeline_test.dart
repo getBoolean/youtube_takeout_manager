@@ -353,6 +353,33 @@ void main() {
       );
     });
 
+    test("a variant of YouTube's sub-category gets YouTube's spelling, and "
+        'nothing is learned', () async {
+      final pipeline = _withClaude(
+        _Claude({'parent': 'Music', 'child': 'Hip-Hop', 'reason': 'Beats'}),
+      );
+
+      final category = await pipeline.categorize(_input());
+
+      expect(category.path, const CategoryPath('Music', 'Hip hop'));
+      expect(pipeline.takeLearned(), isEmpty);
+    });
+
+    test('a variant of a kept sub-category reuses its spelling', () async {
+      final pipeline = _withClaude(
+        _Claude({
+          'parent': 'Gaming',
+          'child': 'Speed-runs',
+          'reason': 'Races through games',
+        }),
+      );
+
+      final category = await pipeline.categorize(_input());
+
+      expect(category.path, const CategoryPath('Gaming', 'Speedruns'));
+      expect(pipeline.takeLearned(), isEmpty);
+    });
+
     test('a new name for a sub-category there is already, as Jev finds, '
         'reuses that one', () async {
       final pipeline = _withClaude(

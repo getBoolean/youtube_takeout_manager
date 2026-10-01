@@ -2,6 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/channel_category_repository.dart';
 import '../domain/channel_category.dart';
+import '../domain/name_key.dart';
 import '../domain/youtube_taxonomy.dart';
 
 part 'channel_categories.g.dart';
@@ -58,12 +59,21 @@ class CustomCategories extends _$CustomCategories {
   Future<Map<String, List<String>>> build() =>
       ref.watch(channelCategoryRepositoryProvider).loadCustomChildren();
 
-  /// Adds [child] under [parent], once whatever its case, and keeps it.
-  Future<void> add(String parent, String child) async {
+  /// Adds [child] under [parent] and keeps it, unless it's a variant of a
+  /// sub-category there is, by [nameKey]. Gives the spelling in use:
+  /// YouTube's, the one kept already, or [child].
+  Future<String> add(String parent, String child) async {
+    // YouTube's alone: the taxonomy with these added is made from them.
+    if (youtubeTaxonomy.find(parent, child)?.child case final youtube?) {
+      return youtube;
+    }
     await future;
     final current = state.requireValue;
     final existing = current[parent] ?? const <String>[];
-    if (existing.any((c) => c.toLowerCase() == child.toLowerCase())) return;
+    final key = nameKey(child);
+    for (final kept in existing) {
+      if (nameKey(kept) == key) return kept;
+    }
     final updated = {
       ...current,
       parent: [...existing, child],
@@ -72,6 +82,7 @@ class CustomCategories extends _$CustomCategories {
     await ref
         .read(channelCategoryRepositoryProvider)
         .saveCustomChildren(updated);
+    return child;
   }
 }
 
