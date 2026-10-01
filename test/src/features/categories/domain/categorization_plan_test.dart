@@ -211,6 +211,34 @@ void main() {
       );
     });
 
+    test("not while the AI that made it isn't there: Claude's, with only "
+        'Jev', () {
+      for (final claudes in [
+        _category(source: CategorySource.claude, tried: _withBoth),
+        _category(
+          source: CategorySource.claude,
+          tried: _withBoth,
+          prompts: const {'claudeCategory': 'claude-1'},
+        ),
+      ]) {
+        expect(_work(claudes, available: _withJev), ChannelWork.none);
+      }
+    });
+
+    test("not while the AI that made it isn't there: Jev's check, with only "
+        'Claude, which names its tags instead', () {
+      expect(
+        _plan(
+          _category(
+            jevAgreed: 0.9,
+            tried: const {CategorizationTier.youtube, CategorizationTier.jev},
+          ),
+          available: _withClaude,
+        ),
+        (work: ChannelWork.tags, redo: false),
+      );
+    });
+
     test('not without an AI to redo it', () {
       expect(
         _work(

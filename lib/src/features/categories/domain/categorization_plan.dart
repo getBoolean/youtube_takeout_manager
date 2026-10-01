@@ -18,16 +18,28 @@ typedef WorkPlan = ({ChannelWork work, bool redo});
 
 const _nothing = (work: ChannelWork.none, redo: false);
 
+/// The AI services whose answers made [category]: redoing it without one
+/// of them would lose what that one said.
+Set<CategorizationTier> _madeBy(ChannelCategory category) => {
+  if (category.source == CategorySource.claude ||
+      category.prompts.containsKey('claudeCategory'))
+    CategorizationTier.claude,
+  if (category.source == CategorySource.jev ||
+      category.jevAgreed != null ||
+      category.prompts.keys.any((step) => step.startsWith('jev')))
+    CategorizationTier.jev,
+};
+
 /// What a run does for a channel with the category [existing] (none yet
 /// when null), given the steps [available] now, whether it [hasTopics] from
 /// YouTube, and each step's prompt [fingerprints] now, by step name.
 ///
 /// A category the user decided is never redone; neither are tags they
 /// edited. An AI output made with a prompt that has since changed, or
-/// before prompts were kept, is redone. Otherwise a channel is looked at
-/// again only when something new could change it; and with Claude there,
-/// a channel whose tags were never asked for, or were named with an older
-/// prompt, gets its tags alone.
+/// before prompts were kept, is redone, once the services that made it are
+/// there. Otherwise a channel is looked at again only when something new
+/// could change it; and with Claude there, a channel whose tags were never
+/// asked for, or were named with an older prompt, gets its tags alone.
 WorkPlan planWork(
   ChannelCategory? existing, {
   required Set<CategorizationTier> available,
@@ -61,7 +73,9 @@ WorkPlan planWork(
       existing.prompts.entries.any((p) => fingerprints[p.key] != p.value) ||
       (existing.prompts.isEmpty &&
           (existing.isAi || existing.jevAgreed != null));
-  if (stale && ai.isNotEmpty) return (work: ChannelWork.categorize, redo: true);
+  if (stale && ai.containsAll(_madeBy(existing))) {
+    return (work: ChannelWork.categorize, redo: true);
+  }
 
   final untried = ai.difference(existing.tried);
   final bool again;
