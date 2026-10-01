@@ -1,7 +1,26 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/storage/entry_box.dart';
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
+
+/// Keeps entries in memory; writes wait for [gate] while it's set, and
+/// [failNext] makes the next write fail.
+class _Gated extends MemoryEntryStore {
+  Completer<void>? gate;
+  bool failNext = false;
+
+  @override
+  Future<void> putAll(String box, Map<String, String> entries) async {
+    await gate?.future;
+    if (failNext) {
+      failNext = false;
+      throw StateError('write failed');
+    }
+    return super.putAll(box, entries);
+  }
+}
 
 /// Keeps entries in memory, recording each write.
 class _Recording extends MemoryEntryStore {
@@ -115,5 +134,84 @@ void main() {
     expect(store.puts.single.keys, ['c']);
     expect(store.deletes.single, ['a']);
     expect(await EntrySet(store, 'ids').load(), {'b', 'c'});
+  });
+
+  group('saves overlapping', () {
+    test('leave the box as the last save says', () async {
+      final store = _Gated();
+      final box = _items(store);
+      await box.load();
+      store.gate = Completer();
+
+      final first = box.save({'a': const _Item(1), 'z': const _Item(26)});
+      final second = box.save({'a': const _Item(1)});
+      store.gate!.complete();
+      await Future.wait([first, second]);
+
+      expect((await _items(store).load()).keys, ['a']);
+    });
+
+    test('leave the box as the last save says, never loaded', () async {
+      final store = _Gated();
+      final box = _items(store);
+      store.gate = Completer();
+
+      final first = box.save({'a': const _Item(1), 'z': const _Item(26)});
+      final second = box.save({'a': const _Item(1)});
+      store.gate!.complete();
+      await Future.wait([first, second]);
+
+      expect((await _items(store).load()).keys, ['a']);
+    });
+
+    test('a load during a save sees what was saved', () async {
+      final store = _Gated();
+      final box = _items(store);
+      await box.load();
+      store.gate = Completer();
+
+      final saving = box.save({'a': const _Item(1)});
+      final loading = box.load();
+      store.gate!.complete();
+      await saving;
+
+      expect((await loading).keys, ['a']);
+    });
+
+    test('a failed save lets the next one write all that changed since the '
+        'last good save', () async {
+      final store = _Gated();
+      final box = _items(store);
+      await box.save({'a': const _Item(1)});
+      store
+        ..gate = Completer()
+        ..failNext = true;
+
+      final failing = box.save({'a': const _Item(1), 'b': const _Item(2)});
+      final next = box.save({
+        'a': const _Item(1),
+        'b': const _Item(2),
+        'c': const _Item(3),
+      });
+      store.gate!.complete();
+
+      await expectLater(failing, throwsStateError);
+      await next;
+      expect(await store.loadAll('items'), {'a': '1', 'b': '2', 'c': '3'});
+    });
+
+    test('of a set leave it as the last save says', () async {
+      final store = _Gated();
+      final ids = EntrySet(store, 'ids');
+      await ids.load();
+      store.gate = Completer();
+
+      final first = ids.save({'a', 'z'});
+      final second = ids.save({'a'});
+      store.gate!.complete();
+      await Future.wait([first, second]);
+
+      expect(await EntrySet(store, 'ids').load(), {'a'});
+    });
   });
 }

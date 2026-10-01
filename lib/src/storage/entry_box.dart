@@ -2,11 +2,24 @@ import 'dart:convert';
 
 import 'entry_store.dart';
 
+/// Runs operations one at a time, in the order they were asked for, so a
+/// save never works from what an earlier, unfinished one is about to change.
+/// A failed operation doesn't hold back the next.
+mixin _OneAtATime {
+  Future<void> _tail = Future.value();
+
+  Future<R> _serial<R>(Future<R> Function() op) {
+    final result = _tail.then((_) => op());
+    _tail = result.then((_) {}, onError: (Object _) {});
+    return result;
+  }
+}
+
 /// One box of an [EntryStore] as a map of [T]s, each value kept as JSON on
 /// its own. Saving writes only the values that changed since the last load
 /// or save (compared by identity, as stores replace only what changed), and
-/// deletes the ones gone.
-class EntryBox<T extends Object> {
+/// deletes the ones gone. Loads, saves and clears run one at a time.
+class EntryBox<T extends Object> with _OneAtATime {
   final EntryStore _store;
   final String name;
   final Object? Function(T value) _encode;
@@ -24,7 +37,7 @@ class EntryBox<T extends Object> {
        _decode = decode;
 
   /// Every value, skipping entries that can't be read.
-  Future<Map<String, T>> load() async {
+  Future<Map<String, T>> load() => _serial(() async {
     final values = <String, T>{};
     for (final MapEntry(:key, :value) in (await _store.loadAll(name)).entries) {
       try {
@@ -35,10 +48,10 @@ class EntryBox<T extends Object> {
     }
     _saved = Map.of(values);
     return values;
-  }
+  });
 
   /// Makes the box hold exactly [values].
-  Future<void> save(Map<String, T> values) async {
+  Future<void> save(Map<String, T> values) => _serial(() async {
     final saved = _saved;
     if (saved == null) {
       // Never loaded: what the box holds is unknown, so it's replaced.
@@ -60,30 +73,31 @@ class EntryBox<T extends Object> {
       if (gone.isNotEmpty) await _store.deleteAll(name, gone);
     }
     _saved = Map.of(values);
-  }
+  });
 
-  Future<void> clear() async {
+  Future<void> clear() => _serial(() async {
     await _store.clear(name);
     _saved = {};
-  }
+  });
 }
 
 /// One box of an [EntryStore] as a set of keys, such as IDs YouTube no
-/// longer has. Saving writes only what was added or removed.
-class EntrySet {
+/// longer has. Saving writes only what was added or removed. Loads, saves
+/// and clears run one at a time.
+class EntrySet with _OneAtATime {
   final EntryStore _store;
   final String name;
   Set<String>? _saved;
 
   EntrySet(this._store, this.name);
 
-  Future<Set<String>> load() async {
+  Future<Set<String>> load() => _serial(() async {
     final keys = (await _store.loadAll(name)).keys.toSet();
     _saved = {...keys};
     return keys;
-  }
+  });
 
-  Future<void> save(Set<String> keys) async {
+  Future<void> save(Set<String> keys) => _serial(() async {
     final saved = _saved;
     if (saved == null) {
       await _store.clear(name);
@@ -97,10 +111,10 @@ class EntrySet {
       if (gone.isNotEmpty) await _store.deleteAll(name, gone.toList());
     }
     _saved = {...keys};
-  }
+  });
 
-  Future<void> clear() async {
+  Future<void> clear() => _serial(() async {
     await _store.clear(name);
     _saved = {};
-  }
+  });
 }
