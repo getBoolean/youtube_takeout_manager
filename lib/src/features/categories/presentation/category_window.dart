@@ -24,6 +24,7 @@ import '../domain/youtube_topics.dart';
 import 'ai_keys_setup.dart';
 import 'category_change_pages.dart';
 import 'category_colors.dart';
+import 'category_tag_page.dart';
 
 /// Whether AI can be asked for another category in the window, and how.
 enum AskAi {
@@ -242,6 +243,12 @@ Future<void> showCategoryWindow(
         ),
       ),
       ...categoryChangePages(channel, draft),
+      windowSliverPage(
+        id: CategoryWindow.addTagId,
+        title: (context) => windowTitle(context, 'Add tag'),
+        backTo: CategoryWindow.mainId,
+        slivers: [AddTagPage(channel: channel)],
+      ),
       AiKeysPages.page(),
     ],
   ).whenComplete(() {

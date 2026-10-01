@@ -48,6 +48,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/chan
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_change_pages.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_tag_page.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_keys_repository.dart';
@@ -1051,6 +1052,26 @@ void main() {
     overrides: [channelCategoriesProvider.overrideWith(_LongCategories.new)],
     then: (tester) async {
       await tester.tap(find.byKey(ChangePage.categoryKey('Entertainment')));
+      await tester.pump();
+    },
+  );
+  fitsAtEveryWidth(
+    'the Add tag page, with text typed',
+    () => const Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          AddTagPage(
+            channel: HistoryChannel(channelId: 'UClong', title: 'Long'),
+          ),
+        ],
+      ),
+    ),
+    overrides: [channelCategoriesProvider.overrideWith(_LongCategories.new)],
+    then: (tester) async {
+      await tester.enterText(
+        find.byKey(AddTagPage.fieldKey),
+        'A new tag with a long name',
+      );
       await tester.pump();
     },
   );
