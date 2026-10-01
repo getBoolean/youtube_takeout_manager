@@ -11,7 +11,7 @@ final _taxonomy = youtubeTaxonomy.withCustom({
 
 const _evidence = ChannelEvidence(
   title: 'Speedy',
-  recentTitles: ['Any% in 10 minutes'],
+  titles: ['Any% in 10 minutes'],
 );
 
 void main() {

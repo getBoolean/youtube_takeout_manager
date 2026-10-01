@@ -126,7 +126,7 @@ ChannelInput _input({List<String> topics = const []}) => (
   topicUrls: topics,
   evidence: const ChannelEvidence(
     title: 'Speedy',
-    recentTitles: ['Any% in 10 minutes'],
+    titles: ['Any% in 10 minutes'],
   ),
 );
 

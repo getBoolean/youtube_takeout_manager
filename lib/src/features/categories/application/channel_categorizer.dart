@@ -12,11 +12,14 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/channel_det
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../domain/categorization_plan.dart';
 import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
+import '../domain/prompt_videos.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
 import '../data/ai_pause_repository.dart';
@@ -190,7 +193,8 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       pipeline = await _pipeline(withClaude: false);
     }
     if (dropped()) return;
-    final titles = recentTitlesByChannel(loaded);
+    final picks = pickPromptVideos(loaded);
+    final videos = ref.read(videoMetadataProvider).value ?? const {};
     final queue = <HistoryChannel>[];
     final unplaced = <String, ChannelCategory>{};
     final now = DateTime.now().toUtc();
@@ -239,7 +243,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           final ChannelCategory category;
           try {
             category = await pipeline.categorize(
-              _inputFor(channel, loaded, details, titles),
+              _inputFor(channel, loaded, details, picks, videos),
             );
           } on AiTierFailure catch (e) {
             stoppedBy ??= e;
@@ -304,7 +308,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       channelCategoriesProvider.future,
     ))[channel.key];
     return pipeline.suggestInstead(
-      _inputFor(channel, loaded, details, recentTitlesByChannel(loaded)),
+      _inputFor(
+        channel,
+        loaded,
+        details,
+        pickPromptVideos(loaded),
+        ref.read(videoMetadataProvider).value ?? const {},
+      ),
       current?.path,
     );
   }
@@ -436,26 +446,37 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   }
 
   /// What's known about [channel]: its topics and description, and the
-  /// titles of videos watched from it.
+  /// titles of videos watched from it that [picks] has for it, some with
+  /// their descriptions from [videos].
   static ChannelInput _inputFor(
     HistoryChannel channel,
     LoadedHistory loaded,
     Map<String, ChannelDetails> details,
-    List<List<String>> titles,
+    List<PromptPicks> picks,
+    Map<String, Video> videos,
   ) {
     final channelDetails = details[channel.channelId];
     final topicUrls = channelDetails?.topicUrls ?? const <String>[];
     final index = loaded.channelIndexByKey[channel.key];
+    final PromptPicks channelPicks = index == null || index >= picks.length
+        ? (titles: const [], described: const [])
+        : picks[index];
+    final watches = loaded.history.watches;
     return (
       key: channel.key,
       topicUrls: topicUrls,
-      evidence: ChannelEvidence(
+      evidence: buildEvidence(
         title: channel.title,
         description: channelDetails?.description,
         topicLabels: [for (final url in topicUrls) topicLabel(url)],
-        recentTitles: index == null || index >= titles.length
-            ? const []
-            : titles[index],
+        picks: channelPicks,
+        watches: watches,
+        descriptions: {
+          for (final id in [
+            for (final i in channelPicks.described) ?watches[i].videoId,
+          ])
+            id: videos[id]?.description,
+        },
       ),
     );
   }
