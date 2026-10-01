@@ -12,8 +12,10 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_keys.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/categorizing_channels.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_pause_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
@@ -34,6 +36,11 @@ import 'package:youtube_takeout_manager/src/features/history/domain/takeout_hist
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_details_fetcher.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
+import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
+import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
+import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
@@ -139,6 +146,7 @@ class _Jev extends TypeSafeRepository {
 class _Claude extends AnthropicRepository {
   _Claude(
     this.answer, {
+    this.tags = const [],
     this.failure,
     this.hold,
     this.structuredOutputs = true,
@@ -146,6 +154,13 @@ class _Claude extends AnthropicRepository {
   });
 
   final Map<String, Object?> answer;
+
+  /// Its answer when asked for tags alone.
+  final List<String> tags;
+
+  /// What each request asked for, with the channel it was about:
+  /// 'tags: Singer' or 'category: Singer'.
+  final kinds = <String>[];
   final AiFailure? failure;
   final Completer<void>? hold;
   final bool structuredOutputs;
@@ -180,9 +195,27 @@ class _Claude extends AnthropicRepository {
     required Map<String, Object?> schema,
   }) async {
     asked.add(user);
+    final tagsOnly = !(schema['properties']! as Map).containsKey('parent');
+    final channel = (jsonDecode(user) as Map)['channel'];
+    kinds.add('${tagsOnly ? 'tags' : 'category'}: $channel');
     await hold?.future;
     if (failure case final failure?) throw failure;
-    return answer;
+    return tagsOnly ? {'tags': tags} : answer;
+  }
+}
+
+/// Fetches nothing: gives each video asked for a description, as YouTube
+/// would, and records the IDs.
+class _VideoDetails extends VideoDetailsFetcher {
+  final asked = <String>{};
+
+  @override
+  Future<void> fetch(Iterable<String> videoIds) async {
+    asked.addAll(videoIds);
+    ref.read(videoMetadataProvider.notifier).addAll([
+      for (final id in videoIds)
+        Video(videoId: id, channelId: 'UCx', description: 'Fetched about $id'),
+    ]);
   }
 }
 
@@ -255,6 +288,7 @@ void main() {
     bool browser = false,
     _Timers? timers,
     DateTime Function()? now,
+    _VideoDetails? videoDetails,
   }) {
     fetcher = _Fetcher(give);
     final c = ProviderContainer(
@@ -269,6 +303,9 @@ void main() {
         ),
         channelDetailsProvider.overrideWith(() => _Details({...details})),
         channelThumbnailFetcherProvider.overrideWith(() => fetcher),
+        videoDetailsFetcherProvider.overrideWith(
+          () => videoDetails ?? _VideoDetails(),
+        ),
         readSessionChannelIdProvider.overrideWithValue(session),
         historySubscriptionsProvider.overrideWith(
           (ref) async => {for (final s in subscriptions) s.channelId: s},
@@ -341,7 +378,7 @@ void main() {
   test('without topics or AI, a channel is uncategorized, and not counted '
       'as categorized', () async {
     final c = container(details: known);
-    final seen = <({bool running, int done, int total})>[];
+    final seen = <({bool running, int done, int total, bool redo})>[];
     c.listen(categorizationProgressProvider, (_, p) => seen.add(p));
 
     c.read(historyShownProvider.notifier).markShown();
@@ -1164,6 +1201,234 @@ void main() {
 
       expect(c.read(aiTierStatusProvider).notice, isNotNull);
       expect(c.read(categorizationProgressProvider).running, isFalse);
+    });
+  });
+
+  group('prompts, tags and video descriptions', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    /// Channel categories kept on this device before the run.
+    void saved(Map<String, ChannelCategory> categories) => setMockStorage(
+      entries: {
+        EntryBoxes.channelCategories: {
+          for (final MapEntry(:key, :value) in categories.entries)
+            key: jsonEncode(value.toMap()),
+        },
+      },
+    );
+
+    final decidedAt = DateTime.utc(2026, 9, 30);
+
+    test('a category AI made before prompts were kept is made again once, '
+        'then left', () async {
+      saved({
+        'UCx': ChannelCategory(
+          path: const CategoryPath('Knowledge'),
+          source: CategorySource.claude,
+          tried: const {CategorizationTier.youtube, CategorizationTier.claude},
+          decidedAt: decidedAt,
+        ),
+      });
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': null,
+        'reason': 'Plays games',
+      });
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      final redone = <bool>[];
+      c.listen(categorizationProgressProvider, (_, p) {
+        if (p.running) redone.add(p.redo);
+      });
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.kinds, contains('category: No topics'));
+      expect(paths(c)['UCx'], const CategoryPath('Gaming'));
+      expect(redone, contains(isTrue));
+      final asked = claude.asked.length;
+
+      c.read(_keys.notifier).set(const AiKeys(anthropic: 'sk-ant-2'));
+      await _settle();
+      expect(claude.asked, hasLength(asked));
+    });
+
+    test("a category from YouTube's topics alone isn't made again, and gets "
+        'its tags', () async {
+      final claude = _Claude(
+        {'parent': 'Gaming', 'child': null, 'reason': ''},
+        tags: ['Mario Kart World'],
+      );
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.kinds, contains('tags: Gamer'));
+      expect(claude.kinds, isNot(contains('category: Gamer')));
+      final gamer = c.read(channelCategoriesProvider).value?['UCg'];
+      expect(gamer?.path, const CategoryPath('Gaming', 'Action'));
+      expect(gamer?.tags, ['Mario Kart World']);
+    });
+
+    test('a category the user accepted keeps it, and gets its tags', () async {
+      saved({
+        'UCs': ChannelCategory(
+          path: const CategoryPath('Music', 'Jazz'),
+          source: CategorySource.claude,
+          userDecision: UserDecision.accepted,
+          decidedAt: decidedAt,
+        ),
+      });
+      final claude = _Claude(
+        {'parent': 'Gaming', 'child': null, 'reason': ''},
+        tags: ['Jazz piano'],
+      );
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.kinds, contains('tags: Singer'));
+      final singer = c.read(channelCategoriesProvider).value?['UCs'];
+      expect(singer?.path, const CategoryPath('Music', 'Jazz'));
+      expect(singer?.userDecision, UserDecision.accepted);
+      expect(singer?.tags, ['Jazz piano']);
+    });
+
+    test('tags the user edited are never asked for again', () async {
+      saved({
+        'UCs': ChannelCategory(
+          path: const CategoryPath('Music', 'Pop'),
+          tags: const ['Mine'],
+          tagsTried: true,
+          tagsEditedByUser: true,
+          tagsPrompt: 'an older prompt',
+          decidedAt: decidedAt,
+        ),
+      });
+      final claude = _Claude(
+        {'parent': 'Gaming', 'child': null, 'reason': ''},
+        tags: ['Theirs'],
+      );
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(claude.kinds.where((k) => k.endsWith('Singer')), isEmpty);
+      expect(c.read(channelCategoriesProvider).value?['UCs']?.tags, ['Mine']);
+    });
+
+    test('new tags are kept as made by AI', () async {
+      final claude = _Claude(
+        {'parent': 'Gaming', 'child': null, 'reason': ''},
+        tags: ['Speedruns'],
+      );
+      final c = container(details: known, keys: claudeKey, claude: claude);
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final names = await c.read(tagNamesProvider.future);
+      expect(names.values.single.name, 'Speedruns');
+      expect(names.values.single.origin, NameOrigin.ai);
+    });
+
+    group('video descriptions', () {
+      final history = TakeoutHistory(
+        watches: [
+          for (var i = 0; i < 3; i++)
+            WatchEntry(
+              time: DateTime.utc(2026, 4, 12 - i),
+              kind: WatchKind.video,
+              title: 'Video $i',
+              url: 'https://www.youtube.com/watch?v=vx$i',
+              channelTitle: 'No topics',
+              channelUrl: 'https://www.youtube.com/channel/UCx',
+            ),
+        ],
+      );
+
+      test('signed in, the missing ones are fetched first, and AI is told '
+          'them', () async {
+        final videoDetails = _VideoDetails();
+        final claude = _Claude({
+          'parent': 'Knowledge',
+          'child': null,
+          'reason': '',
+        });
+        final c = container(
+          details: known,
+          keys: claudeKey,
+          claude: claude,
+          session: 'UCme',
+          history: history,
+          videoDetails: videoDetails,
+        );
+
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+
+        expect(videoDetails.asked, {'vx0', 'vx1', 'vx2'});
+        expect(claude.asked.single, contains('Fetched about vx1'));
+      });
+
+      test('signed out, only the ones kept are told', () async {
+        setMockStorage(
+          entries: {
+            EntryBoxes.videos: {
+              'vx1': jsonEncode(
+                const Video(
+                  videoId: 'vx1',
+                  channelId: 'UCx',
+                  description: 'Kept about vx1',
+                ).toMap(),
+              ),
+            },
+          },
+        );
+        final videoDetails = _VideoDetails();
+        final claude = _Claude({
+          'parent': 'Knowledge',
+          'child': null,
+          'reason': '',
+        });
+        final c = container(
+          details: known,
+          keys: claudeKey,
+          claude: claude,
+          history: history,
+          videoDetails: videoDetails,
+        );
+        c.listen(videoMetadataProvider, (_, _) {});
+
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+
+        expect(videoDetails.asked, isEmpty);
+        expect(claude.asked.single, contains('Kept about vx1'));
+      });
+    });
+
+    test('a channel is marked as being asked about while it is, and only '
+        'then', () async {
+      final hold = Completer<void>();
+      final claude = _Claude({
+        'parent': 'Knowledge',
+        'child': null,
+        'reason': '',
+      }, hold: hold);
+      final c = container(details: known, keys: claudeKey, claude: claude);
+      c.listen(categorizingChannelsProvider, (_, _) {});
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(c.read(categorizingChannelsProvider), contains('UCx'));
+
+      hold.complete();
+      await _settle();
+      expect(c.read(categorizingChannelsProvider), isEmpty);
     });
   });
 }

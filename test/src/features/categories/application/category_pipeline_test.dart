@@ -573,6 +573,42 @@ void main() {
     });
   });
 
+  test("which model answers doesn't change the prompts kept", () async {
+    Future<Map<String, String>> promptsWith(ModelCapabilities model) async {
+      final category = await CategoryPipeline(
+        taxonomy: youtubeTaxonomy,
+        claude: (
+          repository: _Claude({
+            'parent': 'Knowledge',
+            'child': null,
+            'reason': '',
+          }),
+          apiKey: 'sk-ant-1',
+          model: model,
+        ),
+      ).categorize(_input());
+      return category.prompts;
+    }
+
+    expect(
+      await promptsWith(
+        const ModelCapabilities(
+          id: 'claude-haiku-4-5',
+          structuredOutputs: true,
+          lowEffort: false,
+        ),
+      ),
+      await promptsWith(
+        const ModelCapabilities(
+          id: 'claude-sonnet-5-5',
+          structuredOutputs: true,
+          lowEffort: true,
+          maxTokens: 512,
+        ),
+      ),
+    );
+  });
+
   test('a new sub-category Claude names keeps its emoji', () async {
     final pipeline = _withClaude(
       _Claude({

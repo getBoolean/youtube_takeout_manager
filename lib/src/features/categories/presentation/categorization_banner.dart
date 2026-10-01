@@ -23,7 +23,9 @@ class CategorizationBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (:running, :done, :total) = ref.watch(categorizationProgressProvider);
+    final (:running, :done, :total, :redo) = ref.watch(
+      categorizationProgressProvider,
+    );
     final (:disabled, :notice) = ref.watch(aiTierStatusProvider);
     final keys = ref.watch(aiKeysProvider).value ?? AiKeys.none;
     // Signed out, YouTube's topics can't be asked for.
@@ -73,7 +75,8 @@ class CategorizationBanner extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      'Categorizing ${NumberFormat.decimalPattern().format(done)}'
+                      '${redo ? 'Categorizing again with updated prompts: ' : 'Categorizing '}'
+                      '${NumberFormat.decimalPattern().format(done)}'
                       ' of ${formatCount(total, 'channel')}',
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,

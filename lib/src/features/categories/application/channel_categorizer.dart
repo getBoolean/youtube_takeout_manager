@@ -12,6 +12,7 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/channel_det
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_details_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../domain/categorization_plan.dart';
@@ -19,8 +20,10 @@ import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
+import '../domain/name_key.dart';
 import '../domain/prompt_videos.dart';
 import '../domain/sub_category.dart';
+import '../domain/tag_name.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
 import '../data/ai_pause_repository.dart';
@@ -31,8 +34,11 @@ import 'ai_keys.dart';
 import 'ai_tiers.dart';
 import 'categorization_inputs.dart';
 import 'categorization_progress.dart';
+import 'categorizing_channels.dart';
 import 'category_pipeline.dart';
 import 'channel_categories.dart';
+import 'channel_tags.dart';
+import 'prompt_fingerprints.dart';
 
 part 'channel_categorizer.g.dart';
 
@@ -42,6 +48,9 @@ const _saveEvery = 10;
 
 /// Channels categorized at once while AI is asked.
 const _inFlight = 3;
+
+/// The most tags Claude is told to reuse, the most used first.
+const _knownTagsTold = 200;
 
 /// How long categorizing pauses for a busy service that didn't say.
 const _defaultPause = Duration(minutes: 5);
@@ -95,6 +104,9 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       _resumeTimers.clear();
     });
     _restored = _restorePauses(ref.watch(aiPauseRepositoryProvider));
+    // Listened, so the videos kept, a stream, are there to read: one
+    // nothing listens to is paused.
+    ref.listen(videoMetadataProvider, (_, _) {});
     ref.listen(categorizationInputsProvider, (_, inputs) {
       if (inputs != null) _requestRun();
     }, fireImmediately: true);
@@ -195,19 +207,26 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     }
     if (dropped()) return;
     final picks = pickPromptVideos(loaded);
-    final videos = ref.read(videoMetadataProvider).value ?? const {};
-    final queue = <HistoryChannel>[];
+    final fingerprints = {
+      for (final MapEntry(:key, :value) in currentPrompts.entries)
+        key.name: value,
+    };
+    final queue = <(HistoryChannel, ChannelWork)>[];
+    var redo = false;
     final unplaced = <String, ChannelCategory>{};
     final now = DateTime.now().toUtc();
     for (final channel in channels) {
       final hasTopics =
           details[channel.channelId]?.topicUrls.isNotEmpty ?? false;
-      if (needsCategorizing(
+      final plan = planWork(
         existing[channel.key],
         available: pipeline.tiers,
         hasTopics: hasTopics,
-      )) {
-        queue.add(channel);
+        fingerprints: fingerprints,
+      );
+      if (plan.work != ChannelWork.none) {
+        queue.add((channel, plan.work));
+        redo = redo || plan.redo;
       } else if (existing[channel.key] == null) {
         // Nothing to go on yet: uncategorized, and looked at again once
         // topics or AI come.
@@ -224,8 +243,32 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     }
     if (queue.isEmpty) return;
 
+    // Signed in, the descriptions of the videos AI is told about that
+    // aren't kept yet are fetched first, as topics are.
+    if (ref.read(readSessionChannelIdProvider) != null) {
+      final watches = loaded.history.watches;
+      final videoIds = {
+        for (final (channel, _) in queue)
+          if (loaded.channelIndexByKey[channel.key] case final i?
+              when i < picks.length)
+            for (final w in picks[i].described) ?watches[w].videoId,
+      };
+      if (videoIds.isNotEmpty) {
+        await ref
+            .read(videoDetailsFetcherProvider.notifier)
+            .fetch(videoIds)
+            .catchError((Object _) {});
+        if (dropped()) return;
+      }
+    }
+    final videos = await ref
+        .read(videoMetadataProvider.future)
+        .catchError((Object _) => const <String, Video>{});
+    if (dropped()) return;
+
     final progress = ref.read(categorizationProgressProvider.notifier);
-    progress.start(queue.length);
+    final categorizing = ref.read(categorizingChannelsProvider.notifier);
+    progress.start(queue.length, redo: redo);
     var done = 0;
     var next = 0;
     // Set when an AI step fails: the run stops, and runs again without it
@@ -240,20 +283,35 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             stoppedBy == null &&
             crash == null &&
             !dropped()) {
-          final channel = queue[next++];
-          final ChannelCategory category;
+          final (channel, work) = queue[next++];
+          final input = _inputFor(channel, loaded, details, picks, videos);
+          ChannelCategory category;
+          categorizing.add(channel.key);
           try {
-            category = await pipeline.categorize(
-              _inputFor(channel, loaded, details, picks, videos),
-            );
+            category = switch (work) {
+              ChannelWork.tags => await pipeline.retag(
+                input,
+                existing[channel.key]!,
+              ),
+              _ => await pipeline.categorize(input),
+            };
           } on AiTierFailure catch (e) {
             stoppedBy ??= e;
             return;
+          } finally {
+            if (ref.mounted) categorizing.remove(channel.key);
           }
           if (!ref.mounted) return;
           // Still right for its channel when the run was dropped, and paid
           // for: kept either way.
           await _keepLearned(pipeline);
+          if (category.tags.isNotEmpty) {
+            category = category.copyWith(
+              tags: await ref
+                  .read(tagNamesProvider.notifier)
+                  .resolve(category.tags, NameOrigin.ai),
+            );
+          }
           await categories.putAiResult(channel.key, category);
           if (dropped()) return;
           progress.update(++done);
@@ -387,9 +445,16 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final categories = await ref
         .read(channelCategoriesProvider.future)
         .catchError((Object _) => const <String, ChannelCategory>{});
+    final tagNames = await ref
+        .read(tagNamesProvider.future)
+        .catchError((Object _) => const <String, TagName>{});
     return CategoryPipeline(
       taxonomy: ref.read(categoryTaxonomyProvider),
       usage: _usage(categories),
+      knownTags: _mostUsedTags(categories),
+      tagSpellings: {
+        for (final MapEntry(:key, :value) in tagNames.entries) key: value.name,
+      },
       jev: on(AiService.jev)
           ? (
               repository: ref.read(typeSafeRepositoryProvider),
@@ -417,6 +482,26 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       }
     }
     return usage;
+  }
+
+  /// The tags channels have, the most used first, at most
+  /// [_knownTagsTold].
+  static List<String> _mostUsedTags(Map<String, ChannelCategory> categories) {
+    final counts = <String, int>{};
+    final spellings = <String, String>{};
+    for (final category in categories.values) {
+      for (final tag in category.tags) {
+        final key = nameKey(tag);
+        counts[key] = (counts[key] ?? 0) + 1;
+        spellings.putIfAbsent(key, () => tag);
+      }
+    }
+    final keys = counts.keys.toList()
+      ..sort((a, b) {
+        final byUse = counts[b]!.compareTo(counts[a]!);
+        return byUse != 0 ? byUse : spellings[a]!.compareTo(spellings[b]!);
+      });
+    return [for (final key in keys.take(_knownTagsTold)) spellings[key]!];
   }
 
   /// What the Claude model in use can do: as kept, else asked for with

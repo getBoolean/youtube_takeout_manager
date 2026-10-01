@@ -1202,8 +1202,8 @@ class _LongCategories extends ChannelCategories {
 
 class _Categorizing extends CategorizationProgress {
   @override
-  ({bool running, int done, int total}) build() =>
-      (running: true, done: 1234, total: 56789);
+  ({bool running, int done, int total, bool redo}) build() =>
+      (running: true, done: 1234, total: 56789, redo: true);
 }
 
 /// History with long titles and names, and every badge.
