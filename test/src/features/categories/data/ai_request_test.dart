@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_pacer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
 
 final _url = Uri.parse('https://ai.example/v1/ask');
@@ -400,6 +401,131 @@ void main() {
         identical(aiFailureOf(failure, secret: 'sk-test'), failure),
         isTrue,
       );
+    });
+  });
+
+  group('with a pacer', () {
+    /// A clock that moves only when the pacer sleeps.
+    late DateTime now;
+    late List<Duration> pacerSleeps;
+    late List<Duration> sleeps;
+
+    setUp(() {
+      now = _now;
+      pacerSleeps = [];
+      sleeps = [];
+    });
+
+    AiRequester paced(http.Client client, AiPacer pacer) => AiRequester(
+      client: client,
+      policy: _quick,
+      pacer: pacer,
+      now: () => now,
+      sleep: (wait) async => sleeps.add(wait),
+      jitter: () => 0,
+    );
+
+    BucketPacer bucket({int concurrency = 3}) => BucketPacer(
+      concurrency: concurrency,
+      now: () => now,
+      sleep: (wait) async {
+        pacerSleeps.add(wait);
+        now = now.add(wait);
+      },
+    );
+
+    test("a 429's stated wait pauses the service, and the next try waits "
+        'for the pause', () async {
+      var requests = 0;
+      final pacer = bucket();
+      final requester = paced(
+        MockClient(
+          (_) async => ++requests == 1
+              ? http.Response('', 429, headers: {'retry-after': '5'})
+              : http.Response('ok', 200),
+        ),
+        pacer,
+      );
+
+      expect(
+        await requester.send(apiKey: 'sk-test', request: _post, read: _read),
+        'ok',
+      );
+      expect(pacerSleeps, const [Duration(seconds: 5)]);
+      expect(sleeps, isEmpty);
+    });
+
+    test('a stated wait over a minute pauses the service until then', () async {
+      final pacer = bucket();
+      final requester = paced(
+        MockClient(
+          (_) async => http.Response('', 429, headers: {'retry-after': '120'}),
+        ),
+        pacer,
+      );
+
+      await expectLater(
+        requester.send(apiKey: 'sk-test', request: _post, read: _read),
+        throwsA(isA<AiRateLimited>()),
+      );
+      expect(pacer.pausedUntil, _now.add(const Duration(seconds: 120)));
+    });
+
+    test('every try gives its turn back with its reply', () async {
+      final pacer = AdaptivePacer(
+        now: () => now,
+        sleep: (wait) async => now = now.add(wait),
+      );
+      final requester = paced(
+        MockClient((_) async => http.Response('ok', 200)),
+        pacer,
+      );
+
+      for (var i = 0; i < 20; i++) {
+        await requester.send(apiKey: 'sk-test', request: _post, read: _read);
+      }
+
+      expect(pacer.concurrency, 2);
+    });
+
+    test('tries that fail give their turns back', () async {
+      var requests = 0;
+      final pacer = bucket(concurrency: 1);
+      final requester = paced(
+        MockClient((_) async {
+          if (++requests <= 3) throw http.ClientException('offline');
+          return http.Response('ok', 200);
+        }),
+        pacer,
+      );
+
+      await expectLater(
+        requester.send(apiKey: 'sk-test', request: _post, read: _read),
+        throwsA(isA<AiUnreachable>()),
+      );
+      expect(
+        await requester.send(apiKey: 'sk-test', request: _post, read: _read),
+        'ok',
+      );
+    });
+
+    test('a request sent unpaced is not held by a pause', () async {
+      final pacer = bucket()..pauseUntil(_now.add(const Duration(minutes: 5)));
+      final requester = paced(
+        MockClient((_) async => http.Response('ok', 200)),
+        pacer,
+      );
+
+      expect(
+        await requester.send(
+          apiKey: 'sk-test',
+          request: _post,
+          read: _read,
+          paced: false,
+        ),
+        'ok',
+      );
+      expect(pacerSleeps, isEmpty);
     });
   });
 }

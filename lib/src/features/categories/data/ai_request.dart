@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 
 import 'ai_errors.dart';
+import 'ai_pacer.dart';
 
 typedef Now = DateTime Function();
 typedef Sleep = Future<void> Function(Duration wait);
@@ -126,13 +127,14 @@ Future<T> guardAi<T>(
   }
 }
 
-/// Sends requests to an AI service: each try under a timeout, aborted when
-/// it takes too long, tried again within the policy's caps, waiting what the
-/// service asks or backing off. Every outcome is an answer or an
-/// [AiFailure].
+/// Sends requests to an AI service: each try paced, under a timeout,
+/// aborted when it takes too long, tried again within the policy's caps,
+/// waiting what the service asks or backing off. Every outcome is an answer
+/// or an [AiFailure].
 class AiRequester {
   final http.Client _client;
   final RetryPolicy _policy;
+  final AiPacer? _pacer;
   final Now _now;
   final Sleep _sleep;
   final double Function() _jitter;
@@ -140,18 +142,21 @@ class AiRequester {
   AiRequester({
     required http.Client client,
     required RetryPolicy policy,
+    AiPacer? pacer,
     Now? now,
     Sleep? sleep,
     double Function()? jitter,
   }) : _client = client,
        _policy = policy,
+       _pacer = pacer,
        _now = now ?? DateTime.now,
        _sleep = sleep ?? Future<void>.delayed,
        _jitter = jitter ?? Random().nextDouble;
 
   /// Sends what [request] builds, with [apiKey] in it, until [read] makes an
   /// answer of a reply, and gives it. [request] is given the future that
-  /// aborts it. Throws an [AiFailure] that never quotes [apiKey].
+  /// aborts it. Each try takes a turn from the pacer for about [tokens],
+  /// unless not [paced]. Throws an [AiFailure] that never quotes [apiKey].
   Future<T> send<T>({
     required String apiKey,
     required http.BaseRequest Function(Future<void> abort) request,
@@ -167,19 +172,30 @@ class AiRequester {
       );
     }
     final rules = policy ?? _policy;
+    final pacer = paced ? _pacer : null;
     var timeouts = 0;
     for (var attempt = 1; ; attempt++) {
       final last = attempt >= rules.attempts;
+      final turn = await pacer?.turn(tokens: tokens);
       final abort = Completer<void>();
-      final http.Response response;
+      http.Response? response;
+      (Object, StackTrace)? error;
       try {
         response = await () async {
           final streamed = await _client.send(request(abort.future));
           return http.Response.fromStream(streamed);
         }().timeout(rules.timeout);
-      } on Object catch (e) {
+      } on Object catch (e, stack) {
+        error = (e, stack);
+      } finally {
+        // Given back before any wait, so others needn't wait on this one.
+        turn?.done(response);
+      }
+      if (error case (final e, final stack)) {
         final timedOut = e is TimeoutException || abort.isCompleted;
-        if (!timedOut && e is! http.ClientException) rethrow;
+        if (!timedOut && e is! http.ClientException) {
+          Error.throwWithStackTrace(e, stack);
+        }
         if (timedOut) {
           if (!abort.isCompleted) abort.complete();
           timeouts++;
@@ -192,21 +208,30 @@ class AiRequester {
         await _sleep(rules.backoff(attempt, _jitter()));
         continue;
       }
-      switch (read(response)) {
+      final answered = response!;
+      switch (read(answered)) {
         case AiAnswered(:final value):
           return value;
         case AiRefused(:final failure):
           throw failure;
         case AiTryAgain(:final failure):
-          final wait = requestedWait(response.headers);
+          final wait = requestedWait(answered.headers);
           final resumeAt = wait == null ? null : _now().add(wait);
+          // A 429's wait holds the whole service: the requests about to be
+          // sent would run into the same limit.
+          final holdsAll = answered.statusCode == 429;
+          if (resumeAt != null && (holdsAll || wait! > rules.longestWait)) {
+            pacer?.pauseUntil(resumeAt);
+          }
           if (wait != null && wait > rules.longestWait) {
             throw _resumingAt(failure, resumeAt!);
           }
           if (last) {
             throw resumeAt == null ? failure : _resumingAt(failure, resumeAt);
           }
-          await _sleep(wait ?? rules.backoff(attempt, _jitter()));
+          if (wait == null || !holdsAll || pacer == null) {
+            await _sleep(wait ?? rules.backoff(attempt, _jitter()));
+          }
       }
     }
   });
