@@ -144,6 +144,9 @@ class AnthropicRepository {
   /// for before the app was closed.
   void pauseUntil(DateTime until) => _pacer.pauseUntil(until);
 
+  /// Ends a pause now, e.g. for a new key.
+  void resume() => _pacer.resume();
+
   Map<String, String> _headers(String apiKey) => {
     'x-api-key': apiKey,
     'anthropic-version': _version,

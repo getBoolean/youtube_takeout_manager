@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
@@ -12,6 +15,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_pause_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/model_capabilities_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
@@ -84,12 +88,12 @@ class _Fetcher extends ChannelThumbnailFetcher {
 }
 
 /// Jev, agreeing with every category YouTube gives [agree] sure, or failing
-/// with [failure] from its [failAfter]th request on.
+/// with [failure], an AI failure or not, from its [failAfter]th request on.
 class _Jev extends TypeSafeRepository {
   _Jev({this.agree = 0.9, this.failure, this.failAfter = 0});
 
   final double agree;
-  final AiFailure? failure;
+  Object? failure;
   final int failAfter;
   var requests = 0;
 
@@ -162,6 +166,32 @@ class _Claude extends AnthropicRepository {
   }
 }
 
+/// Timers made, to fire by hand.
+class _Timers {
+  final made = <({Duration after, void Function() fire, _Timer timer})>[];
+
+  Timer call(Duration after, void Function() fire) {
+    final timer = _Timer();
+    made.add((after: after, fire: fire, timer: timer));
+    return timer;
+  }
+
+  /// The timers not cancelled, by when they fire.
+  Iterable<({Duration after, void Function() fire, _Timer timer})> get active =>
+      made.where((t) => t.timer.isActive);
+}
+
+class _Timer implements Timer {
+  @override
+  bool isActive = true;
+
+  @override
+  void cancel() => isActive = false;
+
+  @override
+  int get tick => 0;
+}
+
 /// The AI keys, changeable as when entered in the app.
 class _Keys extends Notifier<AiKeys> {
   @override
@@ -203,13 +233,19 @@ void main() {
     AnthropicRepository? claude,
     TakeoutHistory? history,
     bool browser = false,
+    _Timers? timers,
+    DateTime Function()? now,
   }) {
     fetcher = _Fetcher(give);
     final c = ProviderContainer(
       overrides: [
         takeoutHistoryProvider.overrideWith(() => _Fixed(history ?? _history)),
         channelCategorizerProvider.overrideWith(
-          () => ChannelCategorizer(browser: browser),
+          () => ChannelCategorizer(
+            browser: browser,
+            timer: timers?.call ?? Timer.new,
+            now: now ?? DateTime.now,
+          ),
         ),
         channelDetailsProvider.overrideWith(() => _Details({...details})),
         channelThumbnailFetcherProvider.overrideWith(() => fetcher),
@@ -420,12 +456,14 @@ void main() {
       },
     );
 
-    test('when Jev is busy, categorizing stops for now, keeping what it '
-        'made, and says so', () async {
+    test('when Jev is busy, categorizing pauses, keeping what it made, and '
+        'says so', () async {
+      final timers = _Timers();
       final c = container(
         details: known,
         keys: jevKey,
         jev: _Jev(failure: const AiOverloaded(), failAfter: 1),
+        timers: timers,
       );
 
       c.read(historyShownProvider.notifier).markShown();
@@ -434,6 +472,7 @@ void main() {
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, isEmpty);
       expect(status.notice, isNotNull);
+      expect(timers.active, hasLength(1));
       expect(
         c
             .read(channelCategoriesProvider)
@@ -684,5 +723,291 @@ void main() {
     await again.read(channelCategoriesProvider.future);
 
     expect(paths(again)['UCg'], const CategoryPath('Gaming', 'Action'));
+  });
+
+  group('when a service asks to wait', () {
+    const jevKey = AiKeys(typesafe: 'jv_live_1');
+    final t0 = DateTime.utc(2026, 10, 1, 12);
+
+    AiPauseRepository pauses() => AiPauseRepository(KvStorageService());
+
+    int agreed(ProviderContainer c) => c
+        .read(channelCategoriesProvider)
+        .value!
+        .values
+        .where((category) => category.jevAgreed != null)
+        .length;
+
+    test('busy without saying how long, categorizing pauses, says so, keeps '
+        'the pause, and resumes itself after 5 minutes', () async {
+      final timers = _Timers();
+      final jev = _Jev(failure: const AiOverloaded());
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        timers: timers,
+        now: () => t0,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(c.read(aiTierStatusProvider).disabled, isEmpty);
+      expect(c.read(aiTierStatusProvider).notice, isNotNull);
+      expect(timers.active.single.after, const Duration(minutes: 5));
+      expect(await pauses().load(now: t0), {
+        AiService.jev: t0.add(const Duration(minutes: 5)),
+      });
+      expect(agreed(c), 0);
+
+      jev.failure = null;
+      timers.active.single.fire();
+      await _settle();
+
+      expect(agreed(c), 2);
+      expect(c.read(aiTierStatusProvider).notice, isNull);
+      expect(await pauses().load(now: t0), isEmpty);
+    });
+
+    test('rate-limited until a stated time, it resumes then', () async {
+      final timers = _Timers();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(
+          failure: AiRateLimited(
+            'Too many requests for now.',
+            t0.add(const Duration(seconds: 90)),
+          ),
+        ),
+        timers: timers,
+        now: () => t0,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(timers.active.single.after, const Duration(seconds: 90));
+    });
+
+    test('runs asked for while paused wait for the resume', () async {
+      final timers = _Timers();
+      final jev = _Jev(failure: const AiOverloaded());
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        timers: timers,
+        now: () => t0,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      jev.failure = null;
+      double? singerAgreed() =>
+          c.read(channelCategoriesProvider).value?['UCs']?.jevAgreed;
+
+      (c.read(takeoutHistoryProvider.notifier) as _Fixed).switchTo(
+        TakeoutHistory(watches: [_watch('UCs', 'Singer')]),
+      );
+      await _settle();
+      expect(singerAgreed(), isNull);
+
+      timers.active.single.fire();
+      await _settle();
+      expect(singerAgreed(), 0.9);
+    });
+
+    test('a new key ends the pause, and categorizing runs at once', () async {
+      final timers = _Timers();
+      final jev = _Jev(failure: const AiOverloaded());
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        timers: timers,
+        now: () => t0,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      jev.failure = null;
+
+      c.read(_keys.notifier).set(const AiKeys(typesafe: 'jv_live_2'));
+      await _settle();
+
+      expect(timers.active, isEmpty);
+      expect(agreed(c), 2);
+      expect(await pauses().load(now: t0), isEmpty);
+    });
+
+    test('a pause kept from before a restart still holds for the time left, '
+        'then categorizing resumes', () async {
+      await pauses().save(
+        AiService.jev,
+        t0.add(const Duration(minutes: 5)),
+        since: t0,
+      );
+      final timers = _Timers();
+      final jev = _Jev();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        timers: timers,
+        now: () => t0.add(const Duration(minutes: 2)),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(jev.requests, 0);
+      expect(timers.active.single.after, const Duration(minutes: 3));
+
+      timers.active.single.fire();
+      await _settle();
+      expect(agreed(c), 2);
+    });
+
+    test('a pause kept from before a restart that has passed waits for '
+        'nothing, and is forgotten', () async {
+      await pauses().save(
+        AiService.jev,
+        t0.subtract(const Duration(minutes: 1)),
+        since: t0.subtract(const Duration(minutes: 6)),
+      );
+      final timers = _Timers();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(),
+        timers: timers,
+        now: () => t0,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(timers.active, isEmpty);
+      expect(agreed(c), 2);
+      expect(await pauses().load(now: t0), isEmpty);
+    });
+
+    test('asking AI during a kept pause fails at once, saying when it '
+        'resumes', () async {
+      final resumeAt = t0.add(const Duration(minutes: 5));
+      await pauses().save(AiService.claude, resumeAt, since: t0);
+      var messages = 0;
+      final claude = AnthropicRepository(
+        client: MockClient((request) async {
+          if (request.method == 'GET') {
+            return http.Response(
+              jsonEncode({
+                'capabilities': {
+                  'structured_outputs': {'supported': true},
+                },
+              }),
+              200,
+            );
+          }
+          messages++;
+          return http.Response('{}', 500);
+        }),
+        browser: false,
+        now: () => t0.add(const Duration(minutes: 2)),
+        sleep: (_) async {},
+      );
+      final c = container(
+        details: known,
+        keys: const AiKeys(anthropic: 'sk-ant-1'),
+        claude: claude,
+        timers: _Timers(),
+        now: () => t0.add(const Duration(minutes: 2)),
+      );
+      await _settle();
+
+      final failure = await c
+          .read(channelCategorizerProvider.notifier)
+          .suggest(const HistoryChannel(channelId: 'UCg', title: 'Gamer'))
+          .then<Object>((_) => 'no failure', onError: (Object e) => e);
+
+      expect(
+        failure,
+        isA<AiTierFailure>().having(
+          (f) => f.failure,
+          'failure',
+          isA<AiRateLimited>().having((f) => f.resumeAt, 'resumeAt', resumeAt),
+        ),
+      );
+      expect(messages, 0);
+    });
+
+    test('closing the app stops the timer', () async {
+      final timers = _Timers();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: const AiOverloaded()),
+        timers: timers,
+        now: () => t0,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(timers.active, hasLength(1));
+
+      c.dispose();
+
+      expect(timers.active, isEmpty);
+    });
+  });
+
+  group('what an AI failure does', () {
+    const jevKey = AiKeys(typesafe: 'jv_live_1');
+
+    test('a billing problem turns the service off, quoting the API', () async {
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: const AiBillingProblem('Top up at the console.')),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final status = c.read(aiTierStatusProvider);
+      expect(status.disabled, {AiService.jev});
+      expect(status.notice, contains('Top up at the console.'));
+    });
+
+    test(
+      'an unexpected failure turns the service off, saying what it was',
+      () async {
+        final c = container(
+          details: known,
+          keys: jevKey,
+          jev: _Jev(failure: const AiUnexpected('the answer had no answers')),
+        );
+
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+
+        final status = c.read(aiTierStatusProvider);
+        expect(status.disabled, {AiService.jev});
+        expect(status.notice, contains('the answer had no answers'));
+      },
+    );
+
+    test('an error that is no AI failure stops the run, saying so, and is '
+        'never thrown', () async {
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: _Jev(failure: StateError('kaput')),
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(c.read(aiTierStatusProvider).notice, isNotNull);
+      expect(c.read(categorizationProgressProvider).running, isFalse);
+    });
   });
 }

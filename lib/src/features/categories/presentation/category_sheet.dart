@@ -261,6 +261,17 @@ class CategoryAskPage extends StatelessWidget {
     ),
   );
 
+  /// Why AI couldn't be asked, and when to try again if the service said.
+  static String _failureText(Object? error) {
+    if (error is! AiTierFailure) return "AI couldn't be asked: $error";
+    final failure = error.failure;
+    final resumeAt = resumeAtOf(failure);
+    return [
+      "AI couldn't be asked: ${failure.message}",
+      if (resumeAt != null) 'Try again after ${timeOfDay(resumeAt)}.',
+    ].join(' ');
+  }
+
   Widget _answer(BuildContext context, AsyncSnapshot<ChannelCategory> answer) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -290,7 +301,7 @@ class CategoryAskPage extends StatelessWidget {
             liveRegion: true,
             child: Text(
               key: failureKey,
-              "AI couldn't be asked: ${error is AiTierFailure ? error.failure : error}",
+              _failureText(error),
               style: theme.textTheme.bodyMedium?.copyWith(color: scheme.error),
             ),
           ),

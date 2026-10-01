@@ -79,9 +79,10 @@ ClaudeSuggestion? parseClaudeSuggestion(
   final parent = taxonomy.find('${answer['parent'] ?? ''}')?.parent;
   if (parent == null) return null;
   final reason = answer['reason'];
+  final child = answer['child'];
   return (
     parent: parent,
-    child: normalizeChildName(answer['child'] as String?),
+    child: normalizeChildName(child is String ? child : null),
     reason: reason is String ? reason.trim() : '',
   );
 }

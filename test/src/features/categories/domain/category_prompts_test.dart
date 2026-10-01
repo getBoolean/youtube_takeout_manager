@@ -62,6 +62,17 @@ void main() {
       expect(suggestion?.child, isNull);
     });
 
+    test('with a sub-category that is not text is the category alone', () {
+      final suggestion = parseClaudeSuggestion({
+        'parent': 'Knowledge',
+        'child': 42,
+        'reason': 'Explains science',
+      }, _taxonomy);
+
+      expect(suggestion?.parent, 'Knowledge');
+      expect(suggestion?.child, isNull);
+    });
+
     test('naming a category that does not exist is no answer', () {
       expect(
         parseClaudeSuggestion({

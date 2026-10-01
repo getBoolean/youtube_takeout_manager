@@ -142,6 +142,18 @@ void main() {
       expect(clock.sleeps, isEmpty);
     });
 
+    test('ends at once when resumed', () async {
+      final clock = _Clock();
+      final pacer = BucketPacer(now: clock.call, sleep: clock.sleep)
+        ..pauseUntil(clock.now.add(const Duration(minutes: 5)))
+        ..resume();
+
+      (await pacer.turn()).done();
+
+      expect(pacer.pausedUntil, isNull);
+      expect(clock.sleeps, isEmpty);
+    });
+
     test('only ever moves later', () {
       final clock = _Clock();
       final later = clock.now.add(const Duration(seconds: 30));

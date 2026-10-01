@@ -18,6 +18,7 @@ import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/youtube_topics.dart';
 import '../data/ai_errors.dart';
+import '../data/ai_pause_repository.dart';
 import '../data/anthropic_repository.dart';
 import '../data/model_capabilities_repository.dart';
 import '../data/typesafe_repository.dart';
@@ -37,26 +38,54 @@ const _saveEvery = 10;
 /// Channels categorized at once while AI is asked.
 const _inFlight = 3;
 
+/// How long categorizing pauses for a busy service that didn't say.
+const _defaultPause = Duration(minutes: 5);
+
 /// Categorizes the channels watched and subscribed to, the most watched
 /// first, once the history screen has been opened. Signed in, it first asks
 /// YouTube for the topics of channels it doesn't know them for. A category
 /// the user accepted or denied is never replaced. Starts over when the
 /// history, subscriptions or sign-in change, dropping the run under way.
+/// A service that asks to wait pauses categorizing, even across launches,
+/// and it resumes itself.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
 class ChannelCategorizer extends _$ChannelCategorizer {
-  ChannelCategorizer({this.browser = kIsWeb});
+  ChannelCategorizer({
+    this.browser = kIsWeb,
+    Timer Function(Duration after, void Function() fire) timer = Timer.new,
+    DateTime Function() now = DateTime.now,
+  }) : _timer = timer,
+       _now = now;
 
   /// Whether this runs in a browser, which can refuse a service outright.
   final bool browser;
+  final Timer Function(Duration after, void Function() fire) _timer;
+  final DateTime Function() _now;
 
   var _generation = 0;
   Future<void>? _running;
   var _again = false;
 
+  /// The pauses kept from before the app was closed, once restored.
+  Future<void> _restored = Future.value();
+
+  /// When each paused service resumes, the timers resuming them, and the
+  /// notices saying so.
+  final _pausedUntil = <AiService, DateTime>{};
+  final _resumeTimers = <AiService, Timer>{};
+  final _pauseNotices = <AiService, String>{};
+
   @override
   void build() {
+    ref.onDispose(() {
+      for (final timer in _resumeTimers.values) {
+        timer.cancel();
+      }
+      _resumeTimers.clear();
+    });
+    _restored = _restorePauses(ref.watch(aiPauseRepositoryProvider));
     ref.listen(categorizationInputsProvider, (_, inputs) {
       if (inputs != null) _requestRun();
     }, fireImmediately: true);
@@ -71,32 +100,43 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       for (final service in AiService.values) {
         if (before?.keyFor(service) != after.keyFor(service)) {
           ref.read(aiTierStatusProvider.notifier).enable(service);
+          // A pause was for the key before; the keys loading at launch
+          // aren't a change.
+          if (before != null) _endPause(service);
         }
       }
       _requestRun();
     });
   }
 
-  /// Runs now, or again once the run under way ends.
+  /// Runs now, or again once the run under way ends; while paused, not
+  /// until the pause ends.
   void _requestRun() {
+    if (_pausedUntil.isNotEmpty) return;
     if (_running != null) {
       _again = true;
       _generation++;
       return;
     }
-    _running = _run().whenComplete(() {
-      _running = null;
-      if (_again && ref.mounted) {
-        _again = false;
-        _requestRun();
-      }
-    });
+    _running = _run()
+        .catchError((Object e) {
+          if (ref.mounted) _crashed(e);
+        })
+        .whenComplete(() {
+          _running = null;
+          if (_again && ref.mounted) {
+            _again = false;
+            _requestRun();
+          }
+        });
   }
 
   Future<void> _run() async {
     final generation = ++_generation;
     bool dropped() => generation != _generation || !ref.mounted;
 
+    await _restored;
+    if (dropped() || _pausedUntil.isNotEmpty) return;
     final inputs = ref.read(categorizationInputsProvider);
     if (inputs == null) return;
     final categories = ref.read(channelCategoriesProvider.notifier);
@@ -177,27 +217,36 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     // Set when an AI step fails: the run stops, and runs again without it
     // when [rerun].
     AiTierFailure? stoppedBy;
+    // Set when something else goes wrong: the run stops, saying so.
+    Object? crash;
 
     Future<void> worker() async {
-      while (next < queue.length && stoppedBy == null && !dropped()) {
-        final channel = queue[next++];
-        final ChannelCategory category;
-        try {
-          category = await pipeline.categorize(
-            _inputFor(channel, loaded, details, titles),
-          );
-        } on AiTierFailure catch (e) {
-          stoppedBy ??= e;
-          return;
+      try {
+        while (next < queue.length &&
+            stoppedBy == null &&
+            crash == null &&
+            !dropped()) {
+          final channel = queue[next++];
+          final ChannelCategory category;
+          try {
+            category = await pipeline.categorize(
+              _inputFor(channel, loaded, details, titles),
+            );
+          } on AiTierFailure catch (e) {
+            stoppedBy ??= e;
+            return;
+          }
+          if (!ref.mounted) return;
+          // Still right for its channel when the run was dropped, and paid
+          // for: kept either way.
+          await _keepLearned(pipeline);
+          await categories.putIfUndecided(channel.key, category);
+          if (dropped()) return;
+          progress.update(++done);
+          if (done % _saveEvery == 0) await categories.persist();
         }
-        if (!ref.mounted) return;
-        // Still right for its channel when the run was dropped, and paid
-        // for: kept either way.
-        await _keepLearned(pipeline);
-        await categories.putIfUndecided(channel.key, category);
-        if (dropped()) return;
-        progress.update(++done);
-        if (done % _saveEvery == 0) await categories.persist();
+      } on Object catch (e) {
+        crash ??= e;
       }
     }
 
@@ -210,7 +259,12 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       progress.complete();
       if (ref.mounted) await categories.persist();
     }
-    if (stoppedBy case final failure? when ref.mounted) _stopped(failure);
+    if (!ref.mounted) return;
+    if (crash case final e?) {
+      _crashed(e);
+    } else if (stoppedBy case final failure?) {
+      _stopped(failure);
+    }
   }
 
   /// Whether AI can be asked for another category: there's a key for Jev
@@ -226,6 +280,9 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   /// Another category for [channel], from AI told the one it has is wrong.
   /// Throws an [AiTierFailure] when the AI can't be asked.
   Future<ChannelCategory> suggest(HistoryChannel channel) async {
+    // A pause kept from before is the services' too: asking fails at once
+    // when it's far off.
+    await _restored;
     final pipeline = await _pipeline();
     final LoadedHistory loaded =
         ref.read(categorizationInputsProvider)?.loaded ??
@@ -379,54 +436,146 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   }
 
   /// Says why categorizing stopped: a service that can't work is turned off
-  /// and the channels run again without it; a busy one is left for later.
+  /// and the channels run again without it; a busy one pauses categorizing
+  /// until it can be asked again; otherwise it's left for next time.
   void _stopped(AiTierFailure failure) {
     final status = ref.read(aiTierStatusProvider.notifier);
-    final name = switch (failure.service) {
-      AiService.jev => 'Jev',
-      AiService.claude => 'Claude',
-    };
-    // In a browser, a service still unreachable after its retries is taken
-    // to be refused by the browser: asking again would fail the same way.
-    final blocked = failure.failure is AiUnreachable && browser;
+    final service = failure.service;
+    final name = _nameOf(service);
+    void off(String notice) {
+      status.disable(service, notice);
+      // Turned off: the rest go on without it.
+      _requestRun();
+    }
+
     switch (failure.failure) {
       case AiKeyRejected():
-        status.disable(
-          failure.service,
+        off(
           "$name rejected its API key, so it's off. Check the key in "
           'Takeouts › AI categories.',
         );
-      case AiBillingProblem():
-        status.disable(
-          failure.service,
-          "$name's account needs credit, so it's off for now.",
+      case AiBillingProblem(:final message):
+        off(
+          "$name's account can't pay for more, so it's off for now: $message",
         );
-      case AiModelUnavailable():
-        status.disable(
-          failure.service,
-          "$name's model isn't available to this key, so it's off.",
-        );
+      case AiModelUnavailable(:final message):
+        off("$name's model can't be used, so it's off: $message");
       case AiBadRequest(:final message):
         // A request it can't read is one every channel's would be.
-        status.disable(
-          failure.service,
-          "$name turned down the request ($message), so it's off for now.",
-        );
-      case _ when blocked:
-        status.disable(
-          failure.service,
-          "$name can't be reached from the web app, so it's off here.",
-        );
-      default:
+        off("$name turned down the request ($message), so it's off for now.");
+      case AiUnexpected(:final message):
+        off("Something went wrong asking $name, so it's off for now: $message");
+      case AiUnreachable() when browser:
+        // In a browser, a service still unreachable after its retries is
+        // taken to be refused by the browser: asking again would fail the
+        // same way.
+        off("$name can't be reached from the web app, so it's off here.");
+      case AiUnreachable():
         status.note(
-          "$name couldn't be asked just now; the rest of the channels are "
+          "$name couldn't be reached; the rest of the channels are "
           'categorized next time.',
         );
-        return;
+      case AiRateLimited(:final resumeAt) || AiOverloaded(:final resumeAt):
+        final until = resumeAt ?? _now().add(_defaultPause);
+        _hold(service, until);
+        unawaited(
+          ref
+              .read(aiPauseRepositoryProvider)
+              .save(service, until, since: _now())
+              .catchError((Object _) {}),
+        );
+      case AiNoAnswer():
+        status.note(
+          "$name gave no usable answer; the rest of the channels are "
+          'categorized next time.',
+        );
     }
-    // Turned off: the rest go on without it.
-    _requestRun();
   }
+
+  /// Says categorizing stopped for [error], which no AI service explains,
+  /// never quoting a key.
+  void _crashed(Object error) {
+    final keys = ref.read(aiKeysProvider).value ?? AiKeys.none;
+    var failure = aiFailureOf(error, secret: keys.keyFor(AiService.jev));
+    failure = aiFailureOf(failure, secret: keys.keyFor(AiService.claude));
+    ref
+        .read(aiTierStatusProvider.notifier)
+        .note(
+          'Categorizing stopped after an error, and starts again next time: '
+          '${failure.message}',
+        );
+  }
+
+  /// Pauses categorizing, and [service]'s requests, until [until], saying
+  /// so, and resumes then.
+  void _hold(AiService service, DateTime until) {
+    _pausedUntil[service] = until;
+    switch (service) {
+      case AiService.jev:
+        ref.read(typeSafeRepositoryProvider).pauseUntil(until);
+      case AiService.claude:
+        ref.read(anthropicRepositoryProvider).pauseUntil(until);
+    }
+    _resumeTimers.remove(service)?.cancel();
+    final left = until.difference(_now());
+    _resumeTimers[service] = _timer(left.isNegative ? Duration.zero : left, () {
+      _endPause(service);
+      _requestRun();
+    });
+    final notice =
+        '${_nameOf(service)} asked to wait, so categorizing pauses; it '
+        'resumes at ${timeOfDay(until)}.';
+    _pauseNotices[service] = notice;
+    ref.read(aiTierStatusProvider.notifier).note(notice);
+  }
+
+  /// Ends [service]'s pause, if it has one, forgetting it and its notice.
+  void _endPause(AiService service) {
+    if (_pausedUntil.remove(service) == null) return;
+    _resumeTimers.remove(service)?.cancel();
+    switch (service) {
+      case AiService.jev:
+        ref.read(typeSafeRepositoryProvider).resume();
+      case AiService.claude:
+        ref.read(anthropicRepositoryProvider).resume();
+    }
+    unawaited(
+      ref
+          .read(aiPauseRepositoryProvider)
+          .clear(service)
+          .catchError((Object _) {}),
+    );
+    final notice = _pauseNotices.remove(service);
+    final status = ref.read(aiTierStatusProvider);
+    if (notice != null && status.notice == notice) {
+      ref.read(aiTierStatusProvider.notifier).dismiss();
+    }
+  }
+
+  /// Holds the services still paused from before the app was closed for
+  /// the time left, and forgets the pauses that have passed.
+  Future<void> _restorePauses(AiPauseRepository pauses) async {
+    final now = _now();
+    final Map<AiService, DateTime> kept;
+    try {
+      kept = await pauses.load(now: now);
+    } on Object {
+      return;
+    }
+    if (!ref.mounted) return;
+    for (final MapEntry(key: service, value: until) in kept.entries) {
+      if (until.isAfter(now)) {
+        _hold(service, until);
+      } else {
+        unawaited(pauses.clear(service).catchError((Object _) {}));
+      }
+    }
+  }
+
+  static String _nameOf(AiService service) => switch (service) {
+    AiService.jev => 'Jev',
+    AiService.claude => 'Claude',
+  };
 
   /// Whether a channel with the category [existing] could still use its
   /// topics: it has none yet, and the user didn't decide one.

@@ -13,6 +13,8 @@ part of 'channel_categorizer.dart';
 /// YouTube for the topics of channels it doesn't know them for. A category
 /// the user accepted or denied is never replaced. Starts over when the
 /// history, subscriptions or sign-in change, dropping the run under way.
+/// A service that asks to wait pauses categorizing, even across launches,
+/// and it resumes itself.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 
@@ -24,6 +26,8 @@ final channelCategorizerProvider = ChannelCategorizerProvider._();
 /// YouTube for the topics of channels it doesn't know them for. A category
 /// the user accepted or denied is never replaced. Starts over when the
 /// history, subscriptions or sign-in change, dropping the run under way.
+/// A service that asks to wait pauses categorizing, even across launches,
+/// and it resumes itself.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 final class ChannelCategorizerProvider
@@ -33,6 +37,8 @@ final class ChannelCategorizerProvider
   /// YouTube for the topics of channels it doesn't know them for. A category
   /// the user accepted or denied is never replaced. Starts over when the
   /// history, subscriptions or sign-in change, dropping the run under way.
+  /// A service that asks to wait pauses categorizing, even across launches,
+  /// and it resumes itself.
   ///
   /// A service: nothing depends on it, so it can read any provider.
   ChannelCategorizerProvider._()
@@ -63,13 +69,15 @@ final class ChannelCategorizerProvider
 }
 
 String _$channelCategorizerHash() =>
-    r'430522a69da7a948d3891c791832abd2b15dfdd0';
+    r'57864721cc443ae979901cd8c2100d0efe130b4f';
 
 /// Categorizes the channels watched and subscribed to, the most watched
 /// first, once the history screen has been opened. Signed in, it first asks
 /// YouTube for the topics of channels it doesn't know them for. A category
 /// the user accepted or denied is never replaced. Starts over when the
 /// history, subscriptions or sign-in change, dropping the run under way.
+/// A service that asks to wait pauses categorizing, even across launches,
+/// and it resumes itself.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 

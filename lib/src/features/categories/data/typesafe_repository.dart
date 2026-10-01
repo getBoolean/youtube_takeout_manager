@@ -193,6 +193,9 @@ class TypeSafeRepository {
   /// for before the app was closed.
   void pauseUntil(DateTime until) => _pacer.pauseUntil(until);
 
+  /// Ends a pause now, e.g. for a new key.
+  void resume() => _pacer.resume();
+
   /// What Jev's [response] comes to, [answer] reading a 200's body.
   static AiReply<T> _reply<T>(
     http.Response response,

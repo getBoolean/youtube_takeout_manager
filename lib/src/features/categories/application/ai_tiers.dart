@@ -1,6 +1,8 @@
+import 'package:intl/intl.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
+import '../data/ai_errors.dart';
 
 part 'ai_tiers.g.dart';
 
@@ -32,10 +34,20 @@ class AiTierStatus extends _$AiTierStatus {
   void dismiss() => state = (disabled: state.disabled, notice: null);
 }
 
+/// When [failure] says its service can be asked again, if it says.
+DateTime? resumeAtOf(AiFailure failure) => switch (failure) {
+  AiRateLimited(:final resumeAt) || AiOverloaded(:final resumeAt) => resumeAt,
+  _ => null,
+};
+
+/// [time] as a time of day where the user is, e.g. to say when a service
+/// can be asked again.
+String timeOfDay(DateTime time) => DateFormat.jm().format(time.toLocal());
+
 /// An AI step that failed, and which service it was.
 class AiTierFailure implements Exception {
   final AiService service;
-  final Object failure;
+  final AiFailure failure;
 
   const AiTierFailure(this.service, this.failure);
 

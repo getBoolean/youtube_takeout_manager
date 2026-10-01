@@ -38,10 +38,16 @@ final _suggestion = ChannelCategory(
 /// Asks no AI: suggests [suggestion], or fails with [failure] the first
 /// [failures] times, and keeps what the user decided.
 class _Categorizer extends ChannelCategorizer {
-  _Categorizer({this.askable = true, this.failures = 0, this.hold});
+  _Categorizer({
+    this.askable = true,
+    this.failures = 0,
+    this.hold,
+    this.failure = const AiTierFailure(AiService.claude, AiOverloaded()),
+  });
 
   final bool askable;
   int failures;
+  final AiTierFailure failure;
   final Completer<void>? hold;
   final accepted = <ChannelCategory>[];
   var denied = 0;
@@ -59,7 +65,7 @@ class _Categorizer extends ChannelCategorizer {
     await hold?.future;
     if (failures > 0) {
       failures--;
-      throw const AiTierFailure(AiService.claude, AiOverloaded());
+      throw failure;
     }
     return _suggestion;
   }
@@ -181,6 +187,28 @@ void main() {
     await tapKey(tester, CategoryAskPage.retryKey);
     expect(categorizer.asked, 2);
     expect(find.byKey(CategoryAskPage.acceptKey), findsOneWidget);
+  });
+
+  testWidgets('a request refused while the service asks to wait says when '
+      'to try again', (tester) async {
+    await open(
+      tester,
+      using: _Categorizer(
+        failures: 1,
+        failure: AiTierFailure(
+          AiService.claude,
+          AiRateLimited(
+            'Too many requests for now.',
+            DateTime(2026, 10, 1, 15, 45),
+          ),
+        ),
+      ),
+    );
+
+    await tapKey(tester, CategorySheet.askAiKey);
+
+    final failure = tester.widget<Text>(find.byKey(CategoryAskPage.failureKey));
+    expect(failure.data, contains('3:45'));
   });
 
   testWidgets('without AI keys, asking AI is locked, and opens where keys '

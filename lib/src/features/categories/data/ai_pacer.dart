@@ -46,6 +46,9 @@ abstract class AiPacer {
     _pausedUntil = until;
   }
 
+  /// Ends a pause now, e.g. for a new key, which the pause wasn't for.
+  void resume() => _pausedUntil = null;
+
   /// Waits for a turn to send a request of about [tokens]. Throws
   /// [AiRateLimited], with when to resume, when that's further off than
   /// [longestWait].
