@@ -95,6 +95,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   final _resumeTimers = <AiService, Timer>{};
   final _pauseNotices = <AiService, String>{};
 
+  /// The emoji AI gave new sub-categories it suggested, by path, for when
+  /// the suggestion is taken.
+  final _suggestedEmoji = <CategoryPath, String>{};
+
+  /// The emoji AI gave [path], a new sub-category it suggested, if any.
+  String? suggestedEmoji(CategoryPath path) => _suggestedEmoji[path];
+
   @override
   void build() {
     ref.onDispose(() {
@@ -366,7 +373,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final current = (await ref.read(
       channelCategoriesProvider.future,
     ))[channel.key];
-    return pipeline.suggestInstead(
+    final suggestion = await pipeline.suggestInstead(
       _inputFor(
         channel,
         loaded,
@@ -376,57 +383,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       ),
       current?.path,
     );
-  }
-
-  /// Makes [suggestion] [channel]'s category, as the user chose, keeping a
-  /// new sub-category it names.
-  Future<void> accept(
-    HistoryChannel channel,
-    ChannelCategory suggestion,
-  ) async {
-    await ref.read(customCategoriesProvider.future);
-    // As spelled where it's there already, else added.
-    final taxonomy = ref.read(categoryTaxonomyProvider);
-    var path = suggestion.path;
-    if (path != null) {
-      path = taxonomy.find(path.parent, path.child) ?? path;
-      if (path.child case final child? when !taxonomy.contains(path)) {
-        path = CategoryPath(
-          path.parent,
-          await ref
-              .read(customCategoriesProvider.notifier)
-              .add(path.parent, child),
-        );
-      }
+    for (final (:path, :emoji) in pipeline.takeLearned()) {
+      if (emoji != null) _suggestedEmoji[path] = emoji;
     }
-    await ref
-        .read(channelCategoriesProvider.notifier)
-        .decide(
-          channel.key,
-          suggestion.copyWith(
-            path: path,
-            userDecision: UserDecision.accepted,
-            decidedAt: DateTime.now().toUtc(),
-          ),
-        );
-  }
-
-  /// Keeps [channel]'s category as it is, as the user chose: nothing
-  /// replaces it.
-  Future<void> deny(HistoryChannel channel) async {
-    final now = DateTime.now().toUtc();
-    final current = (await ref.read(
-      channelCategoriesProvider.future,
-    ))[channel.key];
-    await ref
-        .read(channelCategoriesProvider.notifier)
-        .decide(
-          channel.key,
-          (current ?? ChannelCategory(decidedAt: now)).copyWith(
-            userDecision: UserDecision.denied,
-            decidedAt: now,
-          ),
-        );
+    return suggestion;
   }
 
   /// A pipeline with the steps there are keys for, Claude only [withClaude],

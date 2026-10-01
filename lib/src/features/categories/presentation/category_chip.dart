@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import '../application/category_editor.dart';
 import '../application/channel_categories.dart';
-import '../application/channel_categorizer.dart';
 import 'category_sheet.dart';
 
 /// A channel's category as a small tonal pill, marked when an AI chose it;
@@ -52,13 +52,13 @@ class ChannelCategoryChip extends ConsumerWidget {
         child: InkWell(
           onTap: () async {
             // Read now: the chip may be gone once the modal closes.
-            final categorizer = ref.read(channelCategorizerProvider.notifier);
+            final editor = ref.read(categoryEditorProvider.notifier);
             final result = await showCategorySheet(context, channel: channel);
             switch (result) {
               case AcceptedSuggestion(:final suggestion):
-                await categorizer.accept(channel, suggestion);
+                await editor.accept(channel, suggestion);
               case KeptCategory():
-                await categorizer.deny(channel);
+                await editor.deny(channel);
               case null:
                 break;
             }

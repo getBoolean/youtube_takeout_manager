@@ -14,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/ai_t
 import 'package:youtube_takeout_manager/src/features/categories/application/categorization_progress.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/categorizing_channels.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/category_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
@@ -710,7 +711,7 @@ void main() {
       expect(claude.asked, isNotEmpty);
 
       const topicless = HistoryChannel(channelId: 'UCx', title: 'No topics');
-      await c.read(channelCategorizerProvider.notifier).deny(topicless);
+      await c.read(categoryEditorProvider.notifier).deny(topicless);
       hold.complete();
       await _settle();
 
@@ -795,13 +796,46 @@ void main() {
       final suggestion = await categorizer.suggest(gamer);
       expect(suggestion.path, const CategoryPath('Gaming', 'Speedruns'));
       expect(claude.asked.last, contains('Gaming › Action'));
-      await categorizer.accept(gamer, suggestion);
+      await c.read(categoryEditorProvider.notifier).accept(gamer, suggestion);
 
       final kept = c.read(channelCategoriesProvider).value?['UCg'];
       expect(kept?.path, const CategoryPath('Gaming', 'Speedruns'));
       expect(kept?.userDecision, UserDecision.accepted);
       expect(await c.read(customCategoriesProvider.future), contains('Gaming'));
     });
+
+    test(
+      'accepting a new sub-category AI suggests keeps the emoji it gave',
+      () async {
+        final claude = _Claude({
+          'parent': 'Gaming',
+          'child': 'Retro',
+          'emoji': '👾',
+          'reason': 'Old games',
+        });
+        // Only Gamer, whose topics name a sub-category: the run asks Claude
+        // for its tags alone, so only asking AI names Retro.
+        final c = container(
+          details: known,
+          keys: claudeKey,
+          claude: claude,
+          history: TakeoutHistory(watches: [_watch('UCg', 'Gamer')]),
+        );
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        expect(await c.read(customCategoriesProvider.future), isEmpty);
+        const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
+
+        final suggestion = await c
+            .read(channelCategorizerProvider.notifier)
+            .suggest(gamer);
+        await c.read(categoryEditorProvider.notifier).accept(gamer, suggestion);
+
+        expect((await c.read(customCategoriesProvider.future))['Gaming'], [
+          const SubCategory(name: 'Retro', emoji: '👾'),
+        ]);
+      },
+    );
 
     test("accepting a variant of a sub-category there is keeps that one's "
         'spelling, and adds none', () async {
@@ -811,26 +845,29 @@ void main() {
       await c
           .read(customCategoriesProvider.notifier)
           .add('Gaming', 'Speedruns');
-      final categorizer = c.read(channelCategorizerProvider.notifier);
       const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
       const singer = HistoryChannel(channelId: 'UCs', title: 'Singer');
 
-      await categorizer.accept(
-        gamer,
-        ChannelCategory(
-          path: const CategoryPath('Gaming', 'speed-runs'),
-          source: CategorySource.claude,
-          decidedAt: DateTime.utc(2026, 10),
-        ),
-      );
-      await categorizer.accept(
-        singer,
-        ChannelCategory(
-          path: const CategoryPath('Music', 'Hip-Hop'),
-          source: CategorySource.claude,
-          decidedAt: DateTime.utc(2026, 10),
-        ),
-      );
+      await c
+          .read(categoryEditorProvider.notifier)
+          .accept(
+            gamer,
+            ChannelCategory(
+              path: const CategoryPath('Gaming', 'speed-runs'),
+              source: CategorySource.claude,
+              decidedAt: DateTime.utc(2026, 10),
+            ),
+          );
+      await c
+          .read(categoryEditorProvider.notifier)
+          .accept(
+            singer,
+            ChannelCategory(
+              path: const CategoryPath('Music', 'Hip-Hop'),
+              source: CategorySource.claude,
+              decidedAt: DateTime.utc(2026, 10),
+            ),
+          );
 
       expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Speedruns'));
       expect(paths(c)['UCs'], const CategoryPath('Music', 'Hip hop'));
@@ -863,10 +900,9 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
-      final categorizer = c.read(channelCategorizerProvider.notifier);
       const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
 
-      await categorizer.deny(gamer);
+      await c.read(categoryEditorProvider.notifier).deny(gamer);
       c.read(_keys.notifier).set(const AiKeys(anthropic: 'sk-ant-2'));
       await _settle();
 

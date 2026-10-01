@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/authentication/data/credential_store.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/ai_tiers.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/category_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
@@ -35,8 +36,23 @@ final _suggestion = ChannelCategory(
   decidedAt: DateTime.utc(2026, 9, 30),
 );
 
+/// Keeps what the user decided, and nothing else.
+class _Editor extends CategoryEditor {
+  final accepted = <ChannelCategory>[];
+  var denied = 0;
+
+  @override
+  Future<void> accept(
+    HistoryChannel channel,
+    ChannelCategory suggestion,
+  ) async => accepted.add(suggestion);
+
+  @override
+  Future<void> deny(HistoryChannel channel) async => denied++;
+}
+
 /// Asks no AI: suggests [suggestion], or fails with [failure] the first
-/// [failures] times, and keeps what the user decided.
+/// [failures] times.
 class _Categorizer extends ChannelCategorizer {
   _Categorizer({
     this.askable = true,
@@ -49,8 +65,6 @@ class _Categorizer extends ChannelCategorizer {
   int failures;
   final AiTierFailure failure;
   final Completer<void>? hold;
-  final accepted = <ChannelCategory>[];
-  var denied = 0;
   var asked = 0;
 
   @override
@@ -69,15 +83,6 @@ class _Categorizer extends ChannelCategorizer {
     }
     return _suggestion;
   }
-
-  @override
-  Future<void> accept(
-    HistoryChannel channel,
-    ChannelCategory suggestion,
-  ) async => accepted.add(suggestion);
-
-  @override
-  Future<void> deny(HistoryChannel channel) async => denied++;
 }
 
 class _Categories extends ChannelCategories {
@@ -91,6 +96,7 @@ class _Categories extends ChannelCategories {
 
 void main() {
   late _Categorizer categorizer;
+  late _Editor editor;
 
   setUp(() => FlutterSecureStorage.setMockInitialValues({}));
 
@@ -103,10 +109,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     categorizer = using ?? _Categorizer();
+    editor = _Editor();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           channelCategorizerProvider.overrideWith(() => categorizer),
+          categoryEditorProvider.overrideWith(() => editor),
           channelCategoriesProvider.overrideWith(
             () => _Categories({'UCg': category ?? _youtube}),
           ),
@@ -146,7 +154,7 @@ void main() {
     expect(categorizer.asked, 1);
     await tapKey(tester, CategoryAskPage.acceptKey);
 
-    expect(categorizer.accepted, [_suggestion]);
+    expect(editor.accepted, [_suggestion]);
     expect(find.byType(CategorySheet), findsNothing);
   });
 
@@ -157,8 +165,8 @@ void main() {
     await tapKey(tester, CategorySheet.askAiKey);
     await tapKey(tester, CategoryAskPage.denyKey);
 
-    expect(categorizer.denied, 1);
-    expect(categorizer.accepted, isEmpty);
+    expect(editor.denied, 1);
+    expect(editor.accepted, isEmpty);
   });
 
   testWidgets('while AI is asked, progress shows', (tester) async {
