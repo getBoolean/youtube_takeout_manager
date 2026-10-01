@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/application/category_pipeline.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
@@ -85,12 +87,18 @@ class _Jev extends TypeSafeRepository {
   }
 }
 
-/// Claude, answering with [answer], and keeping what it was asked.
+/// Claude, answering a category request with [answer] and a tags-only one
+/// with [tags], or failing with [failure], and keeping what it was asked.
 class _Claude extends AnthropicRepository {
-  _Claude(this.answer);
+  _Claude(this.answer, {this.tags = const [], this.failure});
 
   final Map<String, Object?> answer;
+  final List<Object?> tags;
+  final AiFailure? failure;
   final asked = <String>[];
+
+  /// What each request asked for: 'category' or 'tags'.
+  final kinds = <String>[];
 
   @override
   Future<Map<String, Object?>> structured({
@@ -101,14 +109,28 @@ class _Claude extends AnthropicRepository {
     required Map<String, Object?> schema,
   }) async {
     asked.add(user);
-    return answer;
+    final tagsOnly = !(schema['properties']! as Map).containsKey('parent');
+    kinds.add(tagsOnly ? 'tags' : 'category');
+    if (failure case final failure?) throw failure;
+    return tagsOnly ? {'tags': tags} : answer;
   }
 }
 
-CategoryPipeline _withClaude(_Claude claude, {_Jev? jev}) => CategoryPipeline(
+/// Fingerprints that name their step, so a result's are easy to read.
+final _fingerprints = {
+  for (final step in PromptStep.values) step: 'fp-${step.name}',
+};
+
+CategoryPipeline _withClaude(
+  _Claude claude, {
+  _Jev? jev,
+  Map<String, String> tagSpellings = const {},
+}) => CategoryPipeline(
   taxonomy: youtubeTaxonomy.withCustom({
     'Gaming': ['Speedruns'],
   }),
+  tagSpellings: tagSpellings,
+  fingerprints: _fingerprints,
   jev: jev == null ? null : (repository: jev, apiKey: 'jv_live_1'),
   claude: (
     repository: claude,
@@ -134,6 +156,7 @@ CategoryPipeline _pipeline(_Jev jev) => CategoryPipeline(
   taxonomy: youtubeTaxonomy.withCustom({
     'Gaming': ['Speedruns'],
   }),
+  fingerprints: _fingerprints,
   jev: (repository: jev, apiKey: 'jv_live_1'),
 );
 
@@ -289,34 +312,37 @@ void main() {
       expect(pipeline.takeLearned(), isEmpty);
     });
 
-    test('is not asked when Jev agrees', () async {
-      final claude = _Claude({'parent': 'Music', 'child': null, 'reason': ''});
+    test('is asked only for tags when Jev agrees, and they come with the '
+        'category', () async {
+      final claude = _Claude(
+        {'parent': 'Music', 'child': null, 'reason': ''},
+        tags: ['Mario Kart World', 'Speedruns'],
+      );
 
-      await _withClaude(
+      final category = await _withClaude(
         claude,
         jev: _Jev(fits: {'Gaming › Action': 0.9}),
       ).categorize(_input(topics: [_topic('Action_game')]));
 
-      expect(claude.asked, isEmpty);
+      expect(claude.kinds, ['tags']);
+      expect(claude.asked.single, contains('Gaming › Action'));
+      expect(category.path, const CategoryPath('Gaming', 'Action'));
+      expect(category.tags, ['Mario Kart World', 'Speedruns']);
+      expect(category.tagsTried, isTrue);
+      expect(category.tagsPrompt, 'fp-claudeTags');
     });
 
-    test(
-      'without Jev, is not asked when YouTube gives a sub-category',
-      () async {
-        final claude = _Claude({
-          'parent': 'Music',
-          'child': null,
-          'reason': '',
-        });
+    test('without Jev, is asked only for tags when YouTube gives a '
+        'sub-category', () async {
+      final claude = _Claude({'parent': 'Music', 'child': null, 'reason': ''});
 
-        final category = await _withClaude(
-          claude,
-        ).categorize(_input(topics: [_topic('Action_game')]));
+      final category = await _withClaude(
+        claude,
+      ).categorize(_input(topics: [_topic('Action_game')]));
 
-        expect(category.path, const CategoryPath('Gaming', 'Action'));
-        expect(claude.asked, isEmpty);
-      },
-    );
+      expect(category.path, const CategoryPath('Gaming', 'Action'));
+      expect(claude.kinds, ['tags']);
+    });
 
     test('without Jev, names the category YouTube gives none for', () async {
       final claude = _Claude({
@@ -346,7 +372,7 @@ void main() {
         category.path,
         const CategoryPath('Gaming', 'Retro game speedruns'),
       );
-      expect(pipeline.takeLearned(), [category.path]);
+      expect(pipeline.takeLearned(), [(path: category.path!, emoji: null)]);
       expect(
         pipeline.taxonomy.childrenOf('Gaming'),
         contains('Retro game speedruns'),
@@ -416,6 +442,152 @@ void main() {
       expect(suggestion.source, CategorySource.claude);
       expect(claude.asked.single, contains('Gaming › Action'));
     });
+  });
+
+  group('tags', () {
+    test('come with the category when Claude names it, in one call', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'Speedruns',
+        'reason': 'Races',
+        'tags': ['Super Metroid', 'Any%'],
+      });
+
+      final category = await _withClaude(claude).categorize(_input());
+
+      expect(claude.kinds, ['category']);
+      expect(category.tags, ['Super Metroid', 'Any%']);
+      expect(category.tagsPrompt, 'fp-claudeCategory');
+    });
+
+    test('are spelled as the tags there are', () async {
+      final claude = _Claude({
+        'parent': 'Gaming',
+        'child': 'Speedruns',
+        'reason': 'Races',
+        'tags': ['mario-kart world'],
+      });
+
+      final category = await _withClaude(
+        claude,
+        tagSpellings: {'mariokartworld': 'Mario Kart World'},
+      ).categorize(_input());
+
+      expect(category.tags, ['Mario Kart World']);
+    });
+
+    test('are none, and not tried, without Claude', () async {
+      final category = await _pipeline(
+        _Jev(fits: {'Gaming › Action': 0.9}),
+      ).categorize(_input(topics: [_topic('Action_game')]));
+
+      expect(category.tags, isEmpty);
+      expect(category.tagsTried, isFalse);
+      expect(category.tagsPrompt, isNull);
+    });
+
+    test("alone keep the channel's category", () async {
+      final claude = _Claude({}, tags: ['ASMR']);
+      final current = ChannelCategory(
+        path: const CategoryPath('Music', 'Jazz'),
+        source: CategorySource.user,
+        decidedAt: DateTime.utc(2026, 10, 1),
+      );
+
+      final tagged = await _withClaude(claude).retag(_input(), current);
+
+      expect(tagged.path, const CategoryPath('Music', 'Jazz'));
+      expect(tagged.source, CategorySource.user);
+      expect(tagged.tags, ['ASMR']);
+      expect(tagged.tagsTried, isTrue);
+      expect(claude.asked.single, contains('Music › Jazz'));
+    });
+
+    test('alone, with no usable answer, are none, but tried', () async {
+      final claude = _Claude({}, failure: const AiNoAnswer());
+      final current = ChannelCategory(
+        path: const CategoryPath('Music'),
+        decidedAt: DateTime.utc(2026, 10, 1),
+      );
+
+      final tagged = await _withClaude(claude).retag(_input(), current);
+
+      expect(tagged.tags, isEmpty);
+      expect(tagged.tagsTried, isTrue);
+      expect(tagged.tagsPrompt, 'fp-claudeTags');
+    });
+  });
+
+  group('each result keeps the fingerprints of the prompts asked', () {
+    test("none for YouTube's alone", () async {
+      final category = await CategoryPipeline(
+        taxonomy: youtubeTaxonomy,
+        fingerprints: _fingerprints,
+      ).categorize(_input(topics: [_topic('Action_game')]));
+
+      expect(category.prompts, isEmpty);
+    });
+
+    test("Jev's check, when it agrees", () async {
+      final category = await _pipeline(
+        _Jev(fits: {'Gaming › Action': 0.9}),
+      ).categorize(_input(topics: [_topic('Action_game')]));
+
+      expect(category.prompts, {'jevCheck': 'fp-jevCheck'});
+    });
+
+    test("Jev's check and pick, when it picks", () async {
+      final category = await _pipeline(
+        _Jev(
+          fits: {'Gaming › Action': 0.1},
+          parent: {'Gaming': 0.9},
+          child: {'Speedruns': 0.9},
+        ),
+      ).categorize(_input(topics: [_topic('Action_game')]));
+
+      expect(category.prompts, {
+        'jevCheck': 'fp-jevCheck',
+        'jevPick': 'fp-jevPick',
+      });
+    });
+
+    test("every step, when Claude names a new one Jev checks", () async {
+      final category = await _withClaude(
+        _Claude({
+          'parent': 'Gaming',
+          'child': 'Speedrunning',
+          'reason': 'Races',
+        }),
+        jev: _Jev(
+          parent: {'Gaming': 0.5, 'Music': 0.5},
+          child: {'Speedruns': 0.5, 'Action': 0.5},
+        ),
+      ).categorize(_input());
+
+      expect(category.prompts.keys.toSet(), {
+        'jevCheck',
+        'jevPick',
+        'claudeCategory',
+        'jevNameCheck',
+      });
+    });
+  });
+
+  test('a new sub-category Claude names keeps its emoji', () async {
+    final pipeline = _withClaude(
+      _Claude({
+        'parent': 'Gaming',
+        'child': 'Retro',
+        'emoji': '👾',
+        'reason': 'Old games',
+      }),
+    );
+
+    await pipeline.categorize(_input());
+
+    expect(pipeline.takeLearned(), [
+      (path: const CategoryPath('Gaming', 'Retro'), emoji: '👾'),
+    ]);
   });
 
   test('asked again with only Jev, Jev picks something other than the '

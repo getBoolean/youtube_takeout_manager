@@ -484,10 +484,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
 
   /// Keeps the sub-categories [pipeline] learned, for later channels.
   Future<void> _keepLearned(CategoryPipeline pipeline) async {
-    for (final path in pipeline.takeLearned()) {
+    for (final (:path, :emoji) in pipeline.takeLearned()) {
       await ref
           .read(customCategoriesProvider.notifier)
-          .add(path.parent, path.child!);
+          .add(path.parent, path.child!, emoji: emoji);
     }
   }
 
