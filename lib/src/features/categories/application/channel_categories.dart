@@ -2,6 +2,8 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../data/channel_category_repository.dart';
 import '../domain/ai_result_merge.dart';
+import '../domain/category_emoji.dart';
+import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_key.dart';
 import '../domain/sub_category.dart';
@@ -109,6 +111,14 @@ class CustomCategories extends _$CustomCategories {
     state = AsyncData(custom);
     await _repository.saveCustomChildren(custom);
   }
+}
+
+/// Each category's emoji: its sub-category's, YouTube's or as kept with
+/// it, else its category's.
+@riverpod
+String Function(CategoryPath? path) categoryEmojiOf(Ref ref) {
+  final custom = ref.watch(customCategoriesProvider).value ?? const {};
+  return (path) => emojiOf(path, custom: custom);
 }
 
 /// Every category: YouTube's, with the sub-categories made for channels

@@ -76,6 +76,19 @@ void main() {
     });
   });
 
+  test("a sub-category's emoji shows once it's added", () async {
+    final c = _container();
+    c.listen(categoryEmojiOfProvider, (_, _) {});
+    await c
+        .read(customCategoriesProvider.notifier)
+        .add('Gaming', 'Retro', emoji: '👾');
+
+    expect(
+      c.read(categoryEmojiOfProvider)(const CategoryPath('Gaming', 'Retro')),
+      '👾',
+    );
+  });
+
   test('replacing every category keeps them on this device', () async {
     final first = _container();
     await first.read(channelCategoriesProvider.future);

@@ -142,6 +142,63 @@ abstract class _$CustomCategories
   }
 }
 
+/// Each category's emoji: its sub-category's, YouTube's or as kept with
+/// it, else its category's.
+
+@ProviderFor(categoryEmojiOf)
+final categoryEmojiOfProvider = CategoryEmojiOfProvider._();
+
+/// Each category's emoji: its sub-category's, YouTube's or as kept with
+/// it, else its category's.
+
+final class CategoryEmojiOfProvider
+    extends
+        $FunctionalProvider<
+          String Function(CategoryPath? path),
+          String Function(CategoryPath? path),
+          String Function(CategoryPath? path)
+        >
+    with $Provider<String Function(CategoryPath? path)> {
+  /// Each category's emoji: its sub-category's, YouTube's or as kept with
+  /// it, else its category's.
+  CategoryEmojiOfProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'categoryEmojiOfProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$categoryEmojiOfHash();
+
+  @$internal
+  @override
+  $ProviderElement<String Function(CategoryPath? path)> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  String Function(CategoryPath? path) create(Ref ref) {
+    return categoryEmojiOf(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(String Function(CategoryPath? path) value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<String Function(CategoryPath? path)>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$categoryEmojiOfHash() => r'3371fa85e34c69b601fafa80b72a9c545e00b87b';
+
 /// Every category: YouTube's, with the sub-categories made for channels
 /// they don't fit.
 
