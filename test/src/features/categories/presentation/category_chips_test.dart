@@ -170,6 +170,17 @@ void main() {
     );
   });
 
+  testWidgets('a screen reader can open the chip', (tester) async {
+    final semantics = tester.ensureSemantics();
+    await _pump(tester, categories: {'UCg': _category()});
+
+    tester.semantics.tap(find.semantics.byLabel(RegExp('Category')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(CategoryWindow.youtubeSourceKey), findsOneWidget);
+    semantics.dispose();
+  });
+
   testWidgets('tapping the chip opens it, not what it sits in', (tester) async {
     var outer = 0;
     await _pump(

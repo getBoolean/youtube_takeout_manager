@@ -42,8 +42,11 @@ class ChannelCategoryChips extends ConsumerWidget {
       _ => "from YouTube's topics",
     };
 
+    void open() => showCategoryWindow(context, channel: channel);
     return Semantics(
       button: true,
+      // Its own, since the button's below are left out.
+      onTap: open,
       label: [
         if (showCategory)
           source == null ? 'Uncategorized' : 'Category $label, $source',
@@ -55,7 +58,7 @@ class ChannelCategoryChips extends ConsumerWidget {
         child: InkWell(
           key: tapKey,
           borderRadius: BorderRadius.circular(8),
-          onTap: () => showCategoryWindow(context, channel: channel),
+          onTap: open,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: 48),
             child: Align(
