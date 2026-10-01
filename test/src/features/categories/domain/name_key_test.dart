@@ -29,12 +29,17 @@ void main() {
       expect(nameKey('कला'), isNot(nameKey('काला')));
     });
 
+    test('symbols, which are no punctuation', () {
+      expect(nameKey('C++'), isNot(nameKey('C#')));
+      expect(nameKey('C++'), nameKey('c ++'));
+    });
+
     test('letters in another script', () {
       expect(nameKey('Аниме'), isNot(nameKey('Anime')));
     });
   });
 
-  test('a name of only symbols keeps a key of its own', () {
+  test('a name of only punctuation keeps a key of its own', () {
     expect(nameKey('!!!'), isNotEmpty);
     expect(nameKey('!!!'), isNot(nameKey('???')));
   });

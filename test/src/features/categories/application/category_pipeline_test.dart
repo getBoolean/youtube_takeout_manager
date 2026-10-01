@@ -435,4 +435,101 @@ void main() {
     final childOptions = (jev.requests.last['child']! as JevChoice).options;
     expect(childOptions.values, isNot(contains('Action')));
   });
+
+  group("Jev's options", () {
+    /// A pipeline over Knowledge with [children], asking [jev], with
+    /// [usage] channels per path.
+    CategoryPipeline knowledge(
+      List<String> children,
+      _Jev jev, {
+      Map<CategoryPath, int> usage = const {},
+      _Claude? claude,
+    }) => CategoryPipeline(
+      taxonomy: youtubeTaxonomy.withCustom({'Knowledge': children}),
+      usage: usage,
+      jev: (repository: jev, apiKey: 'jv_live_1'),
+      claude: claude == null
+          ? null
+          : (
+              repository: claude,
+              apiKey: 'sk-ant-1',
+              model: const ModelCapabilities(
+                id: 'claude-haiku-4-5',
+                structuredOutputs: true,
+                lowEffort: false,
+              ),
+            ),
+    );
+
+    JevChoice asked(_Jev jev, String question) =>
+        jev.requests.lastWhere(
+              (request) => request.containsKey(question),
+            )[question]!
+            as JevChoice;
+
+    test('names that read alike as keys are options of their own, and a '
+        'pick maps back to the one picked', () async {
+      final jev = _Jev(parent: {'Knowledge': 0.9}, child: {'C++': 0.9});
+
+      final category = await knowledge(['C#', 'C++'], jev).categorize(_input());
+
+      expect(category.path, const CategoryPath('Knowledge', 'C++'));
+      expect(asked(jev, 'child').options.values, containsAll(['C#', 'C++']));
+    });
+
+    test('names in other scripts are options of their own', () async {
+      final jev = _Jev(parent: {'Knowledge': 0.9}, child: {'Химия': 0.9});
+
+      final category = await knowledge([
+        'Физика',
+        'Химия',
+      ], jev).categorize(_input());
+
+      expect(category.path, const CategoryPath('Knowledge', 'Химия'));
+      expect(
+        asked(jev, 'child').options.values,
+        containsAll(['Физика', 'Химия']),
+      );
+    });
+
+    test('a category with more sub-categories than Jev takes offers the '
+        'most used, and "none of these"', () async {
+      final topics = [for (var i = 1; i <= 300; i++) 'Topic $i'];
+      final jev = _Jev(parent: {'Knowledge': 0.9}, child: {'Topic 300': 0.9});
+
+      final category = await knowledge(
+        topics,
+        jev,
+        usage: {const CategoryPath('Knowledge', 'Topic 300'): 9},
+      ).categorize(_input());
+
+      final options = asked(jev, 'child').options;
+      expect(options, hasLength(JevChoice.maxOptions));
+      expect(options.keys, contains('_none'));
+      expect(options.values, contains('Topic 300'));
+      expect(options.values, isNot(contains('Topic 299')));
+      expect(category.path, const CategoryPath('Knowledge', 'Topic 300'));
+    });
+
+    test("Jev's check of a name Claude gives offers at most as many as it "
+        'takes', () async {
+      final topics = [for (var i = 1; i <= 300; i++) 'Topic $i'];
+      final jev = _Jev(parent: {'Knowledge': 0.5, 'Music': 0.5});
+
+      await knowledge(
+        topics,
+        jev,
+        claude: _Claude({
+          'parent': 'Knowledge',
+          'child': 'Something new',
+          'reason': 'New',
+        }),
+      ).categorize(_input());
+
+      expect(
+        asked(jev, 'same').options.length,
+        lessThanOrEqualTo(JevChoice.maxOptions),
+      );
+    });
+  });
 }

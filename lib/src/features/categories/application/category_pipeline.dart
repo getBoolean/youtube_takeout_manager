@@ -43,6 +43,9 @@ const _maxChildren = 200;
 /// The option for "none of these sub-categories fits better".
 const _general = '_none';
 
+/// Sub-categories offered Jev at most, leaving room for [_general].
+const _maxOffered = JevChoice.maxOptions - 1;
+
 /// Jev's pick: a category, how sure it is, and what came next.
 typedef _Pick = ({CategoryPath path, double score, List<ScoredPath> runnersUp});
 
@@ -56,17 +59,23 @@ typedef _Pick = ({CategoryPath path, double score, List<ScoredPath> runnersUp});
 /// channel keeps YouTube's category, the step counted as tried.
 class CategoryPipeline {
   Taxonomy _taxonomy;
+  final Map<CategoryPath, int> _usage;
   final JevAccess? jev;
   final ClaudeAccess? claude;
   final DateTime Function() _now;
   final _learned = <CategoryPath>[];
 
+  /// Picks from [taxonomy]; [usage], how many channels have each category,
+  /// decides which sub-categories Jev is offered when there are more than it
+  /// takes.
   CategoryPipeline({
     required Taxonomy taxonomy,
+    Map<CategoryPath, int> usage = const {},
     this.jev,
     this.claude,
     DateTime Function()? now,
   }) : _taxonomy = taxonomy,
+       _usage = usage,
        _now = now ?? DateTime.now;
 
   /// The categories it picks from, with the sub-categories Claude added.
@@ -203,16 +212,19 @@ class CategoryPipeline {
     );
   }
 
+  /// The categories as Jev's options, by key: the same keys each time.
+  Map<String, String> get _parentOptions => _optionKeys(_taxonomy.parents);
+
   JevChoice _parentQuestion({CategoryPath? exclude}) => JevChoice(
     'Which category best describes the videos this channel makes and the '
     'ones the user watched from it?',
     {
-      for (final parent in _taxonomy.parents)
+      for (final MapEntry(key: key, value: parent) in _parentOptions.entries)
         // A category with no sub-categories to pick instead is left out.
         if (!(exclude?.parent == parent &&
             exclude?.child == null &&
             _taxonomy.childrenOf(parent).isEmpty))
-          _key(parent): _describe(parent),
+          key: _describe(parent),
     },
   );
 
@@ -224,9 +236,7 @@ class CategoryPipeline {
     JevAnswer? parentAnswer, {
     CategoryPath? exclude,
   }) async {
-    final parents = {
-      for (final parent in _taxonomy.parents) _key(parent): parent,
-    };
+    final parents = _parentOptions;
     parentAnswer ??= (await _askJev(jev, state, {
       'parent': _parentQuestion(exclude: exclude),
     }))['parent'];
@@ -242,11 +252,12 @@ class CategoryPipeline {
           ScoredPath(path: CategoryPath(parents[key]!), score: value),
     ]..sort((a, b) => b.score.compareTo(a.score));
 
-    final children = {
-      for (final child in _taxonomy.childrenOf(parent))
-        if (!(exclude?.parent == parent && exclude?.child == child))
-          _key(child): child,
-    };
+    final children = _optionKeys(
+      _offered(
+        parent,
+        except: exclude?.parent == parent ? exclude?.child : null,
+      ),
+    );
     if (children.isEmpty) {
       return (
         path: CategoryPath(parent),
@@ -343,7 +354,7 @@ class CategoryPipeline {
     String reason,
   ) async {
     final jev = this.jev;
-    final existing = {for (final c in _taxonomy.childrenOf(parent)) _key(c): c};
+    final existing = _optionKeys(_offered(parent));
     if (jev == null || existing.isEmpty) return null;
     final answer = (await _askJev(
       jev,
@@ -405,7 +416,46 @@ class CategoryPipeline {
     return children.isEmpty ? parent : '$parent: ${children.join(', ')}';
   }
 
-  /// An option key for [name]: Jev reads keys, so they say what they are.
-  static String _key(String name) =>
-      name.toLowerCase().replaceAll(RegExp('[^a-z0-9]+'), '_');
+  /// [parent]'s sub-categories to offer Jev, leaving [except] out: all of
+  /// them, or, when there are more than it takes, the most used, in their
+  /// order, ties going to the first.
+  List<String> _offered(String parent, {String? except}) {
+    final children = [
+      for (final child in _taxonomy.childrenOf(parent))
+        if (child != except) child,
+    ];
+    if (children.length <= _maxOffered) return children;
+    int used(String child) => _usage[CategoryPath(parent, child)] ?? 0;
+    final ranked = [for (final (i, child) in children.indexed) (i, child)]
+      ..sort((a, b) {
+        final byUse = used(b.$2).compareTo(used(a.$2));
+        return byUse != 0 ? byUse : a.$1.compareTo(b.$1);
+      });
+    final kept = {for (final (_, child) in ranked.take(_maxOffered)) child};
+    return [
+      for (final child in children)
+        if (kept.contains(child)) child,
+    ];
+  }
+
+  /// [names] as Jev's options, by key. Jev reads keys, so they say what
+  /// they are, in ASCII; a name with no Latin letters or digits is
+  /// `option`, and keys that would be the same get `_2`, `_3`… Never
+  /// [_general].
+  static Map<String, String> _optionKeys(Iterable<String> names) {
+    final options = <String, String>{};
+    for (final name in names) {
+      final slug = name
+          .toLowerCase()
+          .replaceAll(RegExp('[^a-z0-9]+'), '_')
+          .replaceAll(RegExp(r'^_+|_+$'), '');
+      final base = slug.isEmpty ? 'option' : slug;
+      var key = base;
+      for (var n = 2; options.containsKey(key) || key == _general; n++) {
+        key = '${base}_$n';
+      }
+      options[key] = name;
+    }
+    return options;
+  }
 }

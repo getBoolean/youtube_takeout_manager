@@ -89,13 +89,17 @@ class _Fetcher extends ChannelThumbnailFetcher {
 
 /// Jev, agreeing with every category YouTube gives [agree] sure, or failing
 /// with [failure], an AI failure or not, from its [failAfter]th request on.
+/// Of options, it picks the first, unsure, or one described as starting
+/// with [prefer], sure. Keeps the questions asked.
 class _Jev extends TypeSafeRepository {
-  _Jev({this.agree = 0.9, this.failure, this.failAfter = 0});
+  _Jev({this.agree = 0.9, this.failure, this.failAfter = 0, this.prefer});
 
   final double agree;
   Object? failure;
   final int failAfter;
+  final String? prefer;
   var requests = 0;
+  final asked = <JevQuestion>[];
 
   @override
   Future<Map<String, JevAnswer>> ask({
@@ -104,17 +108,27 @@ class _Jev extends TypeSafeRepository {
     required Map<String, JevQuestion> questions,
   }) async {
     if (failure case final f? when requests++ >= failAfter) throw f;
+    asked.addAll(questions.values);
     return {
       for (final MapEntry(:key, :value) in questions.entries)
         key: switch (value) {
           JevNoul() => NoulAnswer(agree),
-          JevChoice(:final options) => ChoiceAnswer(
-            choice: options.keys.first,
-            probabilities: {options.keys.first: 0.1},
-            confidence: 0.1,
-          ),
+          JevChoice(:final options) => _pick(options),
         },
     };
+  }
+
+  ChoiceAnswer _pick(Map<String, String?> options) {
+    final preferred = options.entries
+        .where((o) => prefer != null && (o.value?.startsWith(prefer!) ?? false))
+        .firstOrNull;
+    final choice = preferred?.key ?? options.keys.first;
+    final odds = preferred == null ? 0.1 : 0.9;
+    return ChoiceAnswer(
+      choice: choice,
+      probabilities: {choice: odds},
+      confidence: odds,
+    );
   }
 }
 
@@ -455,6 +469,42 @@ void main() {
         expect(c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed, 0.8);
       },
     );
+
+    test('Jev is offered the sub-categories channels have most, when there '
+        'are more than it takes', () async {
+      final jev = _Jev(prefer: 'Knowledge');
+      final c = container(details: known, keys: jevKey, jev: jev);
+      final custom = c.read(customCategoriesProvider.notifier);
+      for (var i = 1; i <= 300; i++) {
+        await custom.add('Knowledge', 'Topic $i');
+      }
+      await c.read(channelCategoriesProvider.future);
+      await c
+          .read(channelCategoriesProvider.notifier)
+          .decide(
+            'UCq',
+            ChannelCategory(
+              path: const CategoryPath('Knowledge', 'Topic 300'),
+              userDecision: UserDecision.accepted,
+              decidedAt: DateTime.utc(2026, 9, 30),
+            ),
+          );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      final knowledge = jev.asked.whereType<JevChoice>().where(
+        (question) => question.options.values.contains('Topic 1'),
+      );
+      expect(knowledge, isNotEmpty);
+      for (final question in knowledge) {
+        expect(
+          question.options.length,
+          lessThanOrEqualTo(JevChoice.maxOptions),
+        );
+        expect(question.options.values, contains('Topic 300'));
+      }
+    });
 
     test('when Jev is busy, categorizing pauses, keeping what it made, and '
         'says so', () async {

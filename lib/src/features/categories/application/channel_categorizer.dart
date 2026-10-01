@@ -364,8 +364,12 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final disabled = ref.read(aiTierStatusProvider).disabled;
     bool on(AiService service) =>
         keys.has(service) && !disabled.contains(service);
+    final categories = await ref
+        .read(channelCategoriesProvider.future)
+        .catchError((Object _) => const <String, ChannelCategory>{});
     return CategoryPipeline(
       taxonomy: ref.read(categoryTaxonomyProvider),
+      usage: _usage(categories),
       jev: on(AiService.jev)
           ? (
               repository: ref.read(typeSafeRepositoryProvider),
@@ -380,6 +384,19 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             )
           : null,
     );
+  }
+
+  /// How many channels have each category.
+  static Map<CategoryPath, int> _usage(
+    Map<String, ChannelCategory> categories,
+  ) {
+    final usage = <CategoryPath, int>{};
+    for (final category in categories.values) {
+      if (category.path case final path?) {
+        usage[path] = (usage[path] ?? 0) + 1;
+      }
+    }
+    return usage;
   }
 
   /// What the Claude model in use can do: as kept, else asked for with
