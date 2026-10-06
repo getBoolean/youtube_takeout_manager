@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
@@ -17,7 +17,6 @@ enum ShowFilter { all, only, hide }
 /// The channels picked to narrow the watched videos to, by
 /// [HistoryChannel.key], and the categories whose channels are; nothing
 /// picked narrows nothing.
-@immutable
 class ChannelSelection {
   final Map<String, HistoryChannel> channels;
   final Set<CategoryPick> categories;
@@ -42,8 +41,8 @@ class ChannelSelection {
   @override
   bool operator ==(Object other) =>
       other is ChannelSelection &&
-      setEquals(other.channels.keys.toSet(), channels.keys.toSet()) &&
-      setEquals(other.categories, categories);
+      _sameSet(other.channels.keys.toSet(), channels.keys.toSet()) &&
+      _sameSet(other.categories, categories);
 
   @override
   int get hashCode => Object.hash(
@@ -55,7 +54,6 @@ class ChannelSelection {
 /// Which of the history's watched channels are shown: one flag per channel,
 /// in the order the loaded history lists them. Equal when they show the
 /// same channels, so a filter that ends up the same doesn't search again.
-@immutable
 class ChannelMask {
   final Uint8List _shown;
 
@@ -70,7 +68,7 @@ class ChannelMask {
 
   @override
   bool operator ==(Object other) =>
-      other is ChannelMask && listEquals(other._shown, _shown);
+      other is ChannelMask && _sameBytes(other._shown, _shown);
 
   @override
   int get hashCode => Object.hashAll(_shown);
@@ -79,7 +77,6 @@ class ChannelMask {
 /// Which of the history's watched videos have something, such as being a
 /// Short: one flag per video, in the history's order. Equal when they flag
 /// the same videos.
-@immutable
 class WatchMask {
   final Uint8List _flags;
 
@@ -93,10 +90,22 @@ class WatchMask {
 
   @override
   bool operator ==(Object other) =>
-      other is WatchMask && listEquals(other._flags, _flags);
+      other is WatchMask && _sameBytes(other._flags, _flags);
 
   @override
   int get hashCode => Object.hashAll(_flags);
+}
+
+bool _sameSet<T>(Set<T> a, Set<T> b) =>
+    a.length == b.length && a.containsAll(b);
+
+bool _sameBytes(Uint8List a, Uint8List b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// Whether the channel [key] passes the channel filters, being [subscribed]

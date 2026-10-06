@@ -12,7 +12,8 @@ part of 'video_details_fetcher.dart';
 /// the watched videos AI is told about: signed in, while the quota lasts,
 /// and only for those neither kept on this device nor known to be gone.
 /// Each request is counted against the quota. Signed out, nothing is
-/// fetched; what's kept is all there is.
+/// fetched; what's kept is all there is. Once [fetch]'s `stop` says so, it
+/// asks for nothing more.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 
@@ -23,7 +24,8 @@ final videoDetailsFetcherProvider = VideoDetailsFetcherProvider._();
 /// the watched videos AI is told about: signed in, while the quota lasts,
 /// and only for those neither kept on this device nor known to be gone.
 /// Each request is counted against the quota. Signed out, nothing is
-/// fetched; what's kept is all there is.
+/// fetched; what's kept is all there is. Once [fetch]'s `stop` says so, it
+/// asks for nothing more.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 final class VideoDetailsFetcherProvider
@@ -32,7 +34,8 @@ final class VideoDetailsFetcherProvider
   /// the watched videos AI is told about: signed in, while the quota lasts,
   /// and only for those neither kept on this device nor known to be gone.
   /// Each request is counted against the quota. Signed out, nothing is
-  /// fetched; what's kept is all there is.
+  /// fetched; what's kept is all there is. Once [fetch]'s `stop` says so, it
+  /// asks for nothing more.
   ///
   /// A service: nothing depends on it, so it can read any provider.
   VideoDetailsFetcherProvider._()
@@ -63,13 +66,14 @@ final class VideoDetailsFetcherProvider
 }
 
 String _$videoDetailsFetcherHash() =>
-    r'e5c9a6eceb19abc2ac395dfb3b661ef1a1215557';
+    r'3e6f20b93c3ba14f4f6a3397f8a590e128f9e2d7';
 
 /// Fetches details, such as descriptions, of videos asked for by ID, like
 /// the watched videos AI is told about: signed in, while the quota lasts,
 /// and only for those neither kept on this device nor known to be gone.
 /// Each request is counted against the quota. Signed out, nothing is
-/// fetched; what's kept is all there is.
+/// fetched; what's kept is all there is. Once [fetch]'s `stop` says so, it
+/// asks for nothing more.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 

@@ -59,7 +59,7 @@ final class AiResultsClearerProvider
   }
 }
 
-String _$aiResultsClearerHash() => r'f30768caf69dfb47a7c67dae6a511810c2598470';
+String _$aiResultsClearerHash() => r'd6959a17f75016708d1ec4034083fc2f13c30c33';
 
 /// Clears what AI made for channels, keeping what the user decided, as
 /// [clearAiResults] says: the run under way is stopped first, so nothing it

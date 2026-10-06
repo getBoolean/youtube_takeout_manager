@@ -1,11 +1,8 @@
-import 'package:flutter/foundation.dart';
-
 import 'category_path.dart';
 
 /// A row of the viewing mix, picked to narrow the watched videos to its
 /// channels: a whole category, one sub-category, the channels known only by
 /// a category, or the channels not categorized.
-@immutable
 class CategoryPick {
   /// Null for the channels not categorized.
   final String? parent;

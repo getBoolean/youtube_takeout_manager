@@ -42,9 +42,7 @@ class WatchEntry with WatchEntryMappable {
     this.channelTitle,
     this.channelUrl,
     this.removedAt,
-  }) : titleSearchText = foldForSearch(title ?? url),
-       channelSearchText = foldForSearch(channelTitle ?? ''),
-       channelId = switch (channelUrl) {
+  }) : channelId = switch (channelUrl) {
          final url? => _channelIdPattern.firstMatch(url)?.group(1),
          null => null,
        };
@@ -62,9 +60,10 @@ class WatchEntry with WatchEntryMappable {
   final String? channelId;
 
   /// The title (or, without one, the link) and the channel's name, folded
-  /// for search, worked out once.
-  final String titleSearchText;
-  final String channelSearchText;
+  /// for search, worked out once, when first searched: shown entries are
+  /// never searched.
+  late final String titleSearchText = foldForSearch(title ?? url);
+  late final String channelSearchText = foldForSearch(channelTitle ?? '');
 
   /// Whether [foldedQuery] (from `foldForSearch`) is in its title or its
   /// channel's name.
