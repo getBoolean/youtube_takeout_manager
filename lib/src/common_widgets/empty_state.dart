@@ -7,7 +7,15 @@ class EmptyState extends StatelessWidget {
   final IconData icon;
   final String message;
 
-  const EmptyState({super.key, required this.icon, required this.message});
+  /// What can be done about it, under the message.
+  final Widget? action;
+
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.message,
+    this.action,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -31,6 +39,10 @@ class EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            if (action case final action?) ...[
+              const SizedBox(height: 16),
+              action,
+            ],
           ],
         ),
       ),

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'channel_groups.dart';
 import 'history_days.dart';
+import 'history_wire.dart';
 import 'takeout_history.dart';
 import 'watched_channels.dart';
 
@@ -106,6 +107,31 @@ class LoadedHistory {
           .length,
       shortCount: history.watches.where((w) => w.isShort).length,
       musicCount: history.watches.where((w) => w.music).length,
+    );
+  }
+
+  /// The history the History worker loaded, from its [rows]: each watched
+  /// video and search is made when first looked at, and the rest is what
+  /// the worker worked out.
+  factory LoadedHistory.fromRows(HistoryRows rows) {
+    final channels = rows.watchedChannels();
+    return LoadedHistory._(
+      history: rows.toHistory(),
+      watchDayKeys: rows.watchDayKeys,
+      searchDayKeys: rows.searchDayKeys,
+      watchDays: rows.all.watchDays(),
+      searchDays: rows.all.searchDays(),
+      watchedChannels: channels,
+      recentChannelIds: rows.recentChannelIds,
+      channelIndexByKey: {
+        for (final (i, c) in channels.indexed) c.channel.key: i,
+      },
+      watchChannelIndex: rows.watchChannelIndex,
+      channelGroups: rows.all.channelGroups(channels),
+      removedWatchCount: rows.removedWatchCount,
+      removedSearchCount: rows.removedSearchCount,
+      shortCount: rows.shortCount,
+      musicCount: rows.musicCount,
     );
   }
 

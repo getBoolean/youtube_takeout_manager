@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:youtube_takeout_manager/src/features/history/domain/history_days.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/history_wire.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
@@ -101,6 +106,25 @@ class _Categories extends ChannelCategories {
   };
 }
 
+/// The History engine in-process, counting the loads asked of it, and
+/// failing them as a stopped worker does while [dies].
+class _Engine extends LocalHistoryEngine {
+  var loads = 0;
+  var dies = false;
+
+  @override
+  Future<HistoryRows> load(Map<String, Uint8List> files) {
+    loads++;
+    if (dies) throw const HistoryWorkerDied();
+    return super.load(files);
+  }
+}
+
+/// [days] as plain values, to compare.
+List<List<Object>> _days(List<HistoryDay> days) => [
+  for (final day in days) [day.dayKey, day.indices.toList()],
+];
+
 /// Waits for the search the filters just changed to finish.
 Future<void> _settle(ProviderContainer c) =>
     c.read(historySearchProvider.future);
@@ -138,10 +162,12 @@ void main() {
   ProviderContainer container({
     TakeoutHistory? history,
     Map<String, CategoryPath?> categories = const {},
+    HistoryEngine? engine,
   }) {
     final c = ProviderContainer(
       overrides: [
         takeoutRepositoryProvider.overrideWithValue(repository),
+        if (engine != null) historyEngineProvider.overrideWithValue(engine),
         if (history != null)
           takeoutHistoryProvider.overrideWith(() => _Fixed(history)),
         channelCategoriesProvider.overrideWith(() => _Categories(categories)),
@@ -191,6 +217,86 @@ void main() {
         'crème brûlée',
         'cats',
       ]);
+    });
+
+    test(
+      'loads on the History engine what loading it in place gives',
+      () async {
+        final files = encodeHistoryCsvs(_history);
+        repository.accounts['UCme']!.addAll(files);
+        final engine = _Engine();
+
+        final history = (await container(
+          engine: engine,
+        ).read(takeoutHistoryProvider.future))!;
+        final expected = loadSavedHistory(files);
+
+        expect(engine.loads, 1);
+        expect(history.history.watches, expected.history.watches);
+        expect(history.history.searches, expected.history.searches);
+        expect(_days(history.watchDays), _days(expected.watchDays));
+        expect(_days(history.searchDays), _days(expected.searchDays));
+        expect(
+          [
+            for (final c in history.watchedChannels)
+              (c.channel, c.count, c.lastWatched),
+          ],
+          [
+            for (final c in expected.watchedChannels)
+              (c.channel, c.count, c.lastWatched),
+          ],
+        );
+        expect(history.recentChannelIds, expected.recentChannelIds);
+        expect(history.channelIndexByKey, expected.channelIndexByKey);
+        expect(history.watchChannelIndex, expected.watchChannelIndex);
+        expect(
+          [
+            for (final g in history.channelGroups.groups)
+              [g.key, g.indices.toList()],
+          ],
+          [
+            for (final g in expected.channelGroups.groups)
+              [g.key, g.indices.toList()],
+          ],
+        );
+        expect(
+          (
+            history.removedWatchCount,
+            history.removedSearchCount,
+            history.shortCount,
+            history.musicCount,
+          ),
+          (
+            expected.removedWatchCount,
+            expected.removedSearchCount,
+            expected.shortCount,
+            expected.musicCount,
+          ),
+        );
+      },
+    );
+
+    test('a History worker that stopped is an error, loaded again only when '
+        'asked', () async {
+      repository.accounts['UCme']!.addAll(encodeHistoryCsvs(_history));
+      final engine = _Engine()..dies = true;
+      final c = container(engine: engine);
+
+      await expectLater(
+        c.read(takeoutHistoryProvider.future),
+        throwsA(isA<HistoryWorkerDied>()),
+      );
+      // Longer than a failed load waits before it's tried again.
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      expect(engine.loads, 1);
+
+      engine.dies = false;
+      c.invalidate(takeoutHistoryProvider);
+
+      expect(
+        (await c.read(takeoutHistoryProvider.future))!.history.watches,
+        _history.watches,
+      );
     });
 
     test('a takeout saved without history has none', () async {

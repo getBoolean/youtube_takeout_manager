@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -96,6 +97,20 @@ class _Fixed extends TakeoutHistoryNotifier {
   @override
   Future<LoadedHistory?> build() async =>
       history == null ? null : LoadedHistory.of(history!);
+}
+
+/// [_history], once [fails] says no more: until then, a History worker that
+/// stopped.
+class _Flaky extends TakeoutHistoryNotifier {
+  _Flaky(this.fails);
+
+  final bool Function() fails;
+
+  @override
+  Future<LoadedHistory?> build() async {
+    if (fails()) throw const HistoryWorkerDied();
+    return LoadedHistory.of(_history);
+  }
 }
 
 /// Records the channels history asks for pictures of, and those it asks
@@ -195,6 +210,7 @@ Future<ProviderContainer> _open(
   Map<String, ChannelCategory> categories = const {},
   AiKeys keys = AiKeys.none,
   List<Override> overrides = const [],
+  TakeoutHistoryNotifier Function()? historyNotifier,
 }) async {
   SharedPreferences.setMockInitialValues({});
   tester.view.physicalSize = Size(width, 900);
@@ -203,7 +219,7 @@ Future<ProviderContainer> _open(
   final container = ProviderContainer(
     overrides: [
       takeoutHistoryProvider.overrideWith(
-        () => _Fixed(noTakeout ? null : history ?? _history),
+        historyNotifier ?? () => _Fixed(noTakeout ? null : history ?? _history),
       ),
       channelThumbnailFetcherProvider.overrideWith(() => _fetcher = _Fetcher()),
       channelThumbnailsProvider.overrideWith(() => _Pictures(pictures)),
@@ -1110,5 +1126,20 @@ void main() {
 
     expect(find.byKey(HistoryPage.noHistoryKey), findsOneWidget);
     expect(find.byType(Tab), findsNothing);
+  });
+
+  testWidgets("history that couldn't be loaded says so, and Retry loads it", (
+    tester,
+  ) async {
+    var builds = 0;
+    await _open(tester, historyNotifier: () => _Flaky(() => builds++ == 0));
+
+    expect(find.byKey(HistoryPage.retryKey), findsOneWidget);
+    expect(_shown('Café tour'), findsNothing);
+
+    await _tapKey(tester, HistoryPage.retryKey);
+
+    expect(find.byKey(HistoryPage.retryKey), findsNothing);
+    expect(_shown('Café tour'), findsWidgets);
   });
 }

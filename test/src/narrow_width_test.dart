@@ -79,6 +79,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/application/emoji_pro
 import 'package:youtube_takeout_manager/src/features/emoji/domain/unicode_emoji.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/domain/emoji_search_config.dart';
 import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_search_bar.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_channel_selection.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_grouping.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
@@ -974,6 +975,11 @@ void main() {
     overrides: historyOverrides,
   );
   fitsAtEveryWidth(
+    "the history page when history couldn't be loaded",
+    () => const HistoryPage(),
+    overrides: [takeoutHistoryProvider.overrideWith(_Stopped.new)],
+  );
+  fitsAtEveryWidth(
     "the history page's watches of one channel",
     () => const HistoryPage(),
     overrides: historyOverrides,
@@ -1410,6 +1416,12 @@ class _Categorizing extends CategorizationProgress {
     stopping: false,
     interrupted: false,
   );
+}
+
+/// History whose worker stopped.
+class _Stopped extends TakeoutHistoryNotifier {
+  @override
+  Future<LoadedHistory?> build() async => throw const HistoryWorkerDied();
 }
 
 /// History with long titles and names, and every badge.

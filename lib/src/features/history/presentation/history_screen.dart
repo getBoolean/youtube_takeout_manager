@@ -101,6 +101,7 @@ class HistoryPage extends HookConsumerWidget {
 
   /// Shown when the takeout has no history.
   static const noHistoryKey = ValueKey('history-none');
+  static const retryKey = ValueKey('history-retry');
 
   /// The toggle for, and the chip of, the filter for what was removed from
   /// YouTube's history.
@@ -128,6 +129,12 @@ class HistoryPage extends HookConsumerWidget {
       body = EmptyState(
         icon: Icons.error_outline,
         message: "History couldn't be loaded: ${historyAsync.error}",
+        action: FilledButton.tonalIcon(
+          key: retryKey,
+          onPressed: () => ref.invalidate(takeoutHistoryProvider),
+          icon: const Icon(Icons.refresh),
+          label: const Text('Retry'),
+        ),
       );
     } else if (!historyAsync.hasValue || loaded == null) {
       // Without a takeout the screen is on its way back to the channels.
