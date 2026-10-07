@@ -41,6 +41,12 @@ class AiOverloaded extends AiFailure {
   const AiOverloaded([super.message = 'The service is busy.', this.resumeAt]);
 }
 
+/// The service didn't answer in time, and isn't asked again: the request
+/// may have been paid for.
+class AiTimedOut extends AiOverloaded {
+  const AiTimedOut() : super("The service didn't answer in time.");
+}
+
 /// The service couldn't be reached, e.g. offline, or refused by the browser.
 class AiUnreachable extends AiFailure {
   const AiUnreachable([super.message = "The service couldn't be reached."]);

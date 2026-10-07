@@ -858,6 +858,45 @@ void main() {
       expect(results, hasLength(4));
     });
 
+    test('a request that takes too long is asked again in halves, not '
+        'waited on', () async {
+      final claude = ScriptedClaude(
+        answer: (kind, channels) {
+          if (channels.length > 2) throw const AiTimedOut();
+          return [
+            for (final channel in channels)
+              {
+                'id': channel['id'],
+                'parent': 'Music',
+                'child': '',
+                'emoji': '',
+                'reason': '',
+                'tags': const [],
+              },
+          ];
+        },
+      );
+      final pipeline = _withClaude(claude);
+
+      final results = await ask(pipeline, await tickets(pipeline, 4));
+
+      expect([for (final r in claude.requests) r.channels.length], [4, 2, 2]);
+      expect(results, hasLength(4));
+    });
+
+    test(
+      'a channel whose request takes too long keeps what YouTube gave',
+      () async {
+        final pipeline = _withClaude(_claude({}, failure: const AiTimedOut()));
+
+        final category = await pipeline.categorize(
+          _input(topics: [_topic('Video_game_culture')]),
+        );
+
+        expect(category.path, const CategoryPath('Gaming'));
+      },
+    );
+
     test('a channel with no usable answer keeps what YouTube gave, Claude '
         'counted as asked', () async {
       final pipeline = _withClaude(_claude({}, failure: const AiNoAnswer()));

@@ -240,7 +240,7 @@ class AiRequester {
           if (!abort.isCompleted) abort.complete();
           timeouts++;
           if (last || timeouts > (rules.timeoutRetries ?? timeouts)) {
-            throw const AiOverloaded("The service didn't answer in time.");
+            throw const AiTimedOut();
           }
         } else if (last) {
           throw const AiUnreachable();

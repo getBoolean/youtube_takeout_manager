@@ -489,7 +489,8 @@ class CategoryPipeline {
   /// Asks Claude about [tickets], in groups of what fits one request, a
   /// few at once, and gives [onResult] each channel's result as its group
   /// is answered. Nothing more is sent once [stopped]. A group with no
-  /// usable answer is asked again in halves, then one channel at a time; a
+  /// usable answer, or none in time, is asked again in halves, then one
+  /// channel at a time; a
   /// channel a group's answer leaves out is asked again alone; one channel
   /// with no usable answer keeps what was settled, unless [noAnswerFails].
   /// Throws an [AiTierFailure] once the groups already sent are answered,
@@ -587,13 +588,15 @@ class CategoryPipeline {
         onUsage: _onUsage,
         policy: RetryPolicy.claudeGroup,
       );
-    } on AiNoAnswer {
-      // Cut off, or refused: asked again in smaller parts, so one channel
+    } on AiFailure catch (e) {
+      // Cut off, refused, or too long in coming (and maybe paid for, so not
+      // asked again as it was): asked again in smaller parts, so one channel
       // doesn't cost the rest their answers.
+      if (e is! AiNoAnswer && e is! AiTimedOut) {
+        throw AiTierFailure(AiService.claude, e);
+      }
       if (group.length == 1) {
-        if (noAnswerFails) {
-          throw const AiTierFailure(AiService.claude, AiNoAnswer());
-        }
+        if (noAnswerFails) throw AiTierFailure(AiService.claude, e);
         await onResult(group.single.input.key, _noAnswer(group.single, tags));
         return;
       }
@@ -601,8 +604,6 @@ class CategoryPipeline {
       await again(group.sublist(0, half));
       await again(group.sublist(half));
       return;
-    } on AiFailure catch (e) {
-      throw AiTierFailure(AiService.claude, e);
     }
 
     final ids = byId.keys.toSet();
