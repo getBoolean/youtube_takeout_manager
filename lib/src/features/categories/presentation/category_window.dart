@@ -15,6 +15,7 @@ import '../application/category_editor.dart';
 import '../application/channel_categories.dart';
 import '../application/channel_categorizer.dart';
 import '../application/channel_tags.dart';
+import '../application/tag_editor.dart';
 import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_key.dart';
@@ -25,6 +26,7 @@ import 'ai_keys_setup.dart';
 import 'category_change_pages.dart';
 import 'category_colors.dart';
 import 'category_tag_page.dart';
+import 'tag_pages.dart';
 
 /// Whether AI can be asked for another category in the window, and how.
 enum AskAi {
@@ -65,6 +67,7 @@ abstract final class CategoryWindow {
   static const newSubId = 'category-new-sub';
   static const emojiId = 'category-emoji';
   static const addTagId = 'category-add-tag';
+  static const newTagId = 'category-new-tag';
 
   static const youtubeSourceKey = ValueKey('category-source-youtube');
   static const aiSourceKey = ValueKey('category-source-ai');
@@ -153,6 +156,8 @@ Future<void> showCategoryWindow(
   // (it measures pages offstage): each ask is paid for.
   final asking = ValueNotifier<Future<ChannelCategory>?>(null);
   final draft = NewSubCategoryDraft();
+  // The name of the new tag being added, from the Add tag page.
+  final newTag = ValueNotifier('');
   void ask() => asking.value = categorizer.suggest(channel)
     // Shown on the page; not an unhandled error if it closed first.
     ..ignore();
@@ -247,13 +252,43 @@ Future<void> showCategoryWindow(
         id: CategoryWindow.addTagId,
         title: (context) => windowTitle(context, 'Add tag'),
         backTo: CategoryWindow.mainId,
-        slivers: [AddTagPage(channel: channel)],
+        slivers: [
+          AddTagPage(channel: channel, onNewTag: (name) => newTag.value = name),
+        ],
+      ),
+      windowPage(
+        id: CategoryWindow.newTagId,
+        title: (context) => windowTitle(context, 'New tag'),
+        backTo: CategoryWindow.addTagId,
+        child: ValueListenableBuilder(
+          valueListenable: newTag,
+          builder: (context, name, _) => TagForm(
+            // A fresh form for each name typed.
+            key: ValueKey(name),
+            initialName: name,
+            onSave: (name, meaning) async {
+              final modal = WoltModalSheet.of(context);
+              final spelled = await container
+                  .read(tagEditorProvider.notifier)
+                  .define(name, meaning: meaning);
+              final has =
+                  container
+                      .read(channelCategoriesProvider)
+                      .value?[channel.key]
+                      ?.tags ??
+                  const <String>[];
+              await editor.setTags(channel, [...has, spelled]);
+              modal.showPageWithId(CategoryWindow.mainId);
+            },
+          ),
+        ),
       ),
       AiKeysPages.page(),
     ],
   ).whenComplete(() {
     asking.dispose();
     draft.dispose();
+    newTag.dispose();
   });
 }
 

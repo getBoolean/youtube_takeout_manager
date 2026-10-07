@@ -54,7 +54,9 @@ List<TagRow> tagRows(
 
 /// Adding a tag to [channel]: a field pinned at the top, and the tags in use
 /// it hasn't, or the text typed as a new one. Built lazily however many
-/// there are; picking one adds it and goes back to the window.
+/// there are; picking one adds it and goes back to the window. A new one
+/// goes to the new tag page, for its meaning, with [onNewTag] told its
+/// name.
 class AddTagPage extends HookConsumerWidget {
   static const fieldKey = ValueKey('add-tag-field');
   static const newKey = ValueKey('add-tag-new');
@@ -62,8 +64,9 @@ class AddTagPage extends HookConsumerWidget {
   static ValueKey<String> rowKey(String tag) => ValueKey('add-tag-$tag');
 
   final HistoryChannel channel;
+  final ValueChanged<String>? onNewTag;
 
-  const AddTagPage({super.key, required this.channel});
+  const AddTagPage({super.key, required this.channel, this.onNewTag});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -131,7 +134,16 @@ class AddTagPage extends HookConsumerWidget {
                   : const Icon(Icons.sell_outlined),
               title: Text(isNew ? 'Add "$name"' : name),
               subtitle: isNew ? null : Text(formatCount(channels, 'channel')),
-              onTap: () => add(context, name),
+              onTap: switch (onNewTag) {
+                final onNewTag? when isNew => () {
+                  onNewTag(name);
+                  controller.clear();
+                  WoltModalSheet.of(
+                    context,
+                  ).showPageWithId(CategoryWindow.newTagId);
+                },
+                _ => () => add(context, name),
+              },
             );
           },
         ),

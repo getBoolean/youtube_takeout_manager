@@ -12,6 +12,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/channel_c
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_tag_page.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
@@ -176,23 +177,70 @@ void main() {
     expect(find.byKey(CategoryWindow.changeKey), findsOneWidget);
   });
 
-  testWidgets('a new tag typed in is the user\'s', (tester) async {
-    final container = await _open(tester);
+  group('a new tag typed in', () {
+    Future<void> typeNew(WidgetTester tester, String name) async {
+      await tester.enterText(find.byKey(AddTagPage.fieldKey), name);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(AddTagPage.newKey));
+      await tester.pumpAndSettle();
+    }
 
-    await tester.enterText(find.byKey(AddTagPage.fieldKey), 'Retro');
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(AddTagPage.newKey));
-    await tester.pumpAndSettle();
+    Future<void> save(WidgetTester tester) async {
+      await tester.ensureVisible(find.byKey(TagForm.saveKey));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(TagForm.saveKey));
+      await tester.pumpAndSettle();
+    }
 
-    expect(await _tags(container), ['Speedruns', 'Retro']);
-    final kept = (await container.read(
-      channelCategoriesProvider.future,
-    ))['UCg'];
-    expect(kept?.tagsEditedByUser, isTrue);
-    final names = await container.read(tagNamesProvider.future);
-    expect(
-      names.values.where((t) => t.name == 'Retro').single.origin,
-      NameOrigin.user,
-    );
+    testWidgets("is the user's, added to the channel, back on its window", (
+      tester,
+    ) async {
+      final container = await _open(tester);
+
+      await typeNew(tester, 'Retro');
+      await save(tester);
+
+      expect(await _tags(container), ['Speedruns', 'Retro']);
+      final kept = (await container.read(
+        channelCategoriesProvider.future,
+      ))['UCg'];
+      expect(kept?.tagsEditedByUser, isTrue);
+      final names = await container.read(tagNamesProvider.future);
+      expect(
+        names.values.where((t) => t.name == 'Retro').single.origin,
+        NameOrigin.user,
+      );
+      expect(find.byKey(CategoryWindow.changeKey), findsOneWidget);
+    });
+
+    testWidgets('with a meaning, is one AI may give other channels, checked '
+        'for on the next run', (tester) async {
+      final container = await _open(tester);
+
+      await typeNew(tester, 'Retro');
+      await tester.enterText(
+        find.byKey(TagForm.meaningKey),
+        'Games from before 2000',
+      );
+      await save(tester);
+
+      final tag = (await container.read(tagNamesProvider.future))['retro'];
+      expect(tag?.meaning, 'Games from before 2000');
+      expect(tag?.changedAt, isNotNull);
+      expect(tag?.offeredToAi, isTrue);
+      expect(await _tags(container), contains('Retro'));
+    });
+
+    testWidgets('without a meaning, stays on this channel alone', (
+      tester,
+    ) async {
+      final container = await _open(tester);
+
+      await typeNew(tester, 'Retro');
+      await save(tester);
+
+      final tag = (await container.read(tagNamesProvider.future))['retro'];
+      expect(tag?.offeredToAi, isFalse);
+    });
   });
 }
