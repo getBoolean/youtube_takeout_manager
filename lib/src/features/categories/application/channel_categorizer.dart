@@ -610,13 +610,38 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             final (channel, plan) = wave[next++];
             final key = channel.key;
             categorizing.add(key);
+            final input = _inputFor(channel, loaded, details, picks, videos);
+            ChannelCategory? latest() =>
+                ref.read(channelCategoriesProvider).value?[key] ??
+                existing[key];
+            Future<void> check(Map<String, double> yes, DateTime at) =>
+                categories.checkTags(
+                  key,
+                  yes,
+                  // The tags as they are now: one deleted, or left without
+                  // a meaning, while Jev was asked, isn't given.
+                  ref.read(tagNamesProvider).value ?? index.names,
+                  at: at,
+                );
             try {
+              // Claude only adds to the tags: Jev checks the user's first.
+              if (plan.work == ChannelWork.claudeTags && plan.checkTags) {
+                if (await pipeline.prepare(
+                      input,
+                      (work: ChannelWork.none, redo: false, checkTags: true),
+                      existing: latest(),
+                      tags: index,
+                    )
+                    case Checked(:final yes, :final at)) {
+                  if (!ref.mounted) return;
+                  await check(yes, at);
+                }
+                if (halted()) continue;
+              }
               final prepared = await pipeline.prepare(
-                _inputFor(channel, loaded, details, picks, videos),
+                input,
                 plan,
-                existing:
-                    ref.read(channelCategoriesProvider).value?[key] ??
-                    existing[key],
+                existing: latest(),
                 tags: index,
               );
               switch (prepared) {
@@ -624,14 +649,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
                   await keep(key, result);
                 case Checked(:final yes, :final at):
                   if (!ref.mounted) return;
-                  // The tags as they are now: one deleted, or left without
-                  // a meaning, while Jev was asked, isn't given.
-                  await categories.checkTags(
-                    key,
-                    yes,
-                    ref.read(tagNamesProvider).value ?? index.names,
-                    at: at,
-                  );
+                  await check(yes, at);
                   await finished(key);
                 case NeedsClaude(:final ticket):
                   waiting[ticket.ask]!.add(ticket);

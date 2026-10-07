@@ -101,7 +101,12 @@ WorkPlan planWork(
     }
     if (existing.tagsAwaitClaude &&
         available.contains(CategorizationTier.claude)) {
-      return _do(ChannelWork.claudeTags);
+      // Claude only adds to the tags: Jev checks the user's first.
+      return (
+        work: ChannelWork.claudeTags,
+        redo: false,
+        checkTags: check().checkTags,
+      );
     }
     return check();
   }

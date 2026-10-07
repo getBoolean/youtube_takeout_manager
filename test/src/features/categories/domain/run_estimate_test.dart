@@ -56,6 +56,28 @@ void main() {
     expect(summary.hasWork, isTrue);
   });
 
+  test("a channel waiting for Claude's tags, checked for the user's tags "
+      'first, is counted, and paid for, as both', () {
+    AiWorkSummary waiting({required bool checkTags}) => summarizeWork([
+      (
+        plan: _plan(ChannelWork.claudeTags, checkTags: checkTags),
+        existing: _categorized,
+        evidenceChars: 900,
+      ),
+    ]);
+    double jev(AiWorkSummary summary) => estimateRunCost(
+      summary,
+      keys: _both,
+      model: defaultAnthropicModel,
+    ).jevDollars;
+
+    final checked = waiting(checkTags: true);
+
+    expect(checked.tags, 1);
+    expect(checked.checks, 1);
+    expect(jev(checked), greaterThan(jev(waiting(checkTags: false))));
+  });
+
   test('a run with nothing to do has no work', () {
     expect(
       summarizeWork([

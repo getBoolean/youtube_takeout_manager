@@ -452,6 +452,23 @@ void main() {
       }
     });
 
+    test("too when it waits for Claude's tags, which check none", () {
+      final waiting = _category(
+        source: CategorySource.user,
+        tagsTried: true,
+        tagsPrompts: const {'jevTags': 'jevtags-2'},
+        tagsAwaitClaude: true,
+        tagsCheckedAt: checkedAt,
+      );
+
+      expect(_plan(waiting, userTagsChangedAt: after), (
+        work: ChannelWork.claudeTags,
+        redo: false,
+        checkTags: true,
+      ));
+      expect(_plan(waiting, userTagsChangedAt: checkedAt).checkTags, isFalse);
+    });
+
     test('not when it is to be categorized or tagged, which offers every '
         'tag', () {
       final plan = _plan(

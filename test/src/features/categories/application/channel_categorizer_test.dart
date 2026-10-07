@@ -1966,11 +1966,19 @@ void main() {
         decidedAt: decidedAt,
       );
 
-      Future<ProviderContainer> start(_Jev jev) async {
+      /// With [claude], UCg waits for Claude's tags.
+      Future<ProviderContainer> start(
+        _Jev jev, {
+        ScriptedClaude? claude,
+      }) async {
         setMockStorage(
           entries: {
             EntryBoxes.channelCategories: {
-              'UCg': jsonEncode(tagged(['Old']).toMap()),
+              'UCg': jsonEncode(
+                tagged([
+                  'Old',
+                ]).copyWith(tagsAwaitClaude: claude != null).toMap(),
+              ),
               'UCs': jsonEncode(tagged(['Mine'], edited: true).toMap()),
               'UCx': jsonEncode(
                 tagged(const [], edited: true, removed: {'mine'}).toMap(),
@@ -1980,8 +1988,12 @@ void main() {
         );
         final c = container(
           details: known,
-          keys: const AiKeys(typesafe: 'jv_live_1'),
+          keys: AiKeys(
+            typesafe: 'jv_live_1',
+            anthropic: claude == null ? '' : 'sk-ant-1',
+          ),
           jev: jev,
+          claude: claude,
           now: () => checkedAt.add(const Duration(days: 2)),
         );
         await c
@@ -2016,6 +2028,30 @@ void main() {
             in c.read(channelCategoriesProvider).value!.entries)
           key: value.tags,
       };
+
+      test("checking one waiting for Claude's tags as well, before Claude "
+          'adds to them', () async {
+        final claude = _claude(
+          const {},
+          tags: const [
+            {'name': 'Speedruns', 'meaning': 'Runs that finish games fast'},
+          ],
+        );
+        final c = await start(
+          _Jev(agree: 0.9, tagFits: {'Mine': 0.9}),
+          claude: claude,
+        );
+
+        await _runAi(c);
+
+        expect(claude.kinds, contains(startsWith('tags')));
+        // Checked as the channels not waiting are, then added to.
+        expect(tags(c)['UCg'], unorderedEquals(['Mine', 'Speedruns']));
+        expect(
+          c.read(channelCategoriesProvider).value!['UCg']!.tagsAwaitClaude,
+          isFalse,
+        );
+      });
 
       test('adding one Jev is sure of and taking off one it is sure no '
           'longer fits; on an edited channel, keeping what the user added '

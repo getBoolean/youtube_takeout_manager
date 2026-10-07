@@ -74,6 +74,11 @@ AiWorkSummary summarizeWork(Iterable<PlannedChannel> channels) {
         categorize++;
       case ChannelWork.tags || ChannelWork.claudeTags:
         tags++;
+        // Checked for the user's tags first.
+        if (plan.checkTags) {
+          checks++;
+          checkChars.add(chars);
+        }
     }
     evidenceChars.add(chars);
   }
