@@ -59,7 +59,7 @@ final class CategoryEditorProvider
   }
 }
 
-String _$categoryEditorHash() => r'7f56b711e39091f2ff9aa6508d180d6436c2638b';
+String _$categoryEditorHash() => r'ba462aa2d60559a9768752fcd35568c78bf1ace7';
 
 /// What the user decides about a channel's category and tags, kept: an AI
 /// suggestion used or the category kept, YouTube's category used, one

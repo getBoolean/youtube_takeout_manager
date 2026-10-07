@@ -13,10 +13,5 @@ ChannelCategory mergeAiResult(
   final tags = existing.tagsEditedByUser || !result.tagsTried
       ? existing
       : result;
-  return category.copyWith(
-    tags: tags.tags,
-    tagsTried: tags.tagsTried,
-    tagsEditedByUser: tags.tagsEditedByUser,
-    tagsPrompt: tags.tagsPrompt,
-  );
+  return category.withTagsOf(tags);
 }

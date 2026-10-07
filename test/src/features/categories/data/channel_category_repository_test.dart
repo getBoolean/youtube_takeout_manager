@@ -76,6 +76,45 @@ void main() {
     expect(await repository().loadTags(), tags);
   });
 
+  test("tags are kept with their meanings, when the user changed one, and "
+      'whether they were deleted; ones kept before read with none', () async {
+    final tags = {
+      'vtuberclips': TagName(
+        name: 'VTuber Clips',
+        meaning: 'Clips of VTuber streams, made by someone else',
+        origin: NameOrigin.user,
+        changedAt: DateTime.utc(2026, 10, 6),
+      ),
+      'gone': const TagName(name: 'Gone', deleted: true),
+    };
+
+    await repository().saveTags(tags);
+
+    expect(await repository().loadTags(), tags);
+    final old = TagNameMapper.fromMap({'name': 'ASMR', 'origin': 'ai'});
+    expect(old.meaning, isNull);
+    expect(old.changedAt, isNull);
+    expect(old.deleted, isFalse);
+  });
+
+  test('a tag is offered to AI when AI named it or it has a meaning, and not '
+      'once deleted', () {
+    expect(const TagName(name: 'ASMR').offeredToAi, isTrue);
+    expect(
+      const TagName(name: 'Mine', origin: NameOrigin.user).offeredToAi,
+      isFalse,
+    );
+    expect(
+      const TagName(
+        name: 'Mine',
+        origin: NameOrigin.user,
+        meaning: 'What I watch on Sundays',
+      ).offeredToAi,
+      isTrue,
+    );
+    expect(const TagName(name: 'Gone', deleted: true).offeredToAi, isFalse);
+  });
+
   test('sub-categories kept as names alone read as made by AI', () async {
     store.boxes[EntryBoxes.customSubCategories] = {'Gaming': '["Speedruns"]'};
 

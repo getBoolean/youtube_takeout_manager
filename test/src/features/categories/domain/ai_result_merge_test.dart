@@ -72,6 +72,43 @@ void main() {
     expect(merged.tagsEditedByUser, isTrue);
   });
 
+  test('a run that asked for tags brings all it knows about them', () {
+    final result = answer.copyWith(
+      tagsPrompts: const {'jevTags': 'fp'},
+      tagsAwaitClaude: true,
+      tagsCheckedAt: DateTime.utc(2026, 10, 6),
+    );
+
+    final merged = mergeAiResult(_category('Music'), result);
+
+    expect(merged.tagsPrompts, {'jevTags': 'fp'});
+    expect(merged.tagsAwaitClaude, isTrue);
+    expect(merged.tagsCheckedAt, DateTime.utc(2026, 10, 6));
+  });
+
+  test('tags the user edited keep what they added and removed', () {
+    final existing =
+        _category(
+          'Music',
+          tags: const ['Mine'],
+          tagsTried: true,
+          edited: true,
+        ).copyWith(
+          tagsAddedByUser: const {'mine'},
+          tagsRemovedByUser: const {'theirs'},
+        );
+
+    final merged = mergeAiResult(
+      existing,
+      answer.copyWith(tagsAwaitClaude: true),
+    );
+
+    expect(merged.tags, ['Mine']);
+    expect(merged.tagsAddedByUser, {'mine'});
+    expect(merged.tagsRemovedByUser, {'theirs'});
+    expect(merged.tagsAwaitClaude, isFalse);
+  });
+
   test('a run that asked for no tags keeps the ones there were', () {
     final existing = _category(
       'Music',

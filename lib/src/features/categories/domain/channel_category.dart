@@ -1,6 +1,7 @@
 import 'package:dart_mappable/dart_mappable.dart';
 
 import 'category_path.dart';
+import 'name_key.dart';
 
 part 'channel_category.mapper.dart';
 
@@ -75,18 +76,37 @@ class ChannelCategory with ChannelCategoryMappable {
   /// a series; Claude names them.
   final List<String> tags;
 
-  /// Whether Claude was asked for tags, so it's asked once.
+  /// Whether AI was asked for tags, so it's asked once.
   final bool tagsTried;
 
-  /// Whether the user added or removed a tag: then they're never replaced.
+  /// Whether the user added or removed a tag: then AI never names them
+  /// again, only checks the tags the user defined.
   final bool tagsEditedByUser;
 
   /// The fingerprint of each step's prompt that decided the category, by
   /// step name, so a changed prompt has it redone.
   final Map<String, String> prompts;
 
-  /// The fingerprint of the prompt that named the tags.
+  /// The fingerprint of the prompt that named the tags, as kept before
+  /// [tagsPrompts]; read only.
   final String? tagsPrompt;
+
+  /// The fingerprint of each step's prompt that made the tags, by step
+  /// name, so a changed prompt has them redone.
+  final Map<String, String> tagsPrompts;
+
+  /// Whether Jev found the channel is about something no tag names, and
+  /// Claude wasn't there to name it: Claude is asked once it is.
+  final bool tagsAwaitClaude;
+
+  /// When the tags were made or last checked, as of the tags there were
+  /// then: a tag the user defines or changes after is checked.
+  final DateTime? tagsCheckedAt;
+
+  /// The tags the user put on this channel, and took off it, by `nameKey`:
+  /// AI never takes off the first, nor puts back the second.
+  final Set<String> tagsAddedByUser;
+  final Set<String> tagsRemovedByUser;
 
   const ChannelCategory({
     this.path,
@@ -104,6 +124,11 @@ class ChannelCategory with ChannelCategoryMappable {
     this.tagsEditedByUser = false,
     this.prompts = const {},
     this.tagsPrompt,
+    this.tagsPrompts = const {},
+    this.tagsAwaitClaude = false,
+    this.tagsCheckedAt,
+    this.tagsAddedByUser = const {},
+    this.tagsRemovedByUser = const {},
   });
 
   /// Whether an AI chose it, rather than YouTube's topics.
@@ -113,4 +138,43 @@ class ChannelCategory with ChannelCategoryMappable {
   /// Whether the user decided it: chose it, or accepted or kept one.
   bool get isDecided =>
       userDecision != UserDecision.none || source == CategorySource.user;
+
+  /// The tags AI may never take off, by `nameKey`: those the user added; on
+  /// a channel they edited before what they added was kept, every tag.
+  Set<String> get protectedTagKeys =>
+      tagsEditedByUser && tagsAddedByUser.isEmpty && tagsRemovedByUser.isEmpty
+      ? {for (final tag in tags) nameKey(tag)}
+      : tagsAddedByUser;
+
+  /// This category with [other]'s tags and all that's known about them.
+  ChannelCategory withTagsOf(ChannelCategory other) => copyWith(
+    tags: other.tags,
+    tagsTried: other.tagsTried,
+    tagsEditedByUser: other.tagsEditedByUser,
+    tagsPrompt: other.tagsPrompt,
+    tagsPrompts: other.tagsPrompts,
+    tagsAwaitClaude: other.tagsAwaitClaude,
+    tagsCheckedAt: other.tagsCheckedAt,
+    tagsAddedByUser: other.tagsAddedByUser,
+    tagsRemovedByUser: other.tagsRemovedByUser,
+  );
+
+  /// This category with what AI made of its tags forgotten: tags the user
+  /// edited stay, with what they added and removed; others go, as never
+  /// asked for.
+  ChannelCategory withoutAiTags() => tagsEditedByUser
+      ? copyWith(
+          tagsPrompt: null,
+          tagsPrompts: const {},
+          tagsAwaitClaude: false,
+          tagsCheckedAt: null,
+        )
+      : copyWith(
+          tags: const [],
+          tagsTried: false,
+          tagsPrompt: null,
+          tagsPrompts: const {},
+          tagsAwaitClaude: false,
+          tagsCheckedAt: null,
+        );
 }

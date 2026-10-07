@@ -32,15 +32,43 @@ class TagNameMapper extends ClassMapperBase<TagName> {
     opt: true,
     def: NameOrigin.ai,
   );
+  static String? _$meaning(TagName v) => v.meaning;
+  static const Field<TagName, String> _f$meaning = Field(
+    'meaning',
+    _$meaning,
+    opt: true,
+  );
+  static DateTime? _$changedAt(TagName v) => v.changedAt;
+  static const Field<TagName, DateTime> _f$changedAt = Field(
+    'changedAt',
+    _$changedAt,
+    opt: true,
+  );
+  static bool _$deleted(TagName v) => v.deleted;
+  static const Field<TagName, bool> _f$deleted = Field(
+    'deleted',
+    _$deleted,
+    opt: true,
+    def: false,
+  );
 
   @override
   final MappableFields<TagName> fields = const {
     #name: _f$name,
     #origin: _f$origin,
+    #meaning: _f$meaning,
+    #changedAt: _f$changedAt,
+    #deleted: _f$deleted,
   };
 
   static TagName _instantiate(DecodingData data) {
-    return TagName(name: data.dec(_f$name), origin: data.dec(_f$origin));
+    return TagName(
+      name: data.dec(_f$name),
+      origin: data.dec(_f$origin),
+      meaning: data.dec(_f$meaning),
+      changedAt: data.dec(_f$changedAt),
+      deleted: data.dec(_f$deleted),
+    );
   }
 
   @override
@@ -100,7 +128,13 @@ extension TagNameValueCopy<$R, $Out> on ObjectCopyWith<$R, TagName, $Out> {
 
 abstract class TagNameCopyWith<$R, $In extends TagName, $Out>
     implements ClassCopyWith<$R, $In, $Out> {
-  $R call({String? name, NameOrigin? origin});
+  $R call({
+    String? name,
+    NameOrigin? origin,
+    String? meaning,
+    DateTime? changedAt,
+    bool? deleted,
+  });
   TagNameCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(Then<$Out2, $R2> t);
 }
 
@@ -113,16 +147,28 @@ class _TagNameCopyWithImpl<$R, $Out>
   late final ClassMapperBase<TagName> $mapper =
       TagNameMapper.ensureInitialized();
   @override
-  $R call({String? name, NameOrigin? origin}) => $apply(
+  $R call({
+    String? name,
+    NameOrigin? origin,
+    Object? meaning = $none,
+    Object? changedAt = $none,
+    bool? deleted,
+  }) => $apply(
     FieldCopyWithData({
       if (name != null) #name: name,
       if (origin != null) #origin: origin,
+      if (meaning != $none) #meaning: meaning,
+      if (changedAt != $none) #changedAt: changedAt,
+      if (deleted != null) #deleted: deleted,
     }),
   );
   @override
   TagName $make(CopyWithData data) => TagName(
     name: data.get(#name, or: $value.name),
     origin: data.get(#origin, or: $value.origin),
+    meaning: data.get(#meaning, or: $value.meaning),
+    changedAt: data.get(#changedAt, or: $value.changedAt),
+    deleted: data.get(#deleted, or: $value.deleted),
   );
 
   @override

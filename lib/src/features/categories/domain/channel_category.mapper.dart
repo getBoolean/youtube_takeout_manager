@@ -404,6 +404,37 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
     _$tagsPrompt,
     opt: true,
   );
+  static Map<String, String> _$tagsPrompts(ChannelCategory v) => v.tagsPrompts;
+  static const Field<ChannelCategory, Map<String, String>> _f$tagsPrompts =
+      Field('tagsPrompts', _$tagsPrompts, opt: true, def: const {});
+  static bool _$tagsAwaitClaude(ChannelCategory v) => v.tagsAwaitClaude;
+  static const Field<ChannelCategory, bool> _f$tagsAwaitClaude = Field(
+    'tagsAwaitClaude',
+    _$tagsAwaitClaude,
+    opt: true,
+    def: false,
+  );
+  static DateTime? _$tagsCheckedAt(ChannelCategory v) => v.tagsCheckedAt;
+  static const Field<ChannelCategory, DateTime> _f$tagsCheckedAt = Field(
+    'tagsCheckedAt',
+    _$tagsCheckedAt,
+    opt: true,
+  );
+  static Set<String> _$tagsAddedByUser(ChannelCategory v) => v.tagsAddedByUser;
+  static const Field<ChannelCategory, Set<String>> _f$tagsAddedByUser = Field(
+    'tagsAddedByUser',
+    _$tagsAddedByUser,
+    opt: true,
+    def: const {},
+  );
+  static Set<String> _$tagsRemovedByUser(ChannelCategory v) =>
+      v.tagsRemovedByUser;
+  static const Field<ChannelCategory, Set<String>> _f$tagsRemovedByUser = Field(
+    'tagsRemovedByUser',
+    _$tagsRemovedByUser,
+    opt: true,
+    def: const {},
+  );
 
   @override
   final MappableFields<ChannelCategory> fields = const {
@@ -422,6 +453,11 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
     #tagsEditedByUser: _f$tagsEditedByUser,
     #prompts: _f$prompts,
     #tagsPrompt: _f$tagsPrompt,
+    #tagsPrompts: _f$tagsPrompts,
+    #tagsAwaitClaude: _f$tagsAwaitClaude,
+    #tagsCheckedAt: _f$tagsCheckedAt,
+    #tagsAddedByUser: _f$tagsAddedByUser,
+    #tagsRemovedByUser: _f$tagsRemovedByUser,
   };
 
   static ChannelCategory _instantiate(DecodingData data) {
@@ -441,6 +477,11 @@ class ChannelCategoryMapper extends ClassMapperBase<ChannelCategory> {
       tagsEditedByUser: data.dec(_f$tagsEditedByUser),
       prompts: data.dec(_f$prompts),
       tagsPrompt: data.dec(_f$tagsPrompt),
+      tagsPrompts: data.dec(_f$tagsPrompts),
+      tagsAwaitClaude: data.dec(_f$tagsAwaitClaude),
+      tagsCheckedAt: data.dec(_f$tagsCheckedAt),
+      tagsAddedByUser: data.dec(_f$tagsAddedByUser),
+      tagsRemovedByUser: data.dec(_f$tagsRemovedByUser),
     );
   }
 
@@ -512,6 +553,8 @@ abstract class ChannelCategoryCopyWith<$R, $In extends ChannelCategory, $Out>
   ListCopyWith<$R, String, ObjectCopyWith<$R, String, String>> get tags;
   MapCopyWith<$R, String, String, ObjectCopyWith<$R, String, String>>
   get prompts;
+  MapCopyWith<$R, String, String, ObjectCopyWith<$R, String, String>>
+  get tagsPrompts;
   $R call({
     CategoryPath? path,
     CategorySource? source,
@@ -528,6 +571,11 @@ abstract class ChannelCategoryCopyWith<$R, $In extends ChannelCategory, $Out>
     bool? tagsEditedByUser,
     Map<String, String>? prompts,
     String? tagsPrompt,
+    Map<String, String>? tagsPrompts,
+    bool? tagsAwaitClaude,
+    DateTime? tagsCheckedAt,
+    Set<String>? tagsAddedByUser,
+    Set<String>? tagsRemovedByUser,
   });
   ChannelCategoryCopyWith<$R2, $In, $Out2> $chain<$R2, $Out2>(
     Then<$Out2, $R2> t,
@@ -567,6 +615,13 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     (v) => call(prompts: v),
   );
   @override
+  MapCopyWith<$R, String, String, ObjectCopyWith<$R, String, String>>
+  get tagsPrompts => MapCopyWith(
+    $value.tagsPrompts,
+    (v, t) => ObjectCopyWith(v, $identity, t),
+    (v) => call(tagsPrompts: v),
+  );
+  @override
   $R call({
     Object? path = $none,
     CategorySource? source,
@@ -583,6 +638,11 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     bool? tagsEditedByUser,
     Map<String, String>? prompts,
     Object? tagsPrompt = $none,
+    Map<String, String>? tagsPrompts,
+    bool? tagsAwaitClaude,
+    Object? tagsCheckedAt = $none,
+    Set<String>? tagsAddedByUser,
+    Set<String>? tagsRemovedByUser,
   }) => $apply(
     FieldCopyWithData({
       if (path != $none) #path: path,
@@ -600,6 +660,11 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
       if (tagsEditedByUser != null) #tagsEditedByUser: tagsEditedByUser,
       if (prompts != null) #prompts: prompts,
       if (tagsPrompt != $none) #tagsPrompt: tagsPrompt,
+      if (tagsPrompts != null) #tagsPrompts: tagsPrompts,
+      if (tagsAwaitClaude != null) #tagsAwaitClaude: tagsAwaitClaude,
+      if (tagsCheckedAt != $none) #tagsCheckedAt: tagsCheckedAt,
+      if (tagsAddedByUser != null) #tagsAddedByUser: tagsAddedByUser,
+      if (tagsRemovedByUser != null) #tagsRemovedByUser: tagsRemovedByUser,
     }),
   );
   @override
@@ -619,6 +684,14 @@ class _ChannelCategoryCopyWithImpl<$R, $Out>
     tagsEditedByUser: data.get(#tagsEditedByUser, or: $value.tagsEditedByUser),
     prompts: data.get(#prompts, or: $value.prompts),
     tagsPrompt: data.get(#tagsPrompt, or: $value.tagsPrompt),
+    tagsPrompts: data.get(#tagsPrompts, or: $value.tagsPrompts),
+    tagsAwaitClaude: data.get(#tagsAwaitClaude, or: $value.tagsAwaitClaude),
+    tagsCheckedAt: data.get(#tagsCheckedAt, or: $value.tagsCheckedAt),
+    tagsAddedByUser: data.get(#tagsAddedByUser, or: $value.tagsAddedByUser),
+    tagsRemovedByUser: data.get(
+      #tagsRemovedByUser,
+      or: $value.tagsRemovedByUser,
+    ),
   );
 
   @override

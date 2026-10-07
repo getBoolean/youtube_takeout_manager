@@ -145,6 +145,43 @@ void main() {
       expect(cleared.tagsEditedByUser, isTrue);
     });
 
+    test('forgets what AI knew about the tags, keeping what the user added '
+        'and removed', () {
+      final cleared = _clear({
+        'UCa':
+            _category(
+              const CategoryPath('Music'),
+              tags: const ['Cover Artist'],
+            ).copyWith(
+              tagsPrompts: const {'jevTags': 'fp'},
+              tagsAwaitClaude: true,
+              tagsCheckedAt: _then,
+            ),
+        'UCe':
+            _category(
+              const CategoryPath('Music'),
+              tags: const ['Mine'],
+              edited: true,
+            ).copyWith(
+              tagsPrompts: const {'jevTags': 'fp'},
+              tagsCheckedAt: _then,
+              tagsAddedByUser: const {'mine'},
+              tagsRemovedByUser: const {'theirs'},
+            ),
+      }).categories;
+
+      final ai = cleared['UCa']!;
+      expect(ai.tags, isEmpty);
+      expect(ai.tagsPrompts, isEmpty);
+      expect(ai.tagsAwaitClaude, isFalse);
+      expect(ai.tagsCheckedAt, isNull);
+      final edited = cleared['UCe']!;
+      expect(edited.tags, ['Mine']);
+      expect(edited.tagsAddedByUser, {'mine'});
+      expect(edited.tagsRemovedByUser, {'theirs'});
+      expect(edited.tagsCheckedAt, isNull);
+    });
+
     test("keeps categories YouTube's topics gave", () {
       final youtube = _category(const CategoryPath('Gaming', 'Action'));
 
@@ -199,10 +236,11 @@ void main() {
           'kept': const TagName(name: 'Kept'),
           'gone': const TagName(name: 'Gone'),
           'typed': const TagName(name: 'Typed', origin: NameOrigin.user),
+          'deleted': const TagName(name: 'Deleted', deleted: true),
         },
       ).tags;
 
-      expect(cleared.keys, unorderedEquals(['kept', 'typed']));
+      expect(cleared.keys, unorderedEquals(['kept', 'typed', 'deleted']));
     });
   });
 

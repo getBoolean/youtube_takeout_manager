@@ -118,6 +118,60 @@ void main() {
     });
   });
 
+  group('editing tags records what the user added and removed', () {
+    test('adding then removing a tag leaves it only as removed, and the '
+        'other way round', () async {
+      final c = _container();
+      await _start(c);
+      final editor = c.read(categoryEditorProvider.notifier);
+
+      await editor.setTags(_gamer, ['Old tag', 'Speedruns']);
+      expect((await _kept(c))?.tagsAddedByUser, contains('speedruns'));
+
+      await editor.setTags(_gamer, ['Old tag']);
+      var kept = await _kept(c);
+      expect(kept?.tagsAddedByUser, isNot(contains('speedruns')));
+      expect(kept?.tagsRemovedByUser, contains('speedruns'));
+
+      await editor.setTags(_gamer, ['Speedruns']);
+      kept = await _kept(c);
+      expect(kept?.tagsAddedByUser, contains('speedruns'));
+      expect(kept?.tagsRemovedByUser, {'oldtag'});
+    });
+
+    test('a channel edited before keeps every tag it had as added', () async {
+      final c = _container();
+      await _start(c, edited: true);
+
+      await c.read(categoryEditorProvider.notifier).setTags(_gamer, [
+        'Old tag',
+        'New tag',
+      ]);
+
+      expect((await _kept(c))?.protectedTagKeys, {'oldtag', 'newtag'});
+    });
+
+    test("taking AI's suggestion counts its tags as added", () async {
+      final c = _container();
+      await _start(c);
+
+      await c
+          .read(categoryEditorProvider.notifier)
+          .accept(
+            _gamer,
+            ChannelCategory(
+              path: const CategoryPath('Gaming', 'Racing'),
+              source: CategorySource.claude,
+              tags: const ['Mario Kart World'],
+              tagsTried: true,
+              decidedAt: _now,
+            ),
+          );
+
+      expect((await _kept(c))?.tagsAddedByUser, {'mariokartworld'});
+    });
+  });
+
   test('keeping the category there is protects it', () async {
     final c = _container();
     await _start(c);

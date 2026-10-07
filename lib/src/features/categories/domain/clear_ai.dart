@@ -51,9 +51,13 @@ AiResults clearAiResults(
     for (final category in categories.values)
       for (final tag in category.tags) nameKey(tag),
   };
+  // Deleted tags stay deleted.
   final tags = {
     for (final MapEntry(:key, :value) in stored.tags.entries)
-      if (value.origin == NameOrigin.user || usedTags.contains(key)) key: value,
+      if (value.origin == NameOrigin.user ||
+          value.deleted ||
+          usedTags.contains(key))
+        key: value,
   };
   return (categories: categories, custom: custom, tags: tags);
 }
@@ -80,14 +84,7 @@ ChannelCategory _cleared(
             tried: category.tried.intersection({CategorizationTier.youtube}),
           );
   }
-  return category.tagsEditedByUser
-      ? cleared.copyWith(
-          tags: category.tags,
-          tagsTried: category.tagsTried,
-          tagsEditedByUser: true,
-          tagsPrompt: category.tagsPrompt,
-        )
-      : cleared.copyWith(tags: const [], tagsTried: false, tagsPrompt: null);
+  return cleared.withTagsOf(category).withoutAiTags();
 }
 
 /// How many channels a clear sends back to AI: those whose category the

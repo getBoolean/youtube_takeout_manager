@@ -78,6 +78,108 @@ void main() {
     expect(category.tagsPrompt, isNull);
   });
 
+  test('what is known about its tags is kept and read back: the prompts '
+      'that made them, whether they wait for Claude, when they were last '
+      'checked, and what the user added and removed', () {
+    final tagged = ChannelCategory(
+      path: const CategoryPath('Entertainment'),
+      tags: const ['VTuber', 'Phase Connect'],
+      tagsTried: true,
+      tagsEditedByUser: true,
+      tagsPrompts: const {'jevTags': 'ab12', 'claudeTags': 'cd34'},
+      tagsAwaitClaude: true,
+      tagsCheckedAt: DateTime.utc(2026, 10, 6, 9),
+      tagsAddedByUser: const {'phaseconnect'},
+      tagsRemovedByUser: const {'gaming'},
+      decidedAt: DateTime.utc(2026, 10, 6),
+    );
+
+    expect(ChannelCategoryMapper.fromJson(tagged.toJson()), tagged);
+  });
+
+  test('a category saved with tags before they were checked or edited one '
+      'by one reads with none of that', () {
+    final category = ChannelCategoryMapper.fromMap({
+      'path': {'parent': 'Gaming'},
+      'source': 'claude',
+      'tags': ['Speedruns'],
+      'tagsTried': true,
+      'tagsPrompt': 'fp',
+      'decidedAt': '2026-10-01T00:00:00.000Z',
+    });
+
+    expect(category.tags, ['Speedruns']);
+    expect(category.tagsPrompt, 'fp');
+    expect(category.tagsPrompts, isEmpty);
+    expect(category.tagsAwaitClaude, isFalse);
+    expect(category.tagsCheckedAt, isNull);
+    expect(category.tagsAddedByUser, isEmpty);
+    expect(category.tagsRemovedByUser, isEmpty);
+  });
+
+  group('the tags AI may never take off', () {
+    ChannelCategory tagged({
+      bool edited = true,
+      Set<String> added = const {},
+      Set<String> removed = const {},
+    }) => ChannelCategory(
+      tags: const ['VTuber', 'ASMR'],
+      tagsTried: true,
+      tagsEditedByUser: edited,
+      tagsAddedByUser: added,
+      tagsRemovedByUser: removed,
+      decidedAt: DateTime.utc(2026, 10, 6),
+    );
+
+    test('are the ones the user added', () {
+      expect(tagged(added: const {'asmr'}).protectedTagKeys, {'asmr'});
+      expect(tagged(removed: const {'gaming'}).protectedTagKeys, isEmpty);
+    });
+
+    test('are all of them on a channel the user edited before what they '
+        'added was kept', () {
+      expect(tagged().protectedTagKeys, {'vtuber', 'asmr'});
+    });
+
+    test("are none on a channel whose tags AI named", () {
+      expect(tagged(edited: false).protectedTagKeys, isEmpty);
+    });
+  });
+
+  test(
+    "taking another's tags takes everything about them, and nothing else",
+    () {
+      final from = ChannelCategory(
+        path: const CategoryPath('Music'),
+        tags: const ['Cover Artist'],
+        tagsTried: true,
+        tagsEditedByUser: true,
+        tagsPrompt: 'old',
+        tagsPrompts: const {'jevTags': 'fp'},
+        tagsAwaitClaude: true,
+        tagsCheckedAt: DateTime.utc(2026, 10, 6),
+        tagsAddedByUser: const {'coverartist'},
+        tagsRemovedByUser: const {'music'},
+        decidedAt: DateTime.utc(2026, 10, 6),
+      );
+      final category = _category();
+
+      final taken = category.withTagsOf(from);
+
+      expect(taken.path, category.path);
+      expect(taken.decidedAt, category.decidedAt);
+      expect(
+        taken,
+        from.copyWith(
+          path: category.path,
+          decidedAt: category.decidedAt,
+          tried: category.tried,
+          hadTopics: category.hadTopics,
+        ),
+      );
+    },
+  );
+
   test('a category the user chose, accepted or kept is decided', () {
     expect(_category().isDecided, isFalse);
     expect(_category(source: CategorySource.user).isDecided, isTrue);

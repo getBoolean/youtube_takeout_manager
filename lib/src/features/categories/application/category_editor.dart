@@ -4,6 +4,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/watched_chan
 import '../domain/category_path.dart';
 import '../domain/category_prompts.dart';
 import '../domain/channel_category.dart';
+import '../domain/name_key.dart';
 import '../domain/sub_category.dart';
 import 'channel_categories.dart';
 import 'channel_categorizer.dart';
@@ -45,19 +46,22 @@ class CategoryEditor extends _$CategoryEditor {
     if ((current?.tagsEditedByUser ?? false) ||
         !suggestion.tagsTried ||
         suggestion.tags.isEmpty) {
-      accepted = accepted.copyWith(
-        tags: current?.tags ?? const [],
-        tagsTried: current?.tagsTried ?? false,
-        tagsEditedByUser: current?.tagsEditedByUser ?? false,
-        tagsPrompt: current?.tagsPrompt,
+      accepted = accepted.withTagsOf(
+        current ?? ChannelCategory(decidedAt: DateTime.now().toUtc()),
       );
     } else {
       // A suggestion the user took is theirs, tags and all.
+      final tags = await ref
+          .read(tagNamesProvider.notifier)
+          .resolve(suggestion.tags, NameOrigin.ai);
+      final keys = {for (final tag in tags) nameKey(tag)};
       accepted = accepted.copyWith(
-        tags: await ref
-            .read(tagNamesProvider.notifier)
-            .resolve(suggestion.tags, NameOrigin.ai),
+        tags: tags,
         tagsEditedByUser: true,
+        tagsAddedByUser: keys,
+        tagsRemovedByUser: (current?.tagsRemovedByUser ?? const {}).difference(
+          keys,
+        ),
       );
     }
     await _decide(channel, accepted);
@@ -108,18 +112,33 @@ class CategoryEditor extends _$CategoryEditor {
   }
 
   /// Makes [tags] [channel]'s, as the user's: spelled as the tags there are
-  /// spell them, new ones made by the user, at most [maxTags].
+  /// spell them, new ones made by the user, at most [maxTags]. What they
+  /// added and removed is kept, so AI never takes off the one nor puts back
+  /// the other; on a channel edited before that was kept, every tag it had
+  /// counts as added.
   Future<void> setTags(HistoryChannel channel, List<String> tags) async {
     final current = await _current(channel);
     final resolved = await ref
         .read(tagNamesProvider.notifier)
         .resolve(tags, NameOrigin.user);
+    final before = {for (final tag in current?.tags ?? const []) nameKey(tag)};
+    final after = {for (final tag in resolved) nameKey(tag)};
+    final added = after.difference(before);
+    final removed = before.difference(after);
     await _decide(
       channel,
       (current ?? ChannelCategory(decidedAt: DateTime.now().toUtc())).copyWith(
         tags: resolved,
         tagsTried: true,
         tagsEditedByUser: true,
+        tagsAddedByUser: {
+          ...?current?.protectedTagKeys,
+          ...added,
+        }.difference(removed),
+        tagsRemovedByUser: {
+          ...?current?.tagsRemovedByUser,
+          ...removed,
+        }.difference(added),
       ),
     );
   }
