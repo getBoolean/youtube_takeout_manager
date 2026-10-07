@@ -11,6 +11,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/pending_ai_work.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/run_estimate.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_announcer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -90,6 +91,8 @@ Future<_Categorizer> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.light,
+        // As the app goes around every screen.
+        builder: (context, child) => CategorizationAnnouncer(child: child!),
         home: const Scaffold(body: CategorizationBanner()),
       ),
     ),
@@ -284,6 +287,62 @@ void main() {
       await run(tester, 40);
       await tester.pump(const Duration(seconds: 2));
 
+      expect(announced, hasLength(2));
+    });
+
+    testWidgets('tells of a run once each way, though History is left and '
+        'opened again while it goes', (tester) async {
+      listen(tester);
+      final shown = ValueNotifier(true);
+      addTearDown(shown.dispose);
+      final categorizer = _Categorizer();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            channelCategorizerProvider.overrideWith(() => categorizer),
+            categorizationProgressProvider.overrideWith(() => _Progress(_idle)),
+            pendingAiWorkProvider.overrideWith(() => _Pending(null)),
+            aiKeysProvider.overrideWith(
+              (ref) async => const AiKeys(anthropic: 'sk-ant-1'),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light,
+            builder: (context, child) => CategorizationAnnouncer(child: child!),
+            home: Scaffold(
+              body: ValueListenableBuilder(
+                valueListenable: shown,
+                builder: (context, show, _) => show
+                    ? const CategorizationBanner()
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ),
+        ),
+      );
+      final progress = ProviderScope.containerOf(
+        tester.element(find.byType(Scaffold)),
+      ).read(categorizationProgressProvider.notifier);
+
+      progress.start(50, ai: true);
+      await tester.pump();
+      shown.value = false;
+      await tester.pump();
+      progress.update(10);
+      await tester.pump();
+      shown.value = true;
+      await tester.pump();
+      progress.update(20);
+      await tester.pump();
+      shown.value = false;
+      await tester.pump();
+      // Its start, once.
+      expect(announced, hasLength(1));
+
+      progress.complete();
+      await tester.pump(const Duration(seconds: 2));
+
+      // And its end.
       expect(announced, hasLength(2));
     });
 

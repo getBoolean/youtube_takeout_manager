@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_takeout_manager/src/app_effects.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/cached_network_image.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/lost_sign_in.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_announcer.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
@@ -46,7 +47,8 @@ class App extends ConsumerWidget {
       routerConfig: _appRouter.config(),
       builder: (context, child) => ImageBytesCacheScope(
         cache: ref.watch(imageBytesCacheProvider),
-        child: child!,
+        // Categorizing is told of wherever the user is.
+        child: CategorizationAnnouncer(child: child!),
       ),
     );
   }
