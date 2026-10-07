@@ -182,6 +182,33 @@ void main() {
     expect(result.draft?.selection.channels.keys, ['UCb']);
   });
 
+  testWidgets("the device's back on a page goes back to the first page, "
+      'keeping what was picked', (tester) async {
+    final result = await open(tester);
+    await tap(tester, HistoryFilterSheet.channelsRowKey);
+    await tap(tester, HistoryFilterSheet.channelKey('UCb'));
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(result.closed, isFalse);
+    expect(within(HistoryFilterSheet.channelsRowKey, 'Beta'), findsOneWidget);
+    await tap(tester, HistoryFilterSheet.showKey);
+    expect(result.draft?.selection.channels.keys, ['UCb']);
+  });
+
+  testWidgets("the device's back on the first page closes, changing nothing", (
+    tester,
+  ) async {
+    final result = await open(tester);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(result.closed, isTrue);
+    expect(result.draft, isNull);
+  });
+
   testWidgets('Clear all clears every filter and closes', (tester) async {
     final result = await open(
       tester,

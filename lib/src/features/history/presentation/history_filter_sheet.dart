@@ -63,61 +63,67 @@ Future<WatchFilterDraft?> showHistoryFilterSheet(
   required bool hasMusic,
   List<CategoryShare> mix = const [],
   List<TagUse> tags = const [],
-}) => WoltModalSheet.show<WatchFilterDraft>(
-  context: context,
-  modalDecorator: (child) => _DraftScope(initial: initial, child: child),
-  pageListBuilder: (_) => [
-    _page(
-      context,
-      id: HistoryFilterSheet.mainId,
-      title: 'Filters',
-      actions: const _Actions(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: _Sections(
-            hasSubscriptions: hasSubscriptions,
-            hasShorts: hasShorts,
-            shortsNote: shortsNote,
-            hasMusic: hasMusic,
+}) {
+  // The page shown: the first page is 0.
+  final page = ValueNotifier(0);
+  return WoltModalSheet.show<WatchFilterDraft>(
+    context: context,
+    pageIndexNotifier: page,
+    modalDecorator: (child) =>
+        _DraftScope(initial: initial, page: page, child: child),
+    pageListBuilder: (_) => [
+      _page(
+        context,
+        id: HistoryFilterSheet.mainId,
+        title: 'Filters',
+        actions: const _Actions(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: _Sections(
+              hasSubscriptions: hasSubscriptions,
+              hasShorts: hasShorts,
+              shortsNote: shortsNote,
+              hasMusic: hasMusic,
+            ),
           ),
+          SliverToBoxAdapter(
+            child: _PageRows(mix: mix, tags: tags, channels: channels),
+          ),
+        ],
+      ),
+      _page(
+        context,
+        id: HistoryFilterSheet.categoriesId,
+        title: 'Categories',
+        backTo: HistoryFilterSheet.mainId,
+        actions: _PageActions(
+          clear: (selection) => selection.copyWith(categories: const {}),
         ),
-        SliverToBoxAdapter(
-          child: _PageRows(mix: mix, tags: tags, channels: channels),
+        slivers: [_CategoriesSliver(mix: mix)],
+      ),
+      _page(
+        context,
+        id: HistoryFilterSheet.tagsId,
+        title: 'Tags',
+        backTo: HistoryFilterSheet.mainId,
+        actions: _PageActions(
+          clear: (selection) => selection.copyWith(tags: const {}),
         ),
-      ],
-    ),
-    _page(
-      context,
-      id: HistoryFilterSheet.categoriesId,
-      title: 'Categories',
-      backTo: HistoryFilterSheet.mainId,
-      actions: _PageActions(
-        clear: (selection) => selection.copyWith(categories: const {}),
+        slivers: [_TagsSliver(tags: tags)],
       ),
-      slivers: [_CategoriesSliver(mix: mix)],
-    ),
-    _page(
-      context,
-      id: HistoryFilterSheet.tagsId,
-      title: 'Tags',
-      backTo: HistoryFilterSheet.mainId,
-      actions: _PageActions(
-        clear: (selection) => selection.copyWith(tags: const {}),
+      _page(
+        context,
+        id: HistoryFilterSheet.channelsId,
+        title: 'Channels',
+        backTo: HistoryFilterSheet.mainId,
+        actions: _PageActions(
+          clear: (selection) => selection.copyWith(channels: const {}),
+        ),
+        slivers: [_ChannelsSliver(channels: channels)],
       ),
-      slivers: [_TagsSliver(tags: tags)],
-    ),
-    _page(
-      context,
-      id: HistoryFilterSheet.channelsId,
-      title: 'Channels',
-      backTo: HistoryFilterSheet.mainId,
-      actions: _PageActions(
-        clear: (selection) => selection.copyWith(channels: const {}),
-      ),
-      slivers: [_ChannelsSliver(channels: channels)],
-    ),
-  ],
-);
+    ],
+  ).whenComplete(page.dispose);
+}
 
 /// A page of the Filters modal: [title], back to [backTo] when given,
 /// [slivers], and [actions] over its bottom.
@@ -151,9 +157,13 @@ SliverWoltModalSheetPage _page(
     ),
     null => null,
   },
-  trailingNavBarWidget: const Padding(
-    padding: EdgeInsetsDirectional.only(end: 8),
-    child: CloseButton(),
+  trailingNavBarWidget: Padding(
+    padding: const EdgeInsetsDirectional.only(end: 8),
+    // Closes from any page: Back goes to the first.
+    child: Builder(
+      builder: (context) =>
+          CloseButton(onPressed: () => Navigator.of(context).pop()),
+    ),
   ),
   stickyActionBar: actions,
   mainContentSliversBuilder: (_) => [
@@ -219,16 +229,34 @@ bool isAiSubCategory(
   _ => false,
 };
 
-/// Holds the filters being set, for the page and its actions alike.
+/// Holds the filters being set, for the pages and their actions alike. On
+/// a page of picks, the device's back goes back to the first page, keeping
+/// them, rather than closing.
 class _DraftScope extends HookWidget {
   final WatchFilterDraft initial;
+  final ValueNotifier<int> page;
   final Widget child;
 
-  const _DraftScope({required this.initial, required this.child});
+  const _DraftScope({
+    required this.initial,
+    required this.page,
+    required this.child,
+  });
 
   @override
-  Widget build(BuildContext context) =>
-      _Draft(notifier: useValueNotifier(initial), child: child);
+  Widget build(BuildContext context) {
+    final draft = _Draft(notifier: useValueNotifier(initial), child: child);
+    return ValueListenableBuilder(
+      valueListenable: page,
+      builder: (context, index, _) => PopScope(
+        canPop: index == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) page.value = 0;
+        },
+        child: draft,
+      ),
+    );
+  }
 }
 
 class _Draft extends InheritedNotifier<ValueNotifier<WatchFilterDraft>> {
