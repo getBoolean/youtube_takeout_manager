@@ -8,10 +8,17 @@ import 'package:squadron/squadron.dart' show SquadronException;
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/name_key.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorize_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
@@ -515,7 +522,27 @@ class _ActiveFilters extends ConsumerWidget {
         : const ChannelSelection();
     final channels = selection.channels.values.toList();
     final categories = selection.categories.toList();
+    final tags = selection.tags.toList();
     final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
+    final emojiOf = ref.watch(categoryEmojiOfProvider);
+    // Only looked at while categories or tags are picked.
+    final custom = categories.isEmpty
+        ? const <String, List<SubCategory>>{}
+        : ref.watch(customCategoriesProvider).value ?? const {};
+    final tagNames = tags.isEmpty
+        ? const <String, TagName>{}
+        : ref.watch(tagNamesProvider).value ?? const {};
+    bool aiSubCategory(CategoryPick pick) =>
+        switch ((pick.parent, pick.child)) {
+          (final parent?, final child?) =>
+            custom[parent]?.any(
+                  (sub) =>
+                      sub.origin == NameOrigin.ai &&
+                      nameKey(sub.name) == nameKey(child),
+                ) ??
+                false,
+          _ => false,
+        };
     final none =
         !removedOnly &&
         subscription == SubscriptionFilter.all &&
@@ -528,6 +555,7 @@ class _ActiveFilters extends ConsumerWidget {
       required Widget avatar,
       required String label,
       String? tooltip,
+      bool ai = false,
       required String clearTooltip,
       required VoidCallback onClear,
     }) => InputChip(
@@ -535,7 +563,13 @@ class _ActiveFilters extends ConsumerWidget {
       avatar: avatar,
       label: Tooltip(
         message: tooltip ?? label,
-        child: Text(label, overflow: TextOverflow.ellipsis),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+            if (ai) ...[const SizedBox(width: 4), const AiMark(size: 14)],
+          ],
+        ),
       ),
       deleteButtonTooltipMessage: clearTooltip,
       onDeleted: onClear,
@@ -604,15 +638,33 @@ class _ActiveFilters extends ConsumerWidget {
                     ),
                   for (final pick in categories)
                     chip(
-                      avatar: const Icon(Icons.category_outlined, size: 18),
+                      avatar: Text(
+                        emojiOf(switch (pick.parent) {
+                          final parent? => CategoryPath(parent, pick.child),
+                          null => null,
+                        }),
+                      ),
                       label: pick.label,
+                      ai: aiSubCategory(pick),
                       clearTooltip:
-                          selection.channels.isEmpty && categories.length == 1
+                          selection.channels.isEmpty &&
+                              tags.isEmpty &&
+                              categories.length == 1
                           ? 'Show every category'
                           : 'Remove ${pick.label}',
                       onClear: () => ref
                           .read(historyChannelSelectionProvider.notifier)
                           .removeCategory(pick),
+                    ),
+                  for (final tag in tags)
+                    chip(
+                      avatar: const Icon(Icons.sell_outlined, size: 18),
+                      label: tag,
+                      ai: tagNames[nameKey(tag)]?.origin == NameOrigin.ai,
+                      clearTooltip: 'Remove $tag',
+                      onClear: () => ref
+                          .read(historyChannelSelectionProvider.notifier)
+                          .removeTag(tag),
                     ),
                   for (final channel in channels.take(_channelChips))
                     chip(

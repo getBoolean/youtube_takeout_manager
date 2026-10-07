@@ -9,6 +9,10 @@ import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:squadron/squadron.dart' show WorkerException;
@@ -114,6 +118,15 @@ class _Formats extends VideoFormats {
 
   @override
   Future<Map<String, VideoFormat>> build() async => formats;
+}
+
+class _Names extends TagNames {
+  _Names(this.names);
+
+  final Map<String, TagName> names;
+
+  @override
+  Future<Map<String, TagName>> build() async => names;
 }
 
 /// History whose load fails with [error], as the History worker passes it
@@ -608,6 +621,88 @@ void main() {
 
     expect(find.byType(CategoryNestHeader), findsNothing);
     expect(_shown('Café tour'), findsOneWidget);
+  });
+
+  group('tags picked', () {
+    Future<ProviderContainer> openTagged(WidgetTester tester) async {
+      final c = await _open(
+        tester,
+        categories: {
+          'UCx': ChannelCategory(
+            path: const CategoryPath('Gaming', 'Action game'),
+            tags: const ['Speedruns', 'Retro'],
+            decidedAt: DateTime.utc(2026, 9, 30),
+          ),
+        },
+        overrides: [
+          tagNamesProvider.overrideWith(
+            () => _Names({
+              'speedruns': const TagName(name: 'Speedruns'),
+              'retro': const TagName(name: 'Retro', origin: NameOrigin.user),
+            }),
+          ),
+        ],
+      );
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(const ChannelSelection(tags: {'Speedruns', 'Retro'}));
+      await tester.pumpAndSettle();
+      return c;
+    }
+
+    Finder tagChip(String name) => find.widgetWithText(InputChip, name);
+
+    testWidgets('show as chips, marked when AI made the tag', (tester) async {
+      await openTagged(tester);
+
+      expect(_shown('Café tour'), findsOneWidget);
+      expect(_shown('Other'), findsNothing);
+      expect(
+        find.descendant(
+          of: tagChip('Speedruns'),
+          matching: find.byType(AiMark),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: tagChip('Retro'), matching: find.byType(AiMark)),
+        findsNothing,
+      );
+    });
+
+    testWidgets("a tag's chip removes it", (tester) async {
+      final c = await openTagged(tester);
+
+      // Its delete button, last.
+      await tester.tap(
+        find
+            .descendant(of: tagChip('Speedruns'), matching: find.byType(Icon))
+            .last,
+      );
+      await tester.pumpAndSettle();
+
+      expect(c.read(historyChannelSelectionProvider).tags, {'Retro'});
+      expect(tagChip('Speedruns'), findsNothing);
+    });
+  });
+
+  testWidgets("a category's chip shows its emoji", (tester) async {
+    final c = await _open(tester, categories: _gamingX());
+
+    c
+        .read(historyChannelSelectionProvider.notifier)
+        .set(
+          ChannelSelection(categories: {const CategoryPick.category('Gaming')}),
+        );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: find.widgetWithText(InputChip, 'Gaming'),
+        matching: find.text('🎮'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('a category and a channel ticked together both narrow what '

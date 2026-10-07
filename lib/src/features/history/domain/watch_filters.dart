@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/name_key.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
@@ -15,39 +16,48 @@ enum SubscriptionFilter { all, subscribed, notSubscribed }
 enum ShowFilter { all, only, hide }
 
 /// The channels picked to narrow the watched videos to, by
-/// [HistoryChannel.key], and the categories whose channels are; nothing
-/// picked narrows nothing.
+/// [HistoryChannel.key], the categories whose channels are, and the tags
+/// whose channels are, by name; nothing picked narrows nothing.
 class ChannelSelection {
   final Map<String, HistoryChannel> channels;
   final Set<CategoryPick> categories;
+  final Set<String> tags;
 
   const ChannelSelection({
     this.channels = const {},
     this.categories = const {},
+    this.tags = const {},
   });
 
-  bool get isEmpty => channels.isEmpty && categories.isEmpty;
+  bool get isEmpty => channels.isEmpty && categories.isEmpty && tags.isEmpty;
 
   /// Whether the channel [key] is picked itself.
   bool contains(String key) => channels.containsKey(key);
 
-  /// Whether the channel [key], in [category], is let through: nothing is
-  /// picked, or it or its category is.
-  bool allows(String key, CategoryPath? category) =>
+  /// Whether the channel [key], in [category] with [tags], is let through:
+  /// nothing is picked, or it, its category or one of its tags is.
+  bool allows(String key, CategoryPath? category, List<String> tags) =>
       isEmpty ||
       channels.containsKey(key) ||
-      categories.any((pick) => pick.matches(category));
+      categories.any((pick) => pick.matches(category)) ||
+      (this.tags.isNotEmpty &&
+          tags.any((tag) => _tagKeys.contains(_tagKey(tag))));
+
+  /// The tags picked, as their names fold.
+  Set<String> get _tagKeys => {for (final tag in tags) _tagKey(tag)};
 
   @override
   bool operator ==(Object other) =>
       other is ChannelSelection &&
       _sameSet(other.channels.keys.toSet(), channels.keys.toSet()) &&
-      _sameSet(other.categories, categories);
+      _sameSet(other.categories, categories) &&
+      _sameSet(other.tags, tags);
 
   @override
   int get hashCode => Object.hash(
     Object.hashAllUnordered(channels.keys),
     Object.hashAllUnordered(categories),
+    Object.hashAllUnordered(tags),
   );
 }
 
@@ -99,6 +109,15 @@ class WatchMask {
   int get hashCode => Object.hashAll(_flags);
 }
 
+/// Each tag name as it folds, kept: thousands of channels share a few
+/// hundred tags, and the channel filters fold them for every channel.
+final _foldedTags = <String, String>{};
+
+String _tagKey(String tag) {
+  if (_foldedTags.length > 20000) _foldedTags.clear();
+  return _foldedTags[tag] ??= nameKey(tag);
+}
+
 bool _sameSet<T>(Set<T> a, Set<T> b) =>
     a.length == b.length && a.containsAll(b);
 
@@ -112,32 +131,36 @@ bool _sameBytes(Uint8List a, Uint8List b) {
 }
 
 /// Whether the channel [key] passes the channel filters, being [subscribed]
-/// or not and in [category]: the subscription filter, and, when channels or
-/// categories are picked, being one of them or in one.
+/// or not, in [category] and with [tags]: the subscription filter, and,
+/// when channels, categories or tags are picked, being one of them, in one
+/// or having one.
 bool channelPasses({
   required String key,
   required bool subscribed,
   required SubscriptionFilter subscription,
   required ChannelSelection selection,
   CategoryPath? category,
+  List<String> tags = const [],
 }) =>
     switch (subscription) {
       SubscriptionFilter.all => true,
       SubscriptionFilter.subscribed => subscribed,
       SubscriptionFilter.notSubscribed => !subscribed,
     } &&
-    selection.allows(key, category);
+    selection.allows(key, category, tags);
 
 /// The channels of [channels] that pass the filters, or null when the
 /// filters narrow nothing. [subscribedKeys] are the keys of the channels
 /// subscribed to; [categoryOf] gives a channel's category, needed only
-/// while categories are picked.
+/// while categories are picked, and [tagsOf] its tags, only while tags
+/// are.
 ChannelMask? buildChannelMask({
   required List<WatchedChannel> channels,
   required Set<String> subscribedKeys,
   required SubscriptionFilter subscription,
   required ChannelSelection selection,
   CategoryPath? Function(String key)? categoryOf,
+  List<String> Function(String key)? tagsOf,
 }) {
   if (subscription == SubscriptionFilter.all && selection.isEmpty) return null;
   final shown = Uint8List(channels.length);
@@ -149,6 +172,7 @@ ChannelMask? buildChannelMask({
       subscription: subscription,
       selection: selection,
       category: selection.categories.isEmpty ? null : categoryOf?.call(key),
+      tags: selection.tags.isEmpty ? const [] : tagsOf?.call(key) ?? const [],
     )) {
       shown[i] = 1;
     }

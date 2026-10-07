@@ -224,4 +224,83 @@ void main() {
     );
     expect(picked, isNot(const ChannelSelection()));
   });
+
+  group('tags picked', () {
+    List<String> shown(ChannelMask? mask) => [
+      for (final (i, c) in _channels.indexed)
+        if (mask == null || mask.allows(i)) c.channel.title,
+    ];
+    const categories = {'UCa': CategoryPath('Gaming', 'Action game')};
+    const tags = {
+      'UCa': ['Speedruns'],
+      'UCb': ['Mario Kart World', 'Speedruns'],
+    };
+    ChannelMask? byTag(
+      ChannelSelection selection, {
+      SubscriptionFilter subscription = SubscriptionFilter.all,
+    }) => buildChannelMask(
+      channels: _channels,
+      subscribedKeys: const {'UCa'},
+      subscription: subscription,
+      selection: selection,
+      categoryOf: (key) => categories[key],
+      tagsOf: (key) => tags[key] ?? const [],
+    );
+
+    test(
+      'keep the channels with any of them, whatever the case or accents',
+      () {
+        expect(
+          shown(byTag(const ChannelSelection(tags: {'mario kart world'}))),
+          ['Beta'],
+        );
+        expect(
+          shown(byTag(const ChannelSelection(tags: {'Speedruns', 'Nothing'}))),
+          ['Alpha', 'Beta'],
+        );
+      },
+    );
+
+    test('and a category picked keep a channel matching either, once', () {
+      expect(
+        shown(
+          byTag(
+            ChannelSelection(
+              tags: const {'Mario Kart World'},
+              categories: {const CategoryPick.category('Gaming')},
+            ),
+          ),
+        ),
+        ['Alpha', 'Beta'],
+      );
+    });
+
+    test('keep only channels that also pass the subscription filter', () {
+      expect(
+        shown(
+          byTag(
+            const ChannelSelection(tags: {'Speedruns'}),
+            subscription: SubscriptionFilter.subscribed,
+          ),
+        ),
+        ['Alpha'],
+      );
+    });
+
+    test('a tag no channel has any more keeps none', () {
+      expect(shown(byTag(const ChannelSelection(tags: {'Gone'}))), isEmpty);
+    });
+
+    test('are something picked, and part of what makes selections equal', () {
+      const picked = ChannelSelection(tags: {'Speedruns'});
+
+      expect(picked.isEmpty, isFalse);
+      expect(picked, const ChannelSelection(tags: {'Speedruns'}));
+      expect(picked, isNot(const ChannelSelection(tags: {'Retro'})));
+      expect(
+        picked.hashCode,
+        const ChannelSelection(tags: {'Speedruns'}).hashCode,
+      );
+    });
+  });
 }

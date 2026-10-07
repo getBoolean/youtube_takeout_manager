@@ -75,6 +75,19 @@ CategoryPath? Function(String key)? historyPickedCategoryOf(Ref ref) {
   return (key) => categories[key]?.path;
 }
 
+/// Each channel's tags, by key, while tags are picked; null otherwise, so
+/// tags arriving don't search again.
+@riverpod
+List<String> Function(String key)? historyPickedTagsOf(Ref ref) {
+  if (ref.watch(
+    historyChannelSelectionProvider.select((s) => s.tags.isEmpty),
+  )) {
+    return null;
+  }
+  final categories = ref.watch(channelCategoriesProvider).value ?? const {};
+  return (key) => categories[key]?.tags ?? const [];
+}
+
 /// The watched channels the channel filters show, or null when they narrow
 /// nothing.
 @riverpod
@@ -86,6 +99,7 @@ ChannelMask? historyChannelMask(Ref ref) => buildChannelMask(
   subscription: ref.watch(historySubscriptionFilterProvider),
   selection: ref.watch(historyChannelSelectionProvider),
   categoryOf: ref.watch(historyPickedCategoryOfProvider),
+  tagsOf: ref.watch(historyPickedTagsOfProvider),
 );
 
 /// How many videos were watched from each channel of [loaded], in its
@@ -240,6 +254,7 @@ ChannelGroups historyChannelGroups(Ref ref) {
   }
   final selection = ref.watch(historyChannelSelectionProvider);
   final categoryOf = ref.watch(historyPickedCategoryOfProvider);
+  final tagsOf = ref.watch(historyPickedTagsOfProvider);
   final query = foldForSearch(ref.watch(historySearchQueryProvider));
   return groups.withUnwatched([
     for (final channel in unwatched)
@@ -249,6 +264,7 @@ ChannelGroups historyChannelGroups(Ref ref) {
             subscription: subscription,
             selection: selection,
             category: categoryOf?.call(channel.key),
+            tags: tagsOf?.call(channel.key) ?? const [],
           ) &&
           (query.isEmpty || foldForSearch(channel.title).contains(query)))
         channel,

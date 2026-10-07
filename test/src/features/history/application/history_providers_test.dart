@@ -96,14 +96,19 @@ class _Formats extends VideoFormats {
 }
 
 class _Categories extends ChannelCategories {
-  _Categories(this.categories);
+  _Categories(this.categories, {this.tags = const {}});
 
   final Map<String, CategoryPath?> categories;
+  final Map<String, List<String>> tags;
 
   @override
   Future<Map<String, ChannelCategory>> build() async => {
-    for (final MapEntry(:key, :value) in categories.entries)
-      key: ChannelCategory(path: value, decidedAt: DateTime.utc(2026, 9, 30)),
+    for (final key in {...categories.keys, ...tags.keys})
+      key: ChannelCategory(
+        path: categories[key],
+        tags: tags[key] ?? const [],
+        decidedAt: DateTime.utc(2026, 9, 30),
+      ),
   };
 }
 
@@ -178,6 +183,7 @@ void main() {
   ProviderContainer container({
     TakeoutHistory? history,
     Map<String, CategoryPath?> categories = const {},
+    Map<String, List<String>> tags = const {},
     HistoryEngine? engine,
   }) {
     final c = ProviderContainer(
@@ -186,7 +192,9 @@ void main() {
         if (engine != null) historyEngineProvider.overrideWithValue(engine),
         if (history != null)
           takeoutHistoryProvider.overrideWith(() => _Fixed(history)),
-        channelCategoriesProvider.overrideWith(() => _Categories(categories)),
+        channelCategoriesProvider.overrideWith(
+          () => _Categories(categories, tags: tags),
+        ),
       ],
     );
     addTearDown(c.dispose);
@@ -199,8 +207,9 @@ void main() {
   /// [categories].
   Future<ProviderContainer> loaded({
     Map<String, CategoryPath?> categories = const {},
+    Map<String, List<String>> tags = const {},
   }) async {
-    final c = container(history: _history, categories: categories);
+    final c = container(history: _history, categories: categories, tags: tags);
     await c.read(takeoutHistoryProvider.future);
     await c.read(channelCategoriesProvider.future);
     return c;
@@ -614,6 +623,50 @@ void main() {
       ],
       ['Song'],
     );
+  });
+
+  group('tags', () {
+    Future<ProviderContainer> tagged() => loaded(
+      tags: {
+        'UCx': ['Speedruns', 'Retro'],
+      },
+    );
+
+    test('picking one shows only the videos of channels with it, whatever '
+        'its case', () async {
+      final c = await tagged();
+
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(const ChannelSelection(tags: {'speedruns'}));
+      await _settle(c);
+
+      expect(watchTitles(c), ['Café tour', 'Unrelated', 'Last']);
+    });
+
+    test('removing the one picked shows every channel again', () async {
+      final c = await tagged();
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(const ChannelSelection(tags: {'Speedruns'}));
+      await _settle(c);
+
+      c.read(historyChannelSelectionProvider.notifier).removeTag('Speedruns');
+      await _settle(c);
+
+      expect(watchTitles(c), hasLength(4));
+    });
+
+    test('one no channel has any more shows nothing', () async {
+      final c = await tagged();
+
+      c
+          .read(historyChannelSelectionProvider.notifier)
+          .set(const ChannelSelection(tags: {'Gone'}));
+      await _settle(c);
+
+      expect(watchTitles(c), isEmpty);
+    });
   });
 
   group('categories', () {

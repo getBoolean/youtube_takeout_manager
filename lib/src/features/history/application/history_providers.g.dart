@@ -274,6 +274,64 @@ final class HistoryPickedCategoryOfProvider
 String _$historyPickedCategoryOfHash() =>
     r'7c3bff0b01580936b379dfd18fd10b9b915cc170';
 
+/// Each channel's tags, by key, while tags are picked; null otherwise, so
+/// tags arriving don't search again.
+
+@ProviderFor(historyPickedTagsOf)
+final historyPickedTagsOfProvider = HistoryPickedTagsOfProvider._();
+
+/// Each channel's tags, by key, while tags are picked; null otherwise, so
+/// tags arriving don't search again.
+
+final class HistoryPickedTagsOfProvider
+    extends
+        $FunctionalProvider<
+          List<String> Function(String key)?,
+          List<String> Function(String key)?,
+          List<String> Function(String key)?
+        >
+    with $Provider<List<String> Function(String key)?> {
+  /// Each channel's tags, by key, while tags are picked; null otherwise, so
+  /// tags arriving don't search again.
+  HistoryPickedTagsOfProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyPickedTagsOfProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyPickedTagsOfHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<String> Function(String key)?> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<String> Function(String key)? create(Ref ref) {
+    return historyPickedTagsOf(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<String> Function(String key)? value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<String> Function(String key)?>(
+        value,
+      ),
+    );
+  }
+}
+
+String _$historyPickedTagsOfHash() =>
+    r'8b032fe972ce0a05368c4b29db561f09438e7636';
+
 /// The watched channels the channel filters show, or null when they narrow
 /// nothing.
 
@@ -322,7 +380,7 @@ final class HistoryChannelMaskProvider
 }
 
 String _$historyChannelMaskHash() =>
-    r'7d1e8486167cc00503dc2596836032fee7f14a5f';
+    r'e82a9962e96068fcc1d1a937640d03af13b9b10f';
 
 /// How many videos were watched from each watched channel, in the loaded
 /// history's order, of the kinds of videos shown: Shorts and YouTube Music
@@ -821,7 +879,7 @@ final class HistoryChannelGroupsProvider
 }
 
 String _$historyChannelGroupsHash() =>
-    r'b9866c876d7950c88ac22563e0948a4902f879e1';
+    r'fa9d4ddffa581c17e00ec0d00a461704e88b77bb';
 
 /// The watched videos shown grouped by channel, nested under the
 /// categories picked; none while no category is.
