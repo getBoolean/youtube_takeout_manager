@@ -26,10 +26,11 @@ Future<int> _best(Future<void> Function() work) async {
 /// heavy viewer's: the first measured run's times (2026-10-05, in the test
 /// VM: load 1256, search 145, channels 96, by channel 9, by day 57,
 /// counts 10, picks 87), three times over, and at least 50 (ruling 13).
-/// Loading on the worker was first measured on 2026-10-07: 2618.
+/// Loading on the worker was first measured on 2026-10-07, once it read
+/// the history once: 1334.
 const _budgets = {
   'load': 3768,
-  'load on the worker': 7854,
+  'load on the worker': 4002,
   'search': 435,
   'channels': 288,
   'by channel': 50,
