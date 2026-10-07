@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:youtube_takeout_manager/src/config/ai_config.dart';
 import '../data/ai_errors.dart';
+import '../data/ai_request.dart';
 import '../data/anthropic_repository.dart';
 import '../data/typesafe_repository.dart';
 import '../domain/categorization_plan.dart';
@@ -11,6 +14,8 @@ import '../domain/channel_category.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/name_key.dart';
+import '../domain/tag_candidates.dart';
+import '../domain/tag_name.dart';
 import '../domain/youtube_taxonomy.dart';
 import '../domain/youtube_topics.dart';
 import 'ai_tiers.dart';
@@ -49,6 +54,10 @@ const _maxChildren = 200;
 /// Sub-categories offered Jev at most, leaving room for [jevGeneral].
 const _maxOffered = JevChoice.maxOptions - 1;
 
+/// Requests about several channels Claude is sent at once; its pacer keeps
+/// them within its limits too.
+const _groupsAtOnce = 3;
+
 /// The steps that decide a category, as opposed to tags.
 const _categorySteps = {
   PromptStep.jevCheck,
@@ -57,52 +66,116 @@ const _categorySteps = {
   PromptStep.claudeCategory,
 };
 
+/// What a channel needs from Claude: its category, with its tags, or its
+/// tags alone.
+enum ClaudeAsk { category, tags }
+
+/// A channel left for Claude by [CategoryPipeline.prepare]: what's known
+/// about it, what it needs, the category settled without Claude when only
+/// its tags are wanted, the tags Jev kept with how sure it was, the steps
+/// asked so far, how sure Jev was of YouTube's category, and a category the
+/// user says is wrong.
+class ClaudeTicket {
+  final ChannelInput input;
+  final ClaudeAsk ask;
+  final ChannelCategory? settled;
+  final List<(TagCandidate, double)> kept;
+  final Set<PromptStep> asked;
+  final double? jevAgreed;
+  final CategoryPath? inaccurate;
+
+  const ClaudeTicket._(
+    this.input,
+    this.ask, {
+    this.settled,
+    this.kept = const [],
+    required this.asked,
+    this.jevAgreed,
+    this.inaccurate,
+  });
+}
+
+/// What [CategoryPipeline.prepare] made of a channel.
+sealed class Prepared {
+  const Prepared();
+}
+
+/// Done without Claude: the channel's [result].
+final class Settled extends Prepared {
+  final ChannelCategory result;
+
+  const Settled(this.result);
+}
+
+/// Waiting for Claude, as [ticket] says.
+final class NeedsClaude extends Prepared {
+  final ClaudeTicket ticket;
+
+  const NeedsClaude(this.ticket);
+}
+
+/// Jev's check of the user's tags: how sure it is that each fits, by key,
+/// as of the tags there were [at]; to apply to the channel's tags as they
+/// are when it lands, the user's edits kept.
+final class Checked extends Prepared {
+  final Map<String, double> yes;
+  final DateTime at;
+
+  const Checked(this.yes, this.at);
+}
+
 /// Jev's pick: a category, how sure it is, and what came next.
 typedef _Pick = ({CategoryPath path, double score, List<ScoredPath> runnersUp});
 
-/// Picks a channel's category, cheapest step first: YouTube's topics; with
-/// [jev], Jev's check of them, then its own pick from [taxonomy]; and with
-/// [claude], Claude, only when Jev can't settle it (or, without Jev, when
-/// YouTube gives no sub-category). A sub-category Claude names that
-/// [taxonomy] lacks joins it, unless Jev finds it's one there already.
+const _categorizing = (
+  work: ChannelWork.categorize,
+  redo: false,
+  checkTags: false,
+);
+const _tagging = (work: ChannelWork.tags, redo: false, checkTags: false);
+
+/// Categorizes channels in two phases, cheapest first.
 ///
-/// With Claude, every channel gets one Claude call: the category and its
-/// tags together when Claude names the category, else its tags alone. Each
-/// result keeps the fingerprints of the prompts that made it.
+/// [prepare] does what needs no Claude: YouTube's topics; with [jev], Jev's
+/// check of them, then its own pick from [taxonomy]; then the channel's
+/// tags from Jev, as Jev finds the tags there are fit. What's left for
+/// Claude comes back as a ticket: a category Jev couldn't settle (or, without
+/// Jev, one YouTube gives no sub-category for), or tags Jev found are
+/// missing. [askClaude] asks Claude about many tickets at once, in groups. A
+/// sub-category Claude names that [taxonomy] lacks joins it, unless Jev
+/// finds it's one there already. Each result keeps the fingerprints of the
+/// prompts that made it.
 ///
 /// Throws an [AiTierFailure] naming the service when an AI step can't be
-/// done, except for one with no usable answer for the channel: that
-/// channel keeps YouTube's category, the step counted as tried.
+/// done, except for one with no usable answer for a channel: that channel
+/// keeps what was settled, the step counted as tried.
 class CategoryPipeline {
   Taxonomy _taxonomy;
   final Map<CategoryPath, int> _usage;
-  final List<String> _knownTags;
-  final Map<String, String> _tagSpellings;
   final Map<PromptStep, String> _fingerprints;
   final JevAccess? jev;
   final ClaudeAccess? claude;
+  final void Function(int inputTokens, int outputTokens)? _onUsage;
   final DateTime Function() _now;
   final _learned = <Learned>[];
+  final _named = <NamedTag>[];
 
   /// Picks from [taxonomy]; [usage], how many channels have each category,
   /// decides which sub-categories Jev is offered when there are more than it
-  /// takes. Claude is told [knownTags] to reuse, and a tag it names is
-  /// spelled as [tagSpellings] has it (by `nameKey`). Results keep
-  /// [fingerprints] of the prompts asked.
+  /// takes. Results keep [fingerprints] of the prompts asked. [onUsage] is
+  /// told the tokens each answer of Claude's used.
   CategoryPipeline({
     required Taxonomy taxonomy,
     Map<CategoryPath, int> usage = const {},
-    List<String> knownTags = const [],
-    Map<String, String> tagSpellings = const {},
     Map<PromptStep, String>? fingerprints,
     this.jev,
     this.claude,
+    void Function(int inputTokens, int outputTokens)? onUsage,
     DateTime Function()? now,
   }) : _taxonomy = taxonomy,
        _usage = usage,
-       _knownTags = knownTags,
-       _tagSpellings = tagSpellings,
        _fingerprints = fingerprints ?? currentPrompts,
+       _onUsage = onUsage,
        _now = now ?? DateTime.now;
 
   /// The categories it picks from, with the sub-categories Claude added.
@@ -115,6 +188,13 @@ class CategoryPipeline {
     return learned;
   }
 
+  /// The tags Claude named since last asked, with their meanings, to keep.
+  List<NamedTag> takeNamedTags() {
+    final named = [..._named];
+    _named.clear();
+    return named;
+  }
+
   /// The steps it takes.
   Set<CategorizationTier> get tiers => {
     CategorizationTier.youtube,
@@ -122,6 +202,7 @@ class CategoryPipeline {
     if (claude != null) CategorizationTier.claude,
   };
 
+  /// A channel's category as [asked] made it, with no tags yet.
   ChannelCategory _result(
     ChannelInput input,
     Set<PromptStep> asked, {
@@ -131,80 +212,95 @@ class CategoryPipeline {
     double? confidence,
     List<ScoredPath> runnersUp = const [],
     String? reason,
-    List<String> tags = const [],
-  }) {
-    final tagsStep = asked.contains(PromptStep.claudeCategory)
-        ? PromptStep.claudeCategory
-        : asked.contains(PromptStep.claudeTags)
-        ? PromptStep.claudeTags
-        : null;
-    return ChannelCategory(
-      path: path,
-      source: source,
-      jevAgreed: jevAgreed,
-      confidence: confidence,
-      runnersUp: runnersUp,
-      reason: reason,
-      tried: tiers,
-      hadTopics: input.topicUrls.isNotEmpty,
-      decidedAt: _now().toUtc(),
-      tags: tags,
-      tagsTried: tagsStep != null,
-      // Claude's tags keep the tags prompt's fingerprint, whichever call
-      // named them.
-      tagsPrompts: tagsStep == null
-          ? const {}
-          : {PromptStep.claudeTags.name: _fingerprints[PromptStep.claudeTags]!},
-      prompts: {
-        for (final step in asked)
-          if (_categorySteps.contains(step)) step.name: _fingerprints[step]!,
-      },
-    );
-  }
+  }) => ChannelCategory(
+    path: path,
+    source: source,
+    jevAgreed: jevAgreed,
+    confidence: confidence,
+    runnersUp: runnersUp,
+    reason: reason,
+    tried: tiers,
+    hadTopics: input.topicUrls.isNotEmpty,
+    decidedAt: _now().toUtc(),
+    prompts: {
+      for (final step in asked)
+        if (_categorySteps.contains(step)) step.name: _fingerprints[step]!,
+    },
+  );
 
-  Future<ChannelCategory> categorize(ChannelInput input) async {
+  /// [base] with its tags: those Jev [kept], then those Claude [added], as
+  /// [rankTags] orders them; waiting for Claude when [awaitClaude]. Claude's
+  /// tags keep the tags prompt's fingerprint, whichever call named them.
+  ChannelCategory _tagged(
+    ChannelCategory base,
+    Set<PromptStep> asked,
+    TagIndex tags, {
+    List<(TagCandidate, double)> kept = const [],
+    List<String> added = const [],
+    bool awaitClaude = false,
+  }) => base.copyWith(
+    tags: rankTags(kept, added, tags.names),
+    tagsTried: true,
+    tagsPrompt: null,
+    tagsPrompts: {
+      if (asked.contains(PromptStep.jevTags))
+        PromptStep.jevTags.name: _fingerprints[PromptStep.jevTags]!,
+      if (asked.contains(PromptStep.claudeTags) ||
+          asked.contains(PromptStep.claudeCategory))
+        PromptStep.claudeTags.name: _fingerprints[PromptStep.claudeTags]!,
+    },
+    tagsAwaitClaude: awaitClaude,
+    tagsCheckedAt: tags.at,
+  );
+
+  /// What [plan] has done for the channel [input] tells of, whose category
+  /// is [existing], without Claude: settled, left for Claude, or, for a
+  /// check of the user's tags, Jev's answers. [tags] are the tags there are
+  /// to offer.
+  Future<Prepared> prepare(
+    ChannelInput input,
+    WorkPlan plan, {
+    ChannelCategory? existing,
+    required TagIndex tags,
+  }) async {
+    if (plan.work == ChannelWork.none) {
+      return plan.checkTags
+          ? _check(input, existing, tags)
+          : Checked(const {}, tags.at);
+    }
     final asked = <PromptStep>{};
     try {
-      return await _categorize(input, asked);
+      return switch (plan.work) {
+        ChannelWork.categorize => await _settle(input, asked, tags),
+        ChannelWork.tags => await _tagsOnto(input, existing!, asked, tags),
+        ChannelWork.claudeTags => _awaitingClaude(input, existing!, tags),
+        ChannelWork.none => throw StateError('Nothing to do'),
+      };
     } on AiTierFailure catch (e) {
       if (e.failure is! AiNoAnswer) rethrow;
       // About this channel alone, such as a refusal, and paid for: asking
       // again would only pay again.
-      return _result(
-        input,
-        asked,
-        path: youtubeCandidates(input.topicUrls).firstOrNull,
-      );
+      return Settled(switch (plan.work) {
+        ChannelWork.categorize => _tagged(
+          _result(
+            input,
+            asked,
+            path: youtubeCandidates(input.topicUrls).firstOrNull,
+          ),
+          asked,
+          tags,
+        ),
+        _ => _tagged(existing!, asked, tags),
+      });
     }
   }
 
-  /// [current]'s tags alone, from Claude, for its category: none when it
-  /// gave no usable answer, still counted as tried. Without Claude, as it
-  /// is.
-  Future<ChannelCategory> retag(
-    ChannelInput input,
-    ChannelCategory current,
-  ) async {
-    final claude = this.claude;
-    final path = current.path;
-    if (claude == null) return current;
-    final tagged = path == null
-        ? const <String>[]
-        : await _tagsOnly(claude, input, path);
-    return current.copyWith(
-      tags: tagged,
-      tagsTried: true,
-      tagsPrompt: null,
-      tagsPrompts: {
-        PromptStep.claudeTags.name: _fingerprints[PromptStep.claudeTags]!,
-      },
-      tagsAwaitClaude: false,
-    );
-  }
-
-  Future<ChannelCategory> _categorize(
+  /// The category from YouTube and Jev, with its tags, or a ticket for
+  /// Claude when they can't settle it.
+  Future<Prepared> _settle(
     ChannelInput input,
     Set<PromptStep> asked,
+    TagIndex tags,
   ) async {
     final candidates = youtubeCandidates(input.topicUrls);
     final jev = this.jev;
@@ -213,9 +309,16 @@ class CategoryPipeline {
       // names what YouTube gives no sub-category for.
       final youtube = candidates.firstOrNull;
       if (claude == null || youtube?.child != null) {
-        return _withTags(input, asked, path: youtube);
+        return _tagsOnto(
+          input,
+          _result(input, asked, path: youtube),
+          asked,
+          tags,
+        );
       }
-      return _claudeCategory(input, asked);
+      return NeedsClaude(
+        ClaudeTicket._(input, ClaudeAsk.category, asked: asked),
+      );
     }
 
     final state = input.evidence.toState();
@@ -239,109 +342,463 @@ class CategoryPipeline {
       }
     }
     if (agreed != null && agreement! >= jevThreshold) {
-      return _withTags(input, asked, path: agreed, jevAgreed: agreement);
+      return _tagsOnto(
+        input,
+        _result(input, asked, path: agreed, jevAgreed: agreement),
+        asked,
+        tags,
+      );
     }
 
     final pick = await _jevPick(jev, state, answers['parent'], asked);
     if (pick != null && pick.score >= jevThreshold) {
-      return _withTags(
+      return _tagsOnto(
         input,
+        _result(
+          input,
+          asked,
+          path: pick.path,
+          source: CategorySource.jev,
+          jevAgreed: agreement,
+          confidence: pick.score,
+          runnersUp: pick.runnersUp,
+        ),
         asked,
-        path: pick.path,
-        source: CategorySource.jev,
-        jevAgreed: agreement,
-        confidence: pick.score,
-        runnersUp: pick.runnersUp,
+        tags,
       );
     }
     if (claude != null) {
-      return _claudeCategory(input, asked, jevAgreed: agreement);
+      return NeedsClaude(
+        ClaudeTicket._(
+          input,
+          ClaudeAsk.category,
+          asked: asked,
+          jevAgreed: agreement,
+        ),
+      );
     }
-    return _result(
+    return _tagsOnto(
       input,
+      _result(input, asked, path: candidates.firstOrNull, jevAgreed: agreement),
       asked,
-      path: candidates.firstOrNull,
-      jevAgreed: agreement,
+      tags,
     );
   }
 
-  /// The result settled without Claude naming the category, with Claude's
-  /// tags for it when Claude is there.
-  Future<ChannelCategory> _withTags(
+  /// [base] with its tags from Jev: the tags it finds fit, of those [tags]
+  /// offers for the channel; left for Claude when Jev finds it's about
+  /// something no tag names, or there are none to offer. Without Claude,
+  /// such a channel waits for it. A channel with no category gets none.
+  Future<Prepared> _tagsOnto(
     ChannelInput input,
-    Set<PromptStep> asked, {
-    CategoryPath? path,
-    CategorySource source = CategorySource.youtube,
-    double? jevAgreed,
-    double? confidence,
-    List<ScoredPath> runnersUp = const [],
+    ChannelCategory base,
+    Set<PromptStep> asked,
+    TagIndex tags,
+  ) async {
+    final path = base.path;
+    final jev = this.jev;
+    if (path == null || (jev == null && claude == null)) return Settled(base);
+    final candidates = jev == null
+        ? const <TagCandidate>[]
+        : tags.candidatesFor(input.evidence, path);
+    var kept = const <(TagCandidate, double)>[];
+    // With nothing to offer Jev, Claude names them.
+    var other = true;
+    if (candidates.isNotEmpty) {
+      asked.add(PromptStep.jevTags);
+      final read = readJevTags(
+        await _askJev(
+          jev!,
+          input.evidence.toState(),
+          jevTagQuestions(candidates),
+        ),
+        candidates,
+      );
+      kept = [
+        for (final candidate in candidates)
+          if (read.yes[candidate.key] case final yes? when yes >= jevThreshold)
+            (candidate, yes),
+      ];
+      other = read.other >= otherThreshold;
+    }
+    final missing = other && kept.length < maxTags;
+    if (missing && claude != null) {
+      return NeedsClaude(
+        ClaudeTicket._(
+          input,
+          ClaudeAsk.tags,
+          settled: base,
+          kept: kept,
+          asked: asked,
+        ),
+      );
+    }
+    return Settled(
+      _tagged(base, asked, tags, kept: kept, awaitClaude: missing),
+    );
+  }
+
+  /// A ticket for Claude's tags for [existing], whose tags Jev found miss
+  /// something; the tags it has stay first, in order.
+  Prepared _awaitingClaude(
+    ChannelInput input,
+    ChannelCategory existing,
+    TagIndex tags,
+  ) => NeedsClaude(
+    ClaudeTicket._(
+      input,
+      ClaudeAsk.tags,
+      settled: existing,
+      kept: [
+        for (final (i, tag) in existing.tags.indexed)
+          (
+            (
+              key: nameKey(tag),
+              tag: tags.names[nameKey(tag)] ?? TagName(name: tag),
+            ),
+            1 - i / 100,
+          ),
+      ],
+      asked: {
+        if (existing.tagsPrompts.containsKey(PromptStep.jevTags.name))
+          PromptStep.jevTags,
+      },
+    ),
+  );
+
+  /// Jev's check of the user's tags defined or changed since [existing]
+  /// was last checked.
+  Future<Prepared> _check(
+    ChannelInput input,
+    ChannelCategory? existing,
+    TagIndex tags,
+  ) async {
+    final pending = tags.changedSince(existing?.tagsCheckedAt);
+    final jev = this.jev;
+    if (pending.isEmpty || jev == null) return Checked(const {}, tags.at);
+    final questions = jevTagQuestions(pending)..remove('other');
+    return Checked(
+      readJevTags(
+        await _askJev(jev, input.evidence.toState(), questions),
+        pending,
+      ).yes,
+      tags.at,
+    );
+  }
+
+  /// Asks Claude about [tickets], in groups of what fits one request, a
+  /// few at once, and gives [onResult] each channel's result as its group
+  /// is answered. Nothing more is sent once [stopped]. A group with no
+  /// usable answer is asked again in halves, then one channel at a time; a
+  /// channel a group's answer leaves out is asked again alone; one channel
+  /// with no usable answer keeps what was settled, unless [noAnswerFails].
+  /// Throws an [AiTierFailure] once the groups already sent are answered,
+  /// when Claude can't be asked.
+  Future<void> askClaude(
+    List<ClaudeTicket> tickets, {
+    required bool Function() stopped,
+    required TagIndex tags,
+    required FutureOr<void> Function(String key, ChannelCategory result)
+    onResult,
+    bool noAnswerFails = false,
   }) async {
     final claude = this.claude;
-    var tags = const <String>[];
-    if (claude != null && path != null) {
-      asked.add(PromptStep.claudeTags);
-      tags = await _tagsOnly(claude, input, path);
+    if (claude == null || tickets.isEmpty) return;
+    final groups = [
+      for (final ask in ClaudeAsk.values)
+        ...packGroups([
+          for (final ticket in tickets)
+            if (ticket.ask == ask) ticket,
+        ], (ticket) => jsonEncode(ticket.input.evidence.toState()).length),
+    ];
+    var next = 0;
+    AiTierFailure? failure;
+    Future<void> worker() async {
+      while (next < groups.length && failure == null && !stopped()) {
+        try {
+          await _askGroup(
+            claude,
+            groups[next++],
+            stopped: stopped,
+            tags: tags,
+            onResult: onResult,
+            noAnswerFails: noAnswerFails,
+          );
+        } on AiTierFailure catch (e) {
+          failure ??= e;
+        }
+      }
     }
-    return _result(
-      input,
-      asked,
-      path: path,
-      source: source,
-      jevAgreed: jevAgreed,
-      confidence: confidence,
-      runnersUp: runnersUp,
-      tags: tags,
-    );
+
+    await Future.wait([for (var i = 0; i < _groupsAtOnce; i++) worker()]);
+    if (failure case final failure?) throw failure;
   }
 
-  /// Claude's tags for a channel in [path]; none when it gave no usable
-  /// answer.
-  Future<List<String>> _tagsOnly(
+  Future<void> _askGroup(
     ClaudeAccess claude,
-    ChannelInput input,
-    CategoryPath path,
-  ) async {
-    final request = claudeTagsRequest(
-      input.evidence,
-      path,
-      knownTags: _knownTags,
+    List<ClaudeTicket> group, {
+    required bool Function() stopped,
+    required TagIndex tags,
+    required FutureOr<void> Function(String key, ChannelCategory result)
+    onResult,
+    required bool noAnswerFails,
+  }) async {
+    if (stopped()) return;
+    Future<void> again(List<ClaudeTicket> part) => _askGroup(
+      claude,
+      part,
+      stopped: stopped,
+      tags: tags,
+      onResult: onResult,
+      noAnswerFails: noAnswerFails,
     );
+    final byId = {for (final (i, ticket) in group.indexed) 'c${i + 1}': ticket};
+    final withCategory = group.first.ask == ClaudeAsk.category;
+    final items = [
+      for (final MapEntry(key: id, value: ticket) in byId.entries)
+        (
+          id: id,
+          evidence: ticket.input.evidence,
+          category: ticket.settled?.path,
+          keptTags: [
+            for (final (candidate, _) in ticket.kept) candidate.tag.name,
+          ],
+          inaccurate: ticket.inaccurate,
+        ),
+    ];
+    final known = tags.knownForClaude();
+    final request = withCategory
+        ? claudeCategoryGroupRequest(items, _taxonomy, knownTags: known)
+        : claudeTagsGroupRequest(items, knownTags: known);
+    final Map<String, Object?> answer;
     try {
-      final answer = await claude.repository.structured(
+      answer = await claude.repository.structured(
         apiKey: claude.apiKey,
         model: claude.model,
         system: request.system,
         user: request.user,
         schema: request.schema,
+        maxTokens: groupAnswerTokens(
+          group.length,
+          withCategory: withCategory,
+          modelMax: claude.model.maxTokens,
+        ),
+        expectedOutputTokens: group.length * (withCategory ? 120 : 60),
+        onUsage: _onUsage,
+        policy: RetryPolicy.claudeGroup,
       );
-      return _spelled(parseClaudeTags(answer['tags']));
     } on AiNoAnswer {
-      // About this channel alone, and paid for: not asked again.
-      return const [];
+      // Cut off, or refused: asked again in smaller parts, so one channel
+      // doesn't cost the rest their answers.
+      if (group.length == 1) {
+        if (noAnswerFails) {
+          throw const AiTierFailure(AiService.claude, AiNoAnswer());
+        }
+        await onResult(group.single.input.key, _noAnswer(group.single, tags));
+        return;
+      }
+      final half = group.length ~/ 2;
+      await again(group.sublist(0, half));
+      await again(group.sublist(half));
+      return;
     } on AiFailure catch (e) {
       throw AiTierFailure(AiService.claude, e);
     }
+
+    final ids = byId.keys.toSet();
+    final missing = <ClaudeTicket>[];
+    if (withCategory) {
+      final parsed = parseClaudeGroup(answer, ids, _taxonomy);
+      for (final MapEntry(key: id, value: ticket) in byId.entries) {
+        final suggestion = parsed[id];
+        if (suggestion == null) {
+          missing.add(ticket);
+          continue;
+        }
+        await onResult(
+          ticket.input.key,
+          await _fromClaudeCategory(ticket, suggestion, tags),
+        );
+      }
+    } else {
+      final parsed = parseClaudeTagsGroup(answer, ids, {
+        for (final MapEntry(key: id, value: ticket) in byId.entries)
+          id: maxTags - ticket.kept.length,
+      });
+      for (final MapEntry(key: id, value: ticket) in byId.entries) {
+        final named = parsed[id];
+        if (named == null) {
+          missing.add(ticket);
+          continue;
+        }
+        _named.addAll(named);
+        await onResult(
+          ticket.input.key,
+          _tagged(
+            ticket.settled!,
+            {...ticket.asked, PromptStep.claudeTags},
+            tags,
+            kept: ticket.kept,
+            added: [for (final tag in named) tag.name],
+          ),
+        );
+      }
+    }
+    for (final ticket in missing) {
+      if (group.length > 1) {
+        await again([ticket]);
+      } else if (noAnswerFails) {
+        throw const AiTierFailure(AiService.claude, AiNoAnswer());
+      } else {
+        await onResult(ticket.input.key, _noAnswer(ticket, tags));
+      }
+    }
   }
 
-  /// [tags] as the tags there are spell them, each once.
-  List<String> _spelled(List<String> tags) {
-    final keys = <String>{};
-    return [
-      for (final tag in tags)
-        if (keys.add(nameKey(tag))) _tagSpellings[nameKey(tag)] ?? tag,
-    ];
+  /// A channel Claude gave no usable answer for: what was settled stands,
+  /// Claude's step counted as asked, since it was paid for.
+  ChannelCategory _noAnswer(ClaudeTicket ticket, TagIndex tags) {
+    switch (ticket.ask) {
+      case ClaudeAsk.category:
+        final asked = {...ticket.asked, PromptStep.claudeCategory};
+        return _tagged(
+          _result(
+            ticket.input,
+            asked,
+            path: youtubeCandidates(ticket.input.topicUrls).firstOrNull,
+            jevAgreed: ticket.jevAgreed,
+          ),
+          asked,
+          tags,
+        );
+      case ClaudeAsk.tags:
+        return _tagged(
+          ticket.settled!,
+          {...ticket.asked, PromptStep.claudeTags},
+          tags,
+          kept: ticket.kept,
+        );
+    }
+  }
+
+  /// Claude's category and tags: a sub-category there is, whatever its
+  /// case; else one Jev finds is there already under another name; else a
+  /// new one, kept with its emoji.
+  Future<ChannelCategory> _fromClaudeCategory(
+    ClaudeTicket ticket,
+    ClaudeSuggestion suggestion,
+    TagIndex tags,
+  ) async {
+    final asked = {...ticket.asked, PromptStep.claudeCategory};
+    final (:parent, :child, :emoji, tags: named, :reason) = suggestion;
+    final path = child == null
+        ? CategoryPath(parent)
+        : _taxonomy.find(parent, child) ??
+              await _sameAsOneThere(
+                ticket.input,
+                asked,
+                parent,
+                child,
+                reason,
+              ) ??
+              _learn(parent, child, emoji);
+    _named.addAll(named);
+    return _tagged(
+      _result(
+        ticket.input,
+        asked,
+        path: path,
+        source: CategorySource.claude,
+        jevAgreed: ticket.jevAgreed,
+        reason: reason.isEmpty ? null : reason,
+      ),
+      asked,
+      tags,
+      added: [for (final tag in named) tag.name],
+    );
+  }
+
+  /// [input]'s category, with its tags, as one channel: [prepare], then
+  /// Claude for it alone when it needs it. [tags] are the tags there are to
+  /// offer; none when not given.
+  Future<ChannelCategory> categorize(ChannelInput input, {TagIndex? tags}) =>
+      _alone(input, _categorizing, null, tags);
+
+  /// [current]'s tags alone, for its category, as one channel: Jev's, and
+  /// Claude's for what they miss; with [fromClaude], Claude's added to the
+  /// tags it has. Without a category, as it is.
+  Future<ChannelCategory> retag(
+    ChannelInput input,
+    ChannelCategory current, {
+    TagIndex? tags,
+    bool fromClaude = false,
+  }) => _alone(
+    input,
+    fromClaude
+        ? (work: ChannelWork.claudeTags, redo: false, checkTags: false)
+        : _tagging,
+    current,
+    tags,
+  );
+
+  Future<ChannelCategory> _alone(
+    ChannelInput input,
+    WorkPlan plan,
+    ChannelCategory? existing,
+    TagIndex? tags,
+  ) async {
+    final index = tags ?? TagIndex.of(const {}, const {}, at: _now());
+    final prepared = await prepare(
+      input,
+      plan,
+      existing: existing,
+      tags: index,
+    );
+    switch (prepared) {
+      case Settled(:final result):
+        return result;
+      case NeedsClaude(:final ticket):
+        late ChannelCategory result;
+        await askClaude(
+          [ticket],
+          stopped: () => false,
+          tags: index,
+          onResult: (_, answer) => result = answer,
+        );
+        return result;
+      case Checked():
+        throw StateError('A check is no category of its own');
+    }
   }
 
   /// Another category than [current], for a channel the user says it's
   /// wrong for: Claude's, told so, with tags; else Jev's pick leaving
-  /// [current] out.
+  /// [current] out. Throws an [AiTierFailure] when there's no usable
+  /// answer.
   Future<ChannelCategory> suggestInstead(
     ChannelInput input,
-    CategoryPath? current,
-  ) async {
+    CategoryPath? current, {
+    TagIndex? tags,
+  }) async {
     final asked = <PromptStep>{};
     if (claude != null) {
-      return _claudeCategory(input, asked, inaccurate: current);
+      final index = tags ?? TagIndex.of(const {}, const {}, at: _now());
+      late ChannelCategory result;
+      await askClaude(
+        [
+          ClaudeTicket._(
+            input,
+            ClaudeAsk.category,
+            asked: asked,
+            inaccurate: current,
+          ),
+        ],
+        stopped: () => false,
+        tags: index,
+        onResult: (_, answer) => result = answer,
+        noAnswerFails: true,
+      );
+      return result;
     }
     final jev = this.jev;
     if (jev == null) throw StateError('No AI to ask');
@@ -434,56 +891,6 @@ class CategoryPipeline {
         childAnswer.probabilities[childAnswer.choice] ?? childAnswer.confidence,
       ),
       runnersUp: runnersUp.take(3).toList(),
-    );
-  }
-
-  /// Claude's category and tags: a sub-category there is, whatever its
-  /// case; else one Jev finds is there already under another name; else a
-  /// new one, kept with its emoji.
-  Future<ChannelCategory> _claudeCategory(
-    ChannelInput input,
-    Set<PromptStep> asked, {
-    double? jevAgreed,
-    CategoryPath? inaccurate,
-  }) async {
-    final claude = this.claude!;
-    final request = claudeCategoryRequest(
-      input.evidence,
-      _taxonomy,
-      knownTags: _knownTags,
-      inaccurate: inaccurate,
-    );
-    asked.add(PromptStep.claudeCategory);
-    final Map<String, Object?> answer;
-    try {
-      answer = await claude.repository.structured(
-        apiKey: claude.apiKey,
-        model: claude.model,
-        system: request.system,
-        user: request.user,
-        schema: request.schema,
-      );
-    } on AiFailure catch (e) {
-      throw AiTierFailure(AiService.claude, e);
-    }
-    final suggestion = parseClaudeSuggestion(answer, _taxonomy);
-    if (suggestion == null) {
-      throw const AiTierFailure(AiService.claude, AiNoAnswer());
-    }
-    final (:parent, :child, :emoji, :tags, :reason) = suggestion;
-    final path = child == null
-        ? CategoryPath(parent)
-        : _taxonomy.find(parent, child) ??
-              await _sameAsOneThere(input, asked, parent, child, reason) ??
-              _learn(parent, child, emoji);
-    return _result(
-      input,
-      asked,
-      path: path,
-      source: CategorySource.claude,
-      jevAgreed: jevAgreed,
-      reason: reason.isEmpty ? null : reason,
-      tags: _spelled([for (final tag in tags) tag.name]),
     );
   }
 

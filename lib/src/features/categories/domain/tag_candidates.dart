@@ -116,6 +116,18 @@ class TagIndex {
     );
   }
 
+  /// Every tag there is, by its folded name.
+  Map<String, TagName> get names => _names;
+
+  /// The tags Claude is told of, to reuse: every tag of the user's that AI
+  /// may use, with its meaning, then at most [most] of AI's, the most used
+  /// first, by name.
+  List<NamedTag> knownForClaude({int most = 200}) => [
+    for (final (key: _, :tag) in _users) (name: tag.name, meaning: tag.meaning),
+    for (final key in _mostUsed.take(most))
+      (name: _names[key]!.name, meaning: null),
+  ];
+
   /// When a tag of the user's that AI may use was last defined or changed:
   /// a channel checked before then is checked again.
   DateTime? get userTagsChangedAt {

@@ -19,7 +19,6 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
-import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_pause_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/model_capabilities_repository.dart';
@@ -46,6 +45,8 @@ import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import 'package:youtube_takeout_manager/src/storage/entry_store.dart';
 import 'package:youtube_takeout_manager/src/storage/storage_providers.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
+
+import '../ai_fakes.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
 
@@ -147,70 +148,21 @@ class _Jev extends TypeSafeRepository {
 /// Claude, answering with [answer] once [hold] completes, or failing with
 /// [failure], keeping what it was asked. Its model answers in shapes when
 /// [structuredOutputs].
-class _Claude extends AnthropicRepository {
-  _Claude(
-    this.answer, {
-    this.tags = const [],
-    this.failure,
-    this.hold,
-    this.structuredOutputs = true,
-    this.capabilitiesFailure,
-  });
-
-  final Map<String, Object?> answer;
-
-  /// Its answer when asked for tags alone.
-  final List<String> tags;
-
-  /// What each request asked for, with the channel it was about:
-  /// 'tags: Singer' or 'category: Singer'.
-  final kinds = <String>[];
-  final AiFailure? failure;
-  final Completer<void>? hold;
-  final bool structuredOutputs;
-
-  /// Why its model can't be looked up, if it can't.
-  final AiFailure? capabilitiesFailure;
-  final asked = <String>[];
-
-  /// The models whose capabilities were asked for.
-  final capabilitiesAsked = <String>[];
-
-  @override
-  Future<ModelCapabilities> capabilities({
-    required String apiKey,
-    required String model,
-  }) async {
-    capabilitiesAsked.add(model);
-    if (capabilitiesFailure case final failure?) throw failure;
-    return ModelCapabilities(
-      id: model,
-      structuredOutputs: structuredOutputs,
-      lowEffort: false,
-    );
-  }
-
-  @override
-  Future<Map<String, Object?>> structured({
-    required String apiKey,
-    required ModelCapabilities model,
-    required String system,
-    required String user,
-    required Map<String, Object?> schema,
-    int? maxTokens,
-    int? expectedOutputTokens,
-    void Function(int inputTokens, int outputTokens)? onUsage,
-    RetryPolicy? policy,
-  }) async {
-    asked.add(user);
-    final tagsOnly = !(schema['properties']! as Map).containsKey('parent');
-    final channel = (jsonDecode(user) as Map)['channel'];
-    kinds.add('${tagsOnly ? 'tags' : 'category'}: $channel');
-    await hold?.future;
-    if (failure case final failure?) throw failure;
-    return tagsOnly ? {'tags': tags} : answer;
-  }
-}
+ScriptedClaude _claude(
+  Map<String, Object?> answer, {
+  List<Object?> tags = const [],
+  AiFailure? failure,
+  Completer<void>? hold,
+  bool structuredOutputs = true,
+  AiFailure? capabilitiesFailure,
+}) => ScriptedClaude(
+  category: answer,
+  tags: tags,
+  failure: failure,
+  hold: hold,
+  structuredOutputs: structuredOutputs,
+  capabilitiesFailure: capabilitiesFailure,
+);
 
 /// Fetches nothing: gives each video asked for a description, as YouTube
 /// would, and records the IDs.
@@ -345,7 +297,7 @@ void main() {
         typeSafeRepositoryProvider.overrideWithValue(jev ?? _Jev()),
         anthropicRepositoryProvider.overrideWithValue(
           claude ??
-              _Claude({'parent': 'Knowledge', 'child': null, 'reason': ''}),
+              _claude({'parent': 'Knowledge', 'child': null, 'reason': ''}),
         ),
       ],
     );
@@ -621,7 +573,7 @@ void main() {
 
     test("the model's capabilities are asked for once, and kept after a "
         'restart', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -655,7 +607,7 @@ void main() {
           lowEffort: true,
         ),
       );
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -671,7 +623,7 @@ void main() {
 
     test("when Claude's model can't be looked up, categorizing goes on "
         'without Claude, saying so', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -698,7 +650,7 @@ void main() {
 
     test("a model that can't answer in shapes turns Claude off, saying so, "
         "and YouTube's and Jev's categories still come", () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -725,7 +677,7 @@ void main() {
 
     test('a channel Claude gives no usable answer for is left as it was, the '
         "rest go on, and it isn't paid for again", () async {
-      final claude = _Claude(const {}, failure: const AiNoAnswer());
+      final claude = _claude(const {}, failure: const AiNoAnswer());
       final c = container(details: known, keys: claudeKey, claude: claude);
 
       c.read(historyShownProvider.notifier).markShown();
@@ -744,7 +696,7 @@ void main() {
 
     test('a decision the user makes while AI is asked is kept', () async {
       final hold = Completer<void>();
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': null,
         'reason': '',
@@ -769,7 +721,7 @@ void main() {
         "already asked for; the other takeout gets YouTube's categories "
         'alone', () async {
       final hold = Completer<void>();
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -806,7 +758,7 @@ void main() {
 
     test('Claude names the categories YouTube gives none for, and a new '
         'sub-category it names is kept', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'Speedruns',
         'reason': 'Races through games',
@@ -831,7 +783,7 @@ void main() {
 
     test('asked again, Claude suggests another category, and accepting it '
         'keeps it as the user chose', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'Speedruns',
         'reason': 'Races, not fights',
@@ -858,7 +810,7 @@ void main() {
     test(
       'accepting a new sub-category AI suggests keeps the emoji it gave',
       () async {
-        final claude = _Claude({
+        final claude = _claude({
           'parent': 'Gaming',
           'child': 'Retro',
           'emoji': '👾',
@@ -949,7 +901,7 @@ void main() {
       final c = container(
         details: known,
         keys: claudeKey,
-        claude: _Claude({'parent': 'Music', 'child': null, 'reason': ''}),
+        claude: _claude({'parent': 'Music', 'child': null, 'reason': ''}),
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
@@ -1001,7 +953,7 @@ void main() {
     test("with both keys, opening History categorizes from YouTube's topics "
         'and asks no AI', () async {
       final jev = _Jev();
-      final claude = _Claude(knowledge);
+      final claude = _claude(knowledge);
       final c = container(
         details: known,
         keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
@@ -1019,7 +971,7 @@ void main() {
     });
 
     test('Run asks AI, and a second Run asks nothing more', () async {
-      final claude = _Claude(knowledge);
+      final claude = _claude(knowledge);
       final c = container(keys: claudeKey, claude: claude, history: noTopics);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
@@ -1036,7 +988,7 @@ void main() {
     test('Stop keeps the answers already asked for and asks nothing more; '
         'Run again asks only for the rest', () async {
       final hold = Completer<void>();
-      final claude = _Claude(knowledge, hold: hold);
+      final claude = _claude(knowledge, hold: hold);
       final c = container(keys: claudeKey, claude: claude, history: noTopics);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
@@ -1069,7 +1021,7 @@ void main() {
       "subscriptions arriving during the user's run keep it going",
       () async {
         final hold = Completer<void>();
-        final claude = _Claude(knowledge, hold: hold);
+        final claude = _claude(knowledge, hold: hold);
         final c = container(keys: claudeKey, claude: claude, history: noTopics);
         c.read(historyShownProvider.notifier).markShown();
         await _settle();
@@ -1093,7 +1045,7 @@ void main() {
 
     test('Jev turned off during the run ends it, rather than Claude taking '
         'over', () async {
-      final claude = _Claude(knowledge);
+      final claude = _claude(knowledge);
       final c = container(
         details: known,
         keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
@@ -1115,7 +1067,7 @@ void main() {
         details: known,
         keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
         jev: _Jev(),
-        claude: _Claude(knowledge, failure: const AiKeyRejected()),
+        claude: _claude(knowledge, failure: const AiKeyRejected()),
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
@@ -1508,7 +1460,7 @@ void main() {
 
     test('an answer that comes after the clear began is not kept', () async {
       final hold = Completer<void>();
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Knowledge', 'child': null, 'reason': ''},
         tags: ['ASMR'],
         hold: hold,
@@ -1552,7 +1504,7 @@ void main() {
         'that lands after it', () async {
       final hold = Completer<void>();
       final jev = _Jev();
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Knowledge', 'child': null, 'reason': ''},
         failure: const AiKeyRejected(),
         hold: hold,
@@ -1579,7 +1531,7 @@ void main() {
     });
 
     test('after a clear, AI waits for the next Run', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',
@@ -1628,7 +1580,7 @@ void main() {
           decidedAt: decidedAt,
         ),
       });
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': null,
         'reason': 'Plays games',
@@ -1654,7 +1606,7 @@ void main() {
 
     test("a category from YouTube's topics alone isn't made again, and gets "
         'its tags', () async {
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Gaming', 'child': null, 'reason': ''},
         tags: ['Mario Kart World'],
       );
@@ -1680,7 +1632,7 @@ void main() {
           decidedAt: decidedAt,
         ),
       });
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Gaming', 'child': null, 'reason': ''},
         tags: ['Jazz piano'],
       );
@@ -1708,7 +1660,7 @@ void main() {
           decidedAt: decidedAt,
         ),
       });
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Gaming', 'child': null, 'reason': ''},
         tags: ['Theirs'],
       );
@@ -1723,7 +1675,7 @@ void main() {
     });
 
     test('new tags are kept as made by AI', () async {
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Gaming', 'child': null, 'reason': ''},
         tags: ['Speedruns'],
       );
@@ -1756,7 +1708,7 @@ void main() {
       test('signed in, the missing ones are fetched first, and AI is told '
           'them', () async {
         final videoDetails = _VideoDetails();
-        final claude = _Claude({
+        final claude = _claude({
           'parent': 'Knowledge',
           'child': null,
           'reason': '',
@@ -1793,7 +1745,7 @@ void main() {
           },
         );
         final videoDetails = _VideoDetails();
-        final claude = _Claude({
+        final claude = _claude({
           'parent': 'Knowledge',
           'child': null,
           'reason': '',
@@ -1819,7 +1771,7 @@ void main() {
     test('a channel is marked as being asked about while it is, and only '
         'then', () async {
       final hold = Completer<void>();
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': '',

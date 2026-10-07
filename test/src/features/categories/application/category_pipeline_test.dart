@@ -5,148 +5,62 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/category_pipeline.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
-import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
-import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_evidence.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/categorization_plan.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_candidates.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/youtube_taxonomy.dart';
+
+import '../ai_fakes.dart';
 
 String _topic(String slug) => 'https://en.wikipedia.org/wiki/$slug';
 
-/// Jev, answering from a script: how likely yes is for each category it's
-/// asked about, and the option it picks with how likely each is.
-class _Jev extends TypeSafeRepository {
-  _Jev({this.fits = const {}, this.parent, this.child});
+typedef _Jev = ScriptedJev;
 
-  /// How likely yes is, by the category's label.
-  final Map<String, double> fits;
-  final Map<String, double>? parent;
-  final Map<String, double>? child;
+/// Claude answering a category request with [answer] and a tags request
+/// with [tags], or failing with [failure].
+ScriptedClaude _claude(
+  Map<String, Object?> answer, {
+  List<Object?> tags = const [],
+  AiFailure? failure,
+}) => ScriptedClaude(
+  category: answer,
+  tags: [...tags, ...?(answer['tags'] as List<Object?>?)],
+  failure: failure,
+);
 
-  /// The questions asked, per request.
-  final requests = <Map<String, JevQuestion>>[];
-
-  @override
-  Future<Map<String, JevAnswer>> ask({
-    required String apiKey,
-    required Object state,
-    required Map<String, JevQuestion> questions,
-  }) async {
-    requests.add(questions);
-    return {
-      for (final MapEntry(:key, :value) in questions.entries)
-        key: switch (value) {
-          JevNoul(:final instructions) => NoulAnswer(
-            fits.entries
-                    .where((f) => instructions.contains('"${f.key}"'))
-                    .firstOrNull
-                    ?.value ??
-                0,
-          ),
-          JevChoice(:final options) => _choose(
-            options,
-            key == 'parent' ? parent : child,
-          ),
-        },
-    };
-  }
-
-  /// Picks the likeliest of [options] by the names in [odds].
-  static ChoiceAnswer _choose(
-    Map<String, String?> options,
-    Map<String, double>? odds,
-  ) {
-    String keyOf(String name) => options.entries
-        .firstWhere(
-          (o) => o.key == name || (o.value?.startsWith(name) ?? false),
-          orElse: () => options.entries.first,
-        )
-        .key;
-    final probabilities = {
-      for (final MapEntry(:key, :value) in (odds ?? const {}).entries)
-        keyOf(key): value,
-    };
-    // Not scripted: no confidence in anything.
-    if (probabilities.isEmpty) {
-      return ChoiceAnswer(
-        choice: options.keys.first,
-        probabilities: {options.keys.first: 0},
-        confidence: 0,
-      );
-    }
-    final best = probabilities.entries.reduce(
-      (a, b) => a.value >= b.value ? a : b,
-    );
-    return ChoiceAnswer(
-      choice: best.key,
-      probabilities: probabilities,
-      confidence: best.value,
-    );
-  }
-}
-
-/// Claude, answering a category request with [answer] and a tags-only one
-/// with [tags], or failing with [failure], and keeping what it was asked.
-class _Claude extends AnthropicRepository {
-  _Claude(this.answer, {this.tags = const [], this.failure});
-
-  final Map<String, Object?> answer;
-  final List<Object?> tags;
-  final AiFailure? failure;
-  final asked = <String>[];
-
-  /// What each request asked for: 'category' or 'tags'.
-  final kinds = <String>[];
-
-  @override
-  Future<Map<String, Object?>> structured({
-    required String apiKey,
-    required ModelCapabilities model,
-    required String system,
-    required String user,
-    required Map<String, Object?> schema,
-    int? maxTokens,
-    int? expectedOutputTokens,
-    void Function(int inputTokens, int outputTokens)? onUsage,
-    RetryPolicy? policy,
-  }) async {
-    asked.add(user);
-    final tagsOnly = !(schema['properties']! as Map).containsKey('parent');
-    kinds.add(tagsOnly ? 'tags' : 'category');
-    if (failure case final failure?) throw failure;
-    return tagsOnly ? {'tags': tags} : answer;
-  }
-}
+/// What each request [claude] was sent asked for: 'category' or 'tags'.
+List<String> _kinds(ScriptedClaude claude) => [
+  for (final request in claude.requests) request.kind,
+];
 
 /// Fingerprints that name their step, so a result's are easy to read.
 final _fingerprints = {
   for (final step in PromptStep.values) step: 'fp-${step.name}',
 };
 
-CategoryPipeline _withClaude(
-  _Claude claude, {
-  _Jev? jev,
-  Map<String, String> tagSpellings = const {},
-}) => CategoryPipeline(
-  taxonomy: youtubeTaxonomy.withCustom({
-    'Gaming': ['Speedruns'],
-  }),
-  tagSpellings: tagSpellings,
-  fingerprints: _fingerprints,
-  jev: jev == null ? null : (repository: jev, apiKey: 'jv_live_1'),
-  claude: (
-    repository: claude,
-    apiKey: 'sk-ant-1',
-    model: const ModelCapabilities(
-      id: 'claude-haiku-4-5',
-      structuredOutputs: true,
-      lowEffort: false,
-    ),
-  ),
-);
+CategoryPipeline _withClaude(ScriptedClaude claude, {_Jev? jev}) =>
+    CategoryPipeline(
+      taxonomy: youtubeTaxonomy.withCustom({
+        'Gaming': ['Speedruns'],
+      }),
+      fingerprints: _fingerprints,
+      jev: jev == null ? null : (repository: jev, apiKey: 'jv_live_1'),
+      claude: (
+        repository: claude,
+        apiKey: 'sk-ant-1',
+        model: const ModelCapabilities(
+          id: 'claude-haiku-4-5',
+          structuredOutputs: true,
+          lowEffort: false,
+        ),
+      ),
+    );
 
 ChannelInput _input({List<String> topics = const []}) => (
   key: 'UCg',
@@ -290,7 +204,7 @@ void main() {
   group('Claude', () {
     test('names the category when Jev disagrees and is unsure of its own '
         'pick, with its reason', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'speedruns',
         'reason': 'Races through games',
@@ -319,7 +233,7 @@ void main() {
 
     test('is asked only for tags when Jev agrees, and they come with the '
         'category', () async {
-      final claude = _Claude(
+      final claude = _claude(
         {'parent': 'Music', 'child': null, 'reason': ''},
         tags: ['Mario Kart World', 'Speedruns'],
       );
@@ -329,7 +243,7 @@ void main() {
         jev: _Jev(fits: {'Gaming › Action': 0.9}),
       ).categorize(_input(topics: [_topic('Action_game')]));
 
-      expect(claude.kinds, ['tags']);
+      expect(_kinds(claude), ['tags']);
       expect(claude.asked.single, contains('Gaming › Action'));
       expect(category.path, const CategoryPath('Gaming', 'Action'));
       expect(category.tags, ['Mario Kart World', 'Speedruns']);
@@ -339,18 +253,18 @@ void main() {
 
     test('without Jev, is asked only for tags when YouTube gives a '
         'sub-category', () async {
-      final claude = _Claude({'parent': 'Music', 'child': null, 'reason': ''});
+      final claude = _claude({'parent': 'Music', 'child': null, 'reason': ''});
 
       final category = await _withClaude(
         claude,
       ).categorize(_input(topics: [_topic('Action_game')]));
 
       expect(category.path, const CategoryPath('Gaming', 'Action'));
-      expect(claude.kinds, ['tags']);
+      expect(_kinds(claude), ['tags']);
     });
 
     test('without Jev, names the category YouTube gives none for', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Knowledge',
         'child': null,
         'reason': 'Explains how things work',
@@ -364,7 +278,7 @@ void main() {
 
     test('a new sub-category it names joins the categories', () async {
       final pipeline = _withClaude(
-        _Claude({
+        _claude({
           'parent': 'Gaming',
           'child': 'Retro game  speedruns ',
           'reason': 'Old games, fast',
@@ -387,7 +301,7 @@ void main() {
     test("a variant of YouTube's sub-category gets YouTube's spelling, and "
         'nothing is learned', () async {
       final pipeline = _withClaude(
-        _Claude({'parent': 'Music', 'child': 'Hip-Hop', 'reason': 'Beats'}),
+        _claude({'parent': 'Music', 'child': 'Hip-Hop', 'reason': 'Beats'}),
       );
 
       final category = await pipeline.categorize(_input());
@@ -398,7 +312,7 @@ void main() {
 
     test('a variant of a kept sub-category reuses its spelling', () async {
       final pipeline = _withClaude(
-        _Claude({
+        _claude({
           'parent': 'Gaming',
           'child': 'Speed-runs',
           'reason': 'Races through games',
@@ -414,7 +328,7 @@ void main() {
     test('a new name for a sub-category there is already, as Jev finds, '
         'reuses that one', () async {
       final pipeline = _withClaude(
-        _Claude({
+        _claude({
           'parent': 'Gaming',
           'child': 'Speedrunning',
           'reason': 'Races through games',
@@ -432,7 +346,7 @@ void main() {
     });
 
     test('asked again, is told the category it had is wrong', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'Speedruns',
         'reason': 'Races, not fights',
@@ -451,7 +365,7 @@ void main() {
 
   group('tags', () {
     test('come with the category when Claude names it, in one call', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'Speedruns',
         'reason': 'Races',
@@ -460,39 +374,42 @@ void main() {
 
       final category = await _withClaude(claude).categorize(_input());
 
-      expect(claude.kinds, ['category']);
+      expect(_kinds(claude), ['category']);
       expect(category.tags, ['Super Metroid', 'Any%']);
       expect(category.tagsPrompts, {'claudeTags': 'fp-claudeTags'});
     });
 
     test('are spelled as the tags there are', () async {
-      final claude = _Claude({
+      final claude = _claude({
         'parent': 'Gaming',
         'child': 'Speedruns',
         'reason': 'Races',
         'tags': ['mario-kart world'],
       });
 
-      final category = await _withClaude(
-        claude,
-        tagSpellings: {'mariokartworld': 'Mario Kart World'},
-      ).categorize(_input());
+      final category = await _withClaude(claude).categorize(
+        _input(),
+        tags: TagIndex.of({
+          'mariokartworld': const TagName(name: 'Mario Kart World'),
+        }, const {}),
+      );
 
       expect(category.tags, ['Mario Kart World']);
     });
 
-    test('are none, and not tried, without Claude', () async {
+    test('are none with only Jev and no tags to offer it, the channel '
+        'waiting for Claude', () async {
       final category = await _pipeline(
         _Jev(fits: {'Gaming › Action': 0.9}),
       ).categorize(_input(topics: [_topic('Action_game')]));
 
       expect(category.tags, isEmpty);
-      expect(category.tagsTried, isFalse);
+      expect(category.tagsAwaitClaude, isTrue);
       expect(category.tagsPrompts, isEmpty);
     });
 
     test("alone keep the channel's category", () async {
-      final claude = _Claude({}, tags: ['ASMR']);
+      final claude = _claude({}, tags: ['ASMR']);
       final current = ChannelCategory(
         path: const CategoryPath('Music', 'Jazz'),
         source: CategorySource.user,
@@ -509,7 +426,7 @@ void main() {
     });
 
     test('alone, with no usable answer, are none, but tried', () async {
-      final claude = _Claude({}, failure: const AiNoAnswer());
+      final claude = _claude({}, failure: const AiNoAnswer());
       final current = ChannelCategory(
         path: const CategoryPath('Music'),
         decidedAt: DateTime.utc(2026, 10, 1),
@@ -558,7 +475,7 @@ void main() {
 
     test("every step, when Claude names a new one Jev checks", () async {
       final category = await _withClaude(
-        _Claude({
+        _claude({
           'parent': 'Gaming',
           'child': 'Speedrunning',
           'reason': 'Races',
@@ -583,7 +500,7 @@ void main() {
       final category = await CategoryPipeline(
         taxonomy: youtubeTaxonomy,
         claude: (
-          repository: _Claude({
+          repository: _claude({
             'parent': 'Knowledge',
             'child': null,
             'reason': '',
@@ -616,7 +533,7 @@ void main() {
 
   test('a new sub-category Claude names keeps its emoji', () async {
     final pipeline = _withClaude(
-      _Claude({
+      _claude({
         'parent': 'Gaming',
         'child': 'Retro',
         'emoji': '👾',
@@ -656,7 +573,7 @@ void main() {
       List<String> children,
       _Jev jev, {
       Map<CategoryPath, int> usage = const {},
-      _Claude? claude,
+      ScriptedClaude? claude,
     }) => CategoryPipeline(
       taxonomy: youtubeTaxonomy.withCustom({'Knowledge': children}),
       usage: usage,
@@ -732,7 +649,7 @@ void main() {
       await knowledge(
         topics,
         jev,
-        claude: _Claude({
+        claude: _claude({
           'parent': 'Knowledge',
           'child': 'Something new',
           'reason': 'New',
@@ -744,5 +661,257 @@ void main() {
         lessThanOrEqualTo(JevChoice.maxOptions),
       );
     });
+  });
+
+  group('tags from Jev first', () {
+    final tags = TagIndex.of({
+      'speedruns': const TagName(
+        name: 'Speedruns',
+        meaning: 'Finishing games as fast as possible',
+      ),
+      'nintendo': const TagName(name: 'Nintendo'),
+    }, const {});
+    final agreeing = {'Gaming › Action': 0.9};
+
+    test("come from the tags there are when Jev finds they fit, and Claude "
+        "isn't asked", () async {
+      final claude = _claude(const {});
+
+      final category = await _withClaude(
+        claude,
+        jev: _Jev(fits: {...agreeing, 'Speedruns': 0.8}),
+      ).categorize(_input(topics: [_topic('Action_game')]), tags: tags);
+
+      expect(category.tags, ['Speedruns']);
+      expect(claude.requests, isEmpty);
+      expect(category.tagsPrompts, {'jevTags': 'fp-jevTags'});
+    });
+
+    test(
+      'are none when nothing fits and Jev finds nothing else to name',
+      () async {
+        final claude = _claude(const {});
+
+        final category = await _withClaude(
+          claude,
+          jev: _Jev(fits: agreeing, other: 0.1),
+        ).categorize(_input(topics: [_topic('Action_game')]), tags: tags);
+
+        expect(category.tags, isEmpty);
+        expect(category.tagsTried, isTrue);
+        expect(claude.requests, isEmpty);
+      },
+    );
+
+    test("come from Claude too when Jev finds something no tag names: it's "
+        'told the tags found, and adds what they miss', () async {
+      final claude = _claude(const {}, tags: ['Super Metroid']);
+
+      final category = await _withClaude(
+        claude,
+        jev: _Jev(fits: {...agreeing, 'Speedruns': 0.8}, other: 0.9),
+      ).categorize(_input(topics: [_topic('Action_game')]), tags: tags);
+
+      final told = claude.requests.single.channels.single;
+      expect(told['tags_found'], ['Speedruns']);
+      expect(category.tags, ['Speedruns', 'Super Metroid']);
+      expect(category.tagsPrompts, {
+        'jevTags': 'fp-jevTags',
+        'claudeTags': 'fp-claudeTags',
+      });
+    });
+
+    test('with only Jev, keep what Jev found, the channel waiting for '
+        'Claude to name the rest', () async {
+      final category = await _pipeline(
+        _Jev(fits: {...agreeing, 'Speedruns': 0.8}, other: 0.9),
+      ).categorize(_input(topics: [_topic('Action_game')]), tags: tags);
+
+      expect(category.tags, ['Speedruns']);
+      expect(category.tagsAwaitClaude, isTrue);
+    });
+
+    test("come with Claude's category when Jev can't settle it, with their "
+        "meanings, and Jev isn't asked for them", () async {
+      final jev = _Jev(parent: {'Gaming': 0.3}, child: {'Speedruns': 0.3});
+      final pipeline = _withClaude(
+        _claude({
+          'parent': 'Gaming',
+          'tags': [
+            {'name': 'Any%', 'meaning': 'Beating a game by any means'},
+          ],
+        }),
+        jev: jev,
+      );
+
+      final category = await pipeline.categorize(_input(), tags: tags);
+
+      expect(category.tags, ['Any%']);
+      expect(pipeline.takeNamedTags(), [
+        (name: 'Any%', meaning: 'Beating a game by any means'),
+      ]);
+      expect(
+        jev.requests.where((questions) => questions.containsKey('other')),
+        isEmpty,
+      );
+    });
+  });
+
+  group('Claude asked about many channels', () {
+    ChannelInput channel(int i) => (
+      key: 'UC$i',
+      topicUrls: const [],
+      evidence: ChannelEvidence(title: 'Channel $i', titles: ['Video $i']),
+    );
+    final none = TagIndex.of(const {}, const {});
+
+    Future<List<ClaudeTicket>> tickets(
+      CategoryPipeline pipeline,
+      int count,
+    ) async => [
+      for (var i = 0; i < count; i++)
+        switch (await pipeline.prepare(channel(i), (
+          work: ChannelWork.categorize,
+          redo: false,
+          checkTags: false,
+        ), tags: none)) {
+          NeedsClaude(:final ticket) => ticket,
+          _ => throw StateError('Expected a ticket'),
+        },
+    ];
+
+    Future<Map<String, ChannelCategory>> ask(
+      CategoryPipeline pipeline,
+      List<ClaudeTicket> tickets, {
+      bool Function()? stopped,
+    }) async {
+      final results = <String, ChannelCategory>{};
+      await pipeline.askClaude(
+        tickets,
+        stopped: stopped ?? () => false,
+        tags: none,
+        onResult: (key, result) => results[key] = result,
+      );
+      return results;
+    }
+
+    test('are asked in requests of at most 20, in order', () async {
+      final claude = _claude({'parent': 'Knowledge'});
+      final pipeline = _withClaude(claude);
+
+      final results = await ask(pipeline, await tickets(pipeline, 45));
+
+      expect([for (final r in claude.requests) r.channels.length], [20, 20, 5]);
+      expect(claude.requests.first.channels.first['channel'], 'Channel 0');
+      expect(results, hasLength(45));
+      expect(results.values.map((c) => c.path).toSet(), {
+        const CategoryPath('Knowledge'),
+      });
+    });
+
+    test('a channel an answer leaves out is asked about alone', () async {
+      final claude = ScriptedClaude(
+        answer: (kind, channels) => [
+          for (final channel in channels)
+            if (channels.length == 1 || channel['channel'] != 'Channel 1')
+              {
+                'id': channel['id'],
+                'parent': 'Music',
+                'child': '',
+                'emoji': '',
+                'reason': '',
+                'tags': const [],
+              },
+        ],
+      );
+      final pipeline = _withClaude(claude);
+
+      final results = await ask(pipeline, await tickets(pipeline, 3));
+
+      expect([for (final r in claude.requests) r.channels.length], [3, 1]);
+      expect(claude.requests.last.channels.single['channel'], 'Channel 1');
+      expect(results.keys, unorderedEquals(['UC0', 'UC1', 'UC2']));
+    });
+
+    test('an answer cut off is asked again in halves', () async {
+      final claude = ScriptedClaude(
+        answer: (kind, channels) {
+          if (channels.length > 2) throw const AiNoAnswer();
+          return [
+            for (final channel in channels)
+              {
+                'id': channel['id'],
+                'parent': 'Music',
+                'child': '',
+                'emoji': '',
+                'reason': '',
+                'tags': const [],
+              },
+          ];
+        },
+      );
+      final pipeline = _withClaude(claude);
+
+      final results = await ask(pipeline, await tickets(pipeline, 4));
+
+      expect([for (final r in claude.requests) r.channels.length], [4, 2, 2]);
+      expect(results, hasLength(4));
+    });
+
+    test('a channel with no usable answer keeps what YouTube gave, Claude '
+        'counted as asked', () async {
+      final pipeline = _withClaude(_claude({}, failure: const AiNoAnswer()));
+
+      final category = await pipeline.categorize(
+        _input(topics: [_topic('Video_game_culture')]),
+      );
+
+      expect(category.path, const CategoryPath('Gaming'));
+      expect(category.prompts.keys, contains('claudeCategory'));
+    });
+
+    test('once stopped, are sent nothing', () async {
+      final claude = _claude({'parent': 'Knowledge'});
+      final pipeline = _withClaude(claude);
+
+      final results = await ask(
+        pipeline,
+        await tickets(pipeline, 3),
+        stopped: () => true,
+      );
+
+      expect(claude.requests, isEmpty);
+      expect(results, isEmpty);
+    });
+  });
+
+  test("a check asks Jev about the user's tags changed since the channel's "
+      'last check, and nothing else', () async {
+    final checkedAt = DateTime.utc(2026, 10, 5);
+    final tags = TagIndex.of({
+      'old': TagName(
+        name: 'Old',
+        origin: NameOrigin.user,
+        meaning: 'Defined before',
+        changedAt: checkedAt.subtract(const Duration(days: 1)),
+      ),
+      'new': TagName(
+        name: 'New',
+        origin: NameOrigin.user,
+        meaning: 'Defined since',
+        changedAt: checkedAt.add(const Duration(days: 1)),
+      ),
+    }, const {});
+    final jev = _Jev(fits: {'New': 0.9});
+
+    final checked = await _pipeline(jev).prepare(
+      _input(),
+      (work: ChannelWork.none, redo: false, checkTags: true),
+      existing: ChannelCategory(tagsCheckedAt: checkedAt, decidedAt: checkedAt),
+      tags: tags,
+    );
+
+    expect(checked, isA<Checked>().having((c) => c.yes, 'yes', {'new': 0.9}));
+    expect(jev.requests.single.keys, ['tag_0']);
   });
 }

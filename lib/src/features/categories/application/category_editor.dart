@@ -51,9 +51,11 @@ class CategoryEditor extends _$CategoryEditor {
       );
     } else {
       // A suggestion the user took is theirs, tags and all.
-      final tags = await ref
-          .read(tagNamesProvider.notifier)
-          .resolve(suggestion.tags, NameOrigin.ai);
+      final categorizer = ref.read(channelCategorizerProvider.notifier);
+      final tags = await ref.read(tagNamesProvider.notifier).resolveNamed([
+        for (final tag in suggestion.tags)
+          (name: tag, meaning: categorizer.suggestedMeaning(tag)),
+      ], NameOrigin.ai);
       final keys = {for (final tag in tags) nameKey(tag)};
       accepted = accepted.copyWith(
         tags: tags,

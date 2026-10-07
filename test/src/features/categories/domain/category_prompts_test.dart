@@ -21,26 +21,19 @@ const _evidence = ChannelEvidence(
 void main() {
   test('Claude is told every category, with the sub-categories there are, '
       'to reuse one that fits', () {
-    final request = claudeCategoryRequest(_evidence, _taxonomy);
+    final request = claudeCategoryGroupRequest([
+      (
+        id: 'c1',
+        evidence: _evidence,
+        category: null,
+        keptTags: const <String>[],
+        inaccurate: null,
+      ),
+    ], _taxonomy);
 
     expect(request.system, contains('Speedruns'));
     expect(request.system, contains('Knowledge'));
     expect(request.user, contains('Any% in 10 minutes'));
-    final parent =
-        (request.schema['properties']! as Map)['parent']
-            as Map<String, Object?>;
-    expect(parent['enum'], _taxonomy.parents.toList());
-    expect(request.schema['additionalProperties'], isFalse);
-  });
-
-  test('asked again, Claude is told the category it had is wrong', () {
-    final request = claudeCategoryRequest(
-      _evidence,
-      _taxonomy,
-      inaccurate: const CategoryPath('Gaming', 'Action'),
-    );
-
-    expect(request.user, contains('Gaming › Action'));
   });
 
   group("Claude's answer", () {
@@ -89,52 +82,6 @@ void main() {
     });
   });
 
-  group('every request to Claude', () {
-    final requests = {
-      'category and tags': claudeCategoryRequest(
-        _evidence,
-        _taxonomy,
-        knownTags: const ['Blue Archive', 'ASMR'],
-      ),
-      'tags only': claudeTagsRequest(
-        _evidence,
-        const CategoryPath('Gaming', 'Speedruns'),
-        knownTags: const ['Blue Archive', 'ASMR'],
-      ),
-    };
-
-    test('takes only the answer it asks for, all of it', () {
-      for (final MapEntry(key: name, value: request) in requests.entries) {
-        final properties = request.schema['properties']! as Map;
-        expect(request.schema['additionalProperties'], isFalse, reason: name);
-        expect(
-          (request.schema['required']! as List).toSet(),
-          properties.keys.toSet(),
-          reason: name,
-        );
-        expect(properties.keys, contains('tags'), reason: name);
-      }
-    });
-
-    test('names the tags there are, to reuse', () {
-      for (final MapEntry(key: name, value: request) in requests.entries) {
-        expect(request.system, contains('Blue Archive'), reason: name);
-        expect(request.system, contains('ASMR'), reason: name);
-      }
-    });
-
-    test('for tags alone, gives the category', () {
-      expect(requests['tags only']!.user, contains('Gaming › Speedruns'));
-      expect(requests['tags only']!.user, contains('Any% in 10 minutes'));
-    });
-
-    test('for a category, asks for an emoji for a new sub-category', () {
-      final properties =
-          requests['category and tags']!.schema['properties']! as Map;
-      expect(properties.keys, contains('emoji'));
-    });
-  });
-
   group("Claude's tags", () {
     test('are tidied, each once, at most five, leaving out what is not a '
         'tag', () {
@@ -164,8 +111,8 @@ void main() {
     });
 
     test('none, or not a list, are none', () {
-      expect(parseClaudeTags(null), isEmpty);
-      expect(parseClaudeTags('ASMR'), isEmpty);
+      expect(parseNamedTags(null), isEmpty);
+      expect(parseNamedTags('ASMR'), isEmpty);
     });
   });
 

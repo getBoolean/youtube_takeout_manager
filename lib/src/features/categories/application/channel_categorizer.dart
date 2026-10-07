@@ -25,6 +25,7 @@ import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/name_key.dart';
 import '../domain/prompt_videos.dart';
+import '../domain/tag_candidates.dart';
 import '../domain/sub_category.dart';
 import '../domain/tag_name.dart';
 import '../domain/youtube_topics.dart';
@@ -51,9 +52,6 @@ const _saveEvery = 10;
 
 /// Channels categorized at once while AI is asked.
 const _inFlight = 3;
-
-/// The most tags Claude is told to reuse, the most used first.
-const _knownTagsTold = 200;
 
 /// How long categorizing pauses for a busy service that didn't say.
 const _defaultPause = Duration(minutes: 5);
@@ -111,8 +109,22 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   /// the suggestion is taken.
   final _suggestedEmoji = <CategoryPath, String>{};
 
+  /// The meanings Claude gave tags it named, by their folded names, for
+  /// when a suggestion is taken or a result kept.
+  final _meanings = <String, String>{};
+
   /// The emoji AI gave [path], a new sub-category it suggested, if any.
   String? suggestedEmoji(CategoryPath path) => _suggestedEmoji[path];
+
+  /// The meaning Claude gave [tag], a tag it named, if any.
+  String? suggestedMeaning(String tag) => _meanings[nameKey(tag)];
+
+  /// Keeps the meanings of the tags [pipeline] named since last asked.
+  void _takeMeanings(CategoryPipeline pipeline) {
+    for (final (:name, :meaning) in pipeline.takeNamedTags()) {
+      if (meaning != null) _meanings[nameKey(name)] = meaning;
+    }
+  }
 
   @override
   void build() {
@@ -282,6 +294,14 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       for (final MapEntry(:key, :value) in currentPrompts.entries)
         key.name: value,
     };
+    final tags = TagIndex.of(
+      await ref
+          .read(tagNamesProvider.future)
+          .catchError((Object _) => const <String, TagName>{}),
+      existing,
+      at: _now(),
+    );
+    if (dropped()) return false;
     final queue = <(HistoryChannel, ChannelWork)>[];
     var redo = false;
     final unplaced = <String, ChannelCategory>{};
@@ -294,12 +314,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         available: pipeline.tiers,
         hasTopics: hasTopics,
         fingerprints: fingerprints,
+        userTagsChangedAt: tags.userTagsChangedAt,
       );
-      // Tags from Jev alone come with the two-phase pipeline; until then,
-      // only Claude names them.
-      final work = plan.work == ChannelWork.tags && pipeline.claude == null
-          ? ChannelWork.none
-          : plan.work;
+      // Checks of the user's tags come with the run in waves.
+      final work = plan.work;
       if (work != ChannelWork.none) {
         queue.add((channel, work));
         redo = redo || plan.redo;
@@ -367,9 +385,14 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           categorizing.add(channel.key);
           try {
             category = switch (work) {
-              ChannelWork.tags || ChannelWork.claudeTags =>
-                await pipeline.retag(input, existing[channel.key]!),
-              _ => await pipeline.categorize(input),
+              ChannelWork.tags ||
+              ChannelWork.claudeTags => await pipeline.retag(
+                input,
+                existing[channel.key]!,
+                tags: tags,
+                fromClaude: work == ChannelWork.claudeTags,
+              ),
+              _ => await pipeline.categorize(input, tags: tags),
             };
           } on AiTierFailure catch (e) {
             stoppedBy ??= e;
@@ -381,11 +404,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           // Still right for its channel when the run was dropped, and paid
           // for: kept either way.
           await _keepLearned(pipeline);
+          _takeMeanings(pipeline);
           if (category.tags.isNotEmpty) {
             category = category.copyWith(
-              tags: await ref
-                  .read(tagNamesProvider.notifier)
-                  .resolve(category.tags, NameOrigin.ai),
+              tags: await ref.read(tagNamesProvider.notifier).resolveNamed([
+                for (final tag in category.tags)
+                  (name: tag, meaning: suggestedMeaning(tag)),
+              ], NameOrigin.ai),
             );
           }
           await categories.putAiResult(channel.key, category);
@@ -451,9 +476,11 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final details = await ref
         .read(channelDetailsProvider.future)
         .catchError((Object _) => const <String, ChannelDetails>{});
-    final current = (await ref.read(
-      channelCategoriesProvider.future,
-    ))[channel.key];
+    final categories = await ref.read(channelCategoriesProvider.future);
+    final current = categories[channel.key];
+    final names = await ref
+        .read(tagNamesProvider.future)
+        .catchError((Object _) => const <String, TagName>{});
     final suggestion = await pipeline.suggestInstead(
       _inputFor(
         channel,
@@ -463,10 +490,12 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         ref.read(videoMetadataProvider).value ?? const {},
       ),
       current?.path,
+      tags: TagIndex.of(names, categories, at: _now()),
     );
     for (final (:path, :emoji) in pipeline.takeLearned()) {
       if (emoji != null) _suggestedEmoji[path] = emoji;
     }
+    _takeMeanings(pipeline);
     return suggestion;
   }
 
@@ -489,16 +518,9 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final categories = await ref
         .read(channelCategoriesProvider.future)
         .catchError((Object _) => const <String, ChannelCategory>{});
-    final tagNames = await ref
-        .read(tagNamesProvider.future)
-        .catchError((Object _) => const <String, TagName>{});
     return CategoryPipeline(
       taxonomy: ref.read(categoryTaxonomyProvider),
       usage: _usage(categories),
-      knownTags: _mostUsedTags(categories),
-      tagSpellings: {
-        for (final MapEntry(:key, :value) in tagNames.entries) key: value.name,
-      },
       jev: withJev && on(AiService.jev)
           ? (
               repository: ref.read(typeSafeRepositoryProvider),
@@ -526,26 +548,6 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       }
     }
     return usage;
-  }
-
-  /// The tags channels have, the most used first, at most
-  /// [_knownTagsTold].
-  static List<String> _mostUsedTags(Map<String, ChannelCategory> categories) {
-    final counts = <String, int>{};
-    final spellings = <String, String>{};
-    for (final category in categories.values) {
-      for (final tag in category.tags) {
-        final key = nameKey(tag);
-        counts[key] = (counts[key] ?? 0) + 1;
-        spellings.putIfAbsent(key, () => tag);
-      }
-    }
-    final keys = counts.keys.toList()
-      ..sort((a, b) {
-        final byUse = counts[b]!.compareTo(counts[a]!);
-        return byUse != 0 ? byUse : spellings[a]!.compareTo(spellings[b]!);
-      });
-    return [for (final key in keys.take(_knownTagsTold)) spellings[key]!];
   }
 
   /// What the Claude model in use can do: as kept, else asked for with
