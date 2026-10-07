@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:collection';
 import 'dart:math';
 
@@ -315,15 +314,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             existing: existing[channel.key],
             evidenceChars: plan.work == ChannelWork.none && !plan.checkTags
                 ? 0
-                : jsonEncode(
-                    _inputFor(
-                      channel,
-                      loaded,
-                      details,
-                      picks,
-                      videos,
-                    ).evidence.toState(),
-                  ).length,
+                : _evidenceSizeOf(channel, loaded, details, picks, videos),
           ),
     ]);
     if (ref.mounted) pending.set(summary);
@@ -857,6 +848,37 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             id: videos[id]?.description,
         },
       ),
+    );
+  }
+
+  /// About how much evidence AI would be told about [channel], worked out
+  /// without making it, as [_inputFor] would: quick enough for every
+  /// channel each time what a run would do is worked out.
+  static int _evidenceSizeOf(
+    HistoryChannel channel,
+    LoadedHistory loaded,
+    Map<String, ChannelDetails> details,
+    List<PromptPicks> picks,
+    Map<String, Video> videos,
+  ) {
+    final channelDetails = details[channel.channelId];
+    final index = loaded.channelIndexByKey[channel.key];
+    final PromptPicks channelPicks = index == null || index >= picks.length
+        ? (titles: const [], described: const [])
+        : picks[index];
+    final watches = loaded.history.watches;
+    return evidenceSize(
+      title: channel.title,
+      description: channelDetails?.description,
+      topics: channelDetails?.topicUrls.length ?? 0,
+      titles: [for (final i in channelPicks.titles) watches[i].title],
+      described: [
+        for (final i in channelPicks.described)
+          (
+            title: watches[i].title,
+            description: videos[watches[i].videoId]?.description,
+          ),
+      ],
     );
   }
 

@@ -2162,5 +2162,74 @@ void main() {
         expect(c.read(pendingAiWorkProvider)?.checks, greaterThan(0));
       },
     );
+
+    test("is quick for a heavy viewer's 12,000 channels", () async {
+      final description =
+          'Runs of classic games, frame by frame, every trick explained. '
+          'https://example.com/route #speedrun #retro 0:00 Start 12:34 End '
+          '${'More words about the runs and the games. ' * 10}';
+      final summaries = _Timers();
+      final c = container(
+        history: TakeoutHistory(
+          watches: [
+            for (var i = 0; i < 12000; i++)
+              for (var w = 0; w < 5; w++)
+                WatchEntry(
+                  time: DateTime.utc(2026, 4, 12),
+                  kind: WatchKind.video,
+                  title: 'Run $w of game $i: any% in record time',
+                  url: 'https://www.youtube.com/watch?v=v${i}x$w',
+                  channelTitle: 'Channel $i',
+                  channelUrl: 'https://www.youtube.com/channel/UC$i',
+                ),
+          ],
+        ),
+        details: {
+          for (var i = 0; i < 12000; i++)
+            'UC$i': ChannelDetails(
+              topicUrls: [_topic('Action_game')],
+              description: description,
+            ),
+        },
+        keys: claudeKey,
+        summaryTimers: summaries,
+      );
+      c.listen(videoMetadataProvider, (_, _) {});
+      await c.read(videoMetadataProvider.future);
+      final videoDescription =
+          'Follow me: https://example.com/me https://example.com/discord '
+          '#speedrun #retro #worldrecord\n0:00 Intro\n1:23 Route\n12:34 End\n'
+          '${'Thanks for watching, and the tricks in this run explained. ' * 15}';
+      c.read(videoMetadataProvider.notifier).addAll([
+        for (var i = 0; i < 12000; i++)
+          for (var w = 0; w < 5; w++)
+            Video(
+              videoId: 'v${i}x$w',
+              channelId: 'UC$i',
+              description: videoDescription,
+            ),
+      ]);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      await fire(summaries);
+      expect(c.read(pendingAiWorkProvider)?.tags, 12000);
+
+      // Worked out again, as when the user defines a tag.
+      await c
+          .read(tagEditorProvider.notifier)
+          .define('Mine', meaning: 'What I watch on Sundays');
+      final watch = Stopwatch()..start();
+      await fire(summaries);
+      final took = watch.elapsedMilliseconds;
+
+      // ignore: avoid_print
+      print('What a run would do, for 12,000 channels: ${took}ms');
+      expect(took, lessThanOrEqualTo(_summaryBudget));
+    });
   });
 }
+
+/// What a run would do may take this long to work out for 12,000
+/// channels, in milliseconds: the first measured run's time (2026-10-07, in
+/// the test VM: 83), three times over.
+const _summaryBudget = 250;

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 
 import 'prompt_videos.dart';
@@ -62,3 +64,32 @@ ChannelEvidence buildEvidence({
         (title: title, description: description),
   ],
 );
+
+/// About how many characters the evidence for the channel [title] is, as
+/// JSON, worked out without making it: its [description] cut as the
+/// evidence cuts it, [topics] of YouTube's topics, the [titles] of the
+/// videos picked, and the [described] ones' titles and raw descriptions,
+/// cut as cleaning cuts them (cleaning only shortens them further). Quick
+/// enough for every channel there is, as often as it's needed.
+int evidenceSize({
+  required String title,
+  String? description,
+  int topics = 0,
+  required Iterable<String?> titles,
+  Iterable<({String? title, String? description})> described = const [],
+}) {
+  int size =
+      40 +
+      title.length +
+      min<int>(description?.length ?? 0, ChannelEvidence.maxDescription) +
+      topics * 30;
+  for (final title in titles) {
+    if (title != null) size += title.length + 3;
+  }
+  for (final (:title, :description) in described) {
+    if (title == null || description == null) continue;
+    size +=
+        34 + title.length + min<int>(description.length, maxVideoDescription);
+  }
+  return size;
+}
