@@ -45,14 +45,14 @@ class WatchedChannel {
   final int count;
   final DateTime lastWatched;
 
-  /// Its name folded for search, worked out once.
-  final String searchText;
+  /// Its name folded for search, worked out when first searched.
+  late final String searchText = foldForSearch(channel.title);
 
   WatchedChannel({
     required this.channel,
     required this.count,
     required this.lastWatched,
-  }) : searchText = foldForSearch(channel.title);
+  });
 }
 
 /// Orders channels the most watched first, then by name.

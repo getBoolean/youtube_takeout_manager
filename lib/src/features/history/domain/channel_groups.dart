@@ -44,6 +44,47 @@ class ChannelGroups {
 
   static final empty = ChannelGroups._(const [], Int32List(0), -1);
 
+  /// Groups as runs of one list: group `g` is the watched channel at
+  /// `order[g]` (-1 for the videos without a channel), its videos
+  /// `members[starts[g]..starts[g + 1]]`, a view, not a copy.
+  /// [channels] are the loaded history's.
+  factory ChannelGroups.ofRuns({
+    required List<WatchedChannel> channels,
+    required Int32List order,
+    required Int32List starts,
+    required Int32List members,
+  }) {
+    final groupOfChannel = Int32List(channels.length)
+      ..fillRange(0, channels.length, -1);
+    var noChannelGroup = -1;
+    final groups = <HistoryChannelGroup>[];
+    for (var g = 0; g < order.length; g++) {
+      final c = order[g];
+      final indices = Int32List.sublistView(members, starts[g], starts[g + 1]);
+      if (c < 0) {
+        noChannelGroup = g;
+        groups.add(
+          HistoryChannelGroup(
+            key: noChannelGroupKey,
+            channel: null,
+            indices: indices,
+          ),
+        );
+      } else {
+        groupOfChannel[c] = g;
+        final channel = channels[c].channel;
+        groups.add(
+          HistoryChannelGroup(
+            key: channel.key,
+            channel: channel,
+            indices: indices,
+          ),
+        );
+      }
+    }
+    return ChannelGroups._(groups, groupOfChannel, noChannelGroup);
+  }
+
   /// Which group has the watched video at [watchIndex], and where in it, or
   /// null when it isn't shown. [watchChannelIndex] gives each watched
   /// video's channel, as the loaded history has it.
