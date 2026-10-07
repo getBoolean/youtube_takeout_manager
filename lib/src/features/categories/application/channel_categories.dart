@@ -49,6 +49,31 @@ class ChannelCategories extends _$ChannelCategories {
     await persist();
   }
 
+  /// Takes the tag with the folded name [key] off every channel, whoever
+  /// made or edited its tags, and keeps them.
+  Future<void> removeTag(String key) async {
+    await future;
+    bool has(ChannelCategory category) =>
+        category.tags.any((tag) => nameKey(tag) == key) ||
+        category.tagsAddedByUser.contains(key) ||
+        category.tagsRemovedByUser.contains(key);
+    state = AsyncData({
+      for (final MapEntry(key: channel, value: category)
+          in state.requireValue.entries)
+        channel: has(category)
+            ? category.copyWith(
+                tags: [
+                  for (final tag in category.tags)
+                    if (nameKey(tag) != key) tag,
+                ],
+                tagsAddedByUser: category.tagsAddedByUser.difference({key}),
+                tagsRemovedByUser: category.tagsRemovedByUser.difference({key}),
+              )
+            : category,
+    });
+    await persist();
+  }
+
   /// Makes [categories] every channel's, and keeps them.
   Future<void> replaceAll(Map<String, ChannelCategory> categories) async {
     await future;

@@ -87,6 +87,90 @@ void main() {
     });
   });
 
+  group('tags AI names with their meanings', () {
+    test('keep the meaning of a new one', () async {
+      final c = _container();
+
+      await c.read(tagNamesProvider.notifier).resolveNamed([
+        (name: 'VTuber Clips', meaning: 'Clips of VTuber streams'),
+      ], NameOrigin.ai);
+
+      final kept = await c.read(tagNamesProvider.future);
+      expect(kept.values.single.meaning, 'Clips of VTuber streams');
+    });
+
+    test('give one AI named without a meaning its meaning, and never '
+        "replace a meaning, nor give the user's tags one", () async {
+      final c = _container();
+      final tags = c.read(tagNamesProvider.notifier);
+      await tags.put('asmr', const TagName(name: 'ASMR'));
+      await tags.put(
+        'speedruns',
+        const TagName(name: 'Speedruns', meaning: 'Beating games fast'),
+      );
+      await tags.put(
+        'mine',
+        const TagName(name: 'Mine', origin: NameOrigin.user),
+      );
+
+      await tags.resolveNamed([
+        (name: 'asmr', meaning: 'Whispered sounds'),
+        (name: 'Speedruns', meaning: 'Something else'),
+        (name: 'Mine', meaning: 'An AI guess'),
+      ], NameOrigin.ai);
+
+      final kept = await c.read(tagNamesProvider.future);
+      expect(kept['asmr']?.meaning, 'Whispered sounds');
+      expect(kept['speedruns']?.meaning, 'Beating games fast');
+      expect(kept['mine']?.meaning, isNull);
+    });
+
+    test('leave out one the user deleted', () async {
+      final c = _container();
+      final tags = c.read(tagNamesProvider.notifier);
+      await tags.put('gone', const TagName(name: 'Gone', deleted: true));
+
+      final resolved = await tags.resolveNamed([
+        (name: 'Gone', meaning: null),
+        (name: 'Kept', meaning: null),
+      ], NameOrigin.ai);
+
+      expect(resolved, ['Kept']);
+      expect((await c.read(tagNamesProvider.future))['gone']?.deleted, isTrue);
+    });
+  });
+
+  test('the tags kept are listed with how many channels have each: the '
+      "user's first, then the most used, never the deleted", () async {
+    final c = _container()..listen(tagRegistryProvider, (_, _) {});
+    final tags = c.read(tagNamesProvider.notifier);
+    await tags.put('asmr', const TagName(name: 'ASMR'));
+    await tags.put('vtuber', const TagName(name: 'VTuber'));
+    await tags.put(
+      'mine',
+      const TagName(name: 'Mine', origin: NameOrigin.user, meaning: 'Mine'),
+    );
+    await tags.put('gone', const TagName(name: 'Gone', deleted: true));
+    await c.read(channelCategoriesProvider.future);
+    ChannelCategory tagged(List<String> tags) => ChannelCategory(
+      tags: tags,
+      tagsTried: true,
+      decidedAt: DateTime.utc(2026, 10, 1),
+    );
+    await c.read(channelCategoriesProvider.notifier).replaceAll({
+      'UCa': tagged(['VTuber', 'ASMR']),
+      'UCb': tagged(['VTuber']),
+    });
+
+    expect(
+      [
+        for (final kept in c.read(tagRegistryProvider))
+          (kept.key, kept.channels),
+      ],
+      [('mine', 0), ('vtuber', 2), ('asmr', 1)],
+    );
+  });
+
   test('tags in use are counted by channel, the most used first', () async {
     final c = _container();
     await c.read(tagNamesProvider.notifier).resolve([

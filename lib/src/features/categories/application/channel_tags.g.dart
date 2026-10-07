@@ -39,7 +39,7 @@ final class TagNamesProvider
   TagNames create() => TagNames();
 }
 
-String _$tagNamesHash() => r'8f4b1118bdfc40a933767237a7e4a2dfa887b245';
+String _$tagNamesHash() => r'69f963324d3dcec963b2af17e8dd91d912a671a6';
 
 /// Every tag there is, as first spelled, with who made it, by its folded
 /// name ([nameKey]), kept on this device.
@@ -66,6 +66,55 @@ abstract class _$TagNames extends $AsyncNotifier<Map<String, TagName>> {
     element.handleCreate(ref, build);
   }
 }
+
+/// Every tag kept and not deleted, with how many channels have it: the
+/// user's first, then the most used, ties by name.
+
+@ProviderFor(tagRegistry)
+final tagRegistryProvider = TagRegistryProvider._();
+
+/// Every tag kept and not deleted, with how many channels have it: the
+/// user's first, then the most used, ties by name.
+
+final class TagRegistryProvider
+    extends $FunctionalProvider<List<KeptTag>, List<KeptTag>, List<KeptTag>>
+    with $Provider<List<KeptTag>> {
+  /// Every tag kept and not deleted, with how many channels have it: the
+  /// user's first, then the most used, ties by name.
+  TagRegistryProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'tagRegistryProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$tagRegistryHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<KeptTag>> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  List<KeptTag> create(Ref ref) {
+    return tagRegistry(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<KeptTag> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<KeptTag>>(value),
+    );
+  }
+}
+
+String _$tagRegistryHash() => r'6d2452eedc11793aefff698c2ea6f8f8a0e47f24';
 
 /// Every tag channels have, the most used first, ties by name.
 
