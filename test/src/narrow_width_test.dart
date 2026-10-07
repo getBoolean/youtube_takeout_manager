@@ -1246,7 +1246,7 @@ void main() {
     );
   }
   fitsAtEveryWidth(
-    "the history page's Filters modal with a category open",
+    "the history page's Filters categories page with a category open",
     () => const HistoryPage(),
     overrides: [
       ...historyOverrides,
@@ -1255,6 +1255,11 @@ void main() {
     then: (tester) async {
       await tester.tap(find.byKey(HistoryToolbar.filtersKey));
       await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      final page = find.byKey(HistoryFilterSheet.categoriesRowKey);
+      await tester.ensureVisible(page);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.tap(page);
       await tester.pump(const Duration(seconds: 1));
       final open = find.byKey(
         HistoryFilterSheet.categoryExpandKey('Entertainment'),

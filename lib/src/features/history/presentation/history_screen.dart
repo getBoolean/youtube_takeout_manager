@@ -532,17 +532,7 @@ class _ActiveFilters extends ConsumerWidget {
     final tagNames = tags.isEmpty
         ? const <String, TagName>{}
         : ref.watch(tagNamesProvider).value ?? const {};
-    bool aiSubCategory(CategoryPick pick) =>
-        switch ((pick.parent, pick.child)) {
-          (final parent?, final child?) =>
-            custom[parent]?.any(
-                  (sub) =>
-                      sub.origin == NameOrigin.ai &&
-                      nameKey(sub.name) == nameKey(child),
-                ) ??
-                false,
-          _ => false,
-        };
+    bool aiSubCategory(CategoryPick pick) => isAiSubCategory(pick, custom);
     final none =
         !removedOnly &&
         subscription == SubscriptionFilter.all &&
@@ -818,6 +808,10 @@ class _WatchedTab extends ConsumerWidget {
       await ref
           .read(channelCategoriesProvider.future)
           .catchError((Object _) => const <String, ChannelCategory>{});
+      // Who made each tag, for the tags offered.
+      await ref
+          .read(tagNamesProvider.future)
+          .then<void>((_) {}, onError: (Object _) {});
       // The categories' shares count only the kinds of videos shown, as
       // the History worker counts them.
       await ref
@@ -849,6 +843,7 @@ class _WatchedTab extends ConsumerWidget {
             : null,
         hasMusic: loaded.musicCount > 0,
         mix: ref.read(viewingMixProvider),
+        tags: ref.read(tagUsageProvider),
       );
       if (draft == null) return;
       ref

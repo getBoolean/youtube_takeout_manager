@@ -31,6 +31,16 @@ class ChannelSelection {
 
   bool get isEmpty => channels.isEmpty && categories.isEmpty && tags.isEmpty;
 
+  ChannelSelection copyWith({
+    Map<String, HistoryChannel>? channels,
+    Set<CategoryPick>? categories,
+    Set<String>? tags,
+  }) => ChannelSelection(
+    channels: channels ?? this.channels,
+    categories: categories ?? this.categories,
+    tags: tags ?? this.tags,
+  );
+
   /// Whether the channel [key] is picked itself.
   bool contains(String key) => channels.containsKey(key);
 

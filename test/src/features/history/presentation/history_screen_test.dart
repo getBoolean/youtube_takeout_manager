@@ -517,6 +517,7 @@ void main() {
     await _open(tester, categories: _gamingX());
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
     await _tapKey(
       tester,
       HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
@@ -548,6 +549,7 @@ void main() {
   group('grouped by channel', () {
     Future<void> pickGaming(WidgetTester tester) async {
       await _openFilters(tester);
+      await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
       await _tapKey(
         tester,
         HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
@@ -613,6 +615,7 @@ void main() {
     await _open(tester, categories: _gamingX());
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
     await _tapKey(
       tester,
       HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
@@ -719,10 +722,13 @@ void main() {
     );
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
     await _tapKey(
       tester,
       HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
     );
+    await _tapKey(tester, HistoryFilterSheet.backKey);
+    await _tapKey(tester, HistoryFilterSheet.channelsRowKey);
     await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
     await _tapKey(tester, HistoryFilterSheet.showKey);
 
@@ -740,6 +746,7 @@ void main() {
     );
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
     await _tapKey(tester, HistoryFilterSheet.categoryExpandKey('Gaming'));
     await _tapKey(
       tester,
@@ -861,7 +868,7 @@ void main() {
     await _openFilters(tester);
 
     expect(
-      find.byKey(HistoryFilterSheet.categoriesSectionKey, skipOffstage: false),
+      find.byKey(HistoryFilterSheet.categoriesRowKey, skipOffstage: false),
       findsNothing,
     );
   });
@@ -948,6 +955,7 @@ void main() {
     await _open(tester);
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelsRowKey);
     await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
     await _tapKey(tester, HistoryFilterSheet.showKey);
 
@@ -961,6 +969,7 @@ void main() {
   ) async {
     await _open(tester);
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelsRowKey);
     await _tapKey(tester, HistoryFilterSheet.channelKey('name:CAFE Channel'));
     await _tapKey(tester, HistoryFilterSheet.showKey);
 
@@ -1056,6 +1065,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.categoriesRowKey);
 
     expect(
       find.descendant(
@@ -1401,6 +1411,7 @@ void main() {
 
     // Showing it alone gives it a chip, with its picture too.
     await _openFilters(tester);
+    await _tapKey(tester, HistoryFilterSheet.channelsRowKey);
     await _tapKey(tester, HistoryFilterSheet.channelKey('UCx'));
     await _tapKey(tester, HistoryFilterSheet.showKey);
     expect(
