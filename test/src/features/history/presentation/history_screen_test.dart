@@ -32,6 +32,7 @@ import 'package:youtube_takeout_manager/src/features/history/application/history
 import 'package:youtube_takeout_manager/src/features/history/application/history_search_query.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/history_shown.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/history_wire.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
@@ -111,6 +112,20 @@ class _Formats extends VideoFormats {
 
   @override
   Future<Map<String, VideoFormat>> build() async => formats;
+}
+
+/// History in-process, its searches failing as a stopped worker's would
+/// while [failing], counting them.
+class _FailingSearches extends LocalHistoryEngine {
+  var failing = true;
+  var searches = 0;
+
+  @override
+  Future<HistoryMatches> search(HistoryQuery query, int generation) {
+    searches++;
+    if (failing) throw const HistoryWorkerDied();
+    return super.search(query, generation);
+  }
 }
 
 /// [_history], once [fails] says no more: until then, a History worker that
@@ -346,6 +361,32 @@ void main() {
     await _tapKey(tester, HistoryToolbar.categorizeKey);
 
     expect(find.byKey(TagsPage.defineKey), findsOneWidget);
+  });
+
+  testWidgets('a search that fails says so in every tab, and Retry searches '
+      'again', (tester) async {
+    final engine = _FailingSearches();
+    final c = await _open(
+      tester,
+      overrides: [historyEngineProvider.overrideWithValue(engine)],
+    );
+
+    c.read(historySearchQueryProvider.notifier).update('cafe');
+    await tester.pumpAndSettle();
+    expect(find.byKey(HistoryPage.searchRetryKey), findsOneWidget);
+    // Not everything, as if nothing were searched for.
+    expect(_shown('Unrelated'), findsNothing);
+    await _openTab(tester, 1);
+    expect(find.byKey(HistoryPage.searchRetryKey), findsOneWidget);
+    await _openTab(tester, 0);
+    expect(engine.searches, 1);
+
+    engine.failing = false;
+    await _tapKey(tester, HistoryPage.searchRetryKey);
+
+    expect(find.byKey(HistoryPage.searchRetryKey), findsNothing);
+    expect(_shown('Café tour'), findsOneWidget);
+    expect(_shown('Unrelated'), findsNothing);
   });
 
   testWidgets('the search narrows every tab', (tester) async {

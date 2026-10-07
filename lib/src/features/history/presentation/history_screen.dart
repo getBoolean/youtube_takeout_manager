@@ -4,6 +4,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:squadron/squadron.dart' show SquadronException;
 
 import 'package:youtube_takeout_manager/src/features/authentication/application/read_session.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
@@ -21,6 +22,7 @@ import 'package:youtube_takeout_manager/src/features/emoji/presentation/emoji_se
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
+import '../data/history_engine.dart';
 import '../application/history_channel_selection.dart';
 import '../application/history_grouping.dart';
 import '../application/history_providers.dart';
@@ -101,6 +103,9 @@ class HistoryPage extends HookConsumerWidget {
   /// Shown when the takeout has no history.
   static const noHistoryKey = ValueKey('history-none');
   static const retryKey = ValueKey('history-retry');
+
+  /// Searches again, after a search failed.
+  static const searchRetryKey = ValueKey('history-search-retry');
 
   /// The toggle for, and the chip of, the filter for what was removed from
   /// YouTube's history.
@@ -842,7 +847,12 @@ class _WatchedTab extends ConsumerWidget {
       ],
     );
 
-    final Widget list = nothing
+    final failure = ref.watch(
+      historySearchProvider.select((s) => s.hasError ? s.error : null),
+    );
+    final Widget list = failure != null
+        ? _SearchFailed(failure)
+        : nothing
         ? EmptyState(
             icon: Icons.history,
             message: watches.isEmpty
@@ -979,6 +989,9 @@ class _SearchesTab extends ConsumerWidget {
     final days = ref.watch(searchDaysProvider);
     final removedOnly = ref.watch(historyRemovedFilterProvider);
     final searches = loaded.history.searches;
+    final failure = ref.watch(
+      historySearchProvider.select((s) => s.hasError ? s.error : null),
+    );
 
     Future<void> act(int index) async {
       final search = searches[index];
@@ -999,7 +1012,9 @@ class _SearchesTab extends ConsumerWidget {
       children: [
         const _ActiveFilters(),
         Expanded(
-          child: days.isEmpty
+          child: failure != null
+              ? _SearchFailed(failure)
+              : days.isEmpty
               ? EmptyState(
                   icon: Icons.search,
                   message: searches.isEmpty
@@ -1026,3 +1041,31 @@ class _SearchesTab extends ConsumerWidget {
     );
   }
 }
+
+/// A search that failed, said in plain words, with a way to search again.
+class _SearchFailed extends ConsumerWidget {
+  final Object failure;
+
+  const _SearchFailed(this.failure);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => EmptyState(
+    icon: Icons.error_outline,
+    message: switch (failure) {
+      HistoryWorkerDied() => 'History stopped working while it searched.',
+      _ => 'Searching history failed: ${plainFailure(failure)}',
+    },
+    action: FilledButton.tonalIcon(
+      key: HistoryPage.searchRetryKey,
+      onPressed: () => ref.invalidate(historySearchProvider),
+      icon: const Icon(Icons.refresh),
+      label: const Text('Retry'),
+    ),
+  );
+}
+
+/// What [failure] says, without a worker's stack trace.
+String plainFailure(Object failure) => switch (failure) {
+  SquadronException(:final message) => message,
+  _ => '$failure',
+};

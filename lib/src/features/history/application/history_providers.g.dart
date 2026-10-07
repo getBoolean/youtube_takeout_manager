@@ -538,7 +538,7 @@ final class HistorySearchProvider
     : super(
         from: null,
         argument: null,
-        retry: null,
+        retry: _searchOnce,
         name: r'historySearchProvider',
         isAutoDispose: true,
         dependencies: null,
@@ -560,7 +560,7 @@ final class HistorySearchProvider
   }
 }
 
-String _$historySearchHash() => r'e4e85e9f3b3d89c725796cf06e9a40218d4801ca';
+String _$historySearchHash() => r'c41ee622e0a9bc06e643a6176b5c64301bcbc57d';
 
 /// What's shown: everything when unfiltered, else the newest search's
 /// results, the previous ones while a search is under way.

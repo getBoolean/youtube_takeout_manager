@@ -55,7 +55,7 @@ final class WorkerStorageProvider
   }
 }
 
-String _$workerStorageHash() => r'6342d71bb25f6b4b1f87bc3f7c28375049dcbed9';
+String _$workerStorageHash() => r'e140e7ea48014c6ac34180c808c08b86c88c6902';
 
 /// Where bulk data is kept: the storage worker, or memory in tests.
 

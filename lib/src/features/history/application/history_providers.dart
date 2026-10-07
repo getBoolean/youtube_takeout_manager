@@ -152,10 +152,14 @@ HistoryFilters historyFilters(Ref ref) {
 /// Each search asked of the History worker gets the next number.
 var _searches = 0;
 
+/// A failed search is searched again only when the user asks: the History
+/// worker was already started again for it, and failed again.
+Duration? _searchOnce(int retryCount, Object error) => null;
+
 /// The history narrowed to the filters, by the History worker. A search
 /// asked since replaces it: an answer to this one arriving after is never
 /// used.
-@riverpod
+@Riverpod(retry: _searchOnce)
 Future<HistoryResults> historySearch(Ref ref) async {
   final loaded = ref.watch(loadedHistoryProvider);
   final filters = ref.watch(historyFiltersProvider);
