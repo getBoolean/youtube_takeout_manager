@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/videos/application/video_fo
 import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:squadron/squadron.dart' show WorkerException;
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/channel_meta_line.dart';
@@ -112,6 +113,17 @@ class _Formats extends VideoFormats {
 
   @override
   Future<Map<String, VideoFormat>> build() async => formats;
+}
+
+/// History whose load fails with [error], as the History worker passes it
+/// on.
+class _FailsWith extends TakeoutHistoryNotifier {
+  _FailsWith(this.error);
+
+  final Object error;
+
+  @override
+  Future<LoadedHistory?> build() async => throw error;
 }
 
 /// History in-process, its searches failing as a stopped worker's would
@@ -1274,6 +1286,23 @@ void main() {
 
     expect(find.byKey(HistoryPage.noHistoryKey), findsOneWidget);
     expect(find.byType(Tab), findsNothing);
+  });
+
+  testWidgets("history that couldn't be loaded says why, without the "
+      "worker's stack trace", (tester) async {
+    await _open(
+      tester,
+      historyNotifier: () => _FailsWith(
+        WorkerException(
+          'FormatException: Unexpected extension byte',
+          StackTrace.current,
+        ),
+      ),
+    );
+
+    expect(find.byKey(HistoryPage.retryKey), findsOneWidget);
+    expect(find.textContaining('Unexpected extension byte'), findsOneWidget);
+    expect(find.textContaining('history_screen_test.dart'), findsNothing);
   });
 
   testWidgets("history that couldn't be loaded says so, and Retry loads it", (

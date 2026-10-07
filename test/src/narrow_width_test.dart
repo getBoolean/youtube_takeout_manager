@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
+import 'package:squadron/squadron.dart' show WorkerException;
 
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/pending_ai_work.dart';
@@ -983,6 +984,24 @@ void main() {
     overrides: [takeoutHistoryProvider.overrideWith(_Stopped.new)],
   );
   fitsAtEveryWidth(
+    "the history page when history couldn't be loaded, for a long reason",
+    () => const HistoryPage(),
+    overrides: [
+      takeoutHistoryProvider.overrideWith(
+        () => _FailsWith(
+          WorkerException(
+            "FileSystemException: Cannot open file, path = '/home/someone/"
+            '.local/share/youtube_takeout_manager/takeouts/'
+            "a-very-long-takeout-name/_history/watch-history.csv' (OS "
+            'Error: The process cannot access the file because it is being '
+            'used by another process, errno = 32)',
+            StackTrace.current,
+          ),
+        ),
+      ),
+    ],
+  );
+  fitsAtEveryWidth(
     "the history page's watches of one channel",
     () => const HistoryPage(),
     overrides: historyOverrides,
@@ -1452,6 +1471,16 @@ class _Categorizing extends CategorizationProgress {
     stopping: false,
     interrupted: false,
   );
+}
+
+/// History whose load fails with [error].
+class _FailsWith extends TakeoutHistoryNotifier {
+  _FailsWith(this.error);
+
+  final Object error;
+
+  @override
+  Future<LoadedHistory?> build() async => throw error;
 }
 
 /// History whose worker stopped.

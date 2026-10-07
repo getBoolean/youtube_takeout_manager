@@ -135,7 +135,10 @@ class HistoryPage extends HookConsumerWidget {
     if (historyAsync.hasError) {
       body = EmptyState(
         icon: Icons.error_outline,
-        message: "History couldn't be loaded: ${historyAsync.error}",
+        message: switch (historyAsync.error) {
+          HistoryWorkerDied() => 'History stopped working while it loaded.',
+          final error => "History couldn't be loaded: ${plainFailure(error!)}",
+        },
         action: FilledButton.tonalIcon(
           key: retryKey,
           onPressed: () => ref.invalidate(takeoutHistoryProvider),

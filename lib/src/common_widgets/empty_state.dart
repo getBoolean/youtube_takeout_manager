@@ -19,31 +19,39 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Scrolls when what it says is longer than the room there is.
     return Center(
-      child: Cue.onMount(
-        motion: premiumSpring(context),
-        acts: const [
-          OpacityAct.fadeIn(),
-          SlideAct.y(from: 0.15),
-          ScaleAct(from: 0.95),
-        ],
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 64, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Cue.onMount(
+          motion: premiumSpring(context),
+          acts: const [
+            OpacityAct.fadeIn(),
+            SlideAct.y(from: 0.15),
+            ScaleAct(from: 0.95),
+          ],
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 64,
                 color: Theme.of(context).colorScheme.outline,
               ),
-              textAlign: TextAlign.center,
-            ),
-            if (action case final action?) ...[
               const SizedBox(height: 16),
-              action,
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (action case final action?) ...[
+                const SizedBox(height: 16),
+                action,
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

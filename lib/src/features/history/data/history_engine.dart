@@ -39,7 +39,7 @@ class HistoryWorkerDied implements Exception {
   const HistoryWorkerDied();
 
   @override
-  String toString() => 'The History worker stopped working.';
+  String toString() => 'History stopped working.';
 }
 
 /// Runs the history on a worker it starts on first use. A call that fails
