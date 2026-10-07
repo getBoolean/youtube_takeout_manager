@@ -113,6 +113,8 @@ import 'package:youtube_takeout_manager/src/features/takeout/presentation/other_
 import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeouts_dialog.dart';
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 
 import 'features/history/history_fixture.dart';
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
@@ -1021,6 +1023,43 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
     },
   );
+  for (final expanded in [false, true]) {
+    fitsAtEveryWidth(
+      "the history page's channels nested under their categories"
+      '${expanded ? ', expanded' : ''}',
+      () => const HistoryPage(),
+      overrides: [
+        ...historyOverrides,
+        channelCategoriesProvider.overrideWith(_LongCategories.new),
+      ],
+      then: (tester) async {
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(HistoryPage)),
+        );
+        // Shown at once; the save isn't waited for.
+        unawaited(
+          container
+              .read(historyGroupingProvider.notifier)
+              .set(HistoryGrouping.channel),
+        );
+        container
+            .read(historyChannelSelectionProvider.notifier)
+            .set(
+              ChannelSelection(
+                categories: {
+                  CategoryPick.of(_longCategory().path!),
+                  const CategoryPick.uncategorized(),
+                },
+              ),
+            );
+        await tester.pump(const Duration(seconds: 1));
+        if (expanded) {
+          await tester.tap(find.byKey(HistoryToolbar.expandAllKey));
+          await tester.pump(const Duration(seconds: 1));
+        }
+      },
+    );
+  }
   for (final source in CategorySource.values) {
     fitsAtEveryWidth(
       'the category window for a category from ${source.name}',

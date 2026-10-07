@@ -8,6 +8,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
+import '../domain/category_nests.dart';
 import '../domain/channel_groups.dart';
 import '../domain/history_days.dart';
 import '../data/history_engine.dart';
@@ -248,4 +249,20 @@ ChannelGroups historyChannelGroups(Ref ref) {
           (query.isEmpty || foldForSearch(channel.title).contains(query)))
         channel,
   ]);
+}
+
+/// The watched videos shown grouped by channel, nested under the
+/// categories picked; none while no category is.
+@riverpod
+List<CategoryNest> historyCategoryNests(Ref ref) {
+  final picks = ref.watch(
+    historyChannelSelectionProvider.select((s) => s.categories),
+  );
+  if (picks.isEmpty) return const [];
+  final categories = ref.watch(channelCategoriesProvider).value ?? const {};
+  return nestByCategory(
+    ref.watch(historyChannelGroupsProvider).groups,
+    picks: picks,
+    categoryOf: (key) => categories[key]?.path,
+  );
 }

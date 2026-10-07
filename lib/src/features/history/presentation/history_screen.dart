@@ -36,6 +36,7 @@ import '../domain/watch_filters.dart';
 import '../domain/watched_channels.dart';
 import 'history_actions.dart';
 import 'history_channel_list.dart';
+import 'history_nested_list.dart';
 import 'history_day_list.dart';
 import 'history_filter_sheet.dart';
 import 'history_toolbar.dart';
@@ -203,9 +204,12 @@ typedef _WatchLists = ({
   StickyGroupedListController days,
   StickyGroupedListController months,
   StickyGroupedListController channels,
+  StickyGroupedListController nests,
+  StickyGroupedListController nestedChannels,
   ScrollController dayScroll,
   ScrollController monthScroll,
   ScrollController channelScroll,
+  ScrollController nestScroll,
 });
 
 class _HistoryBody extends HookConsumerWidget {
@@ -225,15 +229,26 @@ class _HistoryBody extends HookConsumerWidget {
       () => StickyGroupedListController(expandedByDefault: false),
     );
     useEffect(() => channelList.dispose, [channelList]);
+    // Nested under categories, the categories start open, their channels
+    // closed.
+    final nestList = useMemoized(StickyGroupedListController.new);
+    useEffect(() => nestList.dispose, [nestList]);
+    final nestedChannelList = useMemoized(
+      () => StickyGroupedListController(expandedByDefault: false),
+    );
+    useEffect(() => nestedChannelList.dispose, [nestedChannelList]);
     final searchList = useMemoized(StickyGroupedListController.new);
     useEffect(() => searchList.dispose, [searchList]);
     final lists = (
       days: dayList,
       months: monthList,
       channels: channelList,
+      nests: nestList,
+      nestedChannels: nestedChannelList,
       dayScroll: useScrollController(),
       monthScroll: useScrollController(),
       channelScroll: useScrollController(),
+      nestScroll: useScrollController(),
     );
     final searchScroll = useScrollController();
     final highlightedWatch = useState<int?>(null);
@@ -247,6 +262,7 @@ class _HistoryBody extends HookConsumerWidget {
       toTop(lists.dayScroll);
       toTop(lists.monthScroll);
       toTop(lists.channelScroll);
+      toTop(lists.nestScroll);
     }
 
     ref.listen(historySearchQueryProvider, (_, _) {
@@ -678,11 +694,18 @@ class _WatchedTab extends ConsumerWidget {
   /// The groupings offered.
   static const _groupings = HistoryGrouping.values;
 
-  StickyGroupedListController get _list => switch (grouping) {
-    HistoryGrouping.month => lists.months,
-    HistoryGrouping.channel => lists.channels,
-    HistoryGrouping.day => lists.days,
-  };
+  /// The lists open and closed by Collapse all and Expand all: nested,
+  /// both levels.
+  List<StickyGroupedListController> _shown({required bool nested}) =>
+      switch (grouping) {
+        HistoryGrouping.month => [lists.months],
+        HistoryGrouping.channel when nested => [
+          lists.nests,
+          lists.nestedChannels,
+        ],
+        HistoryGrouping.channel => [lists.channels],
+        HistoryGrouping.day => [lists.days],
+      };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -717,6 +740,7 @@ class _WatchedTab extends ConsumerWidget {
           final channel = HistoryChannel.of(watch)!;
           ref.read(historyChannelSelectionProvider.notifier).showOnly(channel);
           lists.channels.setExpanded(channel.key, true);
+          lists.nestedChannels.setExpanded(channel.key, true);
         case WatchAction.openChannel:
           await openExternally(watch.channelUrl!);
         case WatchAction.copyLink:
@@ -779,10 +803,15 @@ class _WatchedTab extends ConsumerWidget {
     }
 
     final byChannel = grouping == HistoryGrouping.channel;
-    final channelGroups = byChannel
+    // Grouped by channel with categories picked, channels nest under them.
+    final nested = byChannel && selection.categories.isNotEmpty;
+    final nests = nested ? ref.watch(historyCategoryNestsProvider) : null;
+    final channelGroups = byChannel && !nested
         ? ref.watch(historyChannelGroupsProvider)
         : null;
-    final nothing = channelGroups?.groups.isEmpty ?? days.isEmpty;
+    final nothing =
+        nests?.isEmpty ?? channelGroups?.groups.isEmpty ?? days.isEmpty;
+    final shown = _shown(nested: nested);
 
     final top = Column(
       mainAxisSize: MainAxisSize.min,
@@ -795,8 +824,16 @@ class _WatchedTab extends ConsumerWidget {
             activeFilters: activeFilters,
             onGroupBy: groupBy,
             onFilters: openFilters,
-            onCollapseAll: () => _list.setAllExpanded(false),
-            onExpandAll: () => _list.setAllExpanded(true),
+            onCollapseAll: () {
+              for (final list in shown) {
+                list.setAllExpanded(false);
+              }
+            },
+            onExpandAll: () {
+              for (final list in shown) {
+                list.setAllExpanded(true);
+              }
+            },
             onCategorize: () => showCategorizeWindow(context),
           ),
         ),
@@ -835,6 +872,29 @@ class _WatchedTab extends ConsumerWidget {
               }
 
               return switch (grouping) {
+                HistoryGrouping.channel when nests != null => HistoryNestedList(
+                  nests: nests,
+                  categories: lists.nests,
+                  channels: lists.nestedChannels,
+                  scrollController: lists.nestScroll,
+                  subscribedKeys: ref.watch(
+                    historySubscriptionMatchProvider.select(
+                      (m) => m.subscribedKeys,
+                    ),
+                  ),
+                  pictures: pictures,
+                  query: query,
+                  onChannelShown: onChannelShown,
+                  // Under its category, a channel shows its tags alone.
+                  channelExtra: (context, group) => switch (group.channel) {
+                    final channel? => ChannelCategoryChips(
+                      channel: channel,
+                      showCategory: false,
+                    ),
+                    null => null,
+                  },
+                  entryBuilder: entry,
+                ),
                 HistoryGrouping.channel => HistoryChannelList(
                   groups: channelGroups!,
                   watchChannelIndex: loaded.watchChannelIndex,

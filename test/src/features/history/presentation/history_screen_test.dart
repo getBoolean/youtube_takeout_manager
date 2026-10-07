@@ -37,6 +37,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/search_entry
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
+import 'package:youtube_takeout_manager/src/features/history/presentation/history_nested_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/grouping_sheet.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_channel_list.dart';
@@ -475,6 +476,84 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(_channelHeader('CAFE Channel'), findsOneWidget);
+  });
+
+  group('grouped by channel', () {
+    Future<void> pickGaming(WidgetTester tester) async {
+      await _openFilters(tester);
+      await _tapKey(
+        tester,
+        HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
+      );
+      await _tapKey(tester, HistoryFilterSheet.showKey);
+    }
+
+    testWidgets('with a category picked, channels nest under their '
+        'categories', (tester) async {
+      await _open(
+        tester,
+        categories: _gamingX(),
+        grouping: HistoryGrouping.channel,
+      );
+
+      await pickGaming(tester);
+
+      expect(find.widgetWithText(CategoryNestHeader, 'Gaming'), findsWidgets);
+      expect(_channelHeader('X'), findsOneWidget);
+      expect(_shown('Café tour'), findsNothing);
+
+      await tester.tap(_channelHeader('X'));
+      await tester.pumpAndSettle();
+      expect(_shown('Café tour'), findsOneWidget);
+    });
+
+    testWidgets('without a category picked, the list stays flat', (
+      tester,
+    ) async {
+      await _open(
+        tester,
+        categories: _gamingX(),
+        grouping: HistoryGrouping.channel,
+      );
+
+      expect(find.byType(CategoryNestHeader), findsNothing);
+      expect(_channelHeader('X'), findsOneWidget);
+    });
+
+    testWidgets('Collapse all and Expand all act on both levels', (
+      tester,
+    ) async {
+      await _open(
+        tester,
+        categories: _gamingX(),
+        grouping: HistoryGrouping.channel,
+      );
+      await pickGaming(tester);
+
+      await _tapKey(tester, HistoryToolbar.collapseAllKey);
+      expect(find.byType(CategoryNestHeader), findsWidgets);
+      expect(find.widgetWithText(ChannelGroupHeader, 'X'), findsNothing);
+
+      await _tapKey(tester, HistoryToolbar.expandAllKey);
+      expect(_channelHeader('X'), findsOneWidget);
+      expect(_shown('Café tour'), findsOneWidget);
+    });
+  });
+
+  testWidgets('grouped by day with a category picked, the list stays flat', (
+    tester,
+  ) async {
+    await _open(tester, categories: _gamingX());
+
+    await _openFilters(tester);
+    await _tapKey(
+      tester,
+      HistoryFilterSheet.categoryKey(const CategoryPick.category('Gaming')),
+    );
+    await _tapKey(tester, HistoryFilterSheet.showKey);
+
+    expect(find.byType(CategoryNestHeader), findsNothing);
+    expect(_shown('Café tour'), findsOneWidget);
   });
 
   testWidgets('a category and a channel ticked together both narrow what '

@@ -822,3 +822,59 @@ final class HistoryChannelGroupsProvider
 
 String _$historyChannelGroupsHash() =>
     r'b9866c876d7950c88ac22563e0948a4902f879e1';
+
+/// The watched videos shown grouped by channel, nested under the
+/// categories picked; none while no category is.
+
+@ProviderFor(historyCategoryNests)
+final historyCategoryNestsProvider = HistoryCategoryNestsProvider._();
+
+/// The watched videos shown grouped by channel, nested under the
+/// categories picked; none while no category is.
+
+final class HistoryCategoryNestsProvider
+    extends
+        $FunctionalProvider<
+          List<CategoryNest>,
+          List<CategoryNest>,
+          List<CategoryNest>
+        >
+    with $Provider<List<CategoryNest>> {
+  /// The watched videos shown grouped by channel, nested under the
+  /// categories picked; none while no category is.
+  HistoryCategoryNestsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'historyCategoryNestsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$historyCategoryNestsHash();
+
+  @$internal
+  @override
+  $ProviderElement<List<CategoryNest>> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  List<CategoryNest> create(Ref ref) {
+    return historyCategoryNests(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(List<CategoryNest> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<List<CategoryNest>>(value),
+    );
+  }
+}
+
+String _$historyCategoryNestsHash() =>
+    r'6a8ad10fb521cd1296d533b73be88f7bc72c9e11';
