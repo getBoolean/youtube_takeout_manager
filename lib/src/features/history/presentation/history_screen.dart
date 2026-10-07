@@ -774,6 +774,7 @@ class _WatchedTab extends ConsumerWidget {
       ref.watch(historyShortsFilterProvider) != ShowFilter.all,
       ref.watch(historyMusicFilterProvider) != ShowFilter.all,
       selection.categories.isNotEmpty,
+      selection.tags.isNotEmpty,
       selection.channels.isNotEmpty,
     ].where((on) => on).length;
 

@@ -674,6 +674,17 @@ void main() {
       );
     });
 
+    testWidgets('count as a filter on the Filters button', (tester) async {
+      await openTagged(tester);
+
+      expect(
+        tester
+            .widget<HistoryToolbar>(find.byType(HistoryToolbar))
+            .activeFilters,
+        1,
+      );
+    });
+
     testWidgets("a tag's chip removes it", (tester) async {
       final c = await openTagged(tester);
 
