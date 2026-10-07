@@ -4,14 +4,16 @@ import 'package:youtube_takeout_manager/src/common_widgets/breakpoints.dart';
 import '../application/history_grouping.dart';
 import 'grouping_sheet.dart';
 
-/// Over the watched videos: how they're grouped, the filters on, and
-/// collapsing or expanding every group. The buttons wrap onto more rows
-/// rather than squeezing their labels.
+/// Over the watched videos: how they're grouped, the filters on,
+/// collapsing or expanding every group, and categorizing channels with AI
+/// ([onCategorize], when given). The buttons wrap onto more rows rather than
+/// squeezing their labels.
 class HistoryToolbar extends StatelessWidget {
   static const groupByKey = ValueKey('history-group-by');
   static const filtersKey = ValueKey('history-filters');
   static const collapseAllKey = ValueKey('history-collapse-all');
   static const expandAllKey = ValueKey('history-expand-all');
+  static const categorizeKey = ValueKey('history-categorize');
 
   final HistoryGrouping grouping;
 
@@ -21,6 +23,7 @@ class HistoryToolbar extends StatelessWidget {
   final VoidCallback onFilters;
   final VoidCallback onCollapseAll;
   final VoidCallback onExpandAll;
+  final VoidCallback? onCategorize;
 
   const HistoryToolbar({
     super.key,
@@ -30,6 +33,7 @@ class HistoryToolbar extends StatelessWidget {
     required this.onFilters,
     required this.onCollapseAll,
     required this.onExpandAll,
+    this.onCategorize,
   });
 
   @override
@@ -64,6 +68,13 @@ class HistoryToolbar extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ),
+        if (onCategorize case final onCategorize?)
+          FilledButton.tonalIcon(
+            key: categorizeKey,
+            onPressed: onCategorize,
+            icon: tiny ? null : const Icon(Icons.auto_fix_high),
+            label: const Text('Categorize', textAlign: TextAlign.center),
+          ),
         IconButton(
           key: collapseAllKey,
           tooltip: 'Collapse all',

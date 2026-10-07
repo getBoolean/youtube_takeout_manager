@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
+
+import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:youtube_takeout_manager/src/common_widgets/channel_avatar.dart';
@@ -306,6 +308,16 @@ void main() {
       tester.getTopLeft(_shown('Other')).dy,
       lessThan(tester.getTopLeft(_shown('Unrelated')).dy),
     );
+  });
+
+  testWidgets('Categorize, in the toolbar, opens the Categorize window', (
+    tester,
+  ) async {
+    await _open(tester);
+
+    await _tapKey(tester, HistoryToolbar.categorizeKey);
+
+    expect(find.byKey(TagsPage.defineKey), findsOneWidget);
   });
 
   testWidgets('the search narrows every tab', (tester) async {

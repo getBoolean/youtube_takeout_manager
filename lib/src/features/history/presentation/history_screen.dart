@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/authentication/application/
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/viewing_mix_provider.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorize_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_chips.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
@@ -813,6 +814,7 @@ class _WatchedTab extends ConsumerWidget {
             onFilters: openFilters,
             onCollapseAll: () => _list.setAllExpanded(false),
             onExpandAll: () => _list.setAllExpanded(true),
+            onCategorize: () => showCategorizeWindow(context),
           ),
         ),
         CategorizationBanner(grouped: byChannel || byCategory),

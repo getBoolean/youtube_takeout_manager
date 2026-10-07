@@ -25,22 +25,33 @@ const _keyPages = {
 void showAiKeysSetup(BuildContext context) =>
     WoltModalSheet.of(context).showPageWithId(AiKeysPages.id);
 
-/// The AI keys page, for a Wolt modal whose first page opened it: saving
-/// the keys, or cancelling, goes back to that first page.
+/// The AI keys page, for a Wolt modal: saving the keys, or cancelling, goes
+/// back to the page [backToId] when given, else the modal's first page.
 abstract final class AiKeysPages {
   static const id = 'ai-keys';
 
-  static SliverWoltModalSheetPage page() => WoltModalSheetPage(
-    id: id,
-    topBarTitle: const _TopBarTitle('AI keys'),
-    isTopBarLayerAlwaysVisible: true,
-    leadingNavBarWidget: const _Back(),
-    trailingNavBarWidget: const _Close(),
-    child: const Padding(
-      padding: EdgeInsets.fromLTRB(24, 8, 24, 24),
-      child: _AiKeysPageBody(),
-    ),
-  );
+  static SliverWoltModalSheetPage page({String? backToId}) =>
+      WoltModalSheetPage(
+        id: id,
+        topBarTitle: const _TopBarTitle('AI keys'),
+        isTopBarLayerAlwaysVisible: true,
+        leadingNavBarWidget: _Back(backToId),
+        trailingNavBarWidget: const _Close(),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: _AiKeysPageBody(backToId),
+        ),
+      );
+}
+
+/// Back to the page [id], or the modal's first page without one.
+void _back(BuildContext context, String? id) {
+  final modal = WoltModalSheet.of(context);
+  if (id == null) {
+    modal.showAtIndex(0);
+  } else {
+    modal.showPageWithId(id);
+  }
 }
 
 /// The AI categories setting: which AI services have keys, and adding or
@@ -161,7 +172,9 @@ class _ServiceStatus extends StatelessWidget {
 /// cancelling, goes back to the modal's first page; otherwise the page stays
 /// open saying what each check found.
 class _AiKeysPageBody extends ConsumerWidget {
-  const _AiKeysPageBody();
+  final String? backToId;
+
+  const _AiKeysPageBody(this.backToId);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -171,7 +184,7 @@ class _AiKeysPageBody extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
     final repository = ref.watch(aiKeysRepositoryProvider);
-    void back() => WoltModalSheet.of(context).showAtIndex(0);
+    void back() => _back(context, backToId);
     return AiKeysForm(
       initial: keys.requireValue,
       builtIn: {
@@ -525,14 +538,16 @@ class _TopBarTitle extends StatelessWidget {
 
 /// Back to the page the keys were opened from.
 class _Back extends StatelessWidget {
-  const _Back();
+  final String? id;
+
+  const _Back(this.id);
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsetsDirectional.only(start: 8),
     child: IconButton(
       tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-      onPressed: () => WoltModalSheet.of(context).showAtIndex(0),
+      onPressed: () => _back(context, id),
       icon: const BackButtonIcon(),
     ),
   );

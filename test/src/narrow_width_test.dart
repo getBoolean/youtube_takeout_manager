@@ -7,6 +7,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/application/pending_ai_work.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorize_window.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/run_estimate.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/common_widgets/counted_tab_bar.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/auth_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/authentication/application/oauth_configured.dart';
@@ -1198,6 +1205,93 @@ void main() {
     },
   );
 
+  fitsAtEveryWidth(
+    "the Categorize window's tags, searched",
+    () => Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          TagsPage(
+            header: const StepHeader(
+              step: 1,
+              steps: 2,
+              title: 'Your tags, with a long title',
+              explanation: 'Define the tags you want AI to give channels.',
+            ),
+            onOpen: (_) {},
+          ),
+        ],
+      ),
+    ),
+    overrides: [
+      tagNamesProvider.overrideWith(_LongTags.new),
+      channelCategoriesProvider.overrideWith(_LongCategories.new),
+    ],
+    then: (tester) async {
+      await tester.enterText(find.byKey(TagsPage.searchKey), 'a');
+      await tester.pump();
+    },
+  );
+  fitsAtEveryWidth(
+    'defining a tag',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: TagForm(
+          initialName: 'A tag with a rather long name',
+          onSave: (_, _) async {},
+        ),
+      ),
+    ),
+  );
+  fitsAtEveryWidth(
+    'changing a tag, asked whether to delete it',
+    () => Scaffold(
+      body: SingleChildScrollView(
+        child: TagForm(
+          name: 'A tag with a rather long name, still going',
+          initialMeaning: 'What a channel with this rather long tag is about',
+          onSave: (_, _) async {},
+          onDelete: () async {},
+        ),
+      ),
+    ),
+    then: (tester) async {
+      await tester.tap(find.byKey(TagForm.deleteKey));
+      await tester.pump();
+    },
+  );
+  fitsAtEveryWidth(
+    'what a run with AI would do, and cost',
+    () => const Scaffold(body: SingleChildScrollView(child: RunPage())),
+    overrides: [
+      pendingAiWorkProvider.overrideWith(_LongPending.new),
+      aiKeysProvider.overrideWith(
+        (ref) async => const AiKeys(typesafe: 'jv', anthropic: 'sk-ant'),
+      ),
+    ],
+  );
+  fitsAtEveryWidth(
+    'a run with AI going, with what Claude has cost',
+    () => const Scaffold(body: SingleChildScrollView(child: RunPage())),
+    overrides: [
+      pendingAiWorkProvider.overrideWith(_LongPending.new),
+      categorizationProgressProvider.overrideWith(_Categorizing.new),
+      claudeUsageProvider.overrideWith(_Spent.new),
+    ],
+  );
+  for (final state in RunState.values) {
+    fitsAtEveryWidth(
+      "the Run page's actions, ${state.name}",
+      () => Scaffold(
+        body: RunActions(
+          state: state,
+          onRun: () {},
+          onStop: () {},
+          onAddKeys: () {},
+        ),
+      ),
+    );
+  }
+
   testWidgets('narrow tiles never overflow their trailing widgets', (
     tester,
   ) async {
@@ -1331,4 +1425,36 @@ class _History extends TakeoutHistoryNotifier {
       ],
     ),
   );
+}
+
+class _LongTags extends TagNames {
+  @override
+  Future<Map<String, TagName>> build() async => {
+    for (var i = 0; i < 20; i++)
+      'tag$i': TagName(
+        name: 'A tag with a rather long name $i',
+        origin: i.isEven ? NameOrigin.ai : NameOrigin.user,
+        meaning: i % 3 == 0
+            ? null
+            : 'What a channel with this rather long tag $i is about, at length',
+      ),
+  };
+}
+
+class _LongPending extends PendingAiWork {
+  @override
+  AiWorkSummary? build() => const AiWorkSummary(
+    categorize: 1234567,
+    redo: 123456,
+    tags: 765432,
+    checks: 9876543,
+    uncategorized: 45678,
+    evidenceChars: [40000, 40000, 40000],
+    checkChars: [2000],
+  );
+}
+
+class _Spent extends ClaudeUsage {
+  @override
+  ({int input, int output}) build() => (input: 12345678, output: 456789);
 }

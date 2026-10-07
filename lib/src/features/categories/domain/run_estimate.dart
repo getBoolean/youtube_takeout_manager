@@ -150,3 +150,8 @@ RunCost estimateRunCost(
     claudeRequests: requests,
   );
 }
+
+/// What Claude's answers that used [input] and [output] tokens cost on its
+/// usual model, in dollars.
+double claudeDollars(int input, int output) =>
+    input * _claudeInPerToken + output * _claudeOutPerToken;
