@@ -49,4 +49,19 @@ void main() {
     expect(nameKey('!!!'), isNotEmpty);
     expect(nameKey('!!!'), isNot(nameKey('???')));
   });
+
+  test("text splits into its words' keys, which join into a name's key", () {
+    expect(nameKeyWords('Mario Kart 8 Deluxe: 150cc, ONLINE!'), [
+      'mario',
+      'kart',
+      '8',
+      'deluxe',
+      '150cc',
+      'online',
+    ]);
+    expect(
+      nameKeyWords('Speed-runs of Pokémon').join(),
+      nameKey('Speed-runs of Pokémon'),
+    );
+  });
 }

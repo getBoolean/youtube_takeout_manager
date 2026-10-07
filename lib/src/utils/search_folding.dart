@@ -5,7 +5,15 @@ import 'package:unorm_dart/unorm_dart.dart' as unorm;
 /// letter plus combining marks), and drops U+FE0F (the emoji presentation
 /// selector, so `❤️` and `❤` match each other). Apply to both the query and
 /// the searched text.
-String foldForSearch(String text) => foldForSearchWithOffsets(text).folded;
+String foldForSearch(String text) {
+  for (var i = 0; i < text.length; i++) {
+    if (text.codeUnitAt(i) >= 0x80) {
+      return foldForSearchWithOffsets(text).folded;
+    }
+  }
+  // ASCII has no marks to drop: lowercasing is all there is.
+  return text.toLowerCase();
+}
 
 /// [foldForSearch]'s result, plus the offset in [text] of each of its code
 /// units, so a match in the folded text can be found in the original.
@@ -14,10 +22,14 @@ String foldForSearch(String text) => foldForSearchWithOffsets(text).folded;
   final offsets = <int>[];
   for (var i = 0; i < text.length; i++) {
     final unit = text.codeUnitAt(i);
-    final String plain;
     if (unit < 0x80) {
-      plain = String.fromCharCode(unit).toLowerCase();
-    } else if (unit == 0xFE0F || _isMark(unit)) {
+      // A-Z lowercased by code, without making a string of each.
+      folded.writeCharCode(unit >= 0x41 && unit <= 0x5A ? unit + 0x20 : unit);
+      offsets.add(i);
+      continue;
+    }
+    final String plain;
+    if (unit == 0xFE0F || _isMark(unit)) {
       continue;
     } else if (unit >= 0xD800 && unit <= 0xDFFF) {
       // Half of a character outside the BMP, e.g. an emoji: kept as is.
