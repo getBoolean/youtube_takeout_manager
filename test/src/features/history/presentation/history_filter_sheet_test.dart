@@ -321,4 +321,66 @@ void main() {
       expect(row(many.last.pick, built: true), findsNothing);
     });
   });
+
+  group('the Tags page', () {
+    Finder row(String name) => find.byKey(HistoryFilterSheet.tagKey(name));
+
+    testWidgets('lists the tags, the most used first', (tester) async {
+      await open(
+        tester,
+        tags: const [
+          (name: 'Retro', channels: 1, origin: NameOrigin.user),
+          (name: 'Speedruns', channels: 7, origin: NameOrigin.ai),
+          (name: 'Anime', channels: 3, origin: NameOrigin.ai),
+        ],
+      );
+      await tap(tester, HistoryFilterSheet.tagsRowKey);
+
+      final tops = [
+        for (final name in ['Speedruns', 'Anime', 'Retro'])
+          tester.getTopLeft(row(name)).dy,
+      ];
+      expect(tops, orderedEquals([...tops]..sort()));
+      expect(
+        find.descendant(of: row('Speedruns'), matching: find.byType(AiMark)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('finds a tag by its name', (tester) async {
+      await open(tester);
+      await tap(tester, HistoryFilterSheet.tagsRowKey);
+
+      await tester.enterText(
+        find.byKey(HistoryFilterSheet.tagSearchKey),
+        'speed',
+      );
+      await tester.pumpAndSettle();
+
+      expect(row('Speedruns'), findsOneWidget);
+      expect(row('Retro'), findsNothing);
+    });
+
+    testWidgets('Clear clears only the tags picked', (tester) async {
+      final result = await open(
+        tester,
+        initial: (
+          subscription: SubscriptionFilter.all,
+          shorts: ShowFilter.all,
+          music: ShowFilter.all,
+          selection: ChannelSelection(
+            categories: {_gaming},
+            tags: const {'Retro'},
+          ),
+        ),
+      );
+      await tap(tester, HistoryFilterSheet.tagsRowKey);
+
+      await tap(tester, HistoryFilterSheet.pageClearKey);
+      await tap(tester, HistoryFilterSheet.showKey);
+
+      expect(result.draft?.selection.tags, isEmpty);
+      expect(result.draft?.selection.categories, {_gaming});
+    });
+  });
 }

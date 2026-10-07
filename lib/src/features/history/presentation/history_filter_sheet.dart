@@ -860,9 +860,10 @@ class _PageRow extends StatelessWidget {
   }
 }
 
-/// The tags to pick, each a row with a checkbox, how many channels have
-/// it, and a mark when AI made it. Built lazily however many there are.
-class _TagsSliver extends StatelessWidget {
+/// The tags to pick, the most used first, each a row with a checkbox, how
+/// many channels have it, and a mark when AI made it; a search over the top
+/// finds them by name. Built lazily however many there are.
+class _TagsSliver extends HookWidget {
   final List<TagUse> tags;
 
   const _TagsSliver({required this.tags});
@@ -870,6 +871,20 @@ class _TagsSliver extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final draft = _Draft.of(context);
+    final query = useState('');
+    final folded = foldForSearch(query.value);
+    final shown = useMemoized(
+      () =>
+          [
+            for (final tag in tags)
+              if (folded.isEmpty || foldForSearch(tag.name).contains(folded))
+                tag,
+          ]..sort((a, b) {
+            final byUse = b.channels.compareTo(a.channels);
+            return byUse != 0 ? byUse : a.name.compareTo(b.name);
+          }),
+      [tags, folded],
+    );
     final picked = {for (final tag in draft.value.selection.tags) nameKey(tag)};
     final tiny = isTinyWidth(context);
 
@@ -884,33 +899,44 @@ class _TagsSliver extends StatelessWidget {
       draft.value = _withSelection(value, value.selection.copyWith(tags: tags));
     }
 
-    return SliverList.builder(
-      itemCount: tags.length,
-      itemBuilder: (context, i) {
-        final (:name, :channels, :origin) = tags[i];
-        return CheckboxListTile(
-          key: HistoryFilterSheet.tagKey(name),
-          value: picked.contains(nameKey(name)),
-          onChanged: (_) => toggle(name),
-          contentPadding: EdgeInsets.symmetric(horizontal: tiny ? 8 : 24),
-          title: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: name),
-                if (origin == NameOrigin.ai)
-                  const WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(start: 4),
-                      child: AiMark(size: 14),
-                    ),
-                  ),
-              ],
-            ),
+    return SliverMainAxisGroup(
+      slivers: [
+        PinnedHeaderSliver(
+          child: _SearchField(
+            key: HistoryFilterSheet.tagSearchKey,
+            hint: 'Find a tag',
+            onChanged: (text) => query.value = text,
           ),
-          subtitle: Text(formatCount(channels, 'channel')),
-        );
-      },
+        ),
+        SliverList.builder(
+          itemCount: shown.length,
+          itemBuilder: (context, i) {
+            final (:name, :channels, :origin) = shown[i];
+            return CheckboxListTile(
+              key: HistoryFilterSheet.tagKey(name),
+              value: picked.contains(nameKey(name)),
+              onChanged: (_) => toggle(name),
+              contentPadding: EdgeInsets.symmetric(horizontal: tiny ? 8 : 24),
+              title: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(text: name),
+                    if (origin == NameOrigin.ai)
+                      const WidgetSpan(
+                        alignment: PlaceholderAlignment.middle,
+                        child: Padding(
+                          padding: EdgeInsetsDirectional.only(start: 4),
+                          child: AiMark(size: 14),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              subtitle: Text(formatCount(channels, 'channel')),
+            );
+          },
+        ),
+      ],
     );
   }
 }
