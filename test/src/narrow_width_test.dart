@@ -1245,6 +1245,77 @@ void main() {
       },
     );
   }
+
+  /// Opens History's Filters with long tags, a long category and a channel
+  /// picked, then the page [row] opens, when given, searched for [search].
+  Future<void> filters(WidgetTester tester, {Key? row, String? search}) async {
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(HistoryPage)),
+    );
+    await container.read(channelCategoriesProvider.future);
+    container
+        .read(historyChannelSelectionProvider.notifier)
+        .set(
+          ChannelSelection(
+            categories: {CategoryPick.of(_longCategory().path!)},
+            tags: {
+              for (var i = 1; i <= 2; i++)
+                'A long tag naming a game series, number $i',
+            },
+            channels: const {
+              'UClong': HistoryChannel(
+                channelId: 'UClong',
+                title: 'A channel with a very long name indeed, it goes on',
+              ),
+            },
+          ),
+        );
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.byKey(HistoryToolbar.filtersKey));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    if (row == null) return;
+    // At the top, clear of the actions over the bottom of the page.
+    await Scrollable.ensureVisible(tester.element(find.byKey(row)));
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tapAt(tester.getTopLeft(find.byKey(row)) + const Offset(4, 4));
+    await tester.pump(const Duration(seconds: 1));
+    if (search == null) return;
+    await tester.enterText(
+      find.byKey(
+        row == HistoryFilterSheet.tagsRowKey
+            ? HistoryFilterSheet.tagSearchKey
+            : HistoryFilterSheet.channelSearchKey,
+      ),
+      search,
+    );
+    await tester.pump(const Duration(seconds: 1));
+  }
+
+  final filterOverrides = [
+    ...historyOverrides,
+    channelCategoriesProvider.overrideWith(_LongCategories.new),
+  ];
+  fitsAtEveryWidth(
+    "the history page's Filters first page, with long picks",
+    () => const HistoryPage(),
+    overrides: filterOverrides,
+    then: filters,
+  );
+  fitsAtEveryWidth(
+    "the history page's Filters tags page, searched",
+    () => const HistoryPage(),
+    overrides: filterOverrides,
+    then: (tester) =>
+        filters(tester, row: HistoryFilterSheet.tagsRowKey, search: 'game'),
+  );
+  fitsAtEveryWidth(
+    "the history page's Filters channels page, searched",
+    () => const HistoryPage(),
+    overrides: filterOverrides,
+    then: (tester) =>
+        filters(tester, row: HistoryFilterSheet.channelsRowKey, search: 'long'),
+  );
   fitsAtEveryWidth(
     "the history page's Filters categories page with a category open",
     () => const HistoryPage(),
