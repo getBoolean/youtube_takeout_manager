@@ -9,6 +9,7 @@ import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
@@ -1431,6 +1432,35 @@ void main() {
 
     expect(_channelHeader('X'), findsOneWidget);
     expect(_shown('Café tour'), findsNothing);
+  });
+
+  testWidgets("tapping a channel's category chip opens its window, and leaves "
+      'the channel as it was; tapping beside it opens the channel', (
+    tester,
+  ) async {
+    await _open(
+      tester,
+      categories: _gamingX(),
+      grouping: HistoryGrouping.channel,
+    );
+    final chip = find.descendant(
+      of: _channelHeader('X'),
+      matching: find.byKey(ChannelCategoryChips.tapKey),
+    );
+
+    await tester.tap(chip);
+    await tester.pumpAndSettle();
+    expect(find.byType(CategoryWindowMain), findsOneWidget);
+    await tester.tap(find.byType(CloseButton).last);
+    await tester.pumpAndSettle();
+    expect(_shown('Café tour'), findsNothing);
+
+    // Beside the chip, on the header's right.
+    await tester.tapAt(
+      tester.getTopRight(_channelHeader('X')) + const Offset(-60, 12),
+    );
+    await tester.pumpAndSettle();
+    expect(_shown('Café tour'), findsOneWidget);
   });
 
   testWidgets('a takeout without history explains how to add it', (

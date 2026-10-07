@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -206,5 +207,120 @@ void main() {
     await _pump(tester, summary: _waiting, keys: AiKeys.none);
 
     expect(find.byKey(CategorizationBanner.categorizeKey), findsNothing);
+  });
+
+  group('announcing a run', () {
+    late List<String> announced;
+
+    setUp(() => announced = []);
+
+    void listen(WidgetTester tester) {
+      tester.binding.defaultBinaryMessenger
+          .setMockDecodedMessageHandler<Object?>(SystemChannels.accessibility, (
+            message,
+          ) async {
+            if (message case {
+              'type': 'announce',
+              'data': {'message': final String text},
+            }) {
+              announced.add(text);
+            }
+            return null;
+          });
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockDecodedMessageHandler<Object?>(
+              SystemChannels.accessibility,
+              null,
+            ),
+      );
+    }
+
+    CategorizationProgress progressOf(WidgetTester tester) =>
+        ProviderScope.containerOf(
+          tester.element(find.byType(CategorizationBanner)),
+        ).read(categorizationProgressProvider.notifier);
+
+    /// A run of [total] channels, as the categorizer reports it: started
+    /// before it knows how many, then each channel done.
+    Future<void> run(
+      WidgetTester tester,
+      int total, {
+      int doneBefore = 0,
+      bool interrupted = false,
+      bool ai = true,
+    }) async {
+      final progress = progressOf(tester);
+      progress.start(0, ai: ai);
+      await tester.pump();
+      progress.start(total, ai: ai);
+      await tester.pump();
+      for (var done = 1; done <= (interrupted ? doneBefore : total); done++) {
+        progress.update(done);
+        await tester.pump();
+      }
+      progress.complete(interrupted: interrupted);
+      await tester.pump();
+    }
+
+    testWidgets('says once that a run started and once that it finished, '
+        'never per channel', (tester) async {
+      listen(tester);
+      await _pump(tester);
+
+      await run(tester, 50);
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(announced, hasLength(2));
+      expect(announced, everyElement(contains('50')));
+    });
+
+    testWidgets('says a run dropped and started again started and finished '
+        'once each', (tester) async {
+      listen(tester);
+      await _pump(tester);
+
+      await run(tester, 50, doneBefore: 10, interrupted: true);
+      await run(tester, 40);
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(announced, hasLength(2));
+    });
+
+    testWidgets("says nothing of YouTube's own categorizing", (tester) async {
+      listen(tester);
+      await _pump(tester);
+
+      await run(tester, 50, ai: false);
+      await tester.pump(const Duration(seconds: 2));
+
+      expect(announced, isEmpty);
+    });
+
+    testWidgets("the run's line is no live region, read out at every "
+        'change', (tester) async {
+      final semantics = tester.ensureSemantics();
+      await _pump(
+        tester,
+        progress: (
+          running: true,
+          ai: true,
+          done: 3,
+          total: 50,
+          redo: false,
+          stopping: false,
+          interrupted: false,
+        ),
+      );
+
+      final node = tester.getSemantics(find.textContaining('3 of 50'));
+      expect(node.flagsCollection.isLiveRegion, isFalse);
+      var parent = node.parent;
+      while (parent != null) {
+        expect(parent.flagsCollection.isLiveRegion, isFalse);
+        parent = parent.parent;
+      }
+      semantics.dispose();
+    });
   });
 }

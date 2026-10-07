@@ -111,44 +111,48 @@ class _DayHeader extends StatelessWidget {
         button: true,
         child: InkWell(
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 8, 10),
-            child: Row(
-              children: [
-                // Day and count at either side; the count under the day
-                // when both don't fit.
-                Expanded(
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 12,
-                    runSpacing: 2,
-                    children: [
-                      Text(day, style: theme.textTheme.titleSmall),
-                      Text(
-                        count,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+          // At least 48 points to tap, at any text size.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 8, 10),
+              child: Row(
+                children: [
+                  // Day and count at either side; the count under the day
+                  // when both don't fit.
+                  Expanded(
+                    child: Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 12,
+                      runSpacing: 2,
+                      children: [
+                        Text(day, style: theme.textTheme.titleSmall),
+                        Text(
+                          count,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 4),
-                AnimatedRotation(
-                  turns: expanded ? 0.5 : 0,
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 200),
-                  curve: Curves.easeOutCubic,
-                  child: Icon(
-                    Icons.expand_more,
-                    size: 20,
-                    color: scheme.onSurfaceVariant,
+                  const SizedBox(width: 4),
+                  AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    child: Icon(
+                      Icons.expand_more,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
