@@ -240,7 +240,7 @@ void main() {
     );
   });
 
-  test('at most 3 are asked at once', () async {
+  test('at most 16 are asked at once', () async {
     var running = 0;
     var most = 0;
     final release = Completer<void>();
@@ -255,15 +255,15 @@ void main() {
     );
 
     final asked = [
-      for (var i = 0; i < 5; i++)
+      for (var i = 0; i < 20; i++)
         repository.ask(apiKey: 'k', state: 's', questions: _questions),
     ];
     await pumpEventQueue();
-    expect(running, 3);
+    expect(running, 16);
     release.complete();
     await Future.wait(asked);
 
-    expect(most, 3);
+    expect(most, 16);
   });
 
   test('a pause further off than a minute fails asking at once, saying '

@@ -57,6 +57,17 @@ class RetryPolicy {
     timeoutRetries: 1,
   );
 
+  /// Claude asked about many channels at once: given longer, and not asked
+  /// again when it takes longer still, since it may have been paid for;
+  /// what was asked is asked again in smaller parts instead.
+  static const claudeGroup = RetryPolicy(
+    attempts: 3,
+    firstBackoff: Duration(seconds: 1),
+    maxBackoff: Duration(seconds: 8),
+    timeout: Duration(seconds: 120),
+    timeoutRetries: 0,
+  );
+
   /// Checking a key, while someone waits for the answer.
   static const keyCheck = RetryPolicy(
     attempts: 2,
@@ -176,13 +187,15 @@ class AiRequester {
 
   /// Sends what [request] builds, with [apiKey] in it, until [read] makes an
   /// answer of a reply, and gives it. [request] is given the future that
-  /// aborts it. Each try takes a turn from the pacer for about [tokens],
-  /// unless not [paced]. Throws an [AiFailure] that never quotes [apiKey].
+  /// aborts it. Each try takes a turn from the pacer for about [tokens], and
+  /// an answer of about [outputTokens], unless not [paced]. Throws an
+  /// [AiFailure] that never quotes [apiKey].
   Future<T> send<T>({
     required String apiKey,
     required http.BaseRequest Function(Future<void> abort) request,
     required AiReply<T> Function(http.Response response) read,
     int tokens = 0,
+    int? outputTokens,
     bool paced = true,
     RetryPolicy? policy,
   }) => guardAi(secret: apiKey, () async {
@@ -197,7 +210,10 @@ class AiRequester {
     var timeouts = 0;
     for (var attempt = 1; ; attempt++) {
       final last = attempt >= rules.attempts;
-      final turn = await pacer?.turn(tokens: tokens);
+      final turn = await pacer?.turn(
+        tokens: tokens,
+        outputTokens: outputTokens,
+      );
       final abort = Completer<void>();
       final built = request(abort.future);
       http.Response? response;

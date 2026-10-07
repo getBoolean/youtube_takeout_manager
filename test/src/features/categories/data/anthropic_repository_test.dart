@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 
@@ -556,6 +557,84 @@ void main() {
 
       expect(outcome, isA<AiOverloaded>());
       expect(requests, 2);
+    });
+  });
+
+  group('a request about many channels', () {
+    Future<Map<String, Object?>> askGroup(
+      http.Client client, {
+      int? maxTokens,
+      void Function(int input, int output)? onUsage,
+    }) =>
+        AnthropicRepository(
+          client: client,
+          browser: false,
+          sleep: (_) async {},
+        ).structured(
+          apiKey: 'sk-ant-1',
+          model: _haiku,
+          system: 'Categorize the channels.',
+          user: '{"channels":[]}',
+          schema: _schema,
+          maxTokens: maxTokens,
+          onUsage: onUsage,
+          policy: RetryPolicy.claudeGroup,
+        );
+
+    test('may be answered at the length it asks for', () async {
+      final bodies = <Map<String, Object?>>[];
+      final client = MockClient((request) async {
+        bodies.add(jsonDecode(request.body) as Map<String, Object?>);
+        return _json(_message({'parent': 'Gaming'}));
+      });
+
+      await askGroup(client, maxTokens: 4600);
+      await askGroup(client);
+
+      expect(bodies.first['max_tokens'], 4600);
+      expect(bodies.last['max_tokens'], _haiku.answerTokens);
+    });
+
+    test(
+      'says how many tokens it used, even when its answer was cut off',
+      () async {
+        final used = <(int, int)>[];
+
+        await askGroup(
+          MockClient((_) async => _json(_message({'parent': 'Gaming'}))),
+          onUsage: (input, output) => used.add((input, output)),
+        );
+        final cutOff = askGroup(
+          MockClient(
+            (_) async => _json(_message({'parent': 'G'}, stop: 'max_tokens')),
+          ),
+          onUsage: (input, output) => used.add((input, output)),
+        );
+
+        await expectLater(cutOff, throwsA(isA<AiNoAnswer>()));
+        expect(used, [(900, 40), (900, 40)]);
+      },
+    );
+
+    test('is given two minutes, and not asked again when it takes longer, '
+        'since it may have been paid for', () {
+      fakeAsync((async) {
+        var requests = 0;
+        Object? outcome;
+        askGroup(
+          MockClient((_) {
+            requests++;
+            return Completer<http.Response>().future;
+          }),
+        ).then<void>((_) {}, onError: (Object e) => outcome = e);
+
+        async.elapse(const Duration(seconds: 90));
+        expect(outcome, isNull);
+        async.elapse(const Duration(minutes: 10));
+
+        expect(outcome, isA<AiOverloaded>());
+        expect(requests, 1);
+      });
     });
   });
 

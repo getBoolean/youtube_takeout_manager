@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/category_pipeline.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
@@ -107,6 +108,10 @@ class _Claude extends AnthropicRepository {
     required String system,
     required String user,
     required Map<String, Object?> schema,
+    int? maxTokens,
+    int? expectedOutputTokens,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    RetryPolicy? policy,
   }) async {
     asked.add(user);
     final tagsOnly = !(schema['properties']! as Map).containsKey('parent');

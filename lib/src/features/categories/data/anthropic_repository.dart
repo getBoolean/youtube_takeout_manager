@@ -73,14 +73,22 @@ class AnthropicRepository {
 
   /// Asks [model] with [apiKey], under [system], about [user], for JSON
   /// matching [schema], and gives it decoded. What [model] supports decides
-  /// the effort asked for and how long the answer may be; a model that
-  /// can't answer in shapes isn't asked. Throws an [AiFailure].
+  /// the effort asked for, and how long the answer may be unless
+  /// [maxTokens] says; the pacer holds [expectedOutputTokens] for it when
+  /// given. [onUsage] is told the tokens each answer used, an unusable one
+  /// too, since it's paid for. Tried as [policy] says, else as Claude's
+  /// SDK does. A model that can't answer in shapes isn't asked. Throws an
+  /// [AiFailure].
   Future<Map<String, Object?>> structured({
     required String apiKey,
     required ModelCapabilities model,
     required String system,
     required String user,
     required Map<String, Object?> schema,
+    int? maxTokens,
+    int? expectedOutputTokens,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    RetryPolicy? policy,
   }) => guardAi(secret: apiKey, () async {
     if (!model.structuredOutputs) {
       throw AiModelUnavailable(
@@ -89,7 +97,7 @@ class AnthropicRepository {
     }
     final body = jsonEncode({
       'model': model.id,
-      'max_tokens': model.answerTokens,
+      'max_tokens': maxTokens ?? model.answerTokens,
       'system': system,
       'messages': [
         {'role': 'user', 'content': user},
@@ -102,6 +110,8 @@ class AnthropicRepository {
     return _requester.send(
       apiKey: apiKey,
       tokens: body.length ~/ 4,
+      outputTokens: expectedOutputTokens,
+      policy: policy,
       request: (abort) =>
           http.AbortableRequest('POST', _endpoint, abortTrigger: abort)
             ..headers.addAll({
@@ -109,7 +119,7 @@ class AnthropicRepository {
               'content-type': 'application/json',
             })
             ..body = body,
-      read: (response) => _reply(response, _answer),
+      read: (response) => _reply(response, (body) => _answer(body, onUsage)),
     );
   });
 
@@ -208,9 +218,21 @@ class AnthropicRepository {
   }
 
   /// The JSON Claude answered with, only once it finished: a refusal, or an
-  /// answer cut off, is no answer.
-  static Map<String, Object?> _answer(String body) {
+  /// answer cut off, is no answer. [onUsage] is told the tokens it used
+  /// either way.
+  static Map<String, Object?> _answer(
+    String body,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+  ) {
     final json = _tryDecode(body);
+    if (json case {
+      'usage': {
+        'input_tokens': final int input,
+        'output_tokens': final int output,
+      },
+    }) {
+      onUsage?.call(input, output);
+    }
     if (json case {
       'stop_reason': 'end_turn',
       'content': final List<dynamic> content,

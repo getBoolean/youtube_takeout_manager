@@ -49,19 +49,20 @@ abstract class AiPacer {
   /// Ends a pause now, e.g. for a new key, which the pause wasn't for.
   void resume() => _pausedUntil = null;
 
-  /// Waits for a turn to send a request of about [tokens]. Throws
-  /// [AiRateLimited], with when to resume, when that's further off than
-  /// [longestWait].
-  Future<AiTurn> turn({int tokens = 0}) async {
+  /// Waits for a turn to send a request of about [tokens], whose answer is
+  /// expected to be about [outputTokens] long, where the service limits
+  /// that. Throws [AiRateLimited], with when to resume, when that's further
+  /// off than [longestWait].
+  Future<AiTurn> turn({int tokens = 0, int? outputTokens}) async {
     await _place();
     try {
       await _waitOutPause();
-      await _budget(tokens);
+      await _budget(tokens, outputTokens);
     } on Object {
       _free();
       rethrow;
     }
-    return _Turn(this, tokens);
+    return _Turn(this, tokens, outputTokens);
   }
 
   /// Waits for one of the [concurrency] places.
@@ -103,11 +104,13 @@ abstract class AiPacer {
   }
 
   /// Waits until the service's other limits leave room for a request of
-  /// [tokens], and holds that room until the turn is done.
-  Future<void> _budget(int tokens);
+  /// [tokens] and an answer of [outputTokens], and holds that room until
+  /// the turn is done.
+  Future<void> _budget(int tokens, int? outputTokens);
 
-  /// Settles the turn for [tokens] given back with [response].
-  void _settle(int tokens, http.BaseResponse? response) {}
+  /// Settles the turn for [tokens] and [outputTokens] given back with
+  /// [response].
+  void _settle(int tokens, int? outputTokens, http.BaseResponse? response) {}
 
   static const _tooMany = 'Too many requests for now.';
 }
@@ -115,23 +118,24 @@ abstract class AiPacer {
 class _Turn implements AiTurn {
   final AiPacer _pacer;
   final int _tokens;
+  final int? _outputTokens;
   bool _done = false;
 
-  _Turn(this._pacer, this._tokens);
+  _Turn(this._pacer, this._tokens, this._outputTokens);
 
   @override
   void done([http.BaseResponse? response]) {
     if (_done) return;
     _done = true;
-    _pacer._settle(_tokens, response);
+    _pacer._settle(_tokens, _outputTokens, response);
     _pacer._free();
   }
 }
 
 /// Jev's documented limits: requests and tokens per second, each a bucket
-/// that refills steadily, and a few requests at once. A request takes what
-/// it costs at once, into debt if need be, and waits once for the debt to
-/// refill.
+/// that refills steadily, and 16 requests at once, well within them. A
+/// request takes what it costs at once, into debt if need be, and waits
+/// once for the debt to refill.
 class BucketPacer extends AiPacer {
   @override
   final int concurrency;
@@ -139,7 +143,7 @@ class BucketPacer extends AiPacer {
   final _Bucket _tokens;
 
   BucketPacer({
-    this.concurrency = 3,
+    this.concurrency = 16,
     double requestsPerSecond = 40,
     double tokensPerSecond = 100000,
     super.now,
@@ -149,7 +153,7 @@ class BucketPacer extends AiPacer {
        _tokens = _Bucket(tokensPerSecond);
 
   @override
-  Future<void> _budget(int tokens) async {
+  Future<void> _budget(int tokens, int? outputTokens) async {
     final now = _now();
     final wait = [
       _requests.take(1, now),
@@ -189,7 +193,8 @@ class AdaptivePacer extends AiPacer {
   final int maxConcurrency;
   final int rampEvery;
 
-  /// The output tokens a request may use, held against what's left.
+  /// The output tokens a request is held to use, against what's left, when
+  /// its turn doesn't say.
   final int outputTokens;
 
   int _concurrency = 1;
@@ -210,15 +215,15 @@ class AdaptivePacer extends AiPacer {
   @override
   int get concurrency => _concurrency;
 
-  List<(_Limit, int)> _needs(int tokens) => [
+  List<(_Limit, int)> _needs(int tokens, int? output) => [
     (_requests, 1),
     (_input, tokens),
-    (_output, outputTokens),
+    (_output, output ?? outputTokens),
   ];
 
   @override
-  Future<void> _budget(int tokens) async {
-    final needs = _needs(tokens);
+  Future<void> _budget(int tokens, int? outputTokens) async {
+    final needs = _needs(tokens, outputTokens);
     final now = _now();
     DateTime? until;
     for (final (limit, need) in needs) {
@@ -245,8 +250,8 @@ class AdaptivePacer extends AiPacer {
   }
 
   @override
-  void _settle(int tokens, http.BaseResponse? response) {
-    for (final (limit, need) in _needs(tokens)) {
+  void _settle(int tokens, int? outputTokens, http.BaseResponse? response) {
+    for (final (limit, need) in _needs(tokens, outputTokens)) {
       limit.held -= need;
     }
     if (response == null) return;

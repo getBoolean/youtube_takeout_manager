@@ -19,6 +19,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/cate
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/data/ai_request.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_pause_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/model_capabilities_repository.dart';
@@ -196,6 +197,10 @@ class _Claude extends AnthropicRepository {
     required String system,
     required String user,
     required Map<String, Object?> schema,
+    int? maxTokens,
+    int? expectedOutputTokens,
+    void Function(int inputTokens, int outputTokens)? onUsage,
+    RetryPolicy? policy,
   }) async {
     asked.add(user);
     final tagsOnly = !(schema['properties']! as Map).containsKey('parent');

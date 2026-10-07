@@ -84,16 +84,16 @@ void main() {
       expect(clock.sleeps, isEmpty);
     });
 
-    test('at most 3 at once: the 4th waits for one to be done', () async {
+    test('at most 16 at once: the 17th waits for one to be done', () async {
       final clock = _Clock();
       final pacer = BucketPacer(now: clock.call, sleep: clock.sleep);
-      final turns = [for (var i = 0; i < 3; i++) await pacer.turn()];
+      final turns = [for (var i = 0; i < 16; i++) await pacer.turn()];
 
-      final fourth = pacer.turn();
-      expect(await _finished(fourth), isFalse);
+      final seventeenth = pacer.turn();
+      expect(await _finished(seventeenth), isFalse);
 
       turns.first.done();
-      expect(await _finished(fourth), isTrue);
+      expect(await _finished(seventeenth), isTrue);
     });
 
     test('a turn done twice frees only one place', () async {
@@ -235,6 +235,25 @@ void main() {
         (await pacer.turn()).done(_reply(200));
 
         expect(clock.sleeps, const [Duration(seconds: 10)]);
+      },
+    );
+
+    test(
+      'a turn holds the output it says it needs, not a whole answer\'s',
+      () async {
+        final clock = _Clock();
+        final pacer = AdaptivePacer(now: clock.call, sleep: clock.sleep);
+        final reset = clock.now.add(const Duration(seconds: 10));
+
+        (await pacer.turn()).done(
+          _reply(200, {
+            'anthropic-ratelimit-output-tokens-remaining': '300',
+            'anthropic-ratelimit-output-tokens-reset': reset.toIso8601String(),
+          }),
+        );
+        (await pacer.turn(outputTokens: 250)).done(_reply(200));
+
+        expect(clock.sleeps, isEmpty);
       },
     );
 
