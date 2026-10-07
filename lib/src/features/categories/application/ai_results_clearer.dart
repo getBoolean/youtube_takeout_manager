@@ -13,8 +13,7 @@ part 'ai_results_clearer.g.dart';
 
 /// Clears what AI made for channels, keeping what the user decided, as
 /// [clearAiResults] says: the run under way is stopped first, so nothing it
-/// answers is kept, and the next time History opens, channels are
-/// categorized again.
+/// answers is kept. AI categorizes them again on the user's next run.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 @Riverpod(keepAlive: true)
@@ -24,7 +23,8 @@ class AiResultsClearer extends _$AiResultsClearer {
 
   Future<void> clear() async {
     // First, so a run asked for while clearing, such as one without a
-    // service an answer turned off, waits for History too.
+    // service an answer turned off, waits for History to be shown again,
+    // after the clear.
     ref.read(historyShownProvider.notifier).reset();
     await ref.read(channelCategorizerProvider.notifier).stopRun();
     final details = await ref

@@ -37,6 +37,7 @@ import 'package:youtube_takeout_manager/src/features/history/domain/loaded_histo
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_details_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
@@ -270,6 +271,22 @@ Future<void> _settle() async {
   }
 }
 
+/// Clicks Run, as the Categorize window does, and lets the run go.
+Future<void> _runAi(ProviderContainer c) async {
+  c.read(channelCategorizerProvider.notifier).run();
+  await _settle();
+}
+
+/// The subscriptions, changeable as when a takeout's arrive.
+class _Subs extends Notifier<List<Subscription>> {
+  @override
+  List<Subscription> build() => const [];
+
+  void set(List<Subscription> subscriptions) => state = subscriptions;
+}
+
+final _subs = NotifierProvider<_Subs, List<Subscription>>(_Subs.new);
+
 // Gamer is watched most, then Singer; Newsy is only subscribed to.
 final _history = TakeoutHistory(
   watches: [
@@ -317,7 +334,7 @@ void main() {
         ),
         readSessionChannelIdProvider.overrideWithValue(session),
         historySubscriptionsProvider.overrideWith(
-          (ref) async => {for (final s in subscriptions) s.channelId: s},
+          (ref) async => {for (final s in ref.watch(_subs)) s.channelId: s},
         ),
         aiKeysProvider.overrideWith((ref) async => ref.watch(_keys)),
         typeSafeRepositoryProvider.overrideWithValue(jev ?? _Jev()),
@@ -329,6 +346,7 @@ void main() {
     );
     addTearDown(c.dispose);
     c.read(_keys.notifier).set(keys);
+    c.read(_subs.notifier).set(subscriptions);
     c.listen(channelCategorizerProvider, (_, _) {});
     return c;
   }
@@ -387,7 +405,7 @@ void main() {
   test('without topics or AI, a channel is uncategorized, and not counted '
       'as categorized', () async {
     final c = container(details: known);
-    final seen = <({bool running, int done, int total, bool redo})>[];
+    final seen = <RunProgress>[];
     c.listen(categorizationProgressProvider, (_, p) => seen.add(p));
 
     c.read(historyShownProvider.notifier).markShown();
@@ -444,6 +462,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, {AiService.jev});
@@ -463,6 +482,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(c.read(aiTierStatusProvider).disabled, {AiService.jev});
       // Only the channels already asked about when it failed, three at once.
@@ -476,6 +496,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final gamer = c.read(channelCategoriesProvider).value?['UCg'];
       expect(gamer?.path, const CategoryPath('Gaming', 'Action'));
@@ -493,6 +514,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, {AiService.jev});
@@ -504,23 +526,24 @@ void main() {
       );
     });
 
-    test(
-      'adding the key later has Jev check the categories already made',
-      () async {
-        final c = container(details: known, jev: _Jev(agree: 0.8));
-        c.read(historyShownProvider.notifier).markShown();
-        await _settle();
-        expect(
-          c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed,
-          isNull,
-        );
+    test('adding the key later starts nothing, and Run then has Jev check the '
+        'categories already made', () async {
+      final jev = _Jev(agree: 0.8);
+      final c = container(details: known, jev: jev);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
 
-        c.read(_keys.notifier).set(jevKey);
-        await _settle();
+      c.read(_keys.notifier).set(jevKey);
+      await _settle();
+      expect(jev.requests, 0);
+      expect(
+        c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed,
+        isNull,
+      );
 
-        expect(c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed, 0.8);
-      },
-    );
+      await _runAi(c);
+      expect(c.read(channelCategoriesProvider).value?['UCg']?.jevAgreed, 0.8);
+    });
 
     test('Jev is offered the sub-categories channels have most, when there '
         'are more than it takes', () async {
@@ -544,6 +567,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final knowledge = jev.asked.whereType<JevChoice>().where(
         (question) => question.options.values.contains('Topic 1'),
@@ -570,6 +594,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, isEmpty);
@@ -599,6 +624,7 @@ void main() {
       final first = container(details: known, keys: claudeKey, claude: claude);
       first.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(first);
       expect(claude.capabilitiesAsked, [anthropicModel]);
       first.dispose();
 
@@ -610,6 +636,7 @@ void main() {
       );
       again.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(again);
 
       expect(claude.asked, isNotEmpty);
       expect(claude.capabilitiesAsked, [anthropicModel]);
@@ -632,6 +659,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(claude.capabilitiesAsked, [anthropicModel]);
     });
@@ -652,6 +680,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, isEmpty);
@@ -678,6 +707,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, {AiService.claude});
@@ -695,6 +725,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(paths(c), containsPair('UCx', null));
       expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
       expect(c.read(aiTierStatusProvider).disabled, isEmpty);
@@ -716,6 +747,7 @@ void main() {
       final c = container(details: known, keys: claudeKey, claude: claude);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(claude.asked, isNotEmpty);
 
       const topicless = HistoryChannel(channelId: 'UCx', title: 'No topics');
@@ -729,7 +761,8 @@ void main() {
     });
 
     test('switching takeouts stops the run under way, keeping the answers '
-        'already asked for', () async {
+        "already asked for; the other takeout gets YouTube's categories "
+        'alone', () async {
       final hold = Completer<void>();
       final claude = _Claude({
         'parent': 'Knowledge',
@@ -747,10 +780,13 @@ void main() {
           ],
         ),
       );
+      await c.read(takeoutSelectionProvider.notifier).select('first');
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(claude.asked, hasLength(3));
 
+      await c.read(takeoutSelectionProvider.notifier).select('other');
       (c.read(takeoutHistoryProvider.notifier) as _Fixed).switchTo(
         TakeoutHistory(watches: [_watch('UCo', 'Other')]),
       );
@@ -759,8 +795,8 @@ void main() {
       await _settle();
 
       expect(paths(c).keys, containsAll(['UC1', 'UC2', 'UC3', 'UCo']));
-      expect(paths(c).containsKey('UC4'), isFalse);
-      expect(claude.asked, hasLength(4));
+      expect(paths(c)['UC4'], isNull);
+      expect(claude.asked, hasLength(3));
     });
 
     test('Claude names the categories YouTube gives none for, and a new '
@@ -774,6 +810,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       // No Unknown topics for No topics, so Claude named it.
       final none = c.read(channelCategoriesProvider).value?['UCx'];
@@ -797,6 +834,7 @@ void main() {
       final c = container(details: known, keys: claudeKey, claude: claude);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       final categorizer = c.read(channelCategorizerProvider.notifier);
       const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
       expect(categorizer.canAskAi, isTrue);
@@ -831,6 +869,7 @@ void main() {
         );
         c.read(historyShownProvider.notifier).markShown();
         await _settle();
+        await _runAi(c);
         expect(await c.read(customCategoriesProvider.future), isEmpty);
         const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
 
@@ -850,6 +889,7 @@ void main() {
       final c = container(details: known, keys: claudeKey);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       await c
           .read(customCategoriesProvider.notifier)
           .add('Gaming', 'Speedruns');
@@ -908,6 +948,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       const gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');
 
       await c.read(categoryEditorProvider.notifier).deny(gamer);
@@ -924,6 +965,7 @@ void main() {
     final c = container(details: known);
     c.read(historyShownProvider.notifier).markShown();
     await _settle();
+    await _runAi(c);
 
     expect(c.read(channelCategorizerProvider.notifier).canAskAi, isFalse);
   });
@@ -932,12 +974,184 @@ void main() {
     final first = container(details: known);
     first.read(historyShownProvider.notifier).markShown();
     await _settle();
+    await _runAi(first);
     first.dispose();
 
     final again = container(details: const {});
     await again.read(channelCategoriesProvider.future);
 
     expect(paths(again)['UCg'], const CategoryPath('Gaming', 'Action'));
+  });
+
+  group('AI is asked only when Run is clicked', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+    const knowledge = {'parent': 'Knowledge', 'child': null, 'reason': ''};
+    final noTopics = TakeoutHistory(
+      watches: [
+        for (final id in ['UC1', 'UC2', 'UC3', 'UC4'])
+          _watch(id, 'Channel $id'),
+      ],
+    );
+
+    test("with both keys, opening History categorizes from YouTube's topics "
+        'and asks no AI', () async {
+      final jev = _Jev();
+      final claude = _Claude(knowledge);
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: jev,
+        claude: claude,
+      );
+
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      expect(paths(c)['UCs'], const CategoryPath('Music', 'Pop'));
+      expect(jev.requests, 0);
+      expect(claude.asked, isEmpty);
+    });
+
+    test('Run asks AI, and a second Run asks nothing more', () async {
+      final claude = _Claude(knowledge);
+      final c = container(keys: claudeKey, claude: claude, history: noTopics);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      expect(claude.asked, isEmpty);
+
+      await _runAi(c);
+      expect(claude.asked, hasLength(4));
+      expect(paths(c)['UC4'], const CategoryPath('Knowledge'));
+
+      await _runAi(c);
+      expect(claude.asked, hasLength(4));
+    });
+
+    test('Stop keeps the answers already asked for and asks nothing more; '
+        'Run again asks only for the rest', () async {
+      final hold = Completer<void>();
+      final claude = _Claude(knowledge, hold: hold);
+      final c = container(keys: claudeKey, claude: claude, history: noTopics);
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      await _runAi(c);
+      expect(claude.asked, hasLength(3));
+
+      c.read(channelCategorizerProvider.notifier).stop();
+      expect(c.read(categorizationProgressProvider).stopping, isTrue);
+      hold.complete();
+      await _settle();
+
+      expect(claude.asked, hasLength(3));
+      expect(
+        [
+          for (final id in ['UC1', 'UC2', 'UC3', 'UC4']) paths(c)[id],
+        ],
+        [...List.filled(3, const CategoryPath('Knowledge')), null],
+      );
+      final progress = c.read(categorizationProgressProvider);
+      expect(progress.running, isFalse);
+      expect(progress.interrupted, isTrue);
+
+      await _runAi(c);
+      expect(claude.asked, hasLength(4));
+      expect(paths(c)['UC4'], const CategoryPath('Knowledge'));
+      expect(c.read(categorizationProgressProvider).interrupted, isFalse);
+    });
+
+    test(
+      "subscriptions arriving during the user's run keep it going",
+      () async {
+        final hold = Completer<void>();
+        final claude = _Claude(knowledge, hold: hold);
+        final c = container(keys: claudeKey, claude: claude, history: noTopics);
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        await _runAi(c);
+
+        c.read(_subs.notifier).set(const [
+          Subscription(
+            channelId: 'UCn',
+            channelUrl: 'http://www.youtube.com/channel/UCn',
+            channelTitle: 'Newsy',
+          ),
+        ]);
+        await _settle();
+        hold.complete();
+        await _settle();
+
+        expect(claude.kinds, contains('category: Newsy'));
+        expect(paths(c)['UC4'], const CategoryPath('Knowledge'));
+      },
+    );
+
+    test('Jev turned off during the run ends it, rather than Claude taking '
+        'over', () async {
+      final claude = _Claude(knowledge);
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: _Jev(failure: const AiKeyRejected()),
+        claude: claude,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+
+      expect(c.read(aiTierStatusProvider).disabled, {AiService.jev});
+      expect(claude.asked, isEmpty);
+      expect(c.read(categorizationProgressProvider).interrupted, isTrue);
+    });
+
+    test('Claude turned off during the run lets it go on with Jev', () async {
+      final c = container(
+        details: known,
+        keys: const AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1'),
+        jev: _Jev(),
+        claude: _Claude(knowledge, failure: const AiKeyRejected()),
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+
+      expect(c.read(aiTierStatusProvider).disabled, {AiService.claude});
+      expect(
+        c
+            .read(channelCategoriesProvider)
+            .value!
+            .values
+            .where((category) => category.jevAgreed != null),
+        hasLength(2),
+      );
+      expect(c.read(categorizationProgressProvider).interrupted, isFalse);
+    });
+
+    test(
+      "a service's pause holds the user's run, not YouTube's categories",
+      () async {
+        final timers = _Timers();
+        final jev = _Jev(failure: const AiOverloaded());
+        final c = container(
+          keys: const AiKeys(typesafe: 'jv_live_1'),
+          jev: jev,
+          timers: timers,
+          history: TakeoutHistory(watches: [_watch('UCx', 'No topics')]),
+        );
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        await _runAi(c);
+        expect(timers.active, hasLength(1));
+
+        await c.read(channelDetailsProvider.notifier).add(known);
+        (c.read(takeoutHistoryProvider.notifier) as _Fixed).switchTo(_history);
+        await _settle();
+
+        expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
+      },
+    );
   });
 
   group('when a service asks to wait', () {
@@ -967,6 +1181,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(c.read(aiTierStatusProvider).disabled, isEmpty);
       expect(c.read(aiTierStatusProvider).notice, isNotNull);
@@ -1002,6 +1217,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(timers.active.single.after, const Duration(seconds: 90));
     });
@@ -1024,6 +1240,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(timers.active.single.after, const Duration(minutes: 1));
     });
@@ -1040,6 +1257,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       jev.failure = null;
       double? singerAgreed() =>
           c.read(channelCategoriesProvider).value?['UCs']?.jevAgreed;
@@ -1067,6 +1285,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       jev.failure = null;
 
       c.read(_keys.notifier).set(const AiKeys(typesafe: 'jv_live_2'));
@@ -1077,8 +1296,8 @@ void main() {
       expect(await pauses().load(now: t0), isEmpty);
     });
 
-    test('a pause kept from before a restart still holds for the time left, '
-        'then categorizing resumes', () async {
+    test('a pause kept from before a restart holds AI for the time left, '
+        "not YouTube's categories, and its end starts no AI", () async {
       await pauses().save(
         AiService.jev,
         t0.add(const Duration(minutes: 5)),
@@ -1096,8 +1315,34 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
-      expect(jev.requests, 0);
+      expect(paths(c)['UCg'], const CategoryPath('Gaming', 'Action'));
       expect(timers.active.single.after, const Duration(minutes: 3));
+
+      timers.active.single.fire();
+      await _settle();
+      expect(jev.requests, 0);
+    });
+
+    test('Run during a kept pause waits for it to end', () async {
+      await pauses().save(
+        AiService.jev,
+        t0.add(const Duration(minutes: 5)),
+        since: t0,
+      );
+      final timers = _Timers();
+      final jev = _Jev();
+      final c = container(
+        details: known,
+        keys: jevKey,
+        jev: jev,
+        timers: timers,
+        now: () => t0,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+      expect(jev.requests, 0);
 
       timers.active.single.fire();
       await _settle();
@@ -1122,6 +1367,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(timers.active, isEmpty);
       expect(agreed(c), 2);
@@ -1188,6 +1434,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(timers.active, hasLength(1));
 
       c.dispose();
@@ -1208,6 +1455,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final status = c.read(aiTierStatusProvider);
       expect(status.disabled, {AiService.jev});
@@ -1225,6 +1473,7 @@ void main() {
 
         c.read(historyShownProvider.notifier).markShown();
         await _settle();
+        await _runAi(c);
 
         final status = c.read(aiTierStatusProvider);
         expect(status.disabled, {AiService.jev});
@@ -1242,6 +1491,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(c.read(aiTierStatusProvider).notice, isNotNull);
       expect(c.read(categorizationProgressProvider).running, isFalse);
@@ -1261,6 +1511,7 @@ void main() {
       final c = container(details: known, keys: claudeKey, claude: claude);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(claude.asked, isNotEmpty);
 
       final clearing = c.read(aiResultsClearerProvider.notifier).clear();
@@ -1284,6 +1535,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       await c
           .read(aiResultsClearerProvider.notifier)
@@ -1308,6 +1560,7 @@ void main() {
       );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       final jevAsked = jev.asked.length;
 
       final clearing = c.read(aiResultsClearerProvider.notifier).clear();
@@ -1320,7 +1573,7 @@ void main() {
       expect(categories.values.where((c) => c.jevAgreed != null), isEmpty);
     });
 
-    test('History opened next categorizes again', () async {
+    test('after a clear, AI waits for the next Run', () async {
       final claude = _Claude({
         'parent': 'Knowledge',
         'child': null,
@@ -1329,6 +1582,7 @@ void main() {
       final c = container(details: known, keys: claudeKey, claude: claude);
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       final asked = claude.asked.length;
 
       await c.read(aiResultsClearerProvider.notifier).clear();
@@ -1337,6 +1591,9 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      expect(claude.asked, hasLength(asked));
+
+      await _runAi(c);
       expect(claude.asked.length, greaterThan(asked));
     });
   });
@@ -1379,14 +1636,14 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(claude.kinds, contains('category: No topics'));
       expect(paths(c)['UCx'], const CategoryPath('Gaming'));
       expect(redone, contains(isTrue));
       final asked = claude.asked.length;
 
-      c.read(_keys.notifier).set(const AiKeys(anthropic: 'sk-ant-2'));
-      await _settle();
+      await _runAi(c);
       expect(claude.asked, hasLength(asked));
     });
 
@@ -1400,6 +1657,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(claude.kinds, contains('tags: Gamer'));
       expect(claude.kinds, isNot(contains('category: Gamer')));
@@ -1425,6 +1683,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(claude.kinds, contains('tags: Singer'));
       final singer = c.read(channelCategoriesProvider).value?['UCs'];
@@ -1452,6 +1711,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       expect(claude.kinds.where((k) => k.endsWith('Singer')), isEmpty);
       expect(c.read(channelCategoriesProvider).value?['UCs']?.tags, ['Mine']);
@@ -1466,6 +1726,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
 
       final names = await c.read(tagNamesProvider.future);
       expect(names.values.single.name, 'Speedruns');
@@ -1506,6 +1767,7 @@ void main() {
 
         c.read(historyShownProvider.notifier).markShown();
         await _settle();
+        await _runAi(c);
 
         expect(videoDetails.asked, {'vx0', 'vx1', 'vx2'});
         expect(claude.asked.single, contains('Fetched about vx1'));
@@ -1542,6 +1804,7 @@ void main() {
 
         c.read(historyShownProvider.notifier).markShown();
         await _settle();
+        await _runAi(c);
 
         expect(videoDetails.asked, isEmpty);
         expect(claude.asked.single, contains('Kept about vx1'));
@@ -1561,6 +1824,7 @@ void main() {
 
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
+      await _runAi(c);
       expect(c.read(categorizingChannelsProvider), contains('UCx'));
 
       hold.complete();

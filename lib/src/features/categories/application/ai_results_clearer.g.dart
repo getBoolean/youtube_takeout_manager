@@ -10,8 +10,7 @@ part of 'ai_results_clearer.dart';
 // ignore_for_file: type=lint, type=warning
 /// Clears what AI made for channels, keeping what the user decided, as
 /// [clearAiResults] says: the run under way is stopped first, so nothing it
-/// answers is kept, and the next time History opens, channels are
-/// categorized again.
+/// answers is kept. AI categorizes them again on the user's next run.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 
@@ -20,16 +19,14 @@ final aiResultsClearerProvider = AiResultsClearerProvider._();
 
 /// Clears what AI made for channels, keeping what the user decided, as
 /// [clearAiResults] says: the run under way is stopped first, so nothing it
-/// answers is kept, and the next time History opens, channels are
-/// categorized again.
+/// answers is kept. AI categorizes them again on the user's next run.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 final class AiResultsClearerProvider
     extends $NotifierProvider<AiResultsClearer, void> {
   /// Clears what AI made for channels, keeping what the user decided, as
   /// [clearAiResults] says: the run under way is stopped first, so nothing it
-  /// answers is kept, and the next time History opens, channels are
-  /// categorized again.
+  /// answers is kept. AI categorizes them again on the user's next run.
   ///
   /// A service: nothing depends on it, so it can read any provider.
   AiResultsClearerProvider._()
@@ -63,8 +60,7 @@ String _$aiResultsClearerHash() => r'd6959a17f75016708d1ec4034083fc2f13c30c33';
 
 /// Clears what AI made for channels, keeping what the user decided, as
 /// [clearAiResults] says: the run under way is stopped first, so nothing it
-/// answers is kept, and the next time History opens, channels are
-/// categorized again.
+/// answers is kept. AI categorizes them again on the user's next run.
 ///
 /// A service: nothing depends on it, so it can read any provider.
 

@@ -39,8 +39,15 @@ class _Details extends ChannelDetailsNotifier {
 
 class _Progress extends CategorizationProgress {
   @override
-  ({bool running, int done, int total, bool redo}) build() =>
-      (running: true, done: 3, total: 12, redo: false);
+  RunProgress build() => (
+    running: true,
+    ai: true,
+    done: 3,
+    total: 12,
+    redo: false,
+    stopping: false,
+    interrupted: false,
+  );
 }
 
 const _gamer = HistoryChannel(channelId: 'UCg', title: 'Gamer');

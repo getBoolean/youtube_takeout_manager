@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart'
+    show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -12,6 +14,7 @@ import 'package:youtube_takeout_manager/src/features/channels/domain/channel_det
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
+import 'package:youtube_takeout_manager/src/features/takeout/application/takeout_selection_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_details_fetcher.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_providers.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
@@ -86,6 +89,15 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   Future<void>? _running;
   var _again = false;
 
+  /// Whether the user asked for AI ([run]): kept while the run restarts,
+  /// such as when subscriptions arrive or a pause ends, and forgotten when
+  /// they stop it, another takeout is shown, or a run gets through every
+  /// channel. Without it, runs ask YouTube's topics alone.
+  var _aiWanted = false;
+
+  /// Whether the run under way asks AI.
+  var _runningAi = false;
+
   /// The pauses kept from before the app was closed, once restored.
   Future<void> _restored = Future.value();
 
@@ -120,6 +132,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     ref.listen(readSessionChannelIdProvider, (previous, next) {
       if (previous == null && next != null) _requestRun();
     });
+    // The user's run was for the takeout shown then.
+    ref.listen(takeoutSelectionProvider.select((s) => s.value?.takeoutId), (
+      previous,
+      next,
+    ) {
+      if (previous != null && previous != next) _aiWanted = false;
+    });
     // A key entered or changed turns its service back on, and has it
     // look at the channels.
     ref.listen(aiKeysProvider, (previous, next) {
@@ -137,10 +156,27 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     });
   }
 
-  /// Runs now, or again once the run under way ends; while paused, not
-  /// until the pause ends.
+  /// Categorizes with AI, as the user asked: Jev and Claude as the keys
+  /// allow, going on from where the last run left off. While a service
+  /// asked to wait, it starts when the wait ends.
+  void run() {
+    if (_aiWanted && _runningAi) return;
+    _aiWanted = true;
+    _requestRun();
+  }
+
+  /// Stops the user's run: nothing more is asked, and the answers already
+  /// asked for still land. A wait ending afterwards starts nothing.
+  void stop() {
+    _aiWanted = false;
+    if (_running == null || !_runningAi) return;
+    _again = false;
+    _generation++;
+    ref.read(categorizationProgressProvider.notifier).stopping();
+  }
+
+  /// Runs now, or again once the run under way ends.
   void _requestRun() {
-    if (_pausedUntil.isNotEmpty) return;
     if (_running != null) {
       _again = true;
       _generation++;
@@ -162,17 +198,40 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   Future<void> _run() async {
     final generation = ++_generation;
     bool dropped() => generation != _generation || !ref.mounted;
+    _runningAi = _aiWanted;
 
     await _restored;
-    if (dropped() || _pausedUntil.isNotEmpty) return;
+    // A wait a service asked for holds AI, not YouTube's topics.
+    final ai = _aiWanted && _pausedUntil.isEmpty;
+    _runningAi = ai;
+    final progress = ref.read(categorizationProgressProvider.notifier);
+    if (ai && ref.mounted) progress.start(0, ai: true);
+    var finished = false;
+    try {
+      finished = await _categorize(ai: ai, dropped: dropped);
+    } finally {
+      if (ref.mounted && ref.read(categorizationProgressProvider).running) {
+        progress.complete(interrupted: ai && !finished);
+      }
+      if (ai && finished && ref.mounted) _aiWanted = false;
+    }
+  }
+
+  /// One run: YouTube's topics, and when [ai], Jev and Claude too. True
+  /// when it got through every channel it had to.
+  Future<bool> _categorize({
+    required bool ai,
+    required bool Function() dropped,
+  }) async {
+    if (dropped()) return false;
     final inputs = ref.read(categorizationInputsProvider);
-    if (inputs == null) return;
+    if (inputs == null) return false;
     final categories = ref.read(channelCategoriesProvider.notifier);
     final existing = await ref.read(channelCategoriesProvider.future);
     var details = await ref
         .read(channelDetailsProvider.future)
         .catchError((Object _) => const <String, ChannelDetails>{});
-    if (dropped()) return;
+    if (dropped()) return false;
 
     final (:loaded, :subscriptions) = inputs;
     final channels = <HistoryChannel>[
@@ -194,26 +253,31 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         await ref
             .read(channelThumbnailFetcherProvider.notifier)
             .fetchDetails(lacking);
-        if (dropped()) return;
+        if (dropped()) return false;
         details = ref.read(channelDetailsProvider).value ?? details;
       }
     }
 
     CategoryPipeline pipeline;
-    try {
-      pipeline = await _pipeline();
-    } on AiTierFailure catch (e) {
-      // Claude's model couldn't be looked up. Turned off, it all runs again
-      // without Claude; paused, it waits; otherwise this run goes on
-      // without Claude.
-      if (!ref.mounted) return;
-      _stopped(e);
-      final off = ref.read(aiTierStatusProvider).disabled.contains(e.service);
-      if (off || _pausedUntil.isNotEmpty) return;
-      pipeline = await _pipeline(withClaude: false);
+    if (!ai) {
+      pipeline = await _pipeline(withJev: false, withClaude: false);
+    } else {
+      try {
+        pipeline = await _pipeline();
+      } on AiTierFailure catch (e) {
+        // Claude's model couldn't be looked up. Turned off, it all runs
+        // again without Claude; paused, it waits; otherwise this run goes on
+        // without Claude.
+        if (!ref.mounted) return false;
+        _stopped(e);
+        final off = ref.read(aiTierStatusProvider).disabled.contains(e.service);
+        if (off || _pausedUntil.isNotEmpty) return false;
+        pipeline = await _pipeline(withClaude: false);
+      }
     }
-    if (dropped()) return;
-    final picks = pickPromptVideos(loaded);
+    if (dropped()) return false;
+    // Only AI is told about the videos watched.
+    final picks = ai ? pickPromptVideos(loaded) : const <PromptPicks>[];
     final fingerprints = {
       for (final MapEntry(:key, :value) in currentPrompts.entries)
         key.name: value,
@@ -248,11 +312,11 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       await categories.addMissing(unplaced);
       if (ref.mounted) await categories.persist();
     }
-    if (queue.isEmpty) return;
+    if (queue.isEmpty) return !dropped();
 
     // Signed in, the descriptions of the videos AI is told about that
     // aren't kept yet are fetched first, as topics are.
-    if (ref.read(readSessionChannelIdProvider) != null) {
+    if (ai && ref.read(readSessionChannelIdProvider) != null) {
       final watches = loaded.history.watches;
       final videoIds = {
         for (final (channel, _) in queue)
@@ -265,17 +329,19 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             .read(videoDetailsFetcherProvider.notifier)
             .fetch(videoIds, stop: dropped)
             .catchError((Object _) {});
-        if (dropped()) return;
+        if (dropped()) return false;
       }
     }
-    final videos = await ref
-        .read(videoMetadataProvider.future)
-        .catchError((Object _) => const <String, Video>{});
-    if (dropped()) return;
+    final videos = ai
+        ? await ref
+              .read(videoMetadataProvider.future)
+              .catchError((Object _) => const <String, Video>{})
+        : const <String, Video>{};
+    if (dropped()) return false;
 
     final progress = ref.read(categorizationProgressProvider.notifier);
     final categorizing = ref.read(categorizingChannelsProvider.notifier);
-    progress.start(queue.length, redo: redo);
+    progress.start(queue.length, redo: redo, ai: ai);
     var done = 0;
     var next = 0;
     // Set when an AI step fails: the run stops, and runs again without it
@@ -335,20 +401,24 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           worker(),
       ]);
     } finally {
-      progress.complete();
       if (ref.mounted) await categories.persist();
     }
-    if (!ref.mounted) return;
+    if (!ref.mounted) return false;
     if (crash case final e?) {
       _crashed(e);
-    } else if (stoppedBy case final failure?) {
-      _stopped(failure);
+      return false;
     }
+    if (stoppedBy case final failure?) {
+      _stopped(failure);
+      return false;
+    }
+    return !dropped();
   }
 
   /// Stops the run under way, if any, and waits for it to end: answers
   /// already asked for still land, but nothing more is asked.
   Future<void> stopRun() async {
+    _aiWanted = false;
     _again = false;
     _generation++;
     await _running;
@@ -397,10 +467,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     return suggestion;
   }
 
-  /// A pipeline with the steps there are keys for, Claude only [withClaude],
-  /// and every category. Throws an [AiTierFailure] when Claude's model can't
-  /// be used.
-  Future<CategoryPipeline> _pipeline({bool withClaude = true}) async {
+  /// A pipeline with the steps there are keys for, Jev only [withJev] and
+  /// Claude only [withClaude], and every category. Throws an
+  /// [AiTierFailure] when Claude's model can't be used.
+  Future<CategoryPipeline> _pipeline({
+    bool withJev = true,
+    bool withClaude = true,
+  }) async {
     final keys = await ref
         .read(aiKeysProvider.future)
         .catchError((Object _) => AiKeys.none);
@@ -423,7 +496,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       tagSpellings: {
         for (final MapEntry(:key, :value) in tagNames.entries) key: value.name,
       },
-      jev: on(AiService.jev)
+      jev: withJev && on(AiService.jev)
           ? (
               repository: ref.read(typeSafeRepositoryProvider),
               apiKey: keys.keyFor(AiService.jev),
@@ -553,7 +626,9 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final name = _nameOf(service);
     void off(String notice) {
       status.disable(service, notice);
-      // Turned off: the rest go on without it.
+      // Without Jev, Claude would take every channel's tags: the user's run
+      // ends. Without Claude, the rest go on with Jev.
+      if (service == AiService.jev) _aiWanted = false;
       _requestRun();
     }
 
@@ -580,9 +655,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         // same way.
         off("$name can't be reached from the web app, so it's off here.");
       case AiUnreachable():
+        _aiWanted = false;
         status.note(
-          "$name couldn't be reached; the rest of the channels are "
-          'categorized next time.',
+          "$name couldn't be reached, so categorizing with AI stopped; "
+          'continue it to try again.',
         );
       case AiRateLimited(:final resumeAt) || AiOverloaded(:final resumeAt):
         final now = _now();
@@ -600,9 +676,10 @@ class ChannelCategorizer extends _$ChannelCategorizer {
               .catchError((Object _) {}),
         );
       case AiNoAnswer():
+        _aiWanted = false;
         status.note(
-          "$name gave no usable answer; the rest of the channels are "
-          'categorized next time.',
+          "$name gave no usable answer, so categorizing with AI stopped; "
+          'continue it to try again.',
         );
     }
   }
@@ -610,15 +687,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   /// Says categorizing stopped for [error], which no AI service explains,
   /// never quoting a key.
   void _crashed(Object error) {
+    _aiWanted = false;
     final keys = ref.read(aiKeysProvider).value ?? AiKeys.none;
     var failure = aiFailureOf(error, secret: keys.keyFor(AiService.jev));
     failure = aiFailureOf(failure, secret: keys.keyFor(AiService.claude));
     ref
         .read(aiTierStatusProvider.notifier)
-        .note(
-          'Categorizing stopped after an error, and starts again next time: '
-          '${failure.message}',
-        );
+        .note('Categorizing stopped after an error: ${failure.message}');
   }
 
   /// Pauses categorizing, and [service]'s requests, until [until], saying

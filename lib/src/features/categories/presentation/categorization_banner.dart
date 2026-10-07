@@ -23,9 +23,8 @@ class CategorizationBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final (:running, :done, :total, :redo) = ref.watch(
-      categorizationProgressProvider,
-    );
+    final (:running, :done, :total, :redo, ai: _, stopping: _, interrupted: _) =
+        ref.watch(categorizationProgressProvider);
     final (:disabled, :notice) = ref.watch(aiTierStatusProvider);
     final keys = ref.watch(aiKeysProvider).value ?? AiKeys.none;
     // Signed out, YouTube's topics can't be asked for.

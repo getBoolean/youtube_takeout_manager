@@ -69,7 +69,7 @@ final class ChannelCategorizerProvider
 }
 
 String _$channelCategorizerHash() =>
-    r'2f7675fa69eb5e1c14dd3c376c294f8220f49b75';
+    r'033708876a20d1a48016b24ae78c09bd0e37d3e2';
 
 /// Categorizes the channels watched and subscribed to, the most watched
 /// first, once the history screen has been opened. Signed in, it first asks
