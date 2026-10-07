@@ -46,15 +46,25 @@ class ChannelSelection {
 
   /// Whether the channel [key], in [category] with [tags], is let through:
   /// nothing is picked, or it, its category or one of its tags is.
-  bool allows(String key, CategoryPath? category, List<String> tags) =>
-      isEmpty ||
-      channels.containsKey(key) ||
-      categories.any((pick) => pick.matches(category)) ||
-      (this.tags.isNotEmpty &&
-          tags.any((tag) => _tagKeys.contains(_tagKey(tag))));
+  /// [tagKeys] are [this.tags] folded, when already worked out.
+  bool allows(
+    String key,
+    CategoryPath? category,
+    List<String> tags, {
+    Set<String>? tagKeys,
+  }) {
+    if (isEmpty ||
+        channels.containsKey(key) ||
+        categories.any((pick) => pick.matches(category))) {
+      return true;
+    }
+    if (this.tags.isEmpty) return false;
+    final picked = tagKeys ?? this.tagKeys;
+    return tags.any((tag) => picked.contains(_tagKey(tag)));
+  }
 
   /// The tags picked, as their names fold.
-  Set<String> get _tagKeys => {for (final tag in tags) _tagKey(tag)};
+  Set<String> get tagKeys => {for (final tag in tags) _tagKey(tag)};
 
   @override
   bool operator ==(Object other) =>
@@ -151,13 +161,14 @@ bool channelPasses({
   required ChannelSelection selection,
   CategoryPath? category,
   List<String> tags = const [],
+  Set<String>? tagKeys,
 }) =>
     switch (subscription) {
       SubscriptionFilter.all => true,
       SubscriptionFilter.subscribed => subscribed,
       SubscriptionFilter.notSubscribed => !subscribed,
     } &&
-    selection.allows(key, category, tags);
+    selection.allows(key, category, tags, tagKeys: tagKeys);
 
 /// The channels of [channels] that pass the filters, or null when the
 /// filters narrow nothing. [subscribedKeys] are the keys of the channels
@@ -174,6 +185,8 @@ ChannelMask? buildChannelMask({
 }) {
   if (subscription == SubscriptionFilter.all && selection.isEmpty) return null;
   final shown = Uint8List(channels.length);
+  // Folded once, not for every channel.
+  final tagKeys = selection.tags.isEmpty ? null : selection.tagKeys;
   for (final (i, watched) in channels.indexed) {
     final key = watched.channel.key;
     if (channelPasses(
@@ -183,6 +196,7 @@ ChannelMask? buildChannelMask({
       selection: selection,
       category: selection.categories.isEmpty ? null : categoryOf?.call(key),
       tags: selection.tags.isEmpty ? const [] : tagsOf?.call(key) ?? const [],
+      tagKeys: tagKeys,
     )) {
       shown[i] = 1;
     }

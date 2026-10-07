@@ -303,4 +303,46 @@ void main() {
       );
     });
   });
+
+  test("narrowing a heavy viewer's 12,660 channels to 10 tags is quick", () {
+    final channels = [
+      for (var i = 0; i < 12660; i++)
+        WatchedChannel(
+          channel: HistoryChannel(channelId: 'UC$i', title: 'Channel $i'),
+          count: 1,
+          lastWatched: DateTime.utc(2026, 4, 12),
+        ),
+    ];
+    final tags = {
+      for (var i = 0; i < 12660; i++)
+        'UC$i': [for (var t = 0; t < 5; t++) 'Tag number ${(i + t) % 400}'],
+    };
+    final selection = ChannelSelection(
+      tags: {for (var t = 0; t < 10; t++) 'Tag number ${t * 37}'},
+    );
+    ChannelMask? mask() => buildChannelMask(
+      channels: channels,
+      subscribedKeys: const {},
+      subscription: SubscriptionFilter.all,
+      selection: selection,
+      tagsOf: (key) => tags[key]!,
+    );
+    mask();
+
+    var best = 1 << 30;
+    for (var run = 0; run < 3; run++) {
+      final watch = Stopwatch()..start();
+      mask();
+      if (watch.elapsedMilliseconds < best) best = watch.elapsedMilliseconds;
+    }
+
+    // ignore: avoid_print
+    print('A tag mask for 12,660 channels: ${best}ms');
+    expect(best, lessThanOrEqualTo(_tagMaskBudget));
+  });
 }
+
+/// A tag mask for 12,660 channels may take this long, in milliseconds:
+/// about five times the first measured run (2026-10-07, in the test VM: 5),
+/// under the 38 it took while each channel folded the tags picked again.
+const _tagMaskBudget = 25;
