@@ -112,6 +112,19 @@ void main() {
       expect(history.isEmpty, isTrue);
     });
 
+    test('give back the videos picked to tell AI about', () {
+      final picks = roundTrip(loaded).picks;
+
+      expect(
+        [
+          for (final p in picks) [p.titles, p.described],
+        ],
+        [
+          for (final p in pickPromptVideos(loaded)) [p.titles, p.described],
+        ],
+      );
+    });
+
     test('make each entry only when it is first looked at', () {
       final history = roundTrip(loaded).toHistory();
 

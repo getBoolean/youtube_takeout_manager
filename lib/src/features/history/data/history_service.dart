@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:squadron/squadron.dart';
 
-import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_videos.dart';
 import '../domain/history_search.dart';
 import '../domain/history_wire.dart';
 import '../domain/loaded_history.dart';
@@ -33,19 +32,17 @@ base class HistoryService {
   /// link or their format; worked out when first needed.
   WatchMask? _shortWatches;
 
-  List<Object?>? _picks;
-
   LoadedHistory get _history =>
       _loaded ?? (throw StateError('No history was loaded.'));
 
   /// Reads the saved history [files] and keeps it, in place of any loaded
-  /// before; answers with what showing it needs.
+  /// before; answers with what showing it needs, and the videos to tell AI
+  /// about, picked here so the picks always match the history.
   @SquadronMethod()
   Future<List<Object?>> load(Map<String, Uint8List> files) async {
     final loaded = loadSavedHistory(files);
     _loaded = loaded;
     _shortWatches = null;
-    _picks = null;
     return HistoryRows.of(loaded).toWire();
   }
 
@@ -101,11 +98,6 @@ base class HistoryService {
       ),
     );
   }
-
-  /// The videos to tell AI about for each watched channel, on the wire.
-  @SquadronMethod()
-  Future<List<Object?>> promptPicks() async =>
-      _picks ??= promptPicksToWire(pickPromptVideos(_history));
 
   WatchMask _shorts(LoadedHistory loaded) => _shortWatches ??= () {
     final watches = loaded.history.watches;

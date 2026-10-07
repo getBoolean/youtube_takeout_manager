@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:squadron/squadron.dart';
 
-import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_videos.dart';
 import '../domain/history_wire.dart';
 import '../domain/watch_filters.dart';
 import 'history_service.dart';
@@ -30,9 +29,6 @@ abstract interface class HistoryEngine {
     ShowFilter shorts = ShowFilter.all,
     ShowFilter music = ShowFilter.all,
   });
-
-  /// The videos to tell AI about, for each watched channel.
-  Future<List<PromptPicks>> promptPicks();
 
   Future<void> stop();
 }
@@ -142,10 +138,6 @@ class WorkerHistoryEngine implements HistoryEngine {
     ShowFilter shorts = ShowFilter.all,
     ShowFilter music = ShowFilter.all,
   }) => _run((h) => h.channelWatchCounts(shorts.index, music.index));
-
-  @override
-  Future<List<PromptPicks>> promptPicks() async =>
-      promptPicksFromWire(await _run((h) => h.promptPicks()));
 
   @override
   Future<void> stop() async {

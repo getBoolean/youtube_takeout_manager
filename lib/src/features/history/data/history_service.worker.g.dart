@@ -11,9 +11,8 @@ part of 'history_service.dart';
 /// Command ids used in operations map
 const int _$channelWatchCountsId = 1;
 const int _$loadId = 2;
-const int _$promptPicksId = 3;
-const int _$searchId = 4;
-const int _$setShortVideosId = 5;
+const int _$searchId = 3;
+const int _$setShortVideosId = 4;
 
 /// WorkerService operations for HistoryService
 extension on HistoryService {
@@ -37,7 +36,6 @@ extension on HistoryService {
       } finally {}
       return $res;
     },
-    _$promptPicksId: ($req) => promptPicks(),
     _$searchId: ($req) async {
       final List<Object?> $res;
       try {
@@ -75,15 +73,6 @@ base mixin _$HistoryService$Invoker on Invoker implements HistoryService {
   @override
   Future<List<Object?>> load(Map<String, Uint8List> files) async {
     final dynamic $res = await send(_$loadId, args: [files]);
-    try {
-      final $dsr = _$Deser(contextAware: false);
-      return $dsr.$5($res);
-    } finally {}
-  }
-
-  @override
-  Future<List<Object?>> promptPicks() async {
-    final dynamic $res = await send(_$promptPicksId);
     try {
       final $dsr = _$Deser(contextAware: false);
       return $dsr.$5($res);
@@ -129,10 +118,6 @@ base mixin _$HistoryService$Facade implements HistoryService {
 
   @override
   // ignore: unused_element
-  List<Object?>? get _picks => throw UnimplementedError();
-
-  @override
-  // ignore: unused_element
   LoadedHistory get _history => throw UnimplementedError();
 
   @override
@@ -146,10 +131,6 @@ base mixin _$HistoryService$Facade implements HistoryService {
   @override
   // ignore: unused_element
   set _shortWatches(void $value) => throw UnimplementedError();
-
-  @override
-  // ignore: unused_element
-  set _picks(void $value) => throw UnimplementedError();
 }
 
 /// WorkerClient for HistoryService
@@ -296,9 +277,6 @@ base class HistoryServiceWorkerPool extends WorkerPool<HistoryServiceWorker>
   @override
   Future<List<Object?>> load(Map<String, Uint8List> files) =>
       execute((w) => w.load(files));
-
-  @override
-  Future<List<Object?>> promptPicks() => execute((w) => w.promptPicks());
 
   @override
   Future<List<Object?>> search(List<Object?> query, int generation) =>

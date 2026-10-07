@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_videos.dart';
 import 'channel_groups.dart';
 import 'history_days.dart';
 import 'history_wire.dart';
@@ -48,6 +49,13 @@ class LoadedHistory {
   final int shortCount;
   final int musicCount;
 
+  /// The videos picked to tell AI about each watched channel, in
+  /// [watchedChannels]' order: picked by the History worker while it
+  /// loaded, else when first asked for.
+  late final List<PromptPicks> promptPicks =
+      _promptPicks ?? pickPromptVideos(this);
+  final List<PromptPicks>? _promptPicks;
+
   LoadedHistory._({
     required this.history,
     required this.watchDayKeys,
@@ -63,7 +71,8 @@ class LoadedHistory {
     required this.removedSearchCount,
     required this.shortCount,
     required this.musicCount,
-  });
+    List<PromptPicks>? promptPicks,
+  }) : _promptPicks = promptPicks;
 
   factory LoadedHistory.of(TakeoutHistory history) {
     final watchDayKeys = [for (final w in history.watches) dayKeyOf(w.time)];
@@ -132,6 +141,7 @@ class LoadedHistory {
       removedSearchCount: rows.removedSearchCount,
       shortCount: rows.shortCount,
       musicCount: rows.musicCount,
+      promptPicks: rows.picks,
     );
   }
 

@@ -125,7 +125,7 @@ Future<void> _eval(ProviderContainer container) async {
       output += o;
     },
   );
-  final picks = pickPromptVideos(loaded);
+  final picks = loaded.promptPicks;
   final watches = loaded.history.watches;
   _log(
     'Tag eval: ${_examples.length} channels, with '

@@ -104,6 +104,10 @@ class HistoryRows {
   /// Everything, by day, month and channel.
   final HistoryMatches all;
 
+  /// The videos picked to tell AI about each watched channel, in the
+  /// channels' order.
+  final List<PromptPicks> picks;
+
   HistoryRows._({
     required this.watchTimes,
     required this.watchKinds,
@@ -129,6 +133,7 @@ class HistoryRows {
     required this.recentChannelIds,
     required this.counts,
     required this.all,
+    required this.picks,
   });
 
   factory HistoryRows.of(LoadedHistory loaded) {
@@ -180,6 +185,7 @@ class HistoryRows {
         loaded.musicCount,
       ]),
       all: HistoryMatches.of(defaultResults(loaded)),
+      picks: loaded.promptPicks,
     );
   }
 
@@ -208,6 +214,7 @@ class HistoryRows {
     recentChannelIds,
     counts,
     all.toWire(),
+    promptPicksToWire(picks),
   ];
 
   factory HistoryRows.fromWire(List<Object?> wire) => HistoryRows._(
@@ -235,6 +242,7 @@ class HistoryRows {
     recentChannelIds: _strings(wire[21]),
     counts: _ints(wire[22]),
     all: HistoryMatches.fromWire(wire[23]! as List<Object?>),
+    picks: promptPicksFromWire(wire[24]! as List<Object?>),
   );
 
   int get removedWatchCount => counts[0];

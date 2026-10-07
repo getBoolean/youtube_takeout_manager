@@ -6,6 +6,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_vi
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_service.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/history_wire.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.dart';
@@ -129,10 +130,12 @@ void main() {
     },
   );
 
-  test('picks the videos told to AI as the screen would', () async {
-    final picks = promptPicksFromWire(await service.promptPicks());
-
-    expect(_plain(picks), _plain(pickPromptVideos(loadSavedHistory(_files))));
+  test('loads with the videos to tell AI about picked, as they would be '
+      'picked in place', () {
+    expect(
+      _plain(LoadedHistory.fromRows(rows).promptPicks),
+      _plain(pickPromptVideos(loadSavedHistory(_files))),
+    );
   });
 
   test('asked before a history is loaded, it says so', () {
@@ -154,7 +157,7 @@ void main() {
     expect(matches.generation, 3);
     expect(_titles(rows, matches), ['A cover of a song']);
     expect(
-      _plain(promptPicksFromWire(await worker.promptPicks())),
+      _plain(LoadedHistory.fromRows(rows).promptPicks),
       _plain(pickPromptVideos(loadSavedHistory(_files))),
     );
   });

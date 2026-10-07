@@ -140,23 +140,6 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   /// The wait before working out what a run would do.
   Timer? _summaryWait;
 
-  /// The videos picked to tell AI about each channel, and the history they
-  /// were picked from, worked out once for it.
-  (LoadedHistory, List<PromptPicks>)? _picks;
-
-  /// The videos picked to tell AI about each of [loaded]'s channels.
-  List<PromptPicks> _picksOf(LoadedHistory loaded) {
-    if (_picks case (
-      final picked,
-      final picks,
-    ) when identical(picked, loaded)) {
-      return picks;
-    }
-    final picks = pickPromptVideos(loaded);
-    _picks = (loaded, picks);
-    return picks;
-  }
-
   var _generation = 0;
   Future<void>? _running;
   var _again = false;
@@ -288,7 +271,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       if (on(AiService.claude) || !keys.hasAny) CategorizationTier.claude,
     };
     final (:loaded, :subscriptions) = inputs;
-    final picks = _picksOf(loaded);
+    final picks = loaded.promptPicks;
     final videos = ref.read(videoMetadataProvider).value ?? const {};
     final index = TagIndex.of(names, existing, at: _now());
     final fingerprints = {
@@ -447,7 +430,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     }
     if (dropped()) return false;
     // Only AI is told about the videos watched.
-    final picks = ai ? _picksOf(loaded) : const <PromptPicks>[];
+    final picks = ai ? loaded.promptPicks : const <PromptPicks>[];
     final fingerprints = {
       for (final MapEntry(:key, :value) in currentPrompts.entries)
         key.name: value,
@@ -737,7 +720,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         channel,
         loaded,
         details,
-        _picksOf(loaded),
+        loaded.promptPicks,
         ref.read(videoMetadataProvider).value ?? const {},
       ),
       current?.path,
