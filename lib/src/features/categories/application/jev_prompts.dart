@@ -1,5 +1,6 @@
 import '../data/typesafe_repository.dart';
 import '../domain/category_path.dart';
+import '../domain/tag_candidates.dart';
 import '../domain/youtube_taxonomy.dart';
 
 /// The option for "none of these".
@@ -94,3 +95,46 @@ String _describe(Taxonomy taxonomy, String parent) {
   final children = taxonomy.childrenOf(parent);
   return children.isEmpty ? parent : '$parent: ${children.join(', ')}';
 }
+
+/// What Jev is asked to tag a channel: whether each of [candidates]
+/// (`tag_0`…) describes it, its meaning being what yes means, and whether
+/// it's also about something none of them name (`other`), which names them,
+/// since Jev reads each question alone.
+Map<String, JevQuestion> jevTagQuestions(List<TagCandidate> candidates) => {
+  for (final (i, (key: _, :tag)) in candidates.indexed)
+    'tag_$i': JevNoul(
+      'Does the tag "${tag.name}" describe what this channel is about, as a '
+      'viewer would tag it?',
+      whenTrue: tag.meaning,
+      whenFalse:
+          'The tag names something else, even something related, such as '
+          'another game in the same series.',
+    ),
+  'other': JevNoul(
+    'Is this channel also specifically about something none of these tags '
+    'name: ${[for (final (key: _, :tag) in candidates) tag.name].join(', ')}? '
+    'Such as a particular game, a series, a group or agency, a person, or a '
+    'kind of video.',
+    whenTrue: 'It is about something none of these tags name.',
+    whenFalse:
+        'These tags name everything specific it is about, or there is '
+        'nothing more specific.',
+  ),
+};
+
+/// How sure Jev is, in [answers] to [jevTagQuestions] of [candidates], that
+/// each tag fits, by its key, and that the channel is about something none
+/// of them name.
+({Map<String, double> yes, double other}) readJevTags(
+  Map<String, JevAnswer> answers,
+  List<TagCandidate> candidates,
+) => (
+  yes: {
+    for (final (i, (:key, tag: _)) in candidates.indexed)
+      if (answers['tag_$i'] case NoulAnswer(:final yes)) key: yes,
+  },
+  other: switch (answers['other']) {
+    NoulAnswer(:final yes) => yes,
+    _ => 0,
+  },
+);

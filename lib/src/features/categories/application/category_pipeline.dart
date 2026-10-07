@@ -483,7 +483,7 @@ class CategoryPipeline {
       source: CategorySource.claude,
       jevAgreed: jevAgreed,
       reason: reason.isEmpty ? null : reason,
-      tags: _spelled(tags),
+      tags: _spelled([for (final tag in tags) tag.name]),
     );
   }
 
