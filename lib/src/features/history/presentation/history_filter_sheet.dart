@@ -625,8 +625,8 @@ class _Section extends StatelessWidget {
   }
 }
 
-/// The channels to pick, searchable, each a row with a checkbox. Built
-/// lazily however many there are.
+/// The channels to pick, each a row with a checkbox; a search over the top
+/// finds them by name. Built lazily however many there are.
 class _ChannelsSliver extends HookConsumerWidget {
   final List<FilterChannel> channels;
 
@@ -649,7 +649,6 @@ class _ChannelsSliver extends HookConsumerWidget {
     final pictures = ref.watch(channelThumbnailsProvider).value ?? const {};
     final selection = draft.value.selection;
     final tiny = isTinyWidth(context);
-    final theme = Theme.of(context);
 
     void toggle(FilterChannel c) {
       final value = draft.value;
@@ -666,33 +665,11 @@ class _ChannelsSliver extends HookConsumerWidget {
 
     return SliverMainAxisGroup(
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(tiny ? 8 : 24, 0, tiny ? 8 : 24, 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    selection.channels.isEmpty
-                        ? 'Channels'
-                        : 'Channels · ${selection.channels.length} picked',
-                    style: theme.textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  onChanged: (text) => query.value = text,
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                    prefixIcon: tiny ? null : const Icon(Icons.search),
-                    hintText: 'Search channels',
-                  ),
-                ),
-              ],
-            ),
+        PinnedHeaderSliver(
+          child: _SearchField(
+            key: HistoryFilterSheet.channelSearchKey,
+            hint: 'Find a channel',
+            onChanged: (text) => query.value = text,
           ),
         ),
         SliverList.builder(

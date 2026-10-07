@@ -82,6 +82,7 @@ void main() {
     WatchFilterDraft initial = noWatchFilters,
     List<TagUse> tags = _tags,
     List<CategoryShare>? mix,
+    List<FilterChannel>? channels,
   }) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
@@ -100,7 +101,7 @@ void main() {
                 result.draft = await showHistoryFilterSheet(
                   context,
                   initial: initial,
-                  channels: _channels,
+                  channels: channels ?? _channels,
                   hasSubscriptions: false,
                   hasShorts: false,
                   hasMusic: false,
@@ -381,6 +382,59 @@ void main() {
 
       expect(result.draft?.selection.tags, isEmpty);
       expect(result.draft?.selection.categories, {_gaming});
+    });
+  });
+
+  group('the Channels page', () {
+    Finder row(String key) => find.byKey(HistoryFilterSheet.channelKey(key));
+
+    testWidgets('finds a channel by its name, the search staying in view as '
+        'the list scrolls', (tester) async {
+      await open(
+        tester,
+        channels: [
+          for (var i = 0; i < 100; i++)
+            (
+              channel: HistoryChannel(channelId: 'UC$i', title: 'Channel $i'),
+              count: 100 - i,
+              subscribed: false,
+            ),
+        ],
+      );
+      await tap(tester, HistoryFilterSheet.channelsRowKey);
+
+      await tester.drag(row('UC3'), const Offset(0, -1500));
+      await tester.pumpAndSettle();
+      final search = find.byKey(HistoryFilterSheet.channelSearchKey);
+      expect(search.hitTestable(), findsOneWidget);
+
+      await tester.enterText(search, 'channel 42');
+      await tester.pumpAndSettle();
+
+      expect(row('UC42'), findsOneWidget);
+      expect(row('UC41'), findsNothing);
+    });
+
+    testWidgets('Clear clears only the channels picked', (tester) async {
+      final result = await open(
+        tester,
+        initial: (
+          subscription: SubscriptionFilter.all,
+          shorts: ShowFilter.all,
+          music: ShowFilter.all,
+          selection: ChannelSelection(
+            tags: const {'Retro'},
+            channels: {'UCa': _channels.first.channel},
+          ),
+        ),
+      );
+      await tap(tester, HistoryFilterSheet.channelsRowKey);
+
+      await tap(tester, HistoryFilterSheet.pageClearKey);
+      await tap(tester, HistoryFilterSheet.showKey);
+
+      expect(result.draft?.selection.channels, isEmpty);
+      expect(result.draft?.selection.tags, {'Retro'});
     });
   });
 }
