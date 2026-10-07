@@ -633,7 +633,14 @@ class ChannelCategorizer extends _$ChannelCategorizer {
                   await keep(key, result);
                 case Checked(:final yes, :final at):
                   if (!ref.mounted) return;
-                  await categories.checkTags(key, yes, index.names, at: at);
+                  // The tags as they are now: one deleted, or left without
+                  // a meaning, while Jev was asked, isn't given.
+                  await categories.checkTags(
+                    key,
+                    yes,
+                    ref.read(tagNamesProvider).value ?? index.names,
+                    at: at,
+                  );
                   await finished(key);
                 case NeedsClaude(:final ticket):
                   waiting[ticket.ask]!.add(ticket);

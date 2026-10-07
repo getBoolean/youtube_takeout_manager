@@ -233,8 +233,9 @@ List<String> rankTags(
 }
 
 /// [current] after Jev checked the user's tags [yes] gives how sure it is
-/// of, by key: one it's sure of (at least [jevThreshold]) is added, unless
-/// the user took it off this channel ([removedByUser]); one there that it's
+/// of, by key: one it's sure of (at least [jevThreshold]) is added, if AI
+/// may still give it ([TagName.offeredToAi]) and the user didn't take it off
+/// this channel ([removedByUser]); one there that it's
 /// sure no longer fits (below [tagRemoveBelow]) comes off, unless the user
 /// put it there ([protectedKeys]). The user's tags come first, the added
 /// after those there; past [maxTags], the last AI tags the user didn't put
@@ -260,7 +261,7 @@ List<String> applyTagCheck(
       if (sure >= jevThreshold &&
           !have.contains(key) &&
           !removedByUser.contains(key))
-        if (names[key] case final tag? when !tag.deleted) tag.name,
+        if (names[key] case final tag? when tag.offeredToAi) tag.name,
   ];
   final result = [
     for (final tag in kept)

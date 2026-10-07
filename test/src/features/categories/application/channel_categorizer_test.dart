@@ -128,6 +128,9 @@ class _Jev extends TypeSafeRepository {
   var requests = 0;
   final asked = <JevQuestion>[];
 
+  /// Answers only once this completes, when set.
+  Completer<void>? hold;
+
   @override
   Future<Map<String, JevAnswer>> ask({
     required String apiKey,
@@ -136,6 +139,7 @@ class _Jev extends TypeSafeRepository {
   }) async {
     if (failure case final f? when requests++ >= failAfter) throw f;
     asked.addAll(questions.values);
+    await hold?.future;
     return {
       for (final MapEntry(:key, :value) in questions.entries)
         key: switch (value) {
@@ -2025,6 +2029,36 @@ void main() {
           'UCs': ['Mine'],
           'UCx': isEmpty,
         });
+      });
+
+      test('never puts on a channel a tag deleted while it was asked '
+          'about', () async {
+        final jev = _Jev(agree: 0.9, tagFits: {'Mine': 0.9})
+          ..hold = Completer<void>();
+        final c = await start(jev);
+        await _runAi(c);
+
+        await c.read(tagEditorProvider.notifier).delete('mine');
+        jev.hold!.complete();
+        await _settle();
+
+        expect([
+          for (final kept in tags(c).values) ...kept,
+        ], isNot(contains('Mine')));
+      });
+
+      test('never puts on a channel a tag left without a meaning while it '
+          'was asked about', () async {
+        final jev = _Jev(agree: 0.9, tagFits: {'Mine': 0.9})
+          ..hold = Completer<void>();
+        final c = await start(jev);
+        await _runAi(c);
+
+        await c.read(tagEditorProvider.notifier).setMeaning('mine', null);
+        jev.hold!.complete();
+        await _settle();
+
+        expect(tags(c)['UCg'], isNot(contains('Mine')));
       });
 
       test('once: the next run checks nothing more, until a meaning '
