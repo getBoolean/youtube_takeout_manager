@@ -32,6 +32,15 @@ typedef ClaudeSuggestion = ({
 /// The most channels one request to Claude asks about.
 const maxGroupChannels = 20;
 
+/// Bumped when how channels are framed in a request to Claude changes in a
+/// way that could change its answers: every Claude fingerprint changes
+/// with it. How many channels a request holds changes none.
+const claudeFramingVersion = 1;
+
+/// Part of what Claude is asked about a channel: what it's told, and the
+/// properties of its answer.
+typedef ClaudePart = ({String instructions, Map<String, Object?> properties});
+
 /// The most characters of channels' evidence one request to Claude holds.
 const maxGroupEvidence = 40000;
 
@@ -272,6 +281,49 @@ String _groupUser(List<ClaudeItem> items, {required bool withCategory}) =>
       ],
     });
 
+/// What Claude is told and answers about a channel's category: each of
+/// [taxonomy]'s categories with its sub-categories, reusing one that fits
+/// before naming a new one, with an emoji, and why.
+ClaudePart claudeCategoryPart(Taxonomy taxonomy) {
+  final categories = [
+    for (final parent in taxonomy.parents)
+      taxonomy.childrenOf(parent).isEmpty
+          ? '- $parent'
+          : '- $parent: ${taxonomy.childrenOf(parent).join(', ')}',
+  ].join('\n');
+  return (
+    instructions:
+        'Categories, each with its sub-categories:\n$categories\n\n'
+        'For each channel, pick the category that fits best. Then, within '
+        'it, reuse the sub-category that fits if there is one. Only if none '
+        'does, name a new sub-category of one to three words, in the style '
+        'of the others, with one emoji for it; otherwise leave the emoji '
+        'empty. Leave the sub-category empty when the channel spans the '
+        'whole category. Give the reason in 20 words or fewer.',
+    properties: {
+      'parent': {'type': 'string', 'enum': taxonomy.parents.toList()},
+      'child': {'type': 'string'},
+      'emoji': {'type': 'string'},
+      'reason': {'type': 'string'},
+    },
+  );
+}
+
+/// What Claude is told and answers about a channel's tags: the kinds of
+/// tags, reusing [knownTags] (the user's with their meanings), and, when
+/// tags were [found] for some channel, adding only what they miss.
+ClaudePart claudeTagsPart(List<NamedTag> knownTags, {required bool found}) => (
+  instructions: _groupTagInstructions(knownTags, found: found),
+  properties: {'tags': _namedTagsSchema},
+);
+
+/// How a request to Claude about several channels opens, saying what it
+/// is to do with them, [doing].
+String _framing(String doing) =>
+    'You $doing YouTube channels by the videos they make and the ones a '
+    'viewer watched from them. Each channel comes with an id: answer for '
+    'every channel, once, by its id.';
+
 /// Asks Claude to categorize the channels [items]: for each, a category
 /// of [taxonomy] and one of its sub-categories, reusing one that fits
 /// before naming a new one, with an emoji; and its tags, reusing
@@ -281,35 +333,19 @@ ClaudeRequest claudeCategoryGroupRequest(
   Taxonomy taxonomy, {
   List<NamedTag> knownTags = const [],
 }) {
-  final categories = [
-    for (final parent in taxonomy.parents)
-      taxonomy.childrenOf(parent).isEmpty
-          ? '- $parent'
-          : '- $parent: ${taxonomy.childrenOf(parent).join(', ')}',
-  ].join('\n');
+  final category = claudeCategoryPart(taxonomy);
+  final tags = claudeTagsPart(
+    knownTags,
+    found: items.any((item) => item.keptTags.isNotEmpty),
+  );
   return (
     system:
-        'You categorize YouTube channels by the videos they make and the '
-        'ones a viewer watched from them. Each channel comes with an id: '
-        'answer for every channel, once, by its id.\n\n'
-        'Categories, each with its sub-categories:\n$categories\n\n'
-        'For each channel, pick the category that fits best. Then, within '
-        'it, reuse the sub-category that fits if there is one. Only if none '
-        'does, name a new sub-category of one to three words, in the style '
-        'of the others, with one emoji for it; otherwise leave the emoji '
-        'empty. Leave the sub-category empty when the channel spans the '
-        'whole category. Give the reason in 20 words or fewer.\n\n'
-        '${_groupTagInstructions(knownTags, found: items.any((i) => i.keptTags.isNotEmpty))}',
+        '${_framing('categorize')}\n\n${category.instructions}\n\n'
+        '${tags.instructions}',
     user: _groupUser(items, withCategory: false),
     schema: _groupSchema(
       [for (final item in items) item.id],
-      {
-        'parent': {'type': 'string', 'enum': taxonomy.parents.toList()},
-        'child': {'type': 'string'},
-        'emoji': {'type': 'string'},
-        'tags': _namedTagsSchema,
-        'reason': {'type': 'string'},
-      },
+      {...category.properties, ...tags.properties},
     ),
   );
 }
@@ -319,19 +355,19 @@ ClaudeRequest claudeCategoryGroupRequest(
 ClaudeRequest claudeTagsGroupRequest(
   List<ClaudeItem> items, {
   List<NamedTag> knownTags = const [],
-}) => (
-  system:
-      'You tag YouTube channels by what they are specifically about, from '
-      'the videos they make and the ones a viewer watched from them. Each '
-      'channel comes with an id and its category: answer for every channel, '
-      'once, by its id.\n\n'
-      '${_groupTagInstructions(knownTags, found: items.any((i) => i.keptTags.isNotEmpty))}',
-  user: _groupUser(items, withCategory: true),
-  schema: _groupSchema(
-    [for (final item in items) item.id],
-    {'tags': _namedTagsSchema},
-  ),
-);
+}) {
+  final tags = claudeTagsPart(
+    knownTags,
+    found: items.any((item) => item.keptTags.isNotEmpty),
+  );
+  return (
+    system:
+        '${_framing('tag')} Each also comes with its category.\n\n'
+        '${tags.instructions}',
+    user: _groupUser(items, withCategory: true),
+    schema: _groupSchema([for (final item in items) item.id], tags.properties),
+  );
+}
 
 /// The answers in Claude's [answer] to a group, by id: for each of [ids],
 /// its first answer; ids not asked about are left out, as are answers

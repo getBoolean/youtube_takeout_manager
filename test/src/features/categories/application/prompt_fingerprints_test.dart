@@ -1,11 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/application/jev_prompts.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_prompts.dart';
-import 'package:youtube_takeout_manager/src/features/categories/domain/channel_evidence.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_videos.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_candidates.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/youtube_taxonomy.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 
@@ -32,30 +34,51 @@ void main() {
     );
   });
 
-  test("changing the wording of Claude's category prompt changes only its "
-      'fingerprint', () {
-    ClaudeRequest wordier(
-      ChannelEvidence evidence,
-      Taxonomy taxonomy, {
-      List<String> knownTags = const [],
-      CategoryPath? inaccurate,
-    }) {
-      final request = claudeCategoryRequest(
-        evidence,
-        taxonomy,
-        knownTags: knownTags,
-        inaccurate: inaccurate,
-      );
+  test("changing the wording of Claude's category instructions changes only "
+      'its fingerprint', () {
+    ClaudePart wordier(Taxonomy taxonomy) {
+      final part = claudeCategoryPart(taxonomy);
       return (
-        system: '${request.system} Be brief.',
-        user: request.user,
-        schema: request.schema,
+        instructions: '${part.instructions} Be brief.',
+        properties: part.properties,
       );
     }
 
     expect(_changed(PromptBuilders(claudeCategory: wordier)), {
       PromptStep.claudeCategory,
     });
+  });
+
+  test("changing Claude's tag instructions redoes tags, not categories", () {
+    ClaudePart wordier(List<NamedTag> knownTags, {required bool found}) {
+      final part = claudeTagsPart(knownTags, found: found);
+      return (
+        instructions: '${part.instructions} Prefer short tags.',
+        properties: part.properties,
+      );
+    }
+
+    expect(_changed(PromptBuilders(claudeTags: wordier)), {
+      PromptStep.claudeTags,
+    });
+  });
+
+  test("changing how channels are framed in a request to Claude changes "
+      "Claude's steps alone; how many channels a request holds changes "
+      'nothing', () {
+    expect(_changed(PromptBuilders(claudeFraming: claudeFramingVersion + 1)), {
+      PromptStep.claudeCategory,
+      PromptStep.claudeTags,
+    });
+  });
+
+  test("changing Jev's tag questions changes only their step", () {
+    Map<String, JevQuestion> blunter(List<TagCandidate> candidates) => {
+      ...jevTagQuestions(candidates),
+      'other': const JevNoul('Anything else?'),
+    };
+
+    expect(_changed(PromptBuilders(jevTags: blunter)), {PromptStep.jevTags});
   });
 
   test('changing how videos are picked changes every step told about '
@@ -71,12 +94,13 @@ void main() {
     expect(_changed(PromptBuilders(pickVideos: fewer)), {
       PromptStep.jevCheck,
       PromptStep.jevPick,
+      PromptStep.jevTags,
       PromptStep.claudeCategory,
       PromptStep.claudeTags,
     });
   });
 
-  test("changing one of Jev's questions changes only its step", () {
+  test("changing one of Jev's category questions changes only its step", () {
     JevNoul blunter(CategoryPath candidate) =>
         JevNoul('Is "${candidate.label}" right?');
 

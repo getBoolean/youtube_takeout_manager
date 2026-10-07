@@ -10,15 +10,26 @@ import '../domain/category_path.dart';
 import '../domain/category_prompts.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/prompt_videos.dart';
+import '../domain/sub_category.dart';
+import '../domain/tag_candidates.dart';
+import '../domain/tag_name.dart';
 import '../domain/youtube_taxonomy.dart';
 import '../domain/youtube_topics.dart';
 import 'jev_prompts.dart';
 
 /// A step that asks AI, whose prompt has a fingerprint.
-enum PromptStep { jevCheck, jevPick, jevNameCheck, claudeCategory, claudeTags }
+enum PromptStep {
+  jevCheck,
+  jevPick,
+  jevNameCheck,
+  jevTags,
+  claudeCategory,
+  claudeTags,
+}
 
 /// What makes the prompts: how videos are picked, what the evidence holds,
-/// and each request. Tests swap one to see its fingerprint change.
+/// Jev's questions, Claude's parts, and how Claude's requests are framed.
+/// Tests swap one to see its fingerprint change.
 class PromptBuilders {
   final List<PromptPicks> Function(LoadedHistory loaded) pickVideos;
   final ChannelEvidence Function({
@@ -30,19 +41,10 @@ class PromptBuilders {
     required Map<String, String?> descriptions,
   })
   evidence;
-  final ClaudeRequest Function(
-    ChannelEvidence evidence,
-    Taxonomy taxonomy, {
-    List<String> knownTags,
-    CategoryPath? inaccurate,
-  })
-  claudeCategory;
-  final ClaudeRequest Function(
-    ChannelEvidence evidence,
-    CategoryPath category, {
-    List<String> knownTags,
-  })
+  final ClaudePart Function(Taxonomy taxonomy) claudeCategory;
+  final ClaudePart Function(List<NamedTag> knownTags, {required bool found})
   claudeTags;
+  final int claudeFraming;
   final JevNoul Function(CategoryPath candidate) jevFit;
   final JevChoice Function(Taxonomy taxonomy, {CategoryPath? exclude})
   jevParent;
@@ -60,25 +62,32 @@ class PromptBuilders {
     required String channel,
   })
   jevSameStateOf;
+  final Map<String, JevQuestion> Function(List<TagCandidate> candidates)
+  jevTags;
 
   const PromptBuilders({
     this.pickVideos = pickPromptVideos,
     this.evidence = buildEvidence,
-    this.claudeCategory = claudeCategoryRequest,
-    this.claudeTags = claudeTagsRequest,
+    this.claudeCategory = claudeCategoryPart,
+    this.claudeTags = claudeTagsPart,
+    this.claudeFraming = claudeFramingVersion,
     this.jevFit = jevFitQuestion,
     this.jevParent = jevParentQuestion,
     this.jevChild = jevChildQuestion,
     this.jevSame = jevSameQuestion,
     this.jevSameStateOf = jevSameState,
+    this.jevTags = jevTagQuestions,
   });
 }
 
 /// Each step's fingerprint: a hash of its prompt and answer shape, built
-/// with [builders] for a fixed sample channel against a fixed taxonomy, so
-/// a change to the wording, the shape, or what evidence goes in (how the
-/// videos are picked among them) changes it without anyone bumping a
-/// number. Which model answers isn't part of it.
+/// with [builders] for a fixed sample channel against a fixed taxonomy and
+/// fixed tags, so a change to the wording, the shape, or what evidence goes
+/// in (how the videos are picked among them) changes it without anyone
+/// bumping a number. Claude's two steps are hashed apart, each from its
+/// part of the request, so a change to the tag instructions redoes tags,
+/// not categories; how many channels a request holds is in neither. Which
+/// model answers isn't part of any.
 Map<PromptStep, String> fingerprintPrompts([
   PromptBuilders builders = const PromptBuilders(),
 ]) {
@@ -102,6 +111,12 @@ Map<PromptStep, String> fingerprintPrompts([
   );
   final state = evidence.toState();
   final gaming = jevOptionKeys(_taxonomy.childrenOf('Gaming'));
+  Map<String, Object?> claude(ClaudePart part) => {
+    'framing': builders.claudeFraming,
+    'instructions': part.instructions,
+    'properties': part.properties,
+    'channel': state,
+  };
   final requests = <PromptStep, Object>{
     PromptStep.jevCheck: {
       'state': state,
@@ -129,16 +144,16 @@ Map<PromptStep, String> fingerprintPrompts([
       ),
       'questions': {'same': builders.jevSame('Gaming', gaming).toJson()},
     },
-    PromptStep.claudeCategory: _claude(
-      builders.claudeCategory(evidence, _taxonomy, knownTags: _knownTags),
-    ),
-    PromptStep.claudeTags: _claude(
-      builders.claudeTags(
-        evidence,
-        const CategoryPath('Gaming', 'Speedruns'),
-        knownTags: _knownTags,
-      ),
-    ),
+    PromptStep.jevTags: {
+      'state': state,
+      'questions': {
+        for (final MapEntry(:key, :value)
+            in builders.jevTags(_candidates).entries)
+          key: value.toJson(),
+      },
+    },
+    PromptStep.claudeCategory: claude(builders.claudeCategory(_taxonomy)),
+    PromptStep.claudeTags: claude(builders.claudeTags(_knownTags, found: true)),
   };
   return {
     for (final MapEntry(key: step, value: request) in requests.entries)
@@ -152,18 +167,46 @@ Map<PromptStep, String> fingerprintPrompts([
 /// The prompts' fingerprints now, worked out once.
 final Map<PromptStep, String> currentPrompts = fingerprintPrompts();
 
-Map<String, Object> _claude(ClaudeRequest request) => {
-  'system': request.system,
-  'user': request.user,
-  'schema': request.schema,
-};
-
 const _channel = 'Sample Speedruns';
 const _topics = [
   'https://en.wikipedia.org/wiki/Action_game',
   'https://en.wikipedia.org/wiki/Video_game_culture',
 ];
-const _knownTags = ['Mario Kart World', 'ASMR', 'Blue Archive'];
+
+/// The sample tags: three AI named, with their meanings, and one the user
+/// defined.
+const _candidates = [
+  (
+    key: 'mariokartworld',
+    tag: TagName(name: 'Mario Kart World', meaning: 'The 2025 Switch 2 racer'),
+  ),
+  (
+    key: 'asmr',
+    tag: TagName(name: 'ASMR', meaning: 'Whispers and soft sounds to relax'),
+  ),
+  (
+    key: 'bluearchive',
+    tag: TagName(name: 'Blue Archive', meaning: 'The mobile game and anime'),
+  ),
+  (
+    key: 'worldrecords',
+    tag: TagName(
+      name: 'World Records',
+      origin: NameOrigin.user,
+      meaning: 'Runs that set or chase a world record',
+    ),
+  ),
+];
+
+/// The tags Claude is told of: AI's by name, the user's with meanings.
+final _knownTags = [
+  for (final (key: _, :tag) in _candidates)
+    (
+      name: tag.name,
+      meaning: tag.origin == NameOrigin.user ? tag.meaning : null,
+    ),
+];
+
 final _taxonomy = youtubeTaxonomy.withCustom({
   'Gaming': ['Speedruns'],
   'Knowledge': ['Space'],
