@@ -20,7 +20,6 @@ import 'package:youtube_takeout_manager/src/features/history/application/history
 import 'package:youtube_takeout_manager/src/features/history/application/takeout_history_notifier.dart';
 import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
-import 'package:youtube_takeout_manager/src/features/history/domain/category_groups.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/search_entry.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/takeout_history.dart';
@@ -661,19 +660,6 @@ void main() {
 
       expect(channelGroups(c), [('Zed', 0)]);
       expect(watchTitles(c), isEmpty);
-    });
-
-    test('watched videos are grouped by category too, the uncategorized '
-        'last', () async {
-      final c = await loaded(categories: {'UCx': action});
-
-      expect(
-        [
-          for (final g in c.read(historyCategoryGroupsProvider).groups)
-            (g.path?.label ?? g.key, g.indices.length, g.channelCount),
-        ],
-        [('Gaming › Action game', 3, 1), (uncategorizedGroupKey, 1, 1)],
-      );
     });
 
     test('the viewing mix counts only the kinds of videos shown', () async {

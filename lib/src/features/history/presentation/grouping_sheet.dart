@@ -11,14 +11,12 @@ extension HistoryGroupingLabels on HistoryGrouping {
     HistoryGrouping.day => 'Day',
     HistoryGrouping.month => 'Month',
     HistoryGrouping.channel => 'Channel',
-    HistoryGrouping.category => 'Category',
   };
 
   IconData get icon => switch (this) {
     HistoryGrouping.day => Icons.today_outlined,
     HistoryGrouping.month => Icons.calendar_month_outlined,
     HistoryGrouping.channel => Icons.video_library_outlined,
-    HistoryGrouping.category => Icons.category_outlined,
   };
 
   String get description => switch (this) {
@@ -27,7 +25,6 @@ extension HistoryGroupingLabels on HistoryGrouping {
     HistoryGrouping.channel =>
       'Every channel you watched or subscribe to, with what you watched '
           'from each',
-    HistoryGrouping.category => 'By the kind of videos each channel makes',
   };
 }
 

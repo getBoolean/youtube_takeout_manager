@@ -1147,11 +1147,7 @@ void main() {
       ),
     );
   }
-  for (final grouping in [
-    HistoryGrouping.month,
-    HistoryGrouping.channel,
-    HistoryGrouping.category,
-  ]) {
+  for (final grouping in [HistoryGrouping.month, HistoryGrouping.channel]) {
     for (final expanded in [false, true]) {
       fitsAtEveryWidth(
         "the history page's videos by ${grouping.name}"

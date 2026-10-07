@@ -8,7 +8,6 @@ import 'package:youtube_takeout_manager/src/features/takeout/application/takeout
 import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
-import '../domain/category_groups.dart';
 import '../domain/channel_groups.dart';
 import '../domain/history_days.dart';
 import '../data/history_engine.dart';
@@ -249,16 +248,4 @@ ChannelGroups historyChannelGroups(Ref ref) {
           (query.isEmpty || foldForSearch(channel.title).contains(query)))
         channel,
   ]);
-}
-
-/// The watched videos shown, by the category of their channels, with the
-/// channels subscribed to but never watched as [historyChannelGroups] has
-/// them.
-@riverpod
-CategoryGroups historyCategoryGroups(Ref ref) {
-  final categories = ref.watch(channelCategoriesProvider).value ?? const {};
-  return groupByCategory(
-    ref.watch(historyChannelGroupsProvider),
-    categoryOf: (key) => categories[key]?.path,
-  );
 }

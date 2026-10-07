@@ -39,7 +39,6 @@ import 'package:youtube_takeout_manager/src/features/history/domain/watch_entry.
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_button.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/grouping_sheet.dart';
-import 'package:youtube_takeout_manager/src/features/history/presentation/history_category_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_channel_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_day_list.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_filter_sheet.dart';
@@ -212,7 +211,9 @@ class _Router extends RootStackRouter {
   ];
 }
 
-/// Opens history showing [history] from the channel list's button.
+/// Opens history showing [history] from the channel list's button, its
+/// watched videos grouped by [grouping] as picked before; the first time
+/// History opens when null.
 Future<ProviderContainer> _open(
   WidgetTester tester, {
   TakeoutHistory? history,
@@ -225,8 +226,11 @@ Future<ProviderContainer> _open(
   AiKeys keys = AiKeys.none,
   List<Override> overrides = const [],
   TakeoutHistoryNotifier Function()? historyNotifier,
+  HistoryGrouping? grouping = HistoryGrouping.day,
 }) async {
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues({
+    if (grouping != null) 'flutter.history.grouping': grouping.name,
+  });
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -294,13 +298,6 @@ Future<void> _openFilters(WidgetTester tester) =>
 Finder _channelHeader(String title) => find
     .byWidgetPredicate(
       (w) => w is ChannelGroupHeader && w.group.channel?.title == title,
-    )
-    .first;
-
-/// The header of the group of [label], grouped by category.
-Finder _categoryHeader(String label) => find
-    .byWidgetPredicate(
-      (w) => w is CategoryGroupHeader && (w.group.path?.label ?? '') == label,
     )
     .first;
 
@@ -447,36 +444,6 @@ void main() {
     );
   });
 
-  testWidgets('grouped by category, each category is a collapsed header, '
-      'the most watched first, that opens to its videos and their channels', (
-    tester,
-  ) async {
-    await _open(tester, categories: _gamingX());
-
-    await _groupBy(tester, HistoryGrouping.category);
-
-    final gaming = _categoryHeader('Gaming › Action game');
-    expect(gaming, findsOneWidget);
-    expect(find.byType(CategoryGroupHeader), findsWidgets);
-    expect(_shown('Café tour'), findsNothing);
-    expect(find.byIcon(Icons.event), findsNothing);
-
-    await tester.tap(gaming);
-    await tester.pumpAndSettle();
-
-    expect(_shown('Café tour'), findsOneWidget);
-    expect(_shown('Unrelated'), findsOneWidget);
-    expect(_shown('Other'), findsNothing);
-    // Rows keep their channel, as a category has several.
-    expect(
-      find.descendant(
-        of: find.byType(ChannelMetaLine),
-        matching: find.textContaining('X'),
-      ),
-      findsWidgets,
-    );
-  });
-
   testWidgets('ticking a category in the Filters modal narrows every '
       'grouping, shown as a chip that clears it', (tester) async {
     await _open(tester, categories: _gamingX());
@@ -556,26 +523,6 @@ void main() {
 
     expect(_shown('Other'), findsOneWidget);
     expect(_shown('Café tour'), findsNothing);
-  });
-
-  testWidgets("showing all from a channel opens its category, with only "
-      "that channel's videos", (tester) async {
-    await _open(tester, categories: _gamingX());
-
-    await tester.tap(_shown('Café tour'));
-    await tester.pumpAndSettle();
-    await tester.tap(
-      find.descendant(
-        of: find.byType(BottomSheet),
-        matching: find.byIcon(Icons.filter_list),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _groupBy(tester, HistoryGrouping.category);
-
-    expect(_shown('Café tour'), findsOneWidget);
-    expect(_shown('Unrelated'), findsOneWidget);
-    expect(_shown('Other'), findsNothing);
   });
 
   testWidgets('channels categorized while a category is picked leave the '
@@ -1153,6 +1100,14 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('the first time, History groups its watched videos by '
+      'channel', (tester) async {
+    await _open(tester, grouping: null);
+
+    expect(_channelHeader('X'), findsOneWidget);
+    expect(_shown('Café tour'), findsNothing);
   });
 
   testWidgets('a takeout without history explains how to add it', (

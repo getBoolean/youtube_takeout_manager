@@ -30,13 +30,11 @@ import '../application/history_shown.dart';
 import '../application/takeout_history_notifier.dart';
 import '../application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
-import '../domain/category_groups.dart';
 import '../domain/history_days.dart';
 import '../domain/loaded_history.dart';
 import '../domain/watch_filters.dart';
 import '../domain/watched_channels.dart';
 import 'history_actions.dart';
-import 'history_category_list.dart';
 import 'history_channel_list.dart';
 import 'history_day_list.dart';
 import 'history_filter_sheet.dart';
@@ -205,11 +203,9 @@ typedef _WatchLists = ({
   StickyGroupedListController days,
   StickyGroupedListController months,
   StickyGroupedListController channels,
-  StickyGroupedListController categories,
   ScrollController dayScroll,
   ScrollController monthScroll,
   ScrollController channelScroll,
-  ScrollController categoryScroll,
 });
 
 class _HistoryBody extends HookConsumerWidget {
@@ -224,26 +220,20 @@ class _HistoryBody extends HookConsumerWidget {
     useEffect(() => dayList.dispose, [dayList]);
     final monthList = useMemoized(StickyGroupedListController.new);
     useEffect(() => monthList.dispose, [monthList]);
-    // Channels and categories start closed, so they read as lists of them.
+    // Channels start closed, so they read as a list of them.
     final channelList = useMemoized(
       () => StickyGroupedListController(expandedByDefault: false),
     );
     useEffect(() => channelList.dispose, [channelList]);
-    final categoryList = useMemoized(
-      () => StickyGroupedListController(expandedByDefault: false),
-    );
-    useEffect(() => categoryList.dispose, [categoryList]);
     final searchList = useMemoized(StickyGroupedListController.new);
     useEffect(() => searchList.dispose, [searchList]);
     final lists = (
       days: dayList,
       months: monthList,
       channels: channelList,
-      categories: categoryList,
       dayScroll: useScrollController(),
       monthScroll: useScrollController(),
       channelScroll: useScrollController(),
-      categoryScroll: useScrollController(),
     );
     final searchScroll = useScrollController();
     final highlightedWatch = useState<int?>(null);
@@ -257,7 +247,6 @@ class _HistoryBody extends HookConsumerWidget {
       toTop(lists.dayScroll);
       toTop(lists.monthScroll);
       toTop(lists.channelScroll);
-      toTop(lists.categoryScroll);
     }
 
     ref.listen(historySearchQueryProvider, (_, _) {
@@ -305,7 +294,8 @@ class _HistoryBody extends HookConsumerWidget {
     useEffect(() => onScreen.dispose, [onScreen]);
 
     final query = ref.watch(historySearchQueryProvider);
-    final grouping = ref.watch(historyGroupingProvider);
+    final grouping =
+        ref.watch(historyGroupingProvider).value ?? HistoryGrouping.channel;
 
     // The lists come a frame after the rest of the screen, so opening it
     // never builds everything in one frame.
@@ -691,7 +681,6 @@ class _WatchedTab extends ConsumerWidget {
   StickyGroupedListController get _list => switch (grouping) {
     HistoryGrouping.month => lists.months,
     HistoryGrouping.channel => lists.channels,
-    HistoryGrouping.category => lists.categories,
     HistoryGrouping.day => lists.days,
   };
 
@@ -728,14 +717,6 @@ class _WatchedTab extends ConsumerWidget {
           final channel = HistoryChannel.of(watch)!;
           ref.read(historyChannelSelectionProvider.notifier).showOnly(channel);
           lists.channels.setExpanded(channel.key, true);
-          final categories = await ref
-              .read(channelCategoriesProvider.future)
-              .catchError((Object _) => const <String, ChannelCategory>{});
-          if (!context.mounted) return;
-          lists.categories.setExpanded(
-            categories[channel.key]?.path?.label ?? uncategorizedGroupKey,
-            true,
-          );
         case WatchAction.openChannel:
           await openExternally(watch.channelUrl!);
         case WatchAction.copyLink:
@@ -793,23 +774,15 @@ class _WatchedTab extends ConsumerWidget {
         available: _groupings,
       );
       if (picked != null) {
-        ref.read(historyGroupingProvider.notifier).set(picked);
+        await ref.read(historyGroupingProvider.notifier).set(picked);
       }
     }
 
     final byChannel = grouping == HistoryGrouping.channel;
-    final byCategory = grouping == HistoryGrouping.category;
     final channelGroups = byChannel
         ? ref.watch(historyChannelGroupsProvider)
         : null;
-    final categoryGroups = byCategory
-        ? ref.watch(historyCategoryGroupsProvider)
-        : null;
-    final nothing = switch ((channelGroups, categoryGroups)) {
-      (final channels?, _) => channels.groups.isEmpty,
-      (_, final categories?) => categories.groups.isEmpty,
-      _ => days.isEmpty,
-    };
+    final nothing = channelGroups?.groups.isEmpty ?? days.isEmpty;
 
     final top = Column(
       mainAxisSize: MainAxisSize.min,
@@ -827,7 +800,7 @@ class _WatchedTab extends ConsumerWidget {
             onCategorize: () => showCategorizeWindow(context),
           ),
         ),
-        CategorizationBanner(grouped: byChannel || byCategory),
+        CategorizationBanner(grouped: byChannel),
         _ActiveFilters(watched: true, onMore: openFilters),
       ],
     );
@@ -862,13 +835,6 @@ class _WatchedTab extends ConsumerWidget {
               }
 
               return switch (grouping) {
-                HistoryGrouping.category => HistoryCategoryList(
-                  groups: categoryGroups!,
-                  watchChannelIndex: loaded.watchChannelIndex,
-                  controller: lists.categories,
-                  scrollController: lists.categoryScroll,
-                  entryBuilder: entry,
-                ),
                 HistoryGrouping.channel => HistoryChannelList(
                   groups: channelGroups!,
                   watchChannelIndex: loaded.watchChannelIndex,

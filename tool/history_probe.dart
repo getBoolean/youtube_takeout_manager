@@ -26,6 +26,17 @@ import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
 final _router = AppRouter();
+
+/// The grouping, kept in memory only.
+class _Grouping extends HistoryGroupingNotifier {
+  @override
+  Future<HistoryGrouping> build() async => HistoryGrouping.day;
+
+  @override
+  Future<void> set(HistoryGrouping grouping) async =>
+      state = AsyncData(grouping);
+}
+
 final _timings = <FrameTiming>[];
 
 void main() {
@@ -37,6 +48,8 @@ void main() {
       readSessionChannelIdProvider.overrideWith((ref) => null),
       // No AI keys: categorizing asks nothing, so nothing is paid for.
       aiKeysProvider.overrideWith((ref) async => AiKeys.none),
+      // The groupings tried aren't saved as the user's.
+      historyGroupingProvider.overrideWith(_Grouping.new),
     ],
   );
   runApp(
@@ -81,7 +94,7 @@ Future<void> _probe(ProviderContainer container) async {
   for (final grouping in [HistoryGrouping.day, HistoryGrouping.channel]) {
     final name = grouping.name;
     _timings.clear();
-    container.read(historyGroupingProvider.notifier).set(grouping);
+    await container.read(historyGroupingProvider.notifier).set(grouping);
     await _settle('$name: switch grouping');
 
     _timings.clear();
