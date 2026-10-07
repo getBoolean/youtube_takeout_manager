@@ -79,18 +79,9 @@ List<int> countChannelWatches(
 
 /// Narrows [loaded] to [filters]. Watched videos match the search by title
 /// or channel name, and searches by their text. Grouped by channel, the
-/// channels whose names match come first.
-///
-/// Works through at most [sliceSize] entries at a time, awaiting [pause]
-/// between slices so no frame waits on it, and gives up with null when
-/// [cancelled] says a newer search replaced it.
-Future<HistoryResults?> searchHistory(
-  LoadedHistory loaded,
-  HistoryFilters filters, {
-  int sliceSize = 3000,
-  Future<void> Function()? pause,
-  bool Function()? cancelled,
-}) async {
+/// channels whose names match come first. Runs on the History worker,
+/// which no frame waits on.
+HistoryResults searchHistory(LoadedHistory loaded, HistoryFilters filters) {
   final query = foldForSearch(filters.query);
   final (:removedOnly, :shorts, :shortWatches, :music, :channels) = (
     removedOnly: filters.removedOnly,
@@ -99,28 +90,11 @@ Future<HistoryResults?> searchHistory(
     music: filters.music,
     channels: filters.channels,
   );
-  Future<bool> keepGoing() async {
-    await pause?.call();
-    return !(cancelled?.call() ?? false);
-  }
-
-  /// Runs [step] on each of `0..count - 1`, a slice at a time. False when
-  /// cancelled.
-  Future<bool> sliced(int count, void Function(int i) step) async {
-    for (var start = 0; start < count; start += sliceSize) {
-      final end = start + sliceSize < count ? start + sliceSize : count;
-      for (var i = start; i < end; i++) {
-        step(i);
-      }
-      if (!await keepGoing()) return false;
-    }
-    return true;
-  }
 
   final watches = loaded.history.watches;
   final channelOf = loaded.watchChannelIndex;
   final watchIndices = <int>[];
-  if (!await sliced(watches.length, (i) {
+  for (var i = 0; i < watches.length; i++) {
     final watch = watches[i];
     if ((!removedOnly || watch.removedAt != null) &&
         (channels == null || channels.allows(channelOf[i])) &&
@@ -129,44 +103,34 @@ Future<HistoryResults?> searchHistory(
         watch.matches(query)) {
       watchIndices.add(i);
     }
-  })) {
-    return null;
   }
 
   final searches = loaded.history.searches;
   final searchIndices = <int>[];
-  if (!await sliced(searches.length, (i) {
+  for (var i = 0; i < searches.length; i++) {
     final search = searches[i];
     if ((!removedOnly || search.removedAt != null) &&
         search.searchText.contains(query)) {
       searchIndices.add(i);
     }
-  })) {
-    return null;
   }
 
   final watchedChannels = loaded.watchedChannels;
-  final nameMatches = <int>{};
-  if (query.isNotEmpty &&
-      !await sliced(watchedChannels.length, (c) {
-        if (watchedChannels[c].searchText.contains(query)) nameMatches.add(c);
-      })) {
-    return null;
-  }
+  final nameMatches = <int>{
+    if (query.isNotEmpty)
+      for (var c = 0; c < watchedChannels.length; c++)
+        if (watchedChannels[c].searchText.contains(query)) c,
+  };
 
-  final watchDays = groupByDay(watchIndices, loaded.watchDayKeys);
-  if (!await keepGoing()) return null;
-  final channelGroups = groupByChannel(
-    channels: watchedChannels,
-    watchChannelIndex: channelOf,
-    watchIndices: watchIndices,
-    nameMatches: nameMatches,
-  );
-  if (!await keepGoing()) return null;
   return (
     loaded: loaded,
-    watchDays: watchDays,
+    watchDays: groupByDay(watchIndices, loaded.watchDayKeys),
     searchDays: groupByDay(searchIndices, loaded.searchDayKeys),
-    channelGroups: channelGroups,
+    channelGroups: groupByChannel(
+      channels: watchedChannels,
+      watchChannelIndex: channelOf,
+      watchIndices: watchIndices,
+      nameMatches: nameMatches,
+    ),
   );
 }

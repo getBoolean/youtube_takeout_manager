@@ -43,7 +43,7 @@ final class TakeoutHistoryNotifierProvider
 }
 
 String _$takeoutHistoryNotifierHash() =>
-    r'59ecd781c3a57ddf14f69148ef4946dd923d5706';
+    r'eb03faa6f04865238ffd108ce4115aa427278707';
 
 /// The selected takeout's watch and search history, or null when no
 /// takeout is selected. Loaded apart from the takeout, when first looked

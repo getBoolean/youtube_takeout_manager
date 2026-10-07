@@ -19,6 +19,8 @@ import 'package:youtube_takeout_manager/src/features/videos/data/video_format_ca
 import 'package:youtube_takeout_manager/src/features/videos/data/youtube_video_repository.dart';
 import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.dart';
 
+import '../history_fixture.dart';
+
 class _Clients extends GoogleAuthRepository {
   @override
   http.Client getAuthenticatedClient(String channelId) => http.Client();
@@ -75,7 +77,7 @@ class _Fixed extends TakeoutHistoryNotifier {
   final TakeoutHistory history;
 
   @override
-  Future<LoadedHistory?> build() async => LoadedHistory.of(history);
+  Future<LoadedHistory?> build() async => loadThroughEngine(ref, history);
 }
 
 WatchEntry _watch(String id, {String? url}) => WatchEntry(

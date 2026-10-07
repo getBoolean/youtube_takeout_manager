@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +35,7 @@ import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.
 import 'package:youtube_takeout_manager/src/features/takeout/domain/takeout_data.dart';
 
 import '../../takeout/memory_takeout_repository.dart';
+import '../history_fixture.dart';
 
 WatchEntry _watch(
   String title,
@@ -82,7 +84,7 @@ class _Fixed extends TakeoutHistoryNotifier {
 
   @override
   Future<LoadedHistory?> build() async =>
-      history == null ? null : LoadedHistory.of(history!);
+      history == null ? null : loadThroughEngine(ref, history!);
 }
 
 class _Formats extends VideoFormats {
@@ -117,6 +119,21 @@ class _Engine extends LocalHistoryEngine {
     loads++;
     if (dies) throw const HistoryWorkerDied();
     return super.load(files);
+  }
+}
+
+/// The History engine in-process, holding its answer to a search for a
+/// text in [held] until that completes, and keeping what was searched for.
+class _HeldEngine extends LocalHistoryEngine {
+  final held = <String, Completer<void>>{};
+  final searched = <String>[];
+
+  @override
+  Future<HistoryMatches> search(HistoryQuery query, int generation) async {
+    searched.add(query.query);
+    final answer = await super.search(query, generation);
+    await held[query.query]?.future;
+    return answer;
   }
 }
 
@@ -200,6 +217,25 @@ void main() {
     for (final day in c.read(watchDaysProvider))
       for (final i in day.indices) _history.watches[i].title,
   ];
+
+  test('a newer search answered first is never replaced by an older one '
+      'answered after it', () async {
+    final engine = _HeldEngine()..held['cafe'] = Completer<void>();
+    final c = container(history: _history, engine: engine);
+    await c.read(takeoutHistoryProvider.future);
+
+    c.read(historySearchQueryProvider.notifier).update('cafe');
+    await pumpEventQueue();
+    c.read(historySearchQueryProvider.notifier).update('unrelated');
+    await _settle(c);
+    expect(watchTitles(c), ['Unrelated']);
+
+    engine.held['cafe']!.complete();
+    await pumpEventQueue();
+
+    expect(watchTitles(c), ['Unrelated']);
+    expect(engine.searched, ['cafe', 'unrelated']);
+  });
 
   group('loading', () {
     test("loads the selected takeout's history", () async {
@@ -656,6 +692,8 @@ void main() {
       );
       await c.read(takeoutHistoryProvider.future);
       await c.read(channelCategoriesProvider.future);
+      // Kept up to date, as the screen keeps it.
+      c.listen(viewingMixProvider, (_, _) {});
       List<(String, int)> mix() => [
         for (final s in c.read(viewingMixProvider))
           (s.pick.label, s.watchCount),
@@ -664,6 +702,8 @@ void main() {
       expect(mix(), [('Gaming', 1), ('Music', 1)]);
 
       c.read(historyMusicFilterProvider.notifier).set(ShowFilter.only);
+      // Counted by the History worker.
+      await c.read(historyChannelWatchCountsProvider.future);
       expect(mix(), [('Music', 1), ('Gaming', 0)]);
     });
   });

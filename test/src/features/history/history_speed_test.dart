@@ -2,9 +2,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/categories/domain/prompt_videos.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_csv_codec.dart';
+import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/channel_groups.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/history_days.dart';
-import 'package:youtube_takeout_manager/src/features/history/domain/history_search.dart';
+import 'package:youtube_takeout_manager/src/features/history/domain/history_wire.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/loaded_history.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 
@@ -38,10 +39,14 @@ const _budgets = {
 void main() {
   late final Map<String, dynamic> files;
   late final LoadedHistory loaded;
+  // Searched and counted as the app does, through the History worker's
+  // wire, in-process.
+  final engine = LocalHistoryEngine();
 
-  setUpAll(() {
+  setUpAll(() async {
     files = syntheticHistoryFiles();
     loaded = loadSavedHistory(files.cast());
+    await engine.load(files.cast());
   });
 
   final measured = <String, int>{};
@@ -67,14 +72,7 @@ void main() {
 
   test('a search narrows it in time', () async {
     await within('search', () async {
-      await searchHistory(loaded, (
-        query: 'a',
-        removedOnly: false,
-        shorts: ShowFilter.all,
-        shortWatches: null,
-        music: ShowFilter.all,
-        channels: null,
-      ));
+      await engine.search(const HistoryQuery(query: 'a'), 1);
     });
   });
 
@@ -90,14 +88,7 @@ void main() {
         subscription: SubscriptionFilter.all,
         selection: ChannelSelection(channels: picked),
       );
-      await searchHistory(loaded, (
-        query: '',
-        removedOnly: false,
-        shorts: ShowFilter.all,
-        shortWatches: null,
-        music: ShowFilter.all,
-        channels: mask,
-      ));
+      await engine.search(HistoryQuery(channelMask: mask!.flags), 1);
     });
   });
 
@@ -117,7 +108,7 @@ void main() {
 
   test("the viewing mix's counts come in time", () async {
     await within('counts', () async {
-      countChannelWatches(loaded, shorts: ShowFilter.hide);
+      await engine.channelWatchCounts(shorts: ShowFilter.hide);
     });
   });
 

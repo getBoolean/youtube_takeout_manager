@@ -59,6 +59,9 @@ class ChannelMask {
 
   const ChannelMask(this._shown);
 
+  /// One flag per channel, for the History worker.
+  Uint8List get flags => _shown;
+
   /// Whether the channel at [channelIndex] is shown; videos without a
   /// channel (-1) never are.
   bool allows(int channelIndex) =>

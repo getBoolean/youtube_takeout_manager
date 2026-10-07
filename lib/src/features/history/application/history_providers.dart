@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -13,7 +11,9 @@ import 'package:youtube_takeout_manager/src/utils/search_folding.dart';
 import '../domain/category_groups.dart';
 import '../domain/channel_groups.dart';
 import '../domain/history_days.dart';
+import '../data/history_engine.dart';
 import '../domain/history_search.dart';
+import '../domain/history_wire.dart';
 import '../domain/loaded_history.dart';
 import '../domain/watch_filters.dart';
 import 'history_channel_selection.dart';
@@ -88,40 +88,51 @@ ChannelMask? historyChannelMask(Ref ref) => buildChannelMask(
   categoryOf: ref.watch(historyPickedCategoryOfProvider),
 );
 
+/// How many videos were watched from each channel of [loaded], in its
+/// order.
+typedef ChannelWatchCounts = ({LoadedHistory loaded, List<int> counts});
+
 /// How many videos were watched from each watched channel, in the loaded
 /// history's order, of the kinds of videos shown: Shorts and YouTube Music
-/// as filtered.
+/// as filtered. Counted by the History worker when filtered.
 @riverpod
-List<int> historyChannelWatchCounts(Ref ref) {
+Future<ChannelWatchCounts> historyChannelWatchCounts(Ref ref) async {
+  final loaded = ref.watch(loadedHistoryProvider);
   final shorts = ref.watch(historyShortsFilterProvider);
-  return countChannelWatches(
-    ref.watch(loadedHistoryProvider),
-    shorts: shorts,
-    shortWatches: shorts == ShowFilter.all
-        ? null
-        : ref.watch(historyShortWatchesProvider),
-    music: ref.watch(historyMusicFilterProvider),
+  final music = ref.watch(historyMusicFilterProvider);
+  if (shorts == ShowFilter.all && music == ShowFilter.all) {
+    return (
+      loaded: loaded,
+      counts: [for (final watched in loaded.watchedChannels) watched.count],
+    );
+  }
+  final engine = ref.watch(historyEngineProvider);
+  // The worker is told first which videos are Shorts by their format.
+  if (shorts != ShowFilter.all) await ref.watch(historyShortsProvider.future);
+  return (
+    loaded: loaded,
+    counts: await engine.channelWatchCounts(shorts: shorts, music: music),
   );
 }
 
-/// Which watched videos are Shorts: watched through a Shorts link, or
-/// short and tall by the format fetched for them.
+/// Tells the History worker which videos are Shorts by the format fetched
+/// for them, whenever those or the history change; answers how many
+/// watched videos are Shorts, by their link or their format.
 @riverpod
-WatchMask historyShortWatches(Ref ref) {
-  final watches = ref.watch(loadedHistoryProvider).history.watches;
+Future<int> historyShorts(Ref ref) async {
+  ref.watch(loadedHistoryProvider);
   final formats = ref.watch(videoFormatsProvider).value ?? const {};
-  final flags = Uint8List(watches.length);
-  for (final (i, watch) in watches.indexed) {
-    if (watch.isShort || (formats[watch.videoId]?.isShort ?? false)) {
-      flags[i] = 1;
-    }
-  }
-  return WatchMask(flags);
+  return ref.watch(historyEngineProvider).setShortVideos([
+    for (final MapEntry(key: videoId, value: format) in formats.entries)
+      if (format.isShort) videoId,
+  ]);
 }
 
 /// How many watched videos are known to be Shorts.
 @riverpod
-int historyShortCount(Ref ref) => ref.watch(historyShortWatchesProvider).count;
+int historyShortCount(Ref ref) =>
+    ref.watch(historyShortsProvider).value ??
+    ref.watch(loadedHistoryProvider).shortCount;
 
 /// What the history screen narrows the history to.
 @riverpod
@@ -131,31 +142,46 @@ HistoryFilters historyFilters(Ref ref) {
     query: ref.watch(historySearchQueryProvider),
     removedOnly: ref.watch(historyRemovedFilterProvider),
     shorts: shorts,
-    // Only looked at while Shorts are filtered, so formats arriving don't
-    // search again otherwise.
-    shortWatches: shorts == ShowFilter.all
-        ? null
-        : ref.watch(historyShortWatchesProvider),
+    // The History worker knows which are Shorts.
+    shortWatches: null,
     music: ref.watch(historyMusicFilterProvider),
     channels: ref.watch(historyChannelMaskProvider),
   );
 }
 
-/// The history narrowed to the filters, worked out a slice at a time
-/// between frames so the screen keeps moving; a newer search stops it.
+/// Each search asked of the History worker gets the next number.
+var _searches = 0;
+
+/// The history narrowed to the filters, by the History worker. A search
+/// asked since replaces it: an answer to this one arriving after is never
+/// used.
 @riverpod
 Future<HistoryResults> historySearch(Ref ref) async {
   final loaded = ref.watch(loadedHistoryProvider);
   final filters = ref.watch(historyFiltersProvider);
   if (isUnfiltered(filters)) return defaultResults(loaded);
-  final results = await searchHistory(
-    loaded,
-    filters,
-    pause: () => Future<void>.delayed(Duration.zero),
-    cancelled: () => !ref.mounted,
+  final engine = ref.watch(historyEngineProvider);
+  // The worker is told first which videos are Shorts by their format, and
+  // searched again when more are known.
+  if (filters.shorts != ShowFilter.all) {
+    await ref.watch(historyShortsProvider.future);
+  }
+  final matches = await engine.search(
+    HistoryQuery(
+      query: filters.query,
+      removedOnly: filters.removedOnly,
+      shorts: filters.shorts,
+      music: filters.music,
+      channelMask: filters.channels?.flags,
+    ),
+    ++_searches,
   );
-  // Only null when replaced, and then nothing reads it.
-  return results ?? defaultResults(loaded);
+  return (
+    loaded: loaded,
+    watchDays: matches.watchDays(),
+    searchDays: matches.searchDays(),
+    channelGroups: matches.channelGroups(loaded.watchedChannels),
+  );
 }
 
 /// What's shown: everything when unfiltered, else the newest search's

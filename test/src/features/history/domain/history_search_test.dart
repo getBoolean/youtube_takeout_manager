@@ -84,8 +84,8 @@ final _mixed = LoadedHistory.of(
   ),
 );
 
-Future<List<String?>> _mixedTitles(HistoryFilters filters) async {
-  final results = (await searchHistory(_mixed, filters))!;
+List<String?> _mixedTitles(HistoryFilters filters) {
+  final results = searchHistory(_mixed, filters);
   return [
     for (final d in results.watchDays)
       for (final i in d.indices) _mixed.history.watches[i].title,
@@ -107,10 +107,7 @@ void main() {
   });
 
   test('narrows every list to the search', () async {
-    final results = (await searchHistory(
-      _loaded,
-      _filters(query: 'mario kart'),
-    ))!;
+    final results = searchHistory(_loaded, _filters(query: 'mario kart'));
 
     expect(results.watchDays.expand((d) => d.indices), [0, 1, 2]);
     expect(results.searchDays.expand((d) => d.indices), [0]);
@@ -122,11 +119,8 @@ void main() {
   });
 
   test('Shorts can be shown alone or hidden', () async {
-    expect(await _mixedTitles(_filters(shorts: ShowFilter.only)), ['A short']);
-    expect(await _mixedTitles(_filters(shorts: ShowFilter.hide)), [
-      'A song',
-      null,
-    ]);
+    expect(_mixedTitles(_filters(shorts: ShowFilter.only)), ['A short']);
+    expect(_mixedTitles(_filters(shorts: ShowFilter.hide)), ['A song', null]);
   });
 
   test('Shorts told apart by their format count, as well as ones watched '
@@ -135,9 +129,7 @@ void main() {
     final shorts = WatchMask(Uint8List.fromList([1, 1, 0]));
 
     expect(
-      await _mixedTitles(
-        _filters(shorts: ShowFilter.only, shortWatches: shorts),
-      ),
+      _mixedTitles(_filters(shorts: ShowFilter.only, shortWatches: shorts)),
       ['A short', 'A song'],
     );
   });
@@ -145,11 +137,8 @@ void main() {
   test(
     'videos watched on YouTube Music can be shown alone or hidden',
     () async {
-      expect(await _mixedTitles(_filters(music: ShowFilter.only)), ['A song']);
-      expect(await _mixedTitles(_filters(music: ShowFilter.hide)), [
-        'A short',
-        null,
-      ]);
+      expect(_mixedTitles(_filters(music: ShowFilter.only)), ['A song']);
+      expect(_mixedTitles(_filters(music: ShowFilter.hide)), ['A short', null]);
     },
   );
 
@@ -160,7 +149,7 @@ void main() {
       Uint8List(_mixed.watchedChannels.length)..[shorty] = 1,
     );
 
-    expect(await _mixedTitles(_filters(channels: mask)), ['A short']);
+    expect(_mixedTitles(_filters(channels: mask)), ['A short']);
   });
 
   test('videos without a channel are grouped last', () {
@@ -172,31 +161,5 @@ void main() {
 
   test('the history knows how many Shorts and Music videos it has', () {
     expect((_mixed.shortCount, _mixed.musicCount), (1, 1));
-  });
-
-  test('works in slices, pausing between them for frames', () async {
-    var pauses = 0;
-    final results = await searchHistory(
-      _loaded,
-      _filters(query: 'mario'),
-      sliceSize: 1,
-      pause: () async => pauses++,
-    );
-
-    expect(pauses, greaterThan(1));
-    expect(results!.watchDays.expand((d) => d.indices), [0, 1, 2]);
-  });
-
-  test('stops when a newer search replaces it', () async {
-    var cancelled = false;
-    final results = await searchHistory(
-      _loaded,
-      _filters(query: 'mario'),
-      sliceSize: 1,
-      pause: () async => cancelled = true,
-      cancelled: () => cancelled,
-    );
-
-    expect(results, isNull);
   });
 }

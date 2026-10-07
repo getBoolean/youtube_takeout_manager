@@ -326,21 +326,28 @@ String _$historyChannelMaskHash() =>
 
 /// How many videos were watched from each watched channel, in the loaded
 /// history's order, of the kinds of videos shown: Shorts and YouTube Music
-/// as filtered.
+/// as filtered. Counted by the History worker when filtered.
 
 @ProviderFor(historyChannelWatchCounts)
 final historyChannelWatchCountsProvider = HistoryChannelWatchCountsProvider._();
 
 /// How many videos were watched from each watched channel, in the loaded
 /// history's order, of the kinds of videos shown: Shorts and YouTube Music
-/// as filtered.
+/// as filtered. Counted by the History worker when filtered.
 
 final class HistoryChannelWatchCountsProvider
-    extends $FunctionalProvider<List<int>, List<int>, List<int>>
-    with $Provider<List<int>> {
+    extends
+        $FunctionalProvider<
+          AsyncValue<ChannelWatchCounts>,
+          ChannelWatchCounts,
+          FutureOr<ChannelWatchCounts>
+        >
+    with
+        $FutureModifier<ChannelWatchCounts>,
+        $FutureProvider<ChannelWatchCounts> {
   /// How many videos were watched from each watched channel, in the loaded
   /// history's order, of the kinds of videos shown: Shorts and YouTube Music
-  /// as filtered.
+  /// as filtered. Counted by the History worker when filtered.
   HistoryChannelWatchCountsProvider._()
     : super(
         from: null,
@@ -357,75 +364,62 @@ final class HistoryChannelWatchCountsProvider
 
   @$internal
   @override
-  $ProviderElement<List<int>> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $FutureProviderElement<ChannelWatchCounts> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
 
   @override
-  List<int> create(Ref ref) {
+  FutureOr<ChannelWatchCounts> create(Ref ref) {
     return historyChannelWatchCounts(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(List<int> value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<List<int>>(value),
-    );
   }
 }
 
 String _$historyChannelWatchCountsHash() =>
-    r'2b112964ffe7fca8d5d88e643256e6fc2382fdee';
+    r'cbe3a0496ff373062d15cba7671bcec1dae06924';
 
-/// Which watched videos are Shorts: watched through a Shorts link, or
-/// short and tall by the format fetched for them.
+/// Tells the History worker which videos are Shorts by the format fetched
+/// for them, whenever those or the history change; answers how many
+/// watched videos are Shorts, by their link or their format.
 
-@ProviderFor(historyShortWatches)
-final historyShortWatchesProvider = HistoryShortWatchesProvider._();
+@ProviderFor(historyShorts)
+final historyShortsProvider = HistoryShortsProvider._();
 
-/// Which watched videos are Shorts: watched through a Shorts link, or
-/// short and tall by the format fetched for them.
+/// Tells the History worker which videos are Shorts by the format fetched
+/// for them, whenever those or the history change; answers how many
+/// watched videos are Shorts, by their link or their format.
 
-final class HistoryShortWatchesProvider
-    extends $FunctionalProvider<WatchMask, WatchMask, WatchMask>
-    with $Provider<WatchMask> {
-  /// Which watched videos are Shorts: watched through a Shorts link, or
-  /// short and tall by the format fetched for them.
-  HistoryShortWatchesProvider._()
+final class HistoryShortsProvider
+    extends $FunctionalProvider<AsyncValue<int>, int, FutureOr<int>>
+    with $FutureModifier<int>, $FutureProvider<int> {
+  /// Tells the History worker which videos are Shorts by the format fetched
+  /// for them, whenever those or the history change; answers how many
+  /// watched videos are Shorts, by their link or their format.
+  HistoryShortsProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'historyShortWatchesProvider',
+        name: r'historyShortsProvider',
         isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$historyShortWatchesHash();
+  String debugGetCreateSourceHash() => _$historyShortsHash();
 
   @$internal
   @override
-  $ProviderElement<WatchMask> $createElement($ProviderPointer pointer) =>
-      $ProviderElement(pointer);
+  $FutureProviderElement<int> $createElement($ProviderPointer pointer) =>
+      $FutureProviderElement(pointer);
 
   @override
-  WatchMask create(Ref ref) {
-    return historyShortWatches(ref);
-  }
-
-  /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(WatchMask value) {
-    return $ProviderOverride(
-      origin: this,
-      providerOverride: $SyncValueProvider<WatchMask>(value),
-    );
+  FutureOr<int> create(Ref ref) {
+    return historyShorts(ref);
   }
 }
 
-String _$historyShortWatchesHash() =>
-    r'550b9e856f3b3d25db36b7afe941ff0ab8d124f8';
+String _$historyShortsHash() => r'edf8f9cc911d8d6aed115c67e86f58e6d17a7476';
 
 /// How many watched videos are known to be Shorts.
 
@@ -470,7 +464,7 @@ final class HistoryShortCountProvider extends $FunctionalProvider<int, int, int>
   }
 }
 
-String _$historyShortCountHash() => r'12958f9dc169ed1d0d98b55a3b1d723e207468a2';
+String _$historyShortCountHash() => r'd04d1c8fa42cd029055fd772ab2aaf03228f42b6';
 
 /// What the history screen narrows the history to.
 
@@ -516,16 +510,18 @@ final class HistoryFiltersProvider
   }
 }
 
-String _$historyFiltersHash() => r'0b04e407d7e4524b5567dccda39e3480f401fab5';
+String _$historyFiltersHash() => r'ecac19d91e56f88e80ff4ce87af03e5aaf420724';
 
-/// The history narrowed to the filters, worked out a slice at a time
-/// between frames so the screen keeps moving; a newer search stops it.
+/// The history narrowed to the filters, by the History worker. A search
+/// asked since replaces it: an answer to this one arriving after is never
+/// used.
 
 @ProviderFor(historySearch)
 final historySearchProvider = HistorySearchProvider._();
 
-/// The history narrowed to the filters, worked out a slice at a time
-/// between frames so the screen keeps moving; a newer search stops it.
+/// The history narrowed to the filters, by the History worker. A search
+/// asked since replaces it: an answer to this one arriving after is never
+/// used.
 
 final class HistorySearchProvider
     extends
@@ -535,8 +531,9 @@ final class HistorySearchProvider
           FutureOr<HistoryResults>
         >
     with $FutureModifier<HistoryResults>, $FutureProvider<HistoryResults> {
-  /// The history narrowed to the filters, worked out a slice at a time
-  /// between frames so the screen keeps moving; a newer search stops it.
+  /// The history narrowed to the filters, by the History worker. A search
+  /// asked since replaces it: an answer to this one arriving after is never
+  /// used.
   HistorySearchProvider._()
     : super(
         from: null,
@@ -563,7 +560,7 @@ final class HistorySearchProvider
   }
 }
 
-String _$historySearchHash() => r'ab03545424dcff49dc04ffd7c6dd18b0111219bb';
+String _$historySearchHash() => r'e4e85e9f3b3d89c725796cf06e9a40218d4801ca';
 
 /// What's shown: everything when unfiltered, else the newest search's
 /// results, the previous ones while a search is under way.

@@ -68,7 +68,7 @@ base class HistoryService {
     );
     final results = isUnfiltered(filters)
         ? defaultResults(loaded)
-        : (await searchHistory(loaded, filters, sliceSize: 1 << 30))!;
+        : searchHistory(loaded, filters);
     return HistoryMatches.of(results, generation: generation).toWire();
   }
 

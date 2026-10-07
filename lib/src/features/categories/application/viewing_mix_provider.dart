@@ -13,8 +13,14 @@ part 'viewing_mix_provider.g.dart';
 /// watched channel, and the ones subscribed to but never watched.
 @riverpod
 List<CategoryShare> viewingMix(Ref ref) {
-  final channels = ref.watch(loadedHistoryProvider).watchedChannels;
-  final counts = ref.watch(historyChannelWatchCountsProvider);
+  final loaded = ref.watch(loadedHistoryProvider);
+  final channels = loaded.watchedChannels;
+  // Counts for another history, while this one's are counted, would be of
+  // the wrong channels.
+  final counts = switch (ref.watch(historyChannelWatchCountsProvider).value) {
+    final counted? when identical(counted.loaded, loaded) => counted.counts,
+    _ => [for (final watched in channels) watched.count],
+  };
   final unwatched = ref.watch(
     historySubscriptionMatchProvider.select((m) => m.unwatched),
   );

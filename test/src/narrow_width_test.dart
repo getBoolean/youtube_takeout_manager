@@ -114,6 +114,7 @@ import 'package:youtube_takeout_manager/src/features/takeout/presentation/takeou
 import 'package:youtube_takeout_manager/src/storage/kv_storage_service.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
 
+import 'features/history/history_fixture.dart';
 import 'features/channels/presentation/channel_detail/channel_list_fixture.dart'
     as fixture;
 
@@ -1427,7 +1428,8 @@ class _Stopped extends TakeoutHistoryNotifier {
 /// History with long titles and names, and every badge.
 class _History extends TakeoutHistoryNotifier {
   @override
-  Future<LoadedHistory?> build() async => LoadedHistory.of(
+  Future<LoadedHistory?> build() async => loadThroughEngine(
+    ref,
     TakeoutHistory(
       watches: [
         WatchEntry(

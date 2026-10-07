@@ -1,9 +1,12 @@
 import 'package:auto_route/auto_route.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.dart';
+import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -47,6 +50,8 @@ import 'package:youtube_takeout_manager/src/features/takeout/domain/subscription
 import 'package:youtube_takeout_manager/src/routing/app_router.dart';
 import 'package:youtube_takeout_manager/src/utils/date_formatter.dart';
 import 'package:youtube_takeout_manager/src/theme/app_theme.dart';
+
+import '../history_fixture.dart';
 
 WatchEntry _watch(
   String title,
@@ -96,7 +101,16 @@ class _Fixed extends TakeoutHistoryNotifier {
 
   @override
   Future<LoadedHistory?> build() async =>
-      history == null ? null : LoadedHistory.of(history!);
+      history == null ? null : loadThroughEngine(ref, history!);
+}
+
+class _Formats extends VideoFormats {
+  _Formats(this.formats);
+
+  final Map<String, VideoFormat> formats;
+
+  @override
+  Future<Map<String, VideoFormat>> build() async => formats;
 }
 
 /// [_history], once [fails] says no more: until then, a History worker that
@@ -109,7 +123,7 @@ class _Flaky extends TakeoutHistoryNotifier {
   @override
   Future<LoadedHistory?> build() async {
     if (fails()) throw const HistoryWorkerDied();
-    return LoadedHistory.of(_history);
+    return loadThroughEngine(ref, _history);
   }
 }
 
@@ -767,6 +781,28 @@ void main() {
   testWidgets('signed in, Shorts are offered before any is known, as their '
       'formats are checked', (tester) async {
     await _open(tester, session: 'UCme');
+
+    await _openFilters(tester);
+
+    expect(find.byKey(HistoryFilterSheet.shortsSectionKey), findsOneWidget);
+  });
+
+  testWidgets('signed out, Shorts known by a format checked before are '
+      'offered', (tester) async {
+    await _open(
+      tester,
+      overrides: [
+        videoFormatsProvider.overrideWith(
+          () => _Formats({
+            // Watched through a plain link.
+            '${'Café tour'.hashCode}': const VideoFormat(
+              seconds: 40,
+              shape: VideoShape.tall,
+            ),
+          }),
+        ),
+      ],
+    );
 
     await _openFilters(tester);
 

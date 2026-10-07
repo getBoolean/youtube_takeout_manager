@@ -33,7 +33,7 @@ class TakeoutHistoryNotifier extends _$TakeoutHistoryNotifier {
     if (files == null || files.isEmpty) return LoadedHistory.empty;
     // Kept, with what showing it needs worked out, on the History worker.
     return LoadedHistory.fromRows(
-      await ref.read(historyEngineProvider).load(files),
+      await ref.watch(historyEngineProvider).load(files),
     );
   }
 }

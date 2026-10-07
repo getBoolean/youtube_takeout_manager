@@ -120,6 +120,9 @@ class HistoryPage extends HookConsumerWidget {
       });
       return null;
     }, const []);
+    // While History shows, the History worker is told of the Shorts known
+    // by their format as they're checked, and the count stays current.
+    ref.listen(historyShortCountProvider, (_, _) {});
     final historyAsync = ref.watch(takeoutHistoryProvider);
     final loaded = historyAsync.value;
     final hasHistory = loaded != null && !loaded.history.isEmpty;
