@@ -369,12 +369,13 @@ List<List<T>> packGroups<T>(
 
 /// How long Claude's answer about [channels] channels may be: room for
 /// each one's category and tags ([withCategory]) or tags alone, up to the
-/// model's [modelMax].
+/// model's [modelMax]. Each may name 5 new tags with a meaning of up to
+/// 160 characters; an answer cut short is asked again, and paid for twice.
 int groupAnswerTokens(
   int channels, {
   required bool withCategory,
   int? modelMax,
-}) => min(modelMax ?? 16384, 200 + channels * (withCategory ? 220 : 150));
+}) => min(modelMax ?? 16384, 200 + channels * (withCategory ? 400 : 300));
 
 final _letterOrDigit = RegExp(r'[\p{L}\p{N}]', unicode: true);
 

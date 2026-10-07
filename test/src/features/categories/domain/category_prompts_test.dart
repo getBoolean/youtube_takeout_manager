@@ -372,6 +372,46 @@ void main() {
     expect(groupAnswerTokens(20, withCategory: true, modelMax: 1000), 1000);
   });
 
+  test("a request's answer has room for each channel's longest answer: a "
+      'category and 5 new tags, each with a full meaning', () {
+    final meaning =
+        'Videos that follow one game from start to finish as fast as '
+        'possible, with the routes, tricks and records explained for '
+        'anyone watching along';
+    expect(meaning.length, lessThanOrEqualTo(maxTagMeaning));
+    Map<String, Object?> answer({required bool withCategory}) => {
+      'id': 'c20',
+      if (withCategory) ...{
+        'parent': 'Science & Education',
+        'child': 'Retro game speedruns and glitch hunts',
+        'emoji': '🏃',
+        'reason':
+            'Most of its videos are runs of old games, explained '
+            'trick by trick, for people who follow speedrunning',
+      },
+      'tags': [
+        for (var i = 0; i < maxTags; i++)
+          {'name': 'Retro Game Speedruns and Glitches $i', 'meaning': meaning},
+      ],
+    };
+    // About 3.5 characters a token, as Anthropic counts English; JSON's
+    // quotes and braces take more.
+    int tokens(Map<String, Object?> answer) =>
+        (jsonEncode(answer).length / 3.5).ceil();
+
+    for (final withCategory in [true, false]) {
+      for (final channels in [1, 10, 20]) {
+        expect(
+          groupAnswerTokens(channels, withCategory: withCategory),
+          greaterThanOrEqualTo(
+            channels * tokens(answer(withCategory: withCategory)),
+          ),
+          reason: '$channels channels, with a category: $withCategory',
+        );
+      }
+    }
+  });
+
   test('an emoji Claude gives for a new sub-category is kept', () {
     expect(parseEmoji('🏃'), '🏃');
     expect(parseEmoji(' 🏎️ '), '🏎️');
