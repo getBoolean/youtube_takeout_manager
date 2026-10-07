@@ -19,6 +19,7 @@ const _now = {
   'jevNameCheck': 'name-2',
   'claudeCategory': 'claude-2',
   'claudeTags': 'tags-2',
+  'jevTags': 'jevtags-2',
 };
 
 ChannelCategory _category({
@@ -32,6 +33,9 @@ ChannelCategory _category({
   bool tagsTried = false,
   bool tagsEdited = false,
   String? tagsPrompt,
+  Map<String, String> tagsPrompts = const {},
+  bool tagsAwaitClaude = false,
+  DateTime? tagsCheckedAt,
 }) => ChannelCategory(
   path: path,
   source: source,
@@ -43,6 +47,9 @@ ChannelCategory _category({
   tagsTried: tagsTried,
   tagsEditedByUser: tagsEdited,
   tagsPrompt: tagsPrompt,
+  tagsPrompts: tagsPrompts,
+  tagsAwaitClaude: tagsAwaitClaude,
+  tagsCheckedAt: tagsCheckedAt,
   decidedAt: DateTime.utc(2026, 9, 30),
 );
 
@@ -50,11 +57,13 @@ WorkPlan _plan(
   ChannelCategory? existing, {
   Set<CategorizationTier> available = _withBoth,
   bool hasTopics = true,
+  DateTime? userTagsChangedAt,
 }) => planWork(
   existing,
   available: available,
   hasTopics: hasTopics,
   fingerprints: _now,
+  userTagsChangedAt: userTagsChangedAt,
 );
 
 ChannelWork _work(
@@ -91,7 +100,7 @@ void main() {
       ]) {
         expect(
           _work(decided, available: _withJev),
-          ChannelWork.none,
+          isNot(ChannelWork.categorize),
           reason: '$decided',
         );
       }
@@ -125,7 +134,7 @@ void main() {
           ),
           available: _withJev,
         ),
-        ChannelWork.none,
+        isNot(ChannelWork.categorize),
       );
       expect(_work(_category(), available: _youtubeOnly), ChannelWork.none);
     });
@@ -152,7 +161,7 @@ void main() {
             tried: _withBoth,
             prompts: const {'claudeCategory': 'claude-2'},
             tagsTried: true,
-            tagsPrompt: 'claude-2',
+            tagsPrompts: const {'claudeTags': 'tags-2'},
           ),
         ),
         ChannelWork.none,
@@ -168,28 +177,37 @@ void main() {
           tried: _withBoth,
           prompts: const {'jevCheck': 'check-1', 'jevPick': 'pick-2'},
           tagsTried: true,
-          tagsPrompt: 'tags-2',
+          tagsPrompts: const {'claudeTags': 'tags-2'},
         ),
       );
 
-      expect(plan, (work: ChannelWork.categorize, redo: true));
+      expect(plan, (
+        work: ChannelWork.categorize,
+        redo: true,
+        checkTags: false,
+      ));
     });
 
     test('when an AI made it before prompts were kept', () {
       expect(
         _plan(_category(source: CategorySource.claude, tried: _withBoth)),
-        (work: ChannelWork.categorize, redo: true),
+        (work: ChannelWork.categorize, redo: true, checkTags: false),
       );
       expect(_plan(_category(jevAgreed: 0.9, tried: _withBoth)), (
         work: ChannelWork.categorize,
         redo: true,
+        checkTags: false,
       ));
     });
 
     test("not when YouTube's topics alone made it", () {
       expect(
         _work(
-          _category(tried: _withBoth, tagsTried: true, tagsPrompt: 'tags-2'),
+          _category(
+            tried: _withBoth,
+            tagsTried: true,
+            tagsPrompts: const {'claudeTags': 'tags-2'},
+          ),
           available: _withClaude,
         ),
         ChannelWork.none,
@@ -204,7 +222,7 @@ void main() {
             userDecision: UserDecision.accepted,
             prompts: const {'claudeCategory': 'claude-1'},
             tagsTried: true,
-            tagsPrompt: 'claude-2',
+            tagsPrompts: const {'claudeTags': 'tags-2'},
           ),
         ),
         ChannelWork.none,
@@ -221,7 +239,10 @@ void main() {
           prompts: const {'claudeCategory': 'claude-1'},
         ),
       ]) {
-        expect(_work(claudes, available: _withJev), ChannelWork.none);
+        expect(
+          _work(claudes, available: _withJev),
+          isNot(ChannelWork.categorize),
+        );
       }
     });
 
@@ -235,7 +256,7 @@ void main() {
           ),
           available: _withClaude,
         ),
-        (work: ChannelWork.tags, redo: false),
+        (work: ChannelWork.tags, redo: false, checkTags: false),
       );
     });
 
@@ -251,14 +272,17 @@ void main() {
   });
 
   group("a channel's tags are asked for alone", () {
-    test('when Claude is there and they were never asked for', () {
-      expect(
-        _plan(
-          _category(userDecision: UserDecision.accepted),
-          available: _withClaude,
-        ),
-        (work: ChannelWork.tags, redo: false),
-      );
+    test('when Jev or Claude is there and they were never asked for', () {
+      for (final available in [_withClaude, _withJev]) {
+        expect(
+          _plan(
+            _category(userDecision: UserDecision.accepted),
+            available: available,
+          ),
+          (work: ChannelWork.tags, redo: false, checkTags: false),
+          reason: '$available',
+        );
+      }
       expect(
         _work(
           _category(tried: _withBoth, prompts: const {}),
@@ -268,56 +292,185 @@ void main() {
       );
     });
 
-    test('again when the prompt that named them has changed', () {
+    test('never in a run that asks no AI, nor for a channel with no '
+        'category', () {
       expect(
-        _plan(
-          _category(
-            source: CategorySource.user,
-            tagsTried: true,
-            tagsPrompt: 'tags-1',
-          ),
+        _work(
+          _category(userDecision: UserDecision.accepted),
+          available: _youtubeOnly,
         ),
-        (work: ChannelWork.tags, redo: true),
+        ChannelWork.none,
+      );
+      expect(
+        _work(
+          _category(path: null, tried: _withBoth, hadTopics: false),
+          hasTopics: false,
+        ),
+        ChannelWork.none,
       );
     });
 
-    test('not when named by either prompt as it is now', () {
-      for (final prompt in ['tags-2', 'claude-2']) {
+    test('again when a prompt that made them has changed, once the AI that '
+        'made them is there', () {
+      final byJev = _category(
+        source: CategorySource.user,
+        tagsTried: true,
+        tagsPrompts: const {'jevTags': 'jevtags-1'},
+      );
+      expect(_plan(byJev, available: _withJev), (
+        work: ChannelWork.tags,
+        redo: true,
+        checkTags: false,
+      ));
+      expect(_work(byJev, available: _withClaude), ChannelWork.none);
+
+      final byBoth = _category(
+        source: CategorySource.user,
+        tagsTried: true,
+        tagsPrompts: const {'jevTags': 'jevtags-2', 'claudeTags': 'tags-1'},
+      );
+      expect(_work(byBoth), ChannelWork.tags);
+      expect(_work(byBoth, available: _withJev), ChannelWork.none);
+    });
+
+    test('again, once, when named before prompts were kept for each step, '
+        'while Claude, which named them, is there', () {
+      final older = _category(
+        source: CategorySource.user,
+        tagsTried: true,
+        tagsPrompt: 'tags-1',
+      );
+
+      expect(_plan(older, available: _withClaude), (
+        work: ChannelWork.tags,
+        redo: true,
+        checkTags: false,
+      ));
+      expect(_work(older, available: _withJev), ChannelWork.none);
+    });
+
+    test('not when named by the prompts as they are now', () {
+      for (final prompts in [
+        const {'claudeTags': 'tags-2'},
+        const {'jevTags': 'jevtags-2'},
+        const {'jevTags': 'jevtags-2', 'claudeTags': 'tags-2'},
+      ]) {
         expect(
           _work(
             _category(
               source: CategorySource.user,
               tagsTried: true,
-              tagsPrompt: prompt,
+              tagsPrompts: prompts,
             ),
           ),
           ChannelWork.none,
-          reason: prompt,
+          reason: '$prompts',
         );
       }
     });
 
+    test('from Claude, when Jev found the channel is about something no tag '
+        'names and Claude is there now', () {
+      final waiting = _category(
+        source: CategorySource.user,
+        tagsTried: true,
+        tagsPrompts: const {'jevTags': 'jevtags-2'},
+        tagsAwaitClaude: true,
+      );
+
+      expect(_plan(waiting, available: _withClaude), (
+        work: ChannelWork.claudeTags,
+        redo: false,
+        checkTags: false,
+      ));
+      expect(_work(waiting, available: _withJev), ChannelWork.none);
+    });
+
     test('never once the user edited them', () {
-      expect(
-        _work(
-          _category(
-            source: CategorySource.user,
-            tagsTried: true,
-            tagsEdited: true,
-            tagsPrompt: 'tags-1',
-          ),
+      for (final edited in [
+        _category(
+          source: CategorySource.user,
+          tagsTried: true,
+          tagsEdited: true,
+          tagsPrompt: 'tags-1',
         ),
-        ChannelWork.none,
+        _category(
+          source: CategorySource.user,
+          tagsTried: true,
+          tagsEdited: true,
+          tagsAwaitClaude: true,
+        ),
+      ]) {
+        expect(_work(edited), ChannelWork.none);
+      }
+    });
+  });
+
+  group("a channel is checked for the user's tags", () {
+    final checkedAt = DateTime.utc(2026, 10, 5);
+    final after = DateTime.utc(2026, 10, 6);
+    final done = _category(
+      source: CategorySource.user,
+      tagsTried: true,
+      tagsPrompts: const {'jevTags': 'jevtags-2'},
+      tagsCheckedAt: checkedAt,
+    );
+
+    test('when one was defined or changed after its last check, with Jev', () {
+      expect(_plan(done, userTagsChangedAt: after), (
+        work: ChannelWork.none,
+        redo: false,
+        checkTags: true,
+      ));
+      expect(_plan(done, userTagsChangedAt: checkedAt).checkTags, isFalse);
+      expect(
+        _plan(done, available: _withClaude, userTagsChangedAt: after).checkTags,
+        isFalse,
       );
     });
 
-    test('not without Claude', () {
-      expect(
-        _work(
-          _category(userDecision: UserDecision.accepted),
-          available: _withJev,
+    test('even when the user edited its tags, or it has no category', () {
+      for (final channel in [
+        _category(
+          source: CategorySource.user,
+          tagsTried: true,
+          tagsEdited: true,
+          tagsCheckedAt: checkedAt,
         ),
-        ChannelWork.none,
+        _category(
+          path: null,
+          tried: _withBoth,
+          hadTopics: false,
+          tagsCheckedAt: checkedAt,
+        ),
+      ]) {
+        expect(
+          _plan(channel, hasTopics: false, userTagsChangedAt: after).checkTags,
+          isTrue,
+          reason: '$channel',
+        );
+      }
+    });
+
+    test('not when it is to be categorized or tagged, which offers every '
+        'tag', () {
+      final plan = _plan(
+        _category(userDecision: UserDecision.accepted),
+        userTagsChangedAt: after,
+      );
+
+      expect(plan.work, ChannelWork.tags);
+      expect(plan.checkTags, isFalse);
+    });
+
+    test('not in a run that asks no AI', () {
+      expect(
+        _plan(
+          done,
+          available: _youtubeOnly,
+          userTagsChangedAt: after,
+        ).checkTags,
+        isFalse,
       );
     });
   });

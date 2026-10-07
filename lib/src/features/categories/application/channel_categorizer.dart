@@ -295,8 +295,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         hasTopics: hasTopics,
         fingerprints: fingerprints,
       );
-      if (plan.work != ChannelWork.none) {
-        queue.add((channel, plan.work));
+      // Tags from Jev alone come with the two-phase pipeline; until then,
+      // only Claude names them.
+      final work = plan.work == ChannelWork.tags && pipeline.claude == null
+          ? ChannelWork.none
+          : plan.work;
+      if (work != ChannelWork.none) {
+        queue.add((channel, work));
         redo = redo || plan.redo;
       } else if (existing[channel.key] == null) {
         // Nothing to go on yet: uncategorized, and looked at again once
@@ -362,10 +367,8 @@ class ChannelCategorizer extends _$ChannelCategorizer {
           categorizing.add(channel.key);
           try {
             category = switch (work) {
-              ChannelWork.tags => await pipeline.retag(
-                input,
-                existing[channel.key]!,
-              ),
+              ChannelWork.tags || ChannelWork.claudeTags =>
+                await pipeline.retag(input, existing[channel.key]!),
               _ => await pipeline.categorize(input),
             };
           } on AiTierFailure catch (e) {

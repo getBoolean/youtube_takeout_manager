@@ -329,7 +329,7 @@ void main() {
       expect(category.path, const CategoryPath('Gaming', 'Action'));
       expect(category.tags, ['Mario Kart World', 'Speedruns']);
       expect(category.tagsTried, isTrue);
-      expect(category.tagsPrompt, 'fp-claudeTags');
+      expect(category.tagsPrompts, {'claudeTags': 'fp-claudeTags'});
     });
 
     test('without Jev, is asked only for tags when YouTube gives a '
@@ -457,7 +457,7 @@ void main() {
 
       expect(claude.kinds, ['category']);
       expect(category.tags, ['Super Metroid', 'Any%']);
-      expect(category.tagsPrompt, 'fp-claudeCategory');
+      expect(category.tagsPrompts, {'claudeTags': 'fp-claudeTags'});
     });
 
     test('are spelled as the tags there are', () async {
@@ -483,7 +483,7 @@ void main() {
 
       expect(category.tags, isEmpty);
       expect(category.tagsTried, isFalse);
-      expect(category.tagsPrompt, isNull);
+      expect(category.tagsPrompts, isEmpty);
     });
 
     test("alone keep the channel's category", () async {
@@ -514,7 +514,7 @@ void main() {
 
       expect(tagged.tags, isEmpty);
       expect(tagged.tagsTried, isTrue);
-      expect(tagged.tagsPrompt, 'fp-claudeTags');
+      expect(tagged.tagsPrompts, {'claudeTags': 'fp-claudeTags'});
     });
   });
 

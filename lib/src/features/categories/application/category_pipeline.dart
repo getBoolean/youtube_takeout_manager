@@ -150,7 +150,11 @@ class CategoryPipeline {
       decidedAt: _now().toUtc(),
       tags: tags,
       tagsTried: tagsStep != null,
-      tagsPrompt: tagsStep == null ? null : _fingerprints[tagsStep],
+      // Claude's tags keep the tags prompt's fingerprint, whichever call
+      // named them.
+      tagsPrompts: tagsStep == null
+          ? const {}
+          : {PromptStep.claudeTags.name: _fingerprints[PromptStep.claudeTags]!},
       prompts: {
         for (final step in asked)
           if (_categorySteps.contains(step)) step.name: _fingerprints[step]!,
@@ -190,7 +194,11 @@ class CategoryPipeline {
     return current.copyWith(
       tags: tagged,
       tagsTried: true,
-      tagsPrompt: _fingerprints[PromptStep.claudeTags],
+      tagsPrompt: null,
+      tagsPrompts: {
+        PromptStep.claudeTags.name: _fingerprints[PromptStep.claudeTags]!,
+      },
+      tagsAwaitClaude: false,
     );
   }
 
