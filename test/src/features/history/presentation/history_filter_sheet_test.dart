@@ -2,13 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/presentation/category_colors.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/channel_categories.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/viewing_mix.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watch_filters.dart';
 import 'package:youtube_takeout_manager/src/features/history/domain/watched_channels.dart';
 import 'package:youtube_takeout_manager/src/features/history/presentation/history_filter_sheet.dart';
+
+/// Gaming's AI-made sub-category, Speedrun games.
+class _Custom extends CustomCategories {
+  @override
+  Future<Map<String, List<SubCategory>>> build() async => const {
+    'Gaming': [SubCategory(name: 'Speedrun games')],
+  };
+}
 
 class _Pictures extends ChannelThumbnails {
   @override
@@ -18,12 +29,20 @@ class _Pictures extends ChannelThumbnails {
 const _gaming = CategoryPick.category('Gaming');
 const _music = CategoryPick.category('Music');
 
+CategoryShare _sub(String parent, String child) => CategoryShare(
+  pick: CategoryPick.of(CategoryPath(parent, child)),
+  watchCount: 10,
+  channelCount: 1,
+  share: 0.2,
+);
+
 final _mix = [
-  const CategoryShare(
+  CategoryShare(
     pick: _gaming,
     watchCount: 30,
     channelCount: 2,
     share: 0.6,
+    children: [_sub('Gaming', 'Action game'), _sub('Gaming', 'Racing game')],
   ),
   const CategoryShare(
     pick: _music,
@@ -62,6 +81,7 @@ void main() {
     WidgetTester tester, {
     WatchFilterDraft initial = noWatchFilters,
     List<TagUse> tags = _tags,
+    List<CategoryShare>? mix,
   }) async {
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
@@ -69,7 +89,10 @@ void main() {
     final result = _Result();
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [channelThumbnailsProvider.overrideWith(_Pictures.new)],
+        overrides: [
+          channelThumbnailsProvider.overrideWith(_Pictures.new),
+          customCategoriesProvider.overrideWith(_Custom.new),
+        ],
         child: MaterialApp(
           home: Builder(
             builder: (context) => TextButton(
@@ -81,7 +104,7 @@ void main() {
                   hasSubscriptions: false,
                   hasShorts: false,
                   hasMusic: false,
-                  mix: _mix,
+                  mix: mix ?? _mix,
                   tags: tags,
                 );
                 result.closed = true;
@@ -185,5 +208,117 @@ void main() {
 
     expect(result.closed, isTrue);
     expect(result.draft, isNull);
+  });
+
+  group('the Categories page', () {
+    Finder row(CategoryPick pick, {bool built = false}) =>
+        find.byKey(HistoryFilterSheet.categoryKey(pick), skipOffstage: !built);
+    final racing = CategoryPick.of(const CategoryPath('Gaming', 'Racing game'));
+
+    testWidgets('finds a sub-category by its name, opening its category', (
+      tester,
+    ) async {
+      await open(tester);
+      await tap(tester, HistoryFilterSheet.categoriesRowKey);
+      expect(row(racing), findsNothing);
+
+      await tester.enterText(
+        find.byKey(HistoryFilterSheet.categorySearchKey),
+        'racing',
+      );
+      await tester.pumpAndSettle();
+
+      expect(row(racing), findsOneWidget);
+      expect(row(_gaming), findsOneWidget);
+      expect(row(_music), findsNothing);
+    });
+
+    testWidgets("Clear clears only the categories picked", (tester) async {
+      final result = await open(
+        tester,
+        initial: (
+          subscription: SubscriptionFilter.all,
+          shorts: ShowFilter.all,
+          music: ShowFilter.all,
+          selection: ChannelSelection(
+            categories: {_gaming},
+            tags: const {'Retro'},
+            channels: {'UCa': _channels.first.channel},
+          ),
+        ),
+      );
+      await tap(tester, HistoryFilterSheet.categoriesRowKey);
+
+      await tap(tester, HistoryFilterSheet.pageClearKey);
+      await tap(tester, HistoryFilterSheet.showKey);
+
+      expect(result.draft?.selection.categories, isEmpty);
+      expect(result.draft?.selection.tags, {'Retro'});
+      expect(result.draft?.selection.channels.keys, ['UCa']);
+    });
+
+    testWidgets('Back keeps what was picked', (tester) async {
+      final result = await open(tester);
+      await tap(tester, HistoryFilterSheet.categoriesRowKey);
+      await tap(tester, HistoryFilterSheet.categoryKey(_music));
+
+      await tap(tester, HistoryFilterSheet.backKey);
+
+      expect(
+        within(HistoryFilterSheet.categoriesRowKey, 'Music'),
+        findsOneWidget,
+      );
+      await tap(tester, HistoryFilterSheet.showKey);
+      expect(result.draft?.selection.categories, {_music});
+    });
+
+    testWidgets('marks the sub-categories AI made', (tester) async {
+      final speedruns = CategoryPick.of(
+        const CategoryPath('Gaming', 'Speedrun games'),
+      );
+      await open(
+        tester,
+        mix: [
+          CategoryShare(
+            pick: _gaming,
+            watchCount: 30,
+            channelCount: 2,
+            share: 1,
+            children: [
+              _sub('Gaming', 'Speedrun games'),
+              _sub('Gaming', 'Racing game'),
+            ],
+          ),
+        ],
+      );
+      await tap(tester, HistoryFilterSheet.categoriesRowKey);
+      await tap(tester, HistoryFilterSheet.categoryExpandKey('Gaming'));
+
+      expect(
+        find.descendant(of: row(speedruns), matching: find.byType(AiMark)),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: row(racing), matching: find.byType(AiMark)),
+        findsNothing,
+      );
+    });
+
+    testWidgets('builds only the rows in view', (tester) async {
+      final many = [
+        for (var i = 0; i < 300; i++)
+          CategoryShare(
+            pick: CategoryPick.category('Category $i'),
+            watchCount: 300 - i,
+            channelCount: 1,
+            share: 1 / 300,
+          ),
+      ];
+      await open(tester, mix: many);
+      await tap(tester, HistoryFilterSheet.categoriesRowKey);
+
+      expect(row(many.first.pick, built: true), findsOneWidget);
+      expect(row(many.last.pick, built: true), findsNothing);
+    });
   });
 }

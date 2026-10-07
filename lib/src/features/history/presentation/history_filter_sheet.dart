@@ -94,14 +94,7 @@ Future<WatchFilterDraft?> showHistoryFilterSheet(
       actions: _PageActions(
         clear: (selection) => selection.copyWith(categories: const {}),
       ),
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-            child: _Categories(mix: mix),
-          ),
-        ),
-      ],
+      slivers: [_CategoriesSliver(mix: mix)],
     ),
     _page(
       context,
@@ -189,6 +182,11 @@ abstract final class HistoryFilterSheet {
 
   /// A page's Clear, clearing only what's picked on it.
   static const pageClearKey = ValueKey('filters-page-clear');
+
+  /// The searches of the Categories, Tags and Channels pages.
+  static const categorySearchKey = ValueKey('filters-category-search');
+  static const tagSearchKey = ValueKey('filters-tag-search');
+  static const channelSearchKey = ValueKey('filters-channel-search');
 
   static ValueKey<String> subscriptionKey(SubscriptionFilter filter) =>
       ValueKey('filters-subscriptions-${filter.name}');
@@ -352,67 +350,134 @@ class _Sections extends StatelessWidget {
 
 /// The viewing mix, largest first, each category a row to tick with its
 /// share of the watched videos; one with sub-categories opens to them, each
-/// to tick alone.
-class _Categories extends HookWidget {
+/// to tick alone. A search over the top finds categories and
+/// sub-categories by name, opening the categories they're in. Built lazily
+/// however many there are.
+class _CategoriesSliver extends HookConsumerWidget {
   final List<CategoryShare> mix;
 
-  const _Categories({required this.mix});
+  const _CategoriesSliver({required this.mix});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final draft = _Draft.of(context);
     final picks = draft.value.selection.categories;
     final open = useState(const <String>{});
+    final query = useState('');
+    final folded = foldForSearch(query.value);
+    final emojiOf = ref.watch(categoryEmojiOfProvider);
+    final custom = ref.watch(customCategoriesProvider).value ?? const {};
+    final tiny = isTinyWidth(context);
+
+    bool matches(CategoryShare share) =>
+        foldForSearch(share.pick.label).contains(folded);
+    // Each row: what it shows, the category it's under, and whether it's
+    // a sub-category.
+    final rows = useMemoized(
+      () => [
+        for (final category in mix)
+          if (folded.isEmpty) ...[
+            (category, category, false),
+            if (open.value.contains(category.pick.parent))
+              for (final sub in category.children) (sub, category, true),
+          ] else if (matches(category) || category.children.any(matches)) ...[
+            (category, category, false),
+            for (final sub in category.children)
+              if (matches(sub)) (sub, category, true),
+          ],
+      ],
+      [mix, folded, open.value],
+    );
 
     void toggle(CategoryPick pick, CategoryShare category) {
       final value = draft.value;
-      draft.value = (
-        subscription: value.subscription,
-        shorts: value.shorts,
-        music: value.music,
-        selection: value.selection.copyWith(
+      draft.value = _withSelection(
+        value,
+        value.selection.copyWith(
           categories: togglePick(value.selection.categories, pick, category),
         ),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final category in mix) ...[
-          _CategoryRow(
-            share: category,
-            state: pickState(picks, category),
-            onTap: () => toggle(category.pick, category),
-            open: category.children.isEmpty
-                ? null
-                : open.value.contains(category.pick.parent),
-            onOpen: () {
-              final parent = category.pick.parent!;
-              open.value = open.value.contains(parent)
-                  ? ({...open.value}..remove(parent))
-                  : {...open.value, parent};
+    return SliverMainAxisGroup(
+      slivers: [
+        PinnedHeaderSliver(
+          child: _SearchField(
+            key: HistoryFilterSheet.categorySearchKey,
+            hint: 'Find a category',
+            onChanged: (text) => query.value = text,
+          ),
+        ),
+        SliverPadding(
+          padding: EdgeInsets.symmetric(horizontal: tiny ? 0 : 8),
+          sliver: SliverList.builder(
+            itemCount: rows.length,
+            itemBuilder: (context, i) {
+              final (share, category, indented) = rows[i];
+              final parent = share.pick.parent;
+              return _CategoryRow(
+                share: share,
+                emoji: emojiOf(
+                  parent == null
+                      ? null
+                      : CategoryPath(parent, share.pick.child),
+                ),
+                ai: isAiSubCategory(share.pick, custom),
+                state: pickState(picks, share),
+                onTap: () => toggle(share.pick, category),
+                indented: indented,
+                // A search opens what it finds.
+                open: indented || category.children.isEmpty || folded.isNotEmpty
+                    ? null
+                    : open.value.contains(parent),
+                onOpen: () => open.value = open.value.contains(parent)
+                    ? ({...open.value}..remove(parent))
+                    : {...open.value, parent!},
+              );
             },
           ),
-          if (open.value.contains(category.pick.parent))
-            for (final sub in category.children)
-              _CategoryRow(
-                share: sub,
-                state: pickState(picks, sub),
-                onTap: () => toggle(sub.pick, category),
-                indented: true,
-              ),
-        ],
+        ),
       ],
     );
   }
 }
 
-/// A row of the viewing mix: a checkbox, its name, its share as a bar, and
-/// the percent and how many channels it has. A category with sub-categories
-/// has a button to [open] them.
+/// A search field pinned over a page's list, on the page's own colour.
+class _SearchField extends StatelessWidget {
+  final String hint;
+  final ValueChanged<String> onChanged;
+
+  const _SearchField({super.key, required this.hint, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final tiny = isTinyWidth(context);
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(tiny ? 8 : 24, 8, tiny ? 8 : 24, 8),
+        child: TextField(
+          onChanged: onChanged,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            isDense: true,
+            prefixIcon: tiny ? null : const Icon(Icons.search),
+            hintText: hint,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A row of the viewing mix: a checkbox, its emoji and name, marked when AI
+/// made it, its share as a bar in its category's colour, and the percent
+/// and how many channels it has. A category with sub-categories has a
+/// button to [open] them.
 class _CategoryRow extends StatelessWidget {
   final CategoryShare share;
+  final String emoji;
+  final bool ai;
 
   /// Ticked, not, or partly (null).
   final bool? state;
@@ -425,6 +490,8 @@ class _CategoryRow extends StatelessWidget {
 
   const _CategoryRow({
     required this.share,
+    required this.emoji,
+    this.ai = false,
     required this.state,
     required this.onTap,
     this.indented = false,
@@ -452,12 +519,31 @@ class _CategoryRow extends StatelessWidget {
             contentPadding: EdgeInsetsDirectional.only(
               start: indented && !tiny ? 24 : 0,
             ),
-            title: Text(indented ? pick.shortLabel : pick.label),
+            title: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$emoji ${indented ? pick.shortLabel : pick.label}',
+                  ),
+                  if (ai)
+                    const WidgetSpan(
+                      alignment: PlaceholderAlignment.middle,
+                      child: Padding(
+                        padding: EdgeInsetsDirectional.only(start: 4),
+                        child: AiMark(size: 14),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 4),
-                ShareBar(share: share.share),
+                ShareBar(
+                  share: share.share,
+                  color: categoryColor(pick.parent, scheme.brightness),
+                ),
                 const SizedBox(height: 4),
                 Semantics(
                   label:
