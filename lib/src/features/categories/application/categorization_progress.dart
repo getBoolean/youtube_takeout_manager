@@ -90,3 +90,17 @@ class CategorizationProgress extends _$CategorizationProgress {
     interrupted: true,
   );
 }
+
+/// The tokens Claude's answers used in the user's run, the one under way or
+/// the last: what it cost.
+@Riverpod(keepAlive: true)
+class ClaudeUsage extends _$ClaudeUsage {
+  @override
+  ({int input, int output}) build() => (input: 0, output: 0);
+
+  /// A new run, from nothing.
+  void reset() => state = (input: 0, output: 0);
+
+  void add(int input, int output) =>
+      state = (input: state.input + input, output: state.output + output);
+}

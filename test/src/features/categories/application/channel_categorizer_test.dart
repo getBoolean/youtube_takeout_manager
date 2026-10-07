@@ -18,6 +18,8 @@ import 'package:youtube_takeout_manager/src/features/categories/application/chan
 import 'package:youtube_takeout_manager/src/features/categories/application/category_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/tag_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_pause_repository.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/anthropic_repository.dart';
@@ -26,6 +28,7 @@ import 'package:youtube_takeout_manager/src/features/categories/data/typesafe_re
 import 'package:youtube_takeout_manager/src/features/categories/domain/category_path.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/tag_name.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_providers.dart';
 import 'package:youtube_takeout_manager/src/features/channels/application/channel_thumbnail_fetcher.dart';
@@ -105,9 +108,19 @@ class _Fetcher extends ChannelThumbnailFetcher {
 /// Of options, it picks the first, unsure, or one described as starting
 /// with [prefer], sure. Keeps the questions asked.
 class _Jev extends TypeSafeRepository {
-  _Jev({this.agree = 0.9, this.failure, this.failAfter = 0, this.prefer});
+  _Jev({
+    this.agree = 0.9,
+    this.failure,
+    this.failAfter = 0,
+    this.prefer,
+    this.tagFits = const {},
+  });
 
   final double agree;
+
+  /// How likely yes is for each tag it's asked about, by name; no for the
+  /// rest, and for something no tag names.
+  final Map<String, double> tagFits;
   Object? failure;
   final int failAfter;
   final String? prefer;
@@ -125,6 +138,15 @@ class _Jev extends TypeSafeRepository {
     return {
       for (final MapEntry(:key, :value) in questions.entries)
         key: switch (value) {
+          JevNoul() when key == 'other' => const NoulAnswer(0),
+          JevNoul(:final instructions) when key.startsWith('tag_') =>
+            NoulAnswer(
+              tagFits.entries
+                      .where((f) => instructions.contains('"${f.key}"'))
+                      .firstOrNull
+                      ?.value ??
+                  0,
+            ),
           JevNoul() => NoulAnswer(agree),
           JevChoice(:final options) => _pick(options),
         },
@@ -726,7 +748,7 @@ void main() {
         'child': null,
         'reason': '',
       }, hold: hold);
-      // No topics for any: each goes to Claude, three at a time.
+      // No topics for any: all go to Claude, in one request.
       final c = container(
         keys: claudeKey,
         claude: claude,
@@ -741,7 +763,7 @@ void main() {
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
       await _runAi(c);
-      expect(claude.asked, hasLength(3));
+      expect(claude.kinds, hasLength(4));
 
       await c.read(takeoutSelectionProvider.notifier).select('other');
       (c.read(takeoutHistoryProvider.notifier) as _Fixed).switchTo(
@@ -751,9 +773,12 @@ void main() {
       hold.complete();
       await _settle();
 
-      expect(paths(c).keys, containsAll(['UC1', 'UC2', 'UC3', 'UCo']));
-      expect(paths(c)['UC4'], isNull);
-      expect(claude.asked, hasLength(3));
+      expect([
+        for (final id in ['UC1', 'UC2', 'UC3', 'UC4']) paths(c)[id],
+      ], List.filled(4, const CategoryPath('Knowledge')));
+      expect(paths(c).containsKey('UCo'), isTrue);
+      expect(paths(c)['UCo'], isNull);
+      expect(claude.kinds, hasLength(4));
     });
 
     test('Claude names the categories YouTube gives none for, and a new '
@@ -978,42 +1003,46 @@ void main() {
       expect(claude.asked, isEmpty);
 
       await _runAi(c);
-      expect(claude.asked, hasLength(4));
+      expect(claude.kinds, hasLength(4));
       expect(paths(c)['UC4'], const CategoryPath('Knowledge'));
 
       await _runAi(c);
-      expect(claude.asked, hasLength(4));
+      expect(claude.kinds, hasLength(4));
     });
 
     test('Stop keeps the answers already asked for and asks nothing more; '
         'Run again asks only for the rest', () async {
       final hold = Completer<void>();
       final claude = _claude(knowledge, hold: hold);
-      final c = container(keys: claudeKey, claude: claude, history: noTopics);
+      final c = container(
+        keys: claudeKey,
+        claude: claude,
+        history: TakeoutHistory(
+          watches: [for (var i = 0; i < 100; i++) _watch('UC$i', 'Channel $i')],
+        ),
+      );
       c.read(historyShownProvider.notifier).markShown();
       await _settle();
       await _runAi(c);
-      expect(claude.asked, hasLength(3));
+      expect(claude.kinds, hasLength(60));
 
       c.read(channelCategorizerProvider.notifier).stop();
       expect(c.read(categorizationProgressProvider).stopping, isTrue);
       hold.complete();
       await _settle();
 
-      expect(claude.asked, hasLength(3));
-      expect(
-        [
-          for (final id in ['UC1', 'UC2', 'UC3', 'UC4']) paths(c)[id],
-        ],
-        [...List.filled(3, const CategoryPath('Knowledge')), null],
-      );
+      expect(claude.kinds, hasLength(60));
+      List<CategoryPath> categorized() => [
+        for (final path in paths(c).values) ?path,
+      ];
+      expect(categorized(), hasLength(60));
       final progress = c.read(categorizationProgressProvider);
       expect(progress.running, isFalse);
       expect(progress.interrupted, isTrue);
 
       await _runAi(c);
-      expect(claude.asked, hasLength(4));
-      expect(paths(c)['UC4'], const CategoryPath('Knowledge'));
+      expect(claude.kinds, hasLength(100));
+      expect(categorized(), hasLength(100));
       expect(c.read(categorizationProgressProvider).interrupted, isFalse);
     });
 
@@ -1787,6 +1816,231 @@ void main() {
       hold.complete();
       await _settle();
       expect(c.read(categorizingChannelsProvider), isEmpty);
+    });
+  });
+  group('a run with AI, in waves', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+    const bothKeys = AiKeys(typesafe: 'jv_live_1', anthropic: 'sk-ant-1');
+
+    /// [count] channels, the first watched most, then fewer and fewer.
+    TakeoutHistory many(int count) => TakeoutHistory(
+      watches: [
+        for (var i = 0; i < count; i++)
+          for (var w = 0; w < (i == 0 ? count + 1 : (count - i) ~/ 10 + 1); w++)
+            _watch('UC$i', 'Channel $i'),
+      ],
+    );
+
+    test('asks Claude about channels in requests of at most 20, the most '
+        'watched first', () async {
+      final claude = _claude({'parent': 'Knowledge'});
+      final c = container(keys: claudeKey, claude: claude, history: many(45));
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+
+      expect([for (final r in claude.requests) r.channels.length], [20, 20, 5]);
+      expect(claude.requests.first.channels.first['channel'], 'Channel 0');
+      expect(
+        paths(c).values.where((p) => p == const CategoryPath('Knowledge')),
+        hasLength(45),
+      );
+    });
+
+    test('offers Jev the tags Claude named in the waves before', () async {
+      final jev = _Jev(agree: 0.9);
+      final claude = _claude({'parent': 'Gaming'}, tags: ['Hermitcraft']);
+      final c = container(
+        details: {
+          for (var i = 0; i < 101; i++)
+            'UC$i': ChannelDetails(topicUrls: [_topic('Action_game')]),
+        },
+        keys: bothKeys,
+        jev: jev,
+        claude: claude,
+        history: many(101),
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+
+      final tagQuestions = [
+        for (final question in jev.asked)
+          if (question is JevNoul && question.instructions.contains('tag'))
+            question.instructions,
+      ];
+      expect(tagQuestions, contains(contains('Hermitcraft')));
+    });
+
+    test('Stop keeps the requests already sent, and sends no more', () async {
+      final hold = Completer<void>();
+      final claude = _claude({'parent': 'Knowledge'}, hold: hold);
+      final c = container(keys: claudeKey, claude: claude, history: many(100));
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+      await _runAi(c);
+      final sent = claude.requests.length;
+      expect(sent, inInclusiveRange(1, 3));
+
+      c.read(channelCategorizerProvider.notifier).stop();
+      hold.complete();
+      await _settle();
+
+      expect(claude.requests, hasLength(sent));
+      expect(
+        paths(c).values.where((p) => p == const CategoryPath('Knowledge')),
+        hasLength(20 * sent),
+      );
+    });
+
+    test('a billing failure keeps the answers that came, and turns Claude '
+        'off', () async {
+      var requests = 0;
+      final claude = ScriptedClaude(
+        answer: (kind, channels) {
+          if (++requests > 1) throw const AiBillingProblem('Out of credit.');
+          return [
+            for (final channel in channels)
+              {
+                'id': channel['id'],
+                'parent': 'Knowledge',
+                'child': '',
+                'emoji': '',
+                'reason': '',
+                'tags': const [],
+              },
+          ];
+        },
+      );
+      final c = container(keys: claudeKey, claude: claude, history: many(45));
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await _runAi(c);
+
+      expect(c.read(aiTierStatusProvider).disabled, {AiService.claude});
+      expect(
+        paths(c).values.where((p) => p == const CategoryPath('Knowledge')),
+        hasLength(20),
+      );
+    });
+
+    group("checks channels for the user's tags", () {
+      final decidedAt = DateTime.utc(2026, 9, 30);
+      final checkedAt = DateTime.utc(2026, 10, 1);
+
+      ChannelCategory tagged(
+        List<String> tags, {
+        bool edited = false,
+        Set<String> removed = const {},
+      }) => ChannelCategory(
+        path: const CategoryPath('Gaming', 'Action'),
+        tried: const {
+          CategorizationTier.youtube,
+          CategorizationTier.jev,
+          CategorizationTier.claude,
+        },
+        jevAgreed: 0.9,
+        prompts: {
+          for (final MapEntry(:key, :value) in currentPrompts.entries)
+            if (key == PromptStep.jevCheck) key.name: value,
+        },
+        tags: tags,
+        tagsTried: true,
+        tagsEditedByUser: edited,
+        tagsRemovedByUser: removed,
+        tagsPrompts: {
+          for (final MapEntry(:key, :value) in currentPrompts.entries)
+            if (key == PromptStep.jevTags) key.name: value,
+        },
+        tagsCheckedAt: checkedAt,
+        decidedAt: decidedAt,
+      );
+
+      Future<ProviderContainer> start(_Jev jev) async {
+        setMockStorage(
+          entries: {
+            EntryBoxes.channelCategories: {
+              'UCg': jsonEncode(tagged(['Old']).toMap()),
+              'UCs': jsonEncode(tagged(['Mine'], edited: true).toMap()),
+              'UCx': jsonEncode(
+                tagged(const [], edited: true, removed: {'mine'}).toMap(),
+              ),
+            },
+          },
+        );
+        final c = container(
+          details: known,
+          keys: const AiKeys(typesafe: 'jv_live_1'),
+          jev: jev,
+          now: () => checkedAt.add(const Duration(days: 2)),
+        );
+        await c
+            .read(tagNamesProvider.notifier)
+            .put(
+              'mine',
+              TagName(
+                name: 'Mine',
+                origin: NameOrigin.user,
+                meaning: 'What I watch on Sundays',
+                changedAt: checkedAt.add(const Duration(days: 1)),
+              ),
+            );
+        await c
+            .read(tagNamesProvider.notifier)
+            .put(
+              'old',
+              TagName(
+                name: 'Old',
+                origin: NameOrigin.user,
+                meaning: 'Changed since',
+                changedAt: checkedAt.add(const Duration(days: 1)),
+              ),
+            );
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        return c;
+      }
+
+      Map<String, List<String>> tags(ProviderContainer c) => {
+        for (final MapEntry(:key, :value)
+            in c.read(channelCategoriesProvider).value!.entries)
+          key: value.tags,
+      };
+
+      test('adding one Jev is sure of and taking off one it is sure no '
+          'longer fits; on an edited channel, keeping what the user added '
+          'and never putting back what they removed', () async {
+        final c = await start(_Jev(agree: 0.9, tagFits: {'Mine': 0.9}));
+
+        await _runAi(c);
+
+        expect(tags(c), {
+          'UCg': ['Mine'],
+          'UCs': ['Mine'],
+          'UCx': isEmpty,
+        });
+      });
+
+      test('once: the next run checks nothing more, until a meaning '
+          'changes', () async {
+        final jev = _Jev(agree: 0.9, tagFits: {'Mine': 0.9});
+        final c = await start(jev);
+        await _runAi(c);
+        final asked = jev.asked.length;
+        expect(asked, greaterThan(0));
+
+        await _runAi(c);
+        expect(jev.asked, hasLength(asked));
+
+        await c
+            .read(tagEditorProvider.notifier)
+            .setMeaning('mine', 'What I watch on Saturdays');
+        await _runAi(c);
+        expect(jev.asked.length, greaterThan(asked));
+      });
     });
   });
 }

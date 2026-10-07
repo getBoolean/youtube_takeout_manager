@@ -66,3 +66,66 @@ abstract class _$CategorizationProgress extends $Notifier<RunProgress> {
     element.handleCreate(ref, build);
   }
 }
+
+/// The tokens Claude's answers used in the user's run, the one under way or
+/// the last: what it cost.
+
+@ProviderFor(ClaudeUsage)
+final claudeUsageProvider = ClaudeUsageProvider._();
+
+/// The tokens Claude's answers used in the user's run, the one under way or
+/// the last: what it cost.
+final class ClaudeUsageProvider
+    extends $NotifierProvider<ClaudeUsage, ({int input, int output})> {
+  /// The tokens Claude's answers used in the user's run, the one under way or
+  /// the last: what it cost.
+  ClaudeUsageProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'claudeUsageProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$claudeUsageHash();
+
+  @$internal
+  @override
+  ClaudeUsage create() => ClaudeUsage();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(({int input, int output}) value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<({int input, int output})>(value),
+    );
+  }
+}
+
+String _$claudeUsageHash() => r'a87659f445ffadb3d69226f1ddfa4b0c1a2a39ef';
+
+/// The tokens Claude's answers used in the user's run, the one under way or
+/// the last: what it cost.
+
+abstract class _$ClaudeUsage extends $Notifier<({int input, int output})> {
+  ({int input, int output}) build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final ref =
+        this.ref as $Ref<({int input, int output}), ({int input, int output})>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<({int input, int output}), ({int input, int output})>,
+              ({int input, int output}),
+              Object?,
+              Object?
+            >;
+    element.handleCreate(ref, build);
+  }
+}

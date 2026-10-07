@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart'
     show ProviderListenableSelect;
@@ -21,6 +23,7 @@ import 'package:youtube_takeout_manager/src/features/videos/domain/video.dart';
 import '../domain/categorization_plan.dart';
 import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
+import '../domain/category_prompts.dart';
 import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/name_key.dart';
@@ -50,8 +53,50 @@ part 'channel_categorizer.g.dart';
 /// being cut short.
 const _saveEvery = 10;
 
-/// Channels categorized at once while AI is asked.
-const _inFlight = 3;
+/// Channels Jev is asked about at once; its pacer keeps them within its
+/// limits.
+const _preparing = 16;
+
+/// Requests about several channels sent to Claude at once; its pacer keeps
+/// them within its limits too.
+const _claudeAtOnce = 3;
+
+/// The channels of [queue] in waves of 100, 200, 400, 800 and 1,600, then
+/// 2,000 each: the most watched, first, have Claude name the tags the rest
+/// mostly reuse through Jev.
+Iterable<List<T>> _waves<T>(List<T> queue) sync* {
+  var size = 100;
+  for (var i = 0; i < queue.length; i += size, size = min(size * 2, 2000)) {
+    yield queue.sublist(i, min(i + size, queue.length));
+  }
+}
+
+/// Groups of channels waiting to go to Claude, taken by whoever asks next;
+/// once closed and empty, none more.
+class _Groups {
+  final _ready = Queue<List<ClaudeTicket>>();
+  final _waiting = Queue<Completer<List<ClaudeTicket>?>>();
+  var _closed = false;
+
+  void add(List<ClaudeTicket> group) => _waiting.isNotEmpty
+      ? _waiting.removeFirst().complete(group)
+      : _ready.add(group);
+
+  void close() {
+    _closed = true;
+    while (_waiting.isNotEmpty) {
+      _waiting.removeFirst().complete(null);
+    }
+  }
+
+  Future<List<ClaudeTicket>?> next() {
+    if (_ready.isNotEmpty) return Future.value(_ready.removeFirst());
+    if (_closed) return Future.value();
+    final waiting = Completer<List<ClaudeTicket>?>();
+    _waiting.add(waiting);
+    return waiting.future;
+  }
+}
 
 /// How long categorizing pauses for a busy service that didn't say.
 const _defaultPause = Duration(minutes: 5);
@@ -173,6 +218,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   /// asked to wait, it starts when the wait ends.
   void run() {
     if (_aiWanted && _runningAi) return;
+    if (!_aiWanted) ref.read(claudeUsageProvider.notifier).reset();
     _aiWanted = true;
     _requestRun();
   }
@@ -302,7 +348,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
       at: _now(),
     );
     if (dropped()) return false;
-    final queue = <(HistoryChannel, ChannelWork)>[];
+    final queue = <(HistoryChannel, WorkPlan)>[];
     var redo = false;
     final unplaced = <String, ChannelCategory>{};
     final now = DateTime.now().toUtc();
@@ -316,10 +362,8 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         fingerprints: fingerprints,
         userTagsChangedAt: tags.userTagsChangedAt,
       );
-      // Checks of the user's tags come with the run in waves.
-      final work = plan.work;
-      if (work != ChannelWork.none) {
-        queue.add((channel, work));
+      if (plan.work != ChannelWork.none || plan.checkTags) {
+        queue.add((channel, plan));
         redo = redo || plan.redo;
       } else if (existing[channel.key] == null) {
         // Nothing to go on yet: uncategorized, and looked at again once
@@ -366,68 +410,138 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     final categorizing = ref.read(categorizingChannelsProvider.notifier);
     progress.start(queue.length, redo: redo, ai: ai);
     var done = 0;
-    var next = 0;
     // Set when an AI step fails: the run stops, and runs again without it
     // when [rerun].
     AiTierFailure? stoppedBy;
     // Set when something else goes wrong: the run stops, saying so.
     Object? crash;
+    bool halted() => stoppedBy != null || crash != null || dropped();
 
-    Future<void> worker() async {
-      try {
-        while (next < queue.length &&
-            stoppedBy == null &&
-            crash == null &&
-            !dropped()) {
-          final (channel, work) = queue[next++];
-          final input = _inputFor(channel, loaded, details, picks, videos);
-          ChannelCategory category;
-          categorizing.add(channel.key);
-          try {
-            category = switch (work) {
-              ChannelWork.tags ||
-              ChannelWork.claudeTags => await pipeline.retag(
-                input,
-                existing[channel.key]!,
-                tags: tags,
-                fromClaude: work == ChannelWork.claudeTags,
-              ),
-              _ => await pipeline.categorize(input, tags: tags),
-            };
-          } on AiTierFailure catch (e) {
-            stoppedBy ??= e;
-            return;
-          } finally {
-            if (ref.mounted) categorizing.remove(channel.key);
-          }
-          if (!ref.mounted) return;
-          // Still right for its channel when the run was dropped, and paid
-          // for: kept either way.
-          await _keepLearned(pipeline);
-          _takeMeanings(pipeline);
-          if (category.tags.isNotEmpty) {
-            category = category.copyWith(
-              tags: await ref.read(tagNamesProvider.notifier).resolveNamed([
-                for (final tag in category.tags)
-                  (name: tag, meaning: suggestedMeaning(tag)),
-              ], NameOrigin.ai),
-            );
-          }
-          await categories.putAiResult(channel.key, category);
-          if (dropped()) return;
-          progress.update(++done);
-          if (done % _saveEvery == 0) await categories.persist();
-        }
-      } on Object catch (e) {
-        crash ??= e;
+    /// Counts [key]'s channel done, saving every so often.
+    Future<void> finished(String key) async {
+      if (ref.mounted) categorizing.remove(key);
+      if (dropped()) return;
+      progress.update(++done);
+      if (done % _saveEvery == 0) await categories.persist();
+    }
+
+    /// Keeps [result] for [key]'s channel: still right for it when the run
+    /// was dropped, and paid for, so kept either way.
+    Future<void> keep(String key, ChannelCategory result) async {
+      if (!ref.mounted) return;
+      await _keepLearned(pipeline);
+      _takeMeanings(pipeline);
+      var category = result;
+      if (category.tags.isNotEmpty) {
+        category = category.copyWith(
+          tags: await ref.read(tagNamesProvider.notifier).resolveNamed([
+            for (final tag in category.tags)
+              (name: tag, meaning: suggestedMeaning(tag)),
+          ], NameOrigin.ai),
+        );
       }
+      await categories.putAiResult(key, category);
+      await finished(key);
     }
 
     try {
-      await Future.wait([
-        for (var i = 0; i < (pipeline.tiers.length > 1 ? _inFlight : 1); i++)
-          worker(),
-      ]);
+      for (final wave in _waves(queue)) {
+        if (halted()) break;
+        // Made again for each wave: the tags Claude named in the waves
+        // before are offered to Jev in this one.
+        final index = TagIndex.of(
+          ref.read(tagNamesProvider).value ?? const {},
+          ref.read(channelCategoriesProvider).value ?? existing,
+          at: _now(),
+        );
+        final groups = _Groups();
+        final waiting = {
+          for (final ask in ClaudeAsk.values) ask: <ClaudeTicket>[],
+        };
+        // A full group goes to Claude at once; the rest when the wave's
+        // channels are all prepared.
+        void send(ClaudeAsk ask, {bool rest = false}) {
+          final tickets = waiting[ask]!;
+          if (tickets.isEmpty || (!rest && tickets.length < maxGroupChannels)) {
+            return;
+          }
+          groups.add([...tickets]);
+          tickets.clear();
+        }
+
+        Future<void> asker() async {
+          for (
+            var group = await groups.next();
+            group != null;
+            group = await groups.next()
+          ) {
+            // Once stopped, what's waiting is never sent.
+            if (halted()) continue;
+            try {
+              await pipeline.askClaude(
+                group,
+                stopped: halted,
+                tags: index,
+                onResult: keep,
+              );
+            } on AiTierFailure catch (e) {
+              stoppedBy ??= e;
+            } on Object catch (e) {
+              crash ??= e;
+            }
+          }
+        }
+
+        var next = 0;
+        Future<void> preparer() async {
+          while (next < wave.length && !halted()) {
+            final (channel, plan) = wave[next++];
+            final key = channel.key;
+            categorizing.add(key);
+            try {
+              final prepared = await pipeline.prepare(
+                _inputFor(channel, loaded, details, picks, videos),
+                plan,
+                existing:
+                    ref.read(channelCategoriesProvider).value?[key] ??
+                    existing[key],
+                tags: index,
+              );
+              switch (prepared) {
+                case Settled(:final result):
+                  await keep(key, result);
+                case Checked(:final yes, :final at):
+                  if (!ref.mounted) return;
+                  await categories.checkTags(key, yes, index.names, at: at);
+                  await finished(key);
+                case NeedsClaude(:final ticket):
+                  waiting[ticket.ask]!.add(ticket);
+                  send(ticket.ask);
+              }
+            } on AiTierFailure catch (e) {
+              stoppedBy ??= e;
+            } on Object catch (e) {
+              crash ??= e;
+            }
+          }
+        }
+
+        final askers = [for (var i = 0; i < _claudeAtOnce; i++) asker()];
+        await Future.wait([
+          for (var i = 0; i < (ai ? _preparing : 1); i++) preparer(),
+        ]);
+        for (final ask in ClaudeAsk.values) {
+          send(ask, rest: true);
+        }
+        groups.close();
+        await Future.wait(askers);
+        // Channels whose tickets were never sent aren't being asked about.
+        if (ref.mounted) {
+          for (final (channel, _) in wave) {
+            categorizing.remove(channel.key);
+          }
+        }
+      }
     } finally {
       if (ref.mounted) await categories.persist();
     }
@@ -534,6 +648,11 @@ class ChannelCategorizer extends _$ChannelCategorizer {
               model: await _claudeModel(keys.keyFor(AiService.claude)),
             )
           : null,
+      onUsage: (input, output) {
+        if (ref.mounted) {
+          ref.read(claudeUsageProvider.notifier).add(input, output);
+        }
+      },
     );
   }
 

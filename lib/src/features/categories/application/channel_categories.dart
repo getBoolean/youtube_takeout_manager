@@ -6,6 +6,8 @@ import '../domain/category_emoji.dart';
 import '../domain/category_path.dart';
 import '../domain/channel_category.dart';
 import '../domain/name_key.dart';
+import '../domain/tag_candidates.dart';
+import '../domain/tag_name.dart';
 import '../domain/sub_category.dart';
 import '../domain/youtube_taxonomy.dart';
 
@@ -47,6 +49,34 @@ class ChannelCategories extends _$ChannelCategories {
     await future;
     state = AsyncData({...state.requireValue, key: category});
     await persist();
+  }
+
+  /// Applies Jev's check of the user's tags, how sure it is of each by key
+  /// ([yes]), to [key]'s tags as they are now, as [applyTagCheck] says: what
+  /// the user added there stays, and what they removed isn't put back. The
+  /// tags count as checked [at].
+  Future<void> checkTags(
+    String key,
+    Map<String, double> yes,
+    Map<String, TagName> names, {
+    required DateTime at,
+  }) async {
+    await future;
+    final current = state.requireValue[key];
+    if (current == null) return;
+    state = AsyncData({
+      ...state.requireValue,
+      key: current.copyWith(
+        tags: applyTagCheck(
+          current.tags,
+          yes,
+          names,
+          protectedKeys: current.protectedTagKeys,
+          removedByUser: current.tagsRemovedByUser,
+        ),
+        tagsCheckedAt: at,
+      ),
+    });
   }
 
   /// Takes the tag with the folded name [key] off every channel, whoever
