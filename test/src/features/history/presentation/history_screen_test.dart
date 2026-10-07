@@ -633,6 +633,43 @@ void main() {
     expect(_shown('Old 0'), findsNothing);
   });
 
+  testWidgets("a channel's category arriving shows in its header, the list "
+      'staying where it was', (tester) async {
+    final container = await _open(
+      tester,
+      history: _longHistory,
+      grouping: HistoryGrouping.channel,
+    );
+    await tester.drag(_channelHeader('Top'), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    final header = find
+        .byType(ChannelGroupHeader)
+        .hitTestable()
+        .evaluate()
+        .map((e) => e.widget as ChannelGroupHeader)
+        .lastWhere((h) => h.group.channel?.title != 'Top');
+    final title = header.group.channel!.title;
+    final before = tester.getTopLeft(_channelHeader(title));
+
+    (container.read(channelCategoriesProvider.notifier) as _Categories)
+        .replace({
+          header.group.key: ChannelCategory(
+            path: const CategoryPath('Gaming'),
+            decidedAt: DateTime.utc(2026, 9, 30),
+          ),
+        });
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(
+        of: _channelHeader(title),
+        matching: find.textContaining('Gaming'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(_channelHeader(title)), before);
+  });
+
   testWidgets('signed out without AI keys, grouping by channel says what '
       'would categorize them', (tester) async {
     await _open(tester);

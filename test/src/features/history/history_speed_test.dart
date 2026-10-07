@@ -26,8 +26,10 @@ Future<int> _best(Future<void> Function() work) async {
 /// heavy viewer's: the first measured run's times (2026-10-05, in the test
 /// VM: load 1256, search 145, channels 96, by channel 9, by day 57,
 /// counts 10, picks 87), three times over, and at least 50 (ruling 13).
+/// Loading on the worker was first measured on 2026-10-07: 2618.
 const _budgets = {
   'load': 3768,
+  'load on the worker': 7854,
   'search': 435,
   'channels': 288,
   'by channel': 50,
@@ -69,6 +71,19 @@ void main() {
     expect(loaded.history.watches, hasLength(64000));
     await within('load', () async => loadSavedHistory(files.cast()));
   });
+
+  test(
+    'loaded as the app loads it, through the History worker, in time',
+    () async {
+      // Read, worked out, picked for AI, across the wire and back.
+      await within(
+        'load on the worker',
+        () async => LoadedHistory.fromRows(
+          await LocalHistoryEngine().load(files.cast()),
+        ),
+      );
+    },
+  );
 
   test('a search narrows it in time', () async {
     await within('search', () async {
