@@ -80,12 +80,14 @@ class AiKeysSection extends ConsumerWidget {
         const SizedBox(height: 4),
         Text(
           keys.hasAny
-              ? 'AI checks the categories YouTube gives channels, and names '
-                    'the ones it has none for.'
-              : 'Add an API key for Jev or Claude, and AI checks the '
-                    'categories YouTube gives channels and names the ones it '
-                    "has none for. Without one, categories come from YouTube's "
-                    'topics alone.',
+              ? 'When you click Categorize in History, AI checks the '
+                    'categories YouTube gives channels, names the ones it has '
+                    'none for, and tags them.'
+              : 'Add an API key for Jev or Claude, then click Categorize in '
+                    'History, and AI checks the categories YouTube gives '
+                    'channels, names the ones it has none for, and tags them. '
+                    "Without one, categories come from YouTube's topics "
+                    'alone.',
           style: hint,
         ),
         const SizedBox(height: 8),

@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wolt_modal_sheet/wolt_modal_sheet.dart';
 
+import 'package:youtube_takeout_manager/src/features/categories/presentation/categorization_banner.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/pending_ai_work.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/categorize_window.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
@@ -1292,6 +1293,28 @@ void main() {
     );
   }
 
+  for (final (state, progress) in <(String, CategorizationProgress Function())>[
+    ('going, with what Claude cost', _Categorizing.new),
+    ('stopping', _Stopping.new),
+    ('stopped, to continue', _Interrupted.new),
+    ('waiting for AI', CategorizationProgress.new),
+  ]) {
+    fitsAtEveryWidth(
+      "History's categorizing banner, $state",
+      () => const Scaffold(
+        body: SingleChildScrollView(child: CategorizationBanner()),
+      ),
+      overrides: [
+        categorizationProgressProvider.overrideWith(progress),
+        pendingAiWorkProvider.overrideWith(_LongPending.new),
+        claudeUsageProvider.overrideWith(_Spent.new),
+        aiKeysProvider.overrideWith(
+          (ref) async => const AiKeys(typesafe: 'jv', anthropic: 'sk-ant'),
+        ),
+      ],
+    );
+  }
+
   testWidgets('narrow tiles never overflow their trailing widgets', (
     tester,
   ) async {
@@ -1457,4 +1480,30 @@ class _LongPending extends PendingAiWork {
 class _Spent extends ClaudeUsage {
   @override
   ({int input, int output}) build() => (input: 12345678, output: 456789);
+}
+
+class _Stopping extends CategorizationProgress {
+  @override
+  RunProgress build() => (
+    running: true,
+    ai: true,
+    done: 1234,
+    total: 56789,
+    redo: false,
+    stopping: true,
+    interrupted: false,
+  );
+}
+
+class _Interrupted extends CategorizationProgress {
+  @override
+  RunProgress build() => (
+    running: false,
+    ai: true,
+    done: 1234,
+    total: 56789,
+    redo: false,
+    stopping: false,
+    interrupted: true,
+  );
 }

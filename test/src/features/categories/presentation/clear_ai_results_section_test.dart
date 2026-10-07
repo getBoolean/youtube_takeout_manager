@@ -16,53 +16,12 @@ class _Clearer extends AiResultsClearer {
 }
 
 void main() {
-  group('the question before clearing', () {
-    test('with Claude and its usual model, says how many channels and '
-        'roughly what it costs', () {
-      final question = clearAiQuestion(
-        channels: 1234,
-        keys: const AiKeys(anthropic: 'sk-ant-1'),
-        model: defaultAnthropicModel,
-      );
+  test('the question before clearing names how many channels go back, and '
+      'no price: nothing is asked of AI until the next run', () {
+    final question = clearAiQuestion(channels: 1234);
 
-      expect(question, contains('1,234'));
-      expect(question, contains(r'$5'));
-    });
-
-    test('a few channels cost less than a dollar', () {
-      expect(
-        clearAiQuestion(
-          channels: 12,
-          keys: const AiKeys(anthropic: 'sk-ant-1'),
-          model: defaultAnthropicModel,
-        ),
-        contains(r'$1'),
-      );
-    });
-
-    test('with another model, names no price', () {
-      final question = clearAiQuestion(
-        channels: 1234,
-        keys: const AiKeys(anthropic: 'sk-ant-1'),
-        model: 'claude-opus-5-5',
-      );
-
-      expect(question, contains('1,234'));
-      expect(question, isNot(contains(r'$')));
-    });
-
-    test('with Jev alone, or no key, names no price', () {
-      for (final keys in [const AiKeys(typesafe: 'jv_live_1'), AiKeys.none]) {
-        expect(
-          clearAiQuestion(
-            channels: 1234,
-            keys: keys,
-            model: defaultAnthropicModel,
-          ),
-          isNot(contains(r'$')),
-        );
-      }
-    });
+    expect(question, contains('1,234'));
+    expect(question, isNot(contains(r'$')));
   });
 
   testWidgets('clearing asks first, in place, then clears', (tester) async {
