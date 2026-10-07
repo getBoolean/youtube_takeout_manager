@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:collection';
 import 'dart:math';
 
@@ -28,6 +29,7 @@ import '../domain/channel_evidence.dart';
 import '../domain/model_capabilities.dart';
 import '../domain/name_key.dart';
 import '../domain/prompt_videos.dart';
+import '../domain/run_estimate.dart';
 import '../domain/tag_candidates.dart';
 import '../domain/sub_category.dart';
 import '../domain/tag_name.dart';
@@ -45,6 +47,7 @@ import 'categorizing_channels.dart';
 import 'category_pipeline.dart';
 import 'channel_categories.dart';
 import 'channel_tags.dart';
+import 'pending_ai_work.dart';
 import 'prompt_fingerprints.dart';
 
 part 'channel_categorizer.g.dart';
@@ -119,14 +122,41 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   ChannelCategorizer({
     this.browser = kIsWeb,
     Timer Function(Duration after, void Function() fire) timer = Timer.new,
+    Timer Function(Duration after, void Function() fire) summaryTimer =
+        Timer.new,
     DateTime Function() now = DateTime.now,
   }) : _timer = timer,
+       _summaryTimer = summaryTimer,
        _now = now;
 
   /// Whether this runs in a browser, which can refuse a service outright.
   final bool browser;
   final Timer Function(Duration after, void Function() fire) _timer;
+
+  /// Waits a moment before working out what a run would do, once what it
+  /// depends on has stopped changing.
+  final Timer Function(Duration after, void Function() fire) _summaryTimer;
   final DateTime Function() _now;
+
+  /// The wait before working out what a run would do.
+  Timer? _summaryWait;
+
+  /// The videos picked to tell AI about each channel, and the history they
+  /// were picked from, worked out once for it.
+  (LoadedHistory, List<PromptPicks>)? _picks;
+
+  /// The videos picked to tell AI about each of [loaded]'s channels.
+  List<PromptPicks> _picksOf(LoadedHistory loaded) {
+    if (_picks case (
+      final picked,
+      final picks,
+    ) when identical(picked, loaded)) {
+      return picks;
+    }
+    final picks = pickPromptVideos(loaded);
+    _picks = (loaded, picks);
+    return picks;
+  }
 
   var _generation = 0;
   Future<void>? _running;
@@ -178,13 +208,21 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         timer.cancel();
       }
       _resumeTimers.clear();
+      _summaryWait?.cancel();
     });
+    // What a run with AI would do, worked out again a moment after what it
+    // depends on changes.
+    ref.listen(channelCategoriesProvider, (_, _) => _summaryLater());
+    ref.listen(tagNamesProvider, (_, _) => _summaryLater());
+    ref.listen(aiTierStatusProvider, (_, _) => _summaryLater());
+    ref.listen(channelDetailsProvider, (_, _) => _summaryLater());
     _restored = _restorePauses(ref.watch(aiPauseRepositoryProvider));
     // Listened, so the videos kept, a stream, are there to read: one
     // nothing listens to is paused.
     ref.listen(videoMetadataProvider, (_, _) {});
     ref.listen(categorizationInputsProvider, (_, inputs) {
       if (inputs != null) _requestRun();
+      _summaryLater();
     }, fireImmediately: true);
     ref.listen(readSessionChannelIdProvider, (previous, next) {
       if (previous == null && next != null) _requestRun();
@@ -210,7 +248,85 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         }
       }
       _requestRun();
+      _summaryLater();
     });
+  }
+
+  /// Works out what a run with AI would do a moment from now, unless the
+  /// user's run is going: then once it ends.
+  void _summaryLater() {
+    _summaryWait?.cancel();
+    if (_running != null && _runningAi) return;
+    _summaryWait = _summaryTimer(const Duration(milliseconds: 500), () {
+      _summaryWait = null;
+      unawaited(_summarize().catchError((Object _) {}));
+    });
+  }
+
+  /// Works out what a run with AI would do now, with the services there are
+  /// keys for, or both when there are none, to show what's waiting.
+  Future<void> _summarize() async {
+    final inputs = ref.read(categorizationInputsProvider);
+    final pending = ref.read(pendingAiWorkProvider.notifier);
+    if (inputs == null) return pending.set(null);
+    final keys = await ref
+        .read(aiKeysProvider.future)
+        .catchError((Object _) => AiKeys.none);
+    final existing = await ref.read(channelCategoriesProvider.future);
+    final details = await ref
+        .read(channelDetailsProvider.future)
+        .catchError((Object _) => const <String, ChannelDetails>{});
+    final names = await ref
+        .read(tagNamesProvider.future)
+        .catchError((Object _) => const <String, TagName>{});
+    if (!ref.mounted) return;
+    final disabled = ref.read(aiTierStatusProvider).disabled;
+    bool on(AiService service) =>
+        keys.has(service) && !disabled.contains(service);
+    final tiers = {
+      CategorizationTier.youtube,
+      if (on(AiService.jev) || !keys.hasAny) CategorizationTier.jev,
+      if (on(AiService.claude) || !keys.hasAny) CategorizationTier.claude,
+    };
+    final (:loaded, :subscriptions) = inputs;
+    final picks = _picksOf(loaded);
+    final videos = ref.read(videoMetadataProvider).value ?? const {};
+    final index = TagIndex.of(names, existing, at: _now());
+    final fingerprints = {
+      for (final MapEntry(:key, :value) in currentPrompts.entries)
+        key.name: value,
+    };
+    final summary = summarizeWork([
+      for (final channel in [
+        for (final watched in loaded.watchedChannels) watched.channel,
+        ...subscriptions.unwatched,
+      ])
+        if (planWork(
+              existing[channel.key],
+              available: tiers,
+              hasTopics:
+                  details[channel.channelId]?.topicUrls.isNotEmpty ?? false,
+              fingerprints: fingerprints,
+              userTagsChangedAt: index.userTagsChangedAt,
+            )
+            case final plan)
+          (
+            plan: plan,
+            existing: existing[channel.key],
+            evidenceChars: plan.work == ChannelWork.none && !plan.checkTags
+                ? 0
+                : jsonEncode(
+                    _inputFor(
+                      channel,
+                      loaded,
+                      details,
+                      picks,
+                      videos,
+                    ).evidence.toState(),
+                  ).length,
+          ),
+    ]);
+    if (ref.mounted) pending.set(summary);
   }
 
   /// Categorizes with AI, as the user asked: Jev and Claude as the keys
@@ -272,6 +388,11 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         progress.complete(interrupted: ai && !finished);
       }
       if (ai && finished && ref.mounted) _aiWanted = false;
+      if (ai && ref.mounted) {
+        // Held while the run went: worked out again now.
+        _runningAi = false;
+        _summaryLater();
+      }
     }
   }
 
@@ -335,7 +456,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     }
     if (dropped()) return false;
     // Only AI is told about the videos watched.
-    final picks = ai ? pickPromptVideos(loaded) : const <PromptPicks>[];
+    final picks = ai ? _picksOf(loaded) : const <PromptPicks>[];
     final fingerprints = {
       for (final MapEntry(:key, :value) in currentPrompts.entries)
         key.name: value,
@@ -600,7 +721,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         channel,
         loaded,
         details,
-        pickPromptVideos(loaded),
+        _picksOf(loaded),
         ref.read(videoMetadataProvider).value ?? const {},
       ),
       current?.path,

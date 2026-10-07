@@ -18,6 +18,7 @@ import 'package:youtube_takeout_manager/src/features/categories/application/chan
 import 'package:youtube_takeout_manager/src/features/categories/application/category_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_categorizer.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/channel_tags.dart';
+import 'package:youtube_takeout_manager/src/features/categories/application/pending_ai_work.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/prompt_fingerprints.dart';
 import 'package:youtube_takeout_manager/src/features/categories/application/tag_editor.dart';
 import 'package:youtube_takeout_manager/src/features/categories/data/ai_errors.dart';
@@ -292,6 +293,7 @@ void main() {
     TakeoutHistory? history,
     bool browser = false,
     _Timers? timers,
+    _Timers? summaryTimers,
     DateTime Function()? now,
     _VideoDetails? videoDetails,
   }) {
@@ -303,6 +305,7 @@ void main() {
           () => ChannelCategorizer(
             browser: browser,
             timer: timers?.call ?? Timer.new,
+            summaryTimer: summaryTimers?.call ?? Timer.new,
             now: now ?? DateTime.now,
           ),
         ),
@@ -2042,5 +2045,88 @@ void main() {
         expect(jev.asked.length, greaterThan(asked));
       });
     });
+  });
+
+  group('what a run with AI would do', () {
+    const claudeKey = AiKeys(anthropic: 'sk-ant-1');
+
+    /// Fires the timers [timers] made that are still waiting.
+    Future<void> fire(_Timers timers) async {
+      for (final timer in [...timers.active]) {
+        timer.timer.cancel();
+        timer.fire();
+      }
+      await _settle();
+    }
+
+    test('is worked out a moment after History is shown', () async {
+      final summaries = _Timers();
+      final c = container(
+        details: known,
+        keys: claudeKey,
+        summaryTimers: summaries,
+      );
+      c.read(historyShownProvider.notifier).markShown();
+      await _settle();
+
+      await fire(summaries);
+
+      final summary = c.read(pendingAiWorkProvider);
+      expect(summary?.categorize, 1);
+      expect(summary?.tags, 2);
+      expect(summary?.hasWork, isTrue);
+    });
+
+    test(
+      'is held while the run goes, and worked out again once it ends',
+      () async {
+        final hold = Completer<void>();
+        final summaries = _Timers();
+        final c = container(
+          details: known,
+          keys: claudeKey,
+          claude: _claude({'parent': 'Knowledge'}, hold: hold),
+          summaryTimers: summaries,
+        );
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        await fire(summaries);
+        final before = c.read(pendingAiWorkProvider);
+
+        await _runAi(c);
+        await fire(summaries);
+        expect(c.read(pendingAiWorkProvider), same(before));
+
+        hold.complete();
+        await _settle();
+        await fire(summaries);
+        expect(c.read(pendingAiWorkProvider)?.hasWork, isFalse);
+      },
+    );
+
+    test(
+      "counts the channels a tag the user defines has them checked for",
+      () async {
+        final summaries = _Timers();
+        final c = container(
+          details: known,
+          keys: const AiKeys(typesafe: 'jv_live_1'),
+          jev: _Jev(),
+          summaryTimers: summaries,
+        );
+        c.read(historyShownProvider.notifier).markShown();
+        await _settle();
+        await _runAi(c);
+        await fire(summaries);
+        expect(c.read(pendingAiWorkProvider)?.checks, 0);
+
+        await c
+            .read(tagEditorProvider.notifier)
+            .define('Mine', meaning: 'What I watch on Sundays');
+        await fire(summaries);
+
+        expect(c.read(pendingAiWorkProvider)?.checks, greaterThan(0));
+      },
+    );
   });
 }
