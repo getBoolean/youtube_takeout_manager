@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -177,6 +178,70 @@ void main() {
       ['Speedrun of Mario Kart'],
     );
     expect(started, hasLength(2));
+  });
+
+  test('a first load on a new engine reads the history once', () async {
+    final started = <_Fake>[];
+    final engine = WorkerHistoryEngine(
+      () async => _Fake()..also(started.add),
+      isDead: died,
+    );
+
+    await engine.load(_files);
+
+    expect(started.single.loaded, hasLength(1));
+  });
+
+  group('a real History worker whose thread dies', () {
+    test('is replaced, the history loaded into it again, and the search '
+        'answered', () async {
+      final threads = <Isolate>[];
+      final engine = WorkerHistoryEngine(
+        () async => startHistoryWorker(
+          threadHook: (thread) => threads.add(thread as Isolate),
+        ),
+      );
+      addTearDown(engine.stop);
+      final rows = await engine.load(_files);
+
+      threads.single.kill(priority: Isolate.immediate);
+      final matches = await engine
+          .search(const HistoryQuery(query: 'cover'), 1)
+          .timeout(const Duration(seconds: 20));
+
+      expect(
+        [for (final i in matches.watchIndices) rows.watchTitles[i]],
+        ['A cover of a song'],
+      );
+      expect(threads, hasLength(2));
+    });
+
+    test('and whose replacement dies too, throws HistoryWorkerDied rather '
+        'than waiting forever', () async {
+      final threads = <Isolate>[];
+      var killing = false;
+      final engine = WorkerHistoryEngine(
+        () async => startHistoryWorker(
+          threadHook: (thread) {
+            final isolate = thread as Isolate;
+            threads.add(isolate);
+            if (killing) isolate.kill(priority: Isolate.immediate);
+          },
+        ),
+      );
+      addTearDown(engine.stop);
+      await engine.load(_files);
+
+      killing = true;
+      threads.single.kill(priority: Isolate.immediate);
+
+      await expectLater(
+        engine
+            .search(const HistoryQuery(query: 'cover'), 1)
+            .timeout(const Duration(seconds: 20)),
+        throwsA(isA<HistoryWorkerDied>()),
+      );
+    });
   });
 
   test('in-process, it finds what the worker finds', () async {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:squadron/squadron.dart';
@@ -144,5 +145,39 @@ void main() {
 
     expect(await storage.run((s) => s.loadAll(EntryBoxes.videos)), {'v1': '1'});
     expect(started, 1);
+  });
+
+  test('a real worker whose thread dies has the calls after it end, '
+      'answered or failed, rather than waiting forever', () async {
+    final dir = await Directory.systemTemp.createTemp('worker_storage');
+    final threads = <Isolate>[];
+    final storage = WorkerStorage(() async {
+      final worker = startStorageWorker(
+        threadHook: (thread) => threads.add(thread as Isolate),
+      );
+      await worker.open(dir.path);
+      return worker;
+    });
+    addTearDown(() async {
+      await storage.stop();
+      try {
+        await dir.delete(recursive: true);
+      } on FileSystemException {
+        // The dead thread's files stay open until the process ends.
+      }
+    });
+    await storage.run((s) => s.putAll(EntryBoxes.videos, {'v1': '1'}));
+
+    threads.single.kill(priority: Isolate.immediate);
+
+    // On Windows the dead thread still holds the storage's lock files, so
+    // a replacement can't open them; the call fails, as it should.
+    await expectLater(
+      storage
+          .run((s) => s.loadAll(EntryBoxes.videos))
+          .then<Object?>((entries) => entries, onError: (Object e) => e)
+          .timeout(const Duration(seconds: 20)),
+      completes,
+    );
   });
 }

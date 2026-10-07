@@ -6,6 +6,7 @@ import 'package:squadron/squadron.dart';
 
 import '../domain/history_wire.dart';
 import '../domain/watch_filters.dart';
+import 'package:youtube_takeout_manager/src/utils/worker_death/worker_death.dart';
 import 'history_service.dart';
 
 part 'history_engine.g.dart';
@@ -45,8 +46,10 @@ class HistoryWorkerDied implements Exception {
 /// is the caller's to handle, on the same worker. A worker that died is
 /// replaced, the history last loaded into it loaded again, with the Shorts
 /// it was told of, and every call under way when it died is made again on
-/// the replacement; when that one dies too, the call throws
-/// [HistoryWorkerDied], and the next call starts afresh.
+/// the replacement; when that one dies too, or can't be started, the call
+/// throws [HistoryWorkerDied], and the next call starts afresh. Workers are
+/// started by [startHistoryWorker], so one that dies fails its calls rather
+/// than leaving them waiting.
 class WorkerHistoryEngine implements HistoryEngine {
   final Future<HistoryService> Function() _start;
   final bool Function(HistoryService service) _isDead;
@@ -71,40 +74,49 @@ class WorkerHistoryEngine implements HistoryEngine {
     _ => false,
   };
 
-  Future<T> _run<T>(Future<T> Function(HistoryService history) call) async {
-    final generation = _generation;
-    final service = await _current();
-    try {
-      return await call(service);
-    } on SquadronException {
-      if (!_isDead(service)) rethrow;
-      if (generation == _generation) _replace(service);
-    }
-    final replacement = await _current();
-    try {
-      return await call(replacement);
-    } on SquadronException {
-      if (!_isDead(replacement)) rethrow;
-      if (identical(await _service, replacement)) _replace(replacement);
-      throw const HistoryWorkerDied();
+  /// Makes [call] on the worker, and once more on a replacement when the
+  /// worker died; a call that [loads] is itself what loads the replacement.
+  Future<T> _run<T>(
+    Future<T> Function(HistoryService history) call, {
+    bool loads = false,
+  }) async {
+    for (var attempt = 1; ; attempt++) {
+      final generation = _generation;
+      HistoryService? service;
+      try {
+        service = await _current(loads: loads);
+        return await call(service);
+      } on SquadronException catch (e) {
+        // A call's own failure, on a worker still running, is the caller's.
+        if (service != null && !_isDead(service) && !_closed(e)) rethrow;
+        // The first call to find it dead replaces it for every call under
+        // way on it.
+        if (generation == _generation) _replace(service);
+        if (attempt == 2) throw const HistoryWorkerDied();
+      }
     }
   }
 
-  void _replace(HistoryService dead) {
+  /// Whether [e] says the worker's channel closed, as when its thread died.
+  static bool _closed(SquadronException e) =>
+      e is SquadronError && e.message.contains('Channel is closed');
+
+  void _replace(HistoryService? dead) {
     _generation++;
     _service = null;
-    unawaited(_retire(dead));
+    if (dead != null) unawaited(_retire(dead));
   }
 
-  /// The worker, started with the history last loaded when there's none,
-  /// or when the last start failed.
-  Future<HistoryService> _current() {
+  /// The worker, started with the history last loaded, unless the call
+  /// about to be made [loads] one, when there's none, or when the last
+  /// start failed.
+  Future<HistoryService> _current({required bool loads}) {
     if (_service case final service?) return service;
     late final Future<HistoryService> started;
     started =
         () async {
           final service = await _start();
-          if (_files case final files?) await service.load(files);
+          if (_files case final files? when !loads) await service.load(files);
           if (_shortVideos case final ids?) await service.setShortVideos(ids);
           return service;
         }().onError<Object>((error, stackTrace) {
@@ -116,9 +128,9 @@ class WorkerHistoryEngine implements HistoryEngine {
 
   @override
   Future<HistoryRows> load(Map<String, Uint8List> files) async {
-    // Kept first: a worker replaced during the load loads them.
+    // Kept first: a worker replaced after the load loads them.
     _files = files;
-    return HistoryRows.fromWire(await _run((h) => h.load(files)));
+    return HistoryRows.fromWire(await _run((h) => h.load(files), loads: true));
   }
 
   @override
@@ -162,6 +174,14 @@ class LocalHistoryEngine extends WorkerHistoryEngine {
   LocalHistoryEngine() : super(() async => HistoryService());
 }
 
+/// Starts a History worker that's stopped, failing the calls under way, as
+/// soon as its thread dies; [threadHook] is given its thread too.
+HistoryServiceWorker startHistoryWorker({PlatformThreadHook? threadHook}) =>
+    terminatedWhenItDies(
+      (hook) => HistoryServiceWorker(threadHook: hook),
+      threadHook: threadHook,
+    );
+
 var _local = false;
 
 /// Tests: the history is kept in-process from now on.
@@ -175,7 +195,7 @@ void setLocalHistoryEngine() => _local = true;
 HistoryEngine historyEngine(Ref ref) {
   final engine = _local
       ? LocalHistoryEngine()
-      : WorkerHistoryEngine(() async => HistoryServiceWorker());
+      : WorkerHistoryEngine(() async => startHistoryWorker());
   ref.onDispose(engine.stop);
   return engine;
 }

@@ -8,6 +8,7 @@ import 'entry_store.dart';
 import 'image_bytes_cache.dart';
 import 'kv_storage_service.dart';
 import 'storage_migration.dart';
+import 'package:youtube_takeout_manager/src/utils/worker_death/worker_death.dart';
 import 'storage_service.dart';
 
 part 'storage_providers.g.dart';
@@ -41,8 +42,11 @@ class WorkerStorage {
     final service = await _current();
     try {
       return await call(service);
-    } on SquadronException {
-      if (!_isDead(service)) rethrow;
+    } on SquadronException catch (e) {
+      // A channel closed is a worker that died, before it's told so.
+      final closed =
+          e is SquadronError && e.message.contains('Channel is closed');
+      if (!_isDead(service) && !closed) rethrow;
       if (generation == _generation) {
         if (_restarted) rethrow;
         _restarted = true;
@@ -87,6 +91,14 @@ class WorkerStorage {
     if (service case final Worker worker) worker.stop();
   }
 }
+
+/// Starts a storage worker that's stopped, failing the calls under way, as
+/// soon as its thread dies; [threadHook] is given its thread too.
+StorageServiceWorker startStorageWorker({PlatformThreadHook? threadHook}) =>
+    terminatedWhenItDies(
+      (hook) => StorageServiceWorker(threadHook: hook),
+      threadHook: threadHook,
+    );
 
 /// An [EntryStore] whose calls run on the storage worker.
 class WorkerEntryStore implements EntryStore {
@@ -141,7 +153,7 @@ WorkerStorage workerStorage(Ref ref) {
   final kv = ref.watch(kvStorageServiceProvider);
   Future<void>? migrated;
   final storage = WorkerStorage(() async {
-    final worker = StorageServiceWorker();
+    final worker = startStorageWorker();
     await worker.open(await storageDirectory());
     await (migrated ??= migrateLegacyBlobs(kv, worker));
     return worker;
