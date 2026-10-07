@@ -127,6 +127,9 @@ class HistoryPage extends HookConsumerWidget {
     // While History shows, the History worker is told of the Shorts known
     // by their format as they're checked, and the count stays current.
     ref.listen(historyShortCountProvider, (_, _) {});
+    // And the watched videos per channel of the kinds shown stay counted,
+    // for the Filters window's categories.
+    ref.listen(historyChannelWatchCountsProvider, (_, _) {});
     final historyAsync = ref.watch(takeoutHistoryProvider);
     final loaded = historyAsync.value;
     final hasHistory = loaded != null && !loaded.history.isEmpty;
@@ -763,6 +766,11 @@ class _WatchedTab extends ConsumerWidget {
       await ref
           .read(channelCategoriesProvider.future)
           .catchError((Object _) => const <String, ChannelCategory>{});
+      // The categories' shares count only the kinds of videos shown, as
+      // the History worker counts them.
+      await ref
+          .read(historyChannelWatchCountsProvider.future)
+          .then<void>((_) {}, onError: (Object _) {});
       if (!context.mounted) return;
       final signedIn = ref.read(readSessionChannelIdProvider) != null;
       final checking = ref.read(videoFormatProgressProvider);

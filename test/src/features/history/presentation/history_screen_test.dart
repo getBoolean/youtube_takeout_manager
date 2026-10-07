@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:youtube_takeout_manager/src/features/videos/domain/video_format.dart';
 import 'package:youtube_takeout_manager/src/features/videos/application/video_format_providers.dart';
+import 'package:youtube_takeout_manager/src/features/history/application/watch_filter_providers.dart';
 import 'package:youtube_takeout_manager/src/features/history/data/history_engine.dart';
 import 'package:youtube_takeout_manager/src/features/categories/presentation/tag_pages.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -923,6 +924,53 @@ void main() {
     await _openFilters(tester);
 
     expect(find.byKey(HistoryFilterSheet.shortsSectionKey), findsOneWidget);
+  });
+
+  testWidgets("with only YouTube Music shown, the Filters window's "
+      'categories count only Music videos', (tester) async {
+    final c = await _open(
+      tester,
+      history: TakeoutHistory(
+        watches: [
+          WatchEntry(
+            time: DateTime(2026, 4, 12, 9).toUtc(),
+            kind: WatchKind.video,
+            music: true,
+            title: 'A song',
+            url: 'https://music.youtube.com/watch?v=song',
+            channelTitle: 'Singer',
+            channelUrl: 'https://www.youtube.com/channel/UCm',
+          ),
+          _watch(
+            'A game',
+            DateTime(2026, 4, 11, 9),
+            channelId: 'UCx',
+            channel: 'X',
+          ),
+        ],
+      ),
+      categories: {
+        'UCm': ChannelCategory(
+          path: const CategoryPath('Music'),
+          decidedAt: DateTime.utc(2026, 9, 30),
+        ),
+        ..._gamingX(),
+      },
+    );
+    c.read(historyMusicFilterProvider.notifier).set(ShowFilter.only);
+    await tester.pumpAndSettle();
+
+    await _openFilters(tester);
+
+    expect(
+      find.descendant(
+        of: find.byKey(
+          HistoryFilterSheet.categoryKey(const CategoryPick.category('Music')),
+        ),
+        matching: find.textContaining('100%'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Shorts can be shown alone', (tester) async {
