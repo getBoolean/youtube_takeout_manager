@@ -779,9 +779,9 @@ void main() {
           tags: tags,
         );
 
-        expect(told, [
-          ('UCg', 2, {'speedruns': 0.8, 'nintendo': 0.0}, 0.3),
-        ]);
+        final (key, offered, yes, other) = told.single;
+        expect((key, offered, other), ('UCg', 2, 0.3));
+        expect(yes, {'speedruns': 0.8, 'nintendo': 0.0});
       },
     );
 
