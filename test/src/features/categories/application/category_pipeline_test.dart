@@ -757,6 +757,34 @@ void main() {
       );
     });
 
+    test(
+      "Jev's answers about a channel's tags are reported as they come",
+      () async {
+        final told = <(String, int, Map<String, double>, double)>[];
+        final pipeline = CategoryPipeline(
+          taxonomy: youtubeTaxonomy.withCustom({
+            'Gaming': ['Speedruns'],
+          }),
+          fingerprints: _fingerprints,
+          jev: (
+            repository: _Jev(fits: {...agreeing, 'Speedruns': 0.8}, other: 0.3),
+            apiKey: 'jv_live_1',
+          ),
+          onJevTags: (key, offered, yes, other) =>
+              told.add((key, offered, yes, other)),
+        );
+
+        await pipeline.categorize(
+          _input(topics: [_topic('Action_game')]),
+          tags: tags,
+        );
+
+        expect(told, [
+          ('UCg', 2, {'speedruns': 0.8, 'nintendo': 0.0}, 0.3),
+        ]);
+      },
+    );
+
     test('with only Jev, keep what Jev found, the channel waiting for '
         'Claude to name the rest', () async {
       final category = await _pipeline(

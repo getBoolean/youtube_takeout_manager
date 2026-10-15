@@ -593,7 +593,13 @@ class ChannelCategorizer extends _$ChannelCategorizer {
             final (channel, plan) = wave[next++];
             final key = channel.key;
             categorizing.add(key);
-            final input = _inputFor(channel, loaded, details, picks, videos);
+            final input = channelInputFor(
+              channel,
+              loaded,
+              details,
+              picks,
+              videos,
+            );
             ChannelCategory? latest() =>
                 ref.read(channelCategoriesProvider).value?[key] ??
                 existing[key];
@@ -716,7 +722,7 @@ class ChannelCategorizer extends _$ChannelCategorizer {
         .read(tagNamesProvider.future)
         .catchError((Object _) => const <String, TagName>{});
     final suggestion = await pipeline.suggestInstead(
-      _inputFor(
+      channelInputFor(
         channel,
         loaded,
         details,
@@ -816,44 +822,8 @@ class ChannelCategorizer extends _$ChannelCategorizer {
     return model;
   }
 
-  /// What's known about [channel]: its topics and description, and the
-  /// titles of videos watched from it that [picks] has for it, some with
-  /// their descriptions from [videos].
-  static ChannelInput _inputFor(
-    HistoryChannel channel,
-    LoadedHistory loaded,
-    Map<String, ChannelDetails> details,
-    List<PromptPicks> picks,
-    Map<String, Video> videos,
-  ) {
-    final channelDetails = details[channel.channelId];
-    final topicUrls = channelDetails?.topicUrls ?? const <String>[];
-    final index = loaded.channelIndexByKey[channel.key];
-    final PromptPicks channelPicks = index == null || index >= picks.length
-        ? (titles: const [], described: const [])
-        : picks[index];
-    final watches = loaded.history.watches;
-    return (
-      key: channel.key,
-      topicUrls: topicUrls,
-      evidence: buildEvidence(
-        title: channel.title,
-        description: channelDetails?.description,
-        topicLabels: [for (final url in topicUrls) topicLabel(url)],
-        picks: channelPicks,
-        watches: watches,
-        descriptions: {
-          for (final id in [
-            for (final i in channelPicks.described) ?watches[i].videoId,
-          ])
-            id: videos[id]?.description,
-        },
-      ),
-    );
-  }
-
   /// About how much evidence AI would be told about [channel], worked out
-  /// without making it, as [_inputFor] would: quick enough for every
+  /// without making it, as [channelInputFor] would: quick enough for every
   /// channel each time what a run would do is worked out.
   static int _evidenceSizeOf(
     HistoryChannel channel,
@@ -1047,4 +1017,40 @@ class ChannelCategorizer extends _$ChannelCategorizer {
   static bool _mayUseTopics(ChannelCategory? existing) =>
       existing == null ||
       (existing.userDecision == UserDecision.none && existing.path == null);
+}
+
+/// What's known about [channel]: its topics and description, and the
+/// titles of videos watched from it that [picks] has for it, some with
+/// their descriptions from [videos].
+ChannelInput channelInputFor(
+  HistoryChannel channel,
+  LoadedHistory loaded,
+  Map<String, ChannelDetails> details,
+  List<PromptPicks> picks,
+  Map<String, Video> videos,
+) {
+  final channelDetails = details[channel.channelId];
+  final topicUrls = channelDetails?.topicUrls ?? const <String>[];
+  final index = loaded.channelIndexByKey[channel.key];
+  final PromptPicks channelPicks = index == null || index >= picks.length
+      ? (titles: const [], described: const [])
+      : picks[index];
+  final watches = loaded.history.watches;
+  return (
+    key: channel.key,
+    topicUrls: topicUrls,
+    evidence: buildEvidence(
+      title: channel.title,
+      description: channelDetails?.description,
+      topicLabels: [for (final url in topicUrls) topicLabel(url)],
+      picks: channelPicks,
+      watches: watches,
+      descriptions: {
+        for (final id in [
+          for (final i in channelPicks.described) ?watches[i].videoId,
+        ])
+          id: videos[id]?.description,
+      },
+    ),
+  );
 }

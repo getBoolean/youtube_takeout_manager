@@ -28,49 +28,21 @@ class TagNames extends _$TagNames {
         for (final name in names) (name: name, meaning: null),
       ], origin);
 
-  /// [tags] as [resolve] has them, new ones kept with their meanings. A
-  /// tag AI named without a meaning takes the one AI gives; no meaning is
-  /// ever replaced, and the user's tags get none from AI.
+  /// [tags] as [resolve] has them, new ones kept with their meanings, as
+  /// [mergeNamedTags] merges them, saved when they change the tags there
+  /// are.
   Future<List<String>> resolveNamed(
     Iterable<NamedTag> tags,
     NameOrigin origin,
   ) async {
     await future;
     final current = state.requireValue;
-    var updated = current;
-    void change(String key, TagName tag) {
-      if (identical(updated, current)) updated = {...current};
-      updated[key] = tag;
+    final merged = mergeNamedTags(current, tags, origin);
+    if (!identical(merged.names, current)) {
+      state = AsyncData(merged.names);
+      await _repository.saveTags(merged.names);
     }
-
-    final resolved = <String>[];
-    final keys = <String>{};
-    for (final (:name, :meaning) in tags) {
-      if (resolved.length == maxTags) break;
-      final tidy = tidyTagName(name);
-      if (tidy == null) continue;
-      final key = nameKey(tidy);
-      if (!keys.add(key)) continue;
-      final said = tidyTagMeaning(meaning);
-      if (updated[key] case final known?) {
-        if (known.deleted) continue;
-        if (said != null &&
-            known.meaning == null &&
-            known.origin == NameOrigin.ai &&
-            origin == NameOrigin.ai) {
-          change(key, known.copyWith(meaning: said));
-        }
-        resolved.add(known.name);
-        continue;
-      }
-      change(key, TagName(name: tidy, origin: origin, meaning: said));
-      resolved.add(tidy);
-    }
-    if (!identical(updated, current)) {
-      state = AsyncData(updated);
-      await _repository.saveTags(updated);
-    }
-    return resolved;
+    return merged.resolved;
   }
 
   /// Keeps [tag] as the one with the folded name [key].

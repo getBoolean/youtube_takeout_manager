@@ -156,6 +156,13 @@ class CategoryPipeline {
   final JevAccess? jev;
   final ClaudeAccess? claude;
   final void Function(int inputTokens, int outputTokens)? _onUsage;
+  final void Function(
+    String key,
+    int offered,
+    Map<String, double> yes,
+    double other,
+  )?
+  _onJevTags;
   final DateTime Function() _now;
   final _learned = <Learned>[];
   final _named = <NamedTag>[];
@@ -163,7 +170,10 @@ class CategoryPipeline {
   /// Picks from [taxonomy]; [usage], how many channels have each category,
   /// decides which sub-categories Jev is offered when there are more than it
   /// takes. Results keep [fingerprints] of the prompts asked. [onUsage] is
-  /// told the tokens each answer of Claude's used.
+  /// told the tokens each answer of Claude's used; [onJevTags], for each
+  /// channel Jev is asked to tag, how many tags it was offered, how sure it
+  /// is of each, by key, and that the channel is about something none of
+  /// them name.
   CategoryPipeline({
     required Taxonomy taxonomy,
     Map<CategoryPath, int> usage = const {},
@@ -171,11 +181,19 @@ class CategoryPipeline {
     this.jev,
     this.claude,
     void Function(int inputTokens, int outputTokens)? onUsage,
+    void Function(
+      String key,
+      int offered,
+      Map<String, double> yes,
+      double other,
+    )?
+    onJevTags,
     DateTime Function()? now,
   }) : _taxonomy = taxonomy,
        _usage = usage,
        _fingerprints = fingerprints ?? currentPrompts,
        _onUsage = onUsage,
+       _onJevTags = onJevTags,
        _now = now ?? DateTime.now;
 
   /// The categories it picks from, with the sub-categories Claude added.
@@ -414,6 +432,7 @@ class CategoryPipeline {
         ),
         candidates,
       );
+      _onJevTags?.call(input.key, candidates.length, read.yes, read.other);
       kept = [
         for (final candidate in candidates)
           if (read.yes[candidate.key] case final yes? when yes >= jevThreshold)
