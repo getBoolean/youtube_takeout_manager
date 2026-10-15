@@ -75,9 +75,9 @@ ClaudeSuggestion? parseClaudeSuggestion(
   );
 }
 
-/// What Claude is told about the kinds of tags, the tags there are to
-/// reuse, [knownTags] (the user's with their meanings), and adding to the
-/// tags found.
+/// What Claude is told about the kinds of tags and what not to tag, the
+/// tags there are to reuse, [knownTags] (the user's with their meanings),
+/// each tag's meaning, and adding to the tags found.
 String _groupTagInstructions(List<NamedTag> knownTags, {required bool found}) {
   final explained = [
     for (final (:name, :meaning) in knownTags)
@@ -88,30 +88,44 @@ String _groupTagInstructions(List<NamedTag> knownTags, {required bool found}) {
       if (meaning == null) name,
   ];
   return [
-    "Name each channel's tags: what it is specifically about, as a viewer "
-        'would tag it. A tag can say:',
-    '- what the creator is, like VTuber or Cover Artist;',
-    '- what it makes, like Anime Clips, Anime Essays or MMD;',
+    "Name each channel's tags: what sets it apart from other channels in "
+        'its category, as a viewer would tag it. A tag can say:',
+    '- what the creator is, like VTuber or Cover Artist, even when its '
+        'category says so too;',
+    '- what it makes, like Anime Clips, Anime Essays or MMD, with what that '
+        'is about beside it (Anime with Anime Essays);',
     '- what it is about: a game by its exact title (Mario Kart World and '
-        'Mario Kart 8 Deluxe are different tags), a franchise or company '
-        'like Nintendo or Minecraft, or a broad subject like Music or Gaming '
-        'when the channel spans more than its category;',
-    '- who it is with, like Hololive, Phase Connect or Hermitcraft;',
+        'Mario Kart 8 Deluxe are different tags), a franchise like '
+        'Minecraft, the company behind several of the games it covers, like '
+        'Nintendo, or a broad subject it covers beyond its category, like '
+        'Music and Gaming for a VTuber who sings and plays games;',
+    '- who it is with: a group or agency, like Hololive, Phase Connect or '
+        "Hermitcraft, even when only the channel's name says so;",
     '- a theme, like ASMR or Roleplay.',
+    "Don't tag:",
+    '- its category or sub-category again, like Racing for a channel in '
+        'Gaming › Racing;',
+    '- what most channels like it do, like Streaming, Singing, Gameplay, '
+        'Reviews or Analysis: name the subject instead, like Music rather '
+        'than Singing;',
+    '- a person by name, such as a creator, singer or voice actor.',
+    'The names above are examples, not tags there are.',
     if (explained.isNotEmpty || named.isNotEmpty) ...[
-      'Reuse one of these tags when it names the same thing, spelled as '
-          'here, with an empty meaning:',
+      'These are the tags there are. Reuse one when it names the same '
+          'thing, spelled as here:',
       ...explained,
       if (named.isNotEmpty) named.join(', '),
-      'Otherwise name a new tag, short, in the same style, with its meaning '
-          'in 15 words or fewer.',
+      'Otherwise name a new tag, short, in the same style.',
     ] else
-      'Keep each tag short, with its meaning in 15 words or fewer.',
+      'Keep each tag short.',
+    'Give every tag, new or reused, its meaning in 15 words or fewer: what '
+        'the tag means on any channel, not on this one, like "Videos about '
+        "Mario Kart World, Nintendo's 2025 kart racer\".",
     if (found)
-      "A channel's tags_found are tags it already has: add only what they "
-          'miss.',
-    'Give at most 5 tags in all, counting tags_found; fewer, or none, when '
-        'nothing more specific fits.',
+      "A channel's tags_found are tags it already has: don't repeat them; "
+          'add only what they miss.',
+    'Give at most 5 tags in all, counting tags_found, the most telling '
+        'first; fewer, or none, when nothing more specific fits.',
   ].join('\n');
 }
 
