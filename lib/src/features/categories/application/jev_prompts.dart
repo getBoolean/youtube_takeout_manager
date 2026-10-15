@@ -111,14 +111,16 @@ Map<String, JevQuestion> jevTagQuestions(List<TagCandidate> candidates) => {
           'another game in the same series.',
     ),
   'other': JevNoul(
-    'Is this channel also specifically about something none of these tags '
-    'name: ${[for (final (key: _, :tag) in candidates) tag.name].join(', ')}? '
-    'Such as a particular game, a series, a group or agency, a person, or a '
-    'kind of video.',
-    whenTrue: 'It is about something none of these tags name.',
+    'Besides these tags: '
+    '${[for (final (key: _, :tag) in candidates) tag.name].join(', ')}, is '
+    'this channel also specifically about a particular game, a franchise or '
+    'company, a group or agency, a kind of creator or video, or a theme that '
+    'none of them name?',
+    whenTrue: 'It is about something specific none of these tags name.',
     whenFalse:
-        'These tags name everything specific it is about, or there is '
-        'nothing more specific.',
+        'These tags name everything specific it is about, or what is left is '
+        'only its category or what most channels like it do, such as '
+        'streaming, playing games or singing.',
   ),
 };
 
