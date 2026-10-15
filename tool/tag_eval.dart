@@ -178,7 +178,7 @@ Future<void> _eval(ProviderContainer container) async {
     expected += wanted.length;
     final channel = _find(channels, example);
     if (channel == null) {
-      final near = _near(channels, example);
+      final near = nearChannelNames(channels, example);
       _log(
         '\n$example: not in this takeout\'s watch history or subscriptions'
         '${near.isEmpty ? '' : '; near: ${near.join(', ')}'}',
@@ -296,10 +296,21 @@ Future<void> _eval(ProviderContainer container) async {
     final spent = claude == null || anthropicModel != defaultAnthropicModel
         ? ''
         : ', about \$${claudeDollars(input, output).toStringAsFixed(3)}';
+    final reach = claudeReach(asked, before: before);
+    // Going on from a pass before, each channel keeps its category and is
+    // offered the tags named for it: the least a later wave asks of Claude.
+    final bestCase = before.isEmpty
+        ? ''
+        : '\nThis is the least a later wave asks of Claude: each channel kept '
+              'its category and was offered the tags named for it. A later '
+              'wave would also ask Claude to categorize channels like the '
+              '${reach.categorizedByClaudeBefore} only Claude could '
+              'categorize in the pass before.';
     _log(
       '\n$heading: $matched of $expected expected tags found. Claude was '
-      'asked about ${asked.length} of ${examples.length} channels: $input '
-      'tokens in, $output out$spent.',
+      'asked about ${asked.length} of ${examples.length} channels '
+      '(${reach.categories} for a category and its tags, ${reach.tags} for '
+      'tags alone): $input tokens in, $output out$spent.$bestCase',
     );
     return results;
   }
@@ -330,20 +341,47 @@ HistoryChannel? _find(List<HistoryChannel> channels, String example) {
   return null;
 }
 
-/// Up to 3 of [channels] with a name that shares the first word of
-/// [example]'s: where to look when it isn't found.
-List<String> _near(List<HistoryChannel> channels, String example) {
-  final words = RegExp(r'\s+');
-  final first = foldForSearch(
-    example,
-  ).split(words).firstWhere((word) => word.isNotEmpty, orElse: () => '');
-  if (first.isEmpty) return const [];
-  return [
-    for (final channel in channels)
-      if (foldForSearch(channel.title).split(words).contains(first))
-        channel.title,
-  ].take(3).toList();
+/// Up to 3 of [channels] named most like [example], the likest first,
+/// whatever the case, accents or spaces: where to look when it isn't
+/// found. Names are alike by the pairs of letters they share, so a name
+/// spelled a little differently is still found.
+List<String> nearChannelNames(List<HistoryChannel> channels, String example) {
+  final wanted = _letterPairs(example);
+  if (wanted.isEmpty) return const [];
+  final alike = <(double, String)>[];
+  for (final channel in channels) {
+    final pairs = _letterPairs(channel.title);
+    if (pairs.isEmpty) continue;
+    final shared = pairs.where(wanted.contains).length;
+    final likeness = 2 * shared / (pairs.length + wanted.length);
+    if (likeness >= 0.5) alike.add((likeness, channel.title));
+  }
+  alike.sort((a, b) => b.$1.compareTo(a.$1));
+  return [for (final (_, title) in alike.take(3)) title];
 }
+
+/// The pairs of letters next to each other in [name], folded, its spaces
+/// left out.
+Set<String> _letterPairs(String name) {
+  final folded = foldForSearch(name).replaceAll(RegExp(r'\s+'), '');
+  return {
+    for (var i = 0; i + 1 < folded.length; i++) folded.substring(i, i + 2),
+  };
+}
+
+/// How many channels a pass asked Claude about, [asked], by what for: a
+/// category with its tags, or tags alone; and how many of the channels it
+/// went on from, [before], only Claude could categorize.
+({int categories, int tags, int categorizedByClaudeBefore}) claudeReach(
+  Map<String, ClaudeAsk> asked, {
+  Map<String, ChannelCategory> before = const {},
+}) => (
+  categories: asked.values.where((ask) => ask == ClaudeAsk.category).length,
+  tags: asked.values.where((ask) => ask == ClaudeAsk.tags).length,
+  categorizedByClaudeBefore: before.values
+      .where((category) => category.source == CategorySource.claude)
+      .length,
+);
 
 void _log(String line) {
   // ignore: avoid_print
