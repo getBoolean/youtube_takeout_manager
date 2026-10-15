@@ -82,7 +82,7 @@ typedef _Example = ({
 /// What Jev said about a channel's tags: how many it was offered, how sure
 /// it is of each, by key, and that the channel is about something none of
 /// them name.
-typedef _JevSaid = ({int offered, Map<String, double> yes, double other});
+typedef JevSaid = ({int offered, Map<String, double> yes, double other});
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -134,9 +134,9 @@ Future<void> _eval(ProviderContainer container) async {
     ).unwatched,
   ];
 
-  var input = 0;
-  var output = 0;
-  final jevSaid = <String, _JevSaid>{};
+  var inputTokens = 0;
+  var outputTokens = 0;
+  final jevSaid = <String, JevSaid>{};
   final jev = keys.hasJev
       ? (
           repository: container.read(typeSafeRepositoryProvider),
@@ -159,8 +159,8 @@ Future<void> _eval(ProviderContainer container) async {
     jev: jev,
     claude: claude,
     onUsage: (i, o) {
-      input += i;
-      output += o;
+      inputTokens += i;
+      outputTokens += o;
     },
     onJevTags: (key, offered, yes, other) =>
         jevSaid[key] = (offered: offered, yes: yes, other: other),
@@ -202,8 +202,8 @@ Future<void> _eval(ProviderContainer container) async {
     WorkPlan plan,
     Map<String, ChannelCategory> before,
   ) async {
-    input = 0;
-    output = 0;
+    inputTokens = 0;
+    outputTokens = 0;
     jevSaid.clear();
     final known = {...names};
     final index = TagIndex.of(names, {...categories, ...before});
@@ -211,6 +211,10 @@ Future<void> _eval(ProviderContainer container) async {
     final asked = <String, ClaudeAsk>{};
     final tickets = <ClaudeTicket>[];
     for (final (:channel, wanted: _, :input) in examples) {
+      // Retagging needs the category the pass before gave it.
+      if (plan.work == ChannelWork.tags && !before.containsKey(channel.key)) {
+        continue;
+      }
       switch (await pipeline.prepare(
         input,
         plan,
@@ -252,50 +256,31 @@ Future<void> _eval(ProviderContainer container) async {
           (name: tag, meaning: meanings[nameKey(tag)]),
       ], NameOrigin.ai);
       names = {...merged.names};
-      results[channel.key] = result.copyWith(tags: merged.resolved);
+      final tagged = result.copyWith(tags: merged.resolved);
+      results[channel.key] = tagged;
 
-      final said = jevSaid[channel.key];
-      final kept = {
-        for (final MapEntry(:key, value: yes) in said?.yes.entries ?? const [])
-          if (yes >= jevThreshold) key: yes,
-      };
-      final jevLine = switch ((said, asked[channel.key])) {
-        _ when jev == null => 'no Jev key',
-        (null, ClaudeAsk.category) => 'not asked: Claude named the category',
-        (null, _) => 'no tags to offer it',
-        (final said?, _) =>
-          '${kept.isEmpty ? 'none of ${said.offered} fit' : [for (final MapEntry(:key, value: yes) in kept.entries) '${names[key]?.name ?? key} (${yes.toStringAsFixed(2)})'].join(', ')}; '
-              'other ${said.other.toStringAsFixed(2)}',
-      };
-      final added = asked.containsKey(channel.key)
-          ? [
-              for (final tag in merged.resolved)
-                if (!kept.containsKey(nameKey(tag)))
-                  '$tag (${names[nameKey(tag)]?.meaning ?? 'no meaning'})'
-                      '${known.containsKey(nameKey(tag)) ? '' : ' new'}',
-            ]
-          : const <String>[];
-      final got = {for (final tag in merged.resolved) nameKey(tag)};
-      final hits = [
-        for (final tag in wanted)
-          if (got.contains(nameKey(tag))) tag,
-      ];
-      matched += hits.length;
+      final report = channelReport(
+        tagged,
+        withJev: jev != null,
+        said: jevSaid[channel.key],
+        asked: asked[channel.key],
+        names: names,
+        known: known.keys.toSet(),
+        wanted: wanted,
+      );
+      matched += report.hits.length;
       _log(
-        '\n${channel.title}: ${result.path?.label ?? 'no category'}\n'
-        '  Jev: $jevLine\n'
-        '  Claude: ${switch (asked[channel.key]) {
-          ClaudeAsk.category => 'asked for the category and tags',
-          ClaudeAsk.tags => 'asked for tags',
-          null => 'not asked',
-        }}${added.isEmpty ? '' : '; added ${added.join('; ')}'}\n'
-        '  got:      ${merged.resolved.join(', ')}\n'
-        '  expected: ${wanted.join(', ')}  (${hits.length} of ${wanted.length})',
+        '\n${channel.title}: ${report.category}\n'
+        '  Jev: ${report.jev}\n'
+        '  Claude: ${report.claude}\n'
+        '  got:${report.tags.isEmpty ? ' nothing' : [for (final tag in report.tags) '\n    - $tag'].join()}\n'
+        '  expected: ${wanted.join(', ')}  (${report.hits.length} of '
+        '${wanted.length})',
       );
     }
     final spent = claude == null || anthropicModel != defaultAnthropicModel
         ? ''
-        : ', about \$${claudeDollars(input, output).toStringAsFixed(3)}';
+        : ', about \$${claudeDollars(inputTokens, outputTokens).toStringAsFixed(3)}';
     final reach = claudeReach(asked, before: before);
     // Going on from a pass before, each channel keeps its category and is
     // offered the tags named for it: the least a later wave asks of Claude.
@@ -310,7 +295,8 @@ Future<void> _eval(ProviderContainer container) async {
       '\n$heading: $matched of $expected expected tags found. Claude was '
       'asked about ${asked.length} of ${examples.length} channels '
       '(${reach.categories} for a category and its tags, ${reach.tags} for '
-      'tags alone): $input tokens in, $output out$spent.$bestCase',
+      'tags alone): $inputTokens tokens in, $outputTokens out$spent.'
+      '$bestCase',
     );
     return results;
   }
@@ -321,6 +307,66 @@ Future<void> _eval(ProviderContainer container) async {
     const {},
   );
   await pass('Pass 2, with the tags pass 1 named', _retagging, first);
+}
+
+/// What a pass made of a channel, to print: its category; what Jev said of
+/// its tags; what Claude was asked for; each tag it got, with who gave it,
+/// whether it's new, and its meaning; and the tags expected that it got.
+typedef ChannelReport = ({
+  String category,
+  String jev,
+  String claude,
+  List<String> tags,
+  List<String> hits,
+});
+
+/// The report of a channel's [result] in a pass: Jev [said] what it did of
+/// its tags, [withJev] being whether there's a Jev key to ask with, and
+/// Claude was [asked] for what, if anything. Each tag shows its meaning as
+/// [names] have it, and is new when it isn't among the keys [known];
+/// [wanted] are the tags expected.
+ChannelReport channelReport(
+  ChannelCategory result, {
+  required bool withJev,
+  required JevSaid? said,
+  required ClaudeAsk? asked,
+  required Map<String, TagName> names,
+  required Set<String> known,
+  required List<String> wanted,
+}) {
+  final kept = {
+    for (final MapEntry(:key, value: yes)
+        in said?.yes.entries ?? const <MapEntry<String, double>>[])
+      if (yes >= jevThreshold) key: yes,
+  };
+  final got = {for (final tag in result.tags) nameKey(tag)};
+  return (
+    category: result.path?.label ?? 'no category',
+    jev: switch ((said, asked)) {
+      _ when !withJev => 'no Jev key',
+      (null, _) when result.path == null =>
+        'not asked: no category to tag it within',
+      (null, ClaudeAsk.category) => 'not asked: Claude named the category',
+      (null, _) => 'no tags to offer it',
+      (final said?, _) =>
+        '${kept.isEmpty ? 'none of ${said.offered} fit' : [for (final MapEntry(:key, value: yes) in kept.entries) '${names[key]?.name ?? key} (${yes.toStringAsFixed(2)})'].join(', ')}; '
+            'other ${said.other.toStringAsFixed(2)}',
+    },
+    claude: switch (asked) {
+      ClaudeAsk.category => 'asked for the category and tags',
+      ClaudeAsk.tags => 'asked for tags',
+      null => 'not asked',
+    },
+    tags: [
+      for (final tag in result.tags)
+        '$tag (${[kept.containsKey(nameKey(tag)) ? 'Jev' : 'Claude', if (!known.contains(nameKey(tag))) 'new'].join(', ')}): '
+            '${names[nameKey(tag)]?.meaning ?? 'no meaning'}',
+    ],
+    hits: [
+      for (final tag in wanted)
+        if (got.contains(nameKey(tag))) tag,
+    ],
+  );
 }
 
 /// The channel [example] names among [channels]: by its channel ID when
