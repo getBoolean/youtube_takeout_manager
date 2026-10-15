@@ -284,19 +284,24 @@ Map<String, ClaudeSuggestion> parseClaudeGroup(
 }
 
 /// The tags in Claude's [answer] to a group asking for tags alone, by id:
-/// for each of [ids], its first answer's, at most the [room] it has.
+/// for each of [ids], its first answer's that aren't among the tags
+/// [found] for it, at most the room those leave.
 Map<String, List<NamedTag>> parseClaudeTagsGroup(
   Map<String, Object?> answer,
   Set<String> ids,
-  Map<String, int> room,
+  Map<String, List<String>> found,
 ) {
   final parsed = <String, List<NamedTag>>{};
   for (final item in _answers(answer, ids)) {
     final id = item['id']! as String;
-    parsed.putIfAbsent(
-      id,
-      () => parseNamedTags(item['tags'], room: room[id] ?? maxTags),
-    );
+    parsed.putIfAbsent(id, () {
+      final had = found[id] ?? const <String>[];
+      return parseNamedTags(
+        item['tags'],
+        room: max(0, maxTags - had.length),
+        skip: {for (final tag in had) nameKey(tag)},
+      );
+    });
   }
   return parsed;
 }
@@ -316,12 +321,16 @@ Iterable<Map<String, Object?>> _answers(
 }
 
 /// The tags in Claude's answer [tags], with their meanings: text only,
-/// tidied, each once by [nameKey], at most [room]; an empty meaning is
-/// none.
-List<NamedTag> parseNamedTags(Object? tags, {int room = maxTags}) {
+/// tidied, each once by [nameKey], leaving out those whose [nameKey] is in
+/// [skip], at most [room]; an empty meaning is none.
+List<NamedTag> parseNamedTags(
+  Object? tags, {
+  int room = maxTags,
+  Set<String> skip = const {},
+}) {
   if (tags is! List) return const [];
   final kept = <NamedTag>[];
-  final keys = <String>{};
+  final keys = {...skip};
   for (final tag in tags) {
     if (kept.length >= room) break;
     final (name, meaning) = switch (tag) {

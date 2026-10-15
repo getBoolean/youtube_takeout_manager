@@ -624,7 +624,7 @@ class CategoryPipeline {
     } else {
       final parsed = parseClaudeTagsGroup(answer, ids, {
         for (final MapEntry(key: id, value: ticket) in byId.entries)
-          id: maxTags - ticket.kept.length,
+          id: [for (final (candidate, _) in ticket.kept) candidate.tag.name],
       });
       for (final MapEntry(key: id, value: ticket) in byId.entries) {
         final named = parsed[id];

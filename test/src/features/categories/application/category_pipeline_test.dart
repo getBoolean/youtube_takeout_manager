@@ -10,6 +10,7 @@ import 'package:youtube_takeout_manager/src/features/categories/domain/category_
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/channel_evidence.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/model_capabilities.dart';
+import 'package:youtube_takeout_manager/src/features/categories/domain/name_key.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/categorization_plan.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/sub_category.dart';
 import 'package:youtube_takeout_manager/src/features/categories/domain/tag_candidates.dart';
@@ -719,6 +720,41 @@ void main() {
         'jevTags': 'fp-jevTags',
         'claudeTags': 'fp-claudeTags',
       });
+    });
+
+    test("Claude's repeats of the tags found take none of the room left for "
+        'the tags it adds', () async {
+      final found = TagIndex.of({
+        for (final name in ['VTuber', 'Singing', 'Streaming'])
+          nameKey(name): TagName(name: name, meaning: 'A $name channel'),
+      }, const {});
+      final pipeline = _withClaude(
+        _claude(
+          const {},
+          tags: ['VTuber', 'Singing', 'Phase Connect', 'Cover Artist'],
+        ),
+        jev: _Jev(
+          fits: {...agreeing, 'VTuber': 0.9, 'Singing': 0.8, 'Streaming': 0.7},
+          other: 0.9,
+        ),
+      );
+
+      final category = await pipeline.categorize(
+        _input(topics: [_topic('Action_game')]),
+        tags: found,
+      );
+
+      expect(category.tags, [
+        'VTuber',
+        'Singing',
+        'Streaming',
+        'Phase Connect',
+        'Cover Artist',
+      ]);
+      expect(
+        [for (final tag in pipeline.takeNamedTags()) tag.name],
+        ['Phase Connect', 'Cover Artist'],
+      );
     });
 
     test('with only Jev, keep what Jev found, the channel waiting for '

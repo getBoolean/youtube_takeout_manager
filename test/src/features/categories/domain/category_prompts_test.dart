@@ -278,7 +278,7 @@ void main() {
             ],
           },
           {'c1'},
-          const {'c1': maxTags},
+          const {'c1': <String>[]},
         );
 
         expect(answers['c1']?.single.meaning, hasLength(maxTagMeaning));
@@ -298,10 +298,43 @@ void main() {
             ],
           },
           {'c2'},
-          const {'c2': 3},
+          const {
+            'c2': ['X', 'Y'],
+          },
         );
 
         expect([for (final t in answers['c2']!) t.name], ['A', 'B', 'C']);
+      });
+
+      test('a tag it repeats from the tags found takes none of the room left '
+          'for the tags it adds', () {
+        final answers = parseClaudeTagsGroup(
+          {
+            'answers': [
+              {
+                'id': 'c1',
+                'tags': [
+                  for (final name in [
+                    'VTuber',
+                    'singing',
+                    'Phase Connect',
+                    'Cover Artist',
+                  ])
+                    {'name': name, 'meaning': ''},
+                ],
+              },
+            ],
+          },
+          {'c1'},
+          const {
+            'c1': ['VTuber', 'Singing', 'Streaming'],
+          },
+        );
+
+        expect(
+          [for (final t in answers['c1']!) t.name],
+          ['Phase Connect', 'Cover Artist'],
+        );
       });
 
       test('keeps at most 5 clean, distinct tags for each channel, and no '
